@@ -1,0 +1,4 @@
+-keep class ch.nutrisnap.app.data.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
+-dontwarn org.jsoup.**
