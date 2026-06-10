@@ -51,7 +51,7 @@ fun MacroBar(
             }
             Spacer(Modifier.height(12.dp))
             LinearProgressIndicator(
-                progress = { progress },
+                progress = progress,
                 modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
                 color = if (progress < 1f) Green700 else Coral,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
