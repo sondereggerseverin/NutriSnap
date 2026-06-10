@@ -1,16 +1,23 @@
 package ch.nutrisnap.app.data.repository
 
 import ch.nutrisnap.app.data.model.FoodItem
+import ch.nutrisnap.app.data.model.OFFProduct
 import ch.nutrisnap.app.data.model.OFFSearchResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 
+@Serializable
+private data class SingleProductResponse(
+    val status: Int = 0,
+    val product: OFFProduct? = null
+)
+
 /**
  * Queries the Open Food Facts API (free, no key needed).
- * Docs: https://wiki.openfoodfacts.org/API
  */
 class FoodSearchRepository {
 
@@ -50,10 +57,7 @@ class FoodSearchRepository {
     suspend fun searchByBarcode(barcode: String): FoodItem? = withContext(Dispatchers.IO) {
         runCatching {
             val raw  = fetch("https://world.openfoodfacts.org/api/v0/product/$barcode.json")
-            // minimal inline parse for single product endpoint
-            val json2 = Json { ignoreUnknownKeys = true; coerceInputValues = true }
-            data class SingleResp(val status: Int = 0, val product: ch.nutrisnap.app.data.model.OFFProduct? = null)
-            val resp  = json2.decodeFromString<SingleResp>(raw)
+            val resp = json.decodeFromString<SingleProductResponse>(raw)
             if (resp.status != 1) return@runCatching null
             val p = resp.product ?: return@runCatching null
             val n = p.nutriments ?: return@runCatching null
