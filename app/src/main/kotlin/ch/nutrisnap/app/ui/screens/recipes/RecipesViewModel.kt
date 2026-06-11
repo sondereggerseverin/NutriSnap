@@ -12,43 +12,60 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 data class RecipesUiState(
-    val recipes:     List<Recipe> = emptyList(),
-    val query:       String       = "",
-    val isImporting: Boolean      = false,
-    val importError: String?      = null,
-    val lastImport:  Recipe?      = null
+    val recipes:          List<Recipe> = emptyList(),
+    val query:            String       = "",
+    val isImporting:      Boolean      = false,
+    val importError:      String?      = null,
+    val lastImport:       Recipe?      = null,
+    /** True when Instagram blocked all scraping attempts → UI should open manual-caption step */
+    val instagramBlocked: Boolean      = false,
+    /** The IG URL that was blocked, prefilled in the manual-caption sheet */
+    val blockedUrl:       String       = ""
 )
 
 class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = RecipeRepository(NutriDatabase.getInstance(app))
 
-    private val _query       = MutableStateFlow("")
-    private val _isImporting = MutableStateFlow(false)
-    private val _importError = MutableStateFlow<String?>(null)
-    private val _lastImport  = MutableStateFlow<Recipe?>(null)
+    private val _query            = MutableStateFlow("")
+    private val _isImporting      = MutableStateFlow(false)
+    private val _importError      = MutableStateFlow<String?>(null)
+    private val _lastImport       = MutableStateFlow<Recipe?>(null)
+    private val _instagramBlocked = MutableStateFlow(false)
+    private val _blockedUrl       = MutableStateFlow("")
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<RecipesUiState> = combine(
         _query.flatMapLatest { q ->
             if (q.isBlank()) repo.getAll() else repo.search(q)
         },
-        _query, _isImporting, _importError, _lastImport
-    ) { recipes, q, importing, error, last ->
-        RecipesUiState(recipes, q, importing, error, last)
+        _query, _isImporting, _importError, _lastImport, _instagramBlocked, _blockedUrl
+    ) { recipes, q, importing, error, last, igBlocked, blockedUrl ->
+        RecipesUiState(recipes, q, importing, error, last, igBlocked, blockedUrl)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RecipesUiState())
 
     fun setQuery(q: String) { _query.value = q }
     fun clearError()        { _importError.value = null }
     fun clearLastImport()   { _lastImport.value = null }
+    fun clearInstagramBlocked() {
+        _instagramBlocked.value = false
+        _blockedUrl.value = ""
+    }
 
     fun importFromUrl(url: String) {
         viewModelScope.launch {
-            _isImporting.value = true
-            _importError.value = null
+            _isImporting.value      = true
+            _importError.value      = null
+            _instagramBlocked.value = false
             val result: RecipeScrapeResult = repo.importFromUrl(url)
             _isImporting.value = false
-            if (result.success) _lastImport.value = result.recipe
-            else _importError.value = result.error ?: "Fehler beim Importieren"
+            when {
+                result.instagramBlocked -> {
+                    _instagramBlocked.value = true
+                    _blockedUrl.value       = url
+                }
+                result.success -> _lastImport.value = result.recipe
+                else           -> _importError.value = result.error ?: "Fehler beim Importieren"
+            }
         }
     }
 
