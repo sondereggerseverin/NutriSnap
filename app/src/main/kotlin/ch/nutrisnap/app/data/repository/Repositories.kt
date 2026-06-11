@@ -8,7 +8,6 @@ import java.time.LocalDate
 
 class DiaryRepository(db: NutriDatabase) {
     private val dao = db.diaryDao()
-    private val foodDao = db.foodItemDao()
 
     fun getEntriesForDate(date: LocalDate): Flow<List<DiaryEntry>> =
         dao.getEntriesForDate(date.toString())
@@ -17,18 +16,18 @@ class DiaryRepository(db: NutriDatabase) {
         dao.getWeeklySummary(from.toString())
 
     suspend fun addEntry(food: FoodItem, amountGrams: Float, mealType: MealType, date: LocalDate): Long {
-        val factor = amountGrams / 100f
+        val f = amountGrams / 100f
         return dao.insert(
             DiaryEntry(
-                foodItemId = food.id,
-                foodName   = food.name + (food.brand?.let { " ($it)" } ?: ""),
+                foodItemId  = food.id,
+                foodName    = food.name + (food.brand?.let { " ($it)" } ?: ""),
                 amountGrams = amountGrams,
-                mealType   = mealType,
-                dateStr    = date.toString(),
-                calories   = food.caloriesPer100g * factor,
-                protein    = food.proteinPer100g  * factor,
-                carbs      = food.carbsPer100g    * factor,
-                fat        = food.fatPer100g      * factor
+                mealType    = mealType,
+                dateStr     = date.toString(),
+                calories    = food.caloriesPer100g * f,
+                protein     = food.proteinPer100g  * f,
+                carbs       = food.carbsPer100g    * f,
+                fat         = food.fatPer100g      * f
             )
         )
     }
@@ -40,13 +39,13 @@ class RecipeRepository(db: NutriDatabase) {
     private val dao     = db.recipeDao()
     private val scraper = RecipeScraper()
 
-    fun getAll():               Flow<List<Recipe>> = dao.getAll()
-    fun search(q: String):      Flow<List<Recipe>> = dao.search(q)
+    fun getAll():           Flow<List<Recipe>> = dao.getAll()
+    fun search(q: String):  Flow<List<Recipe>> = dao.search(q)
 
-    suspend fun saveRecipe(recipe: Recipe): Long = dao.insert(recipe)
-    suspend fun updateRecipe(recipe: Recipe)     = dao.update(recipe)
-    suspend fun deleteRecipe(recipe: Recipe)     = dao.delete(recipe)
-    suspend fun getById(id: Long)                = dao.getById(id)
+    suspend fun saveRecipe(r: Recipe): Long  = dao.insert(r)
+    suspend fun updateRecipe(r: Recipe)      = dao.update(r)
+    suspend fun deleteRecipe(r: Recipe)      = dao.delete(r)
+    suspend fun getById(id: Long)            = dao.getById(id)
 
     suspend fun importFromUrl(url: String): RecipeScrapeResult {
         val result = scraper.scrape(url)
@@ -65,15 +64,18 @@ class FoodItemRepository(db: NutriDatabase) {
     fun getCustom(): Flow<List<FoodItem>> = dao.getAllCustom()
 
     suspend fun searchAll(query: String): List<FoodItem> {
+        // If query looks like a barcode (all digits, 8-14 chars), try barcode first
+        if (query.all { it.isDigit() } && query.length in 8..14) {
+            val barcodeResult = remote.searchByBarcode(query)
+            if (barcodeResult != null) return listOf(barcodeResult)
+        }
         val local  = dao.search(query)
         val remote = remote.searchByName(query)
-        // merge: local first, then remote (deduplicated by name)
         val names  = local.map { it.name.lowercase() }.toSet()
         return local + remote.filter { it.name.lowercase() !in names }
     }
 
     suspend fun searchBarcode(barcode: String): FoodItem? = remote.searchByBarcode(barcode)
-
-    suspend fun saveCustomFood(item: FoodItem): Long = dao.insert(item)
-    suspend fun deleteFood(item: FoodItem)           = dao.delete(item)
+    suspend fun saveCustomFood(item: FoodItem): Long      = dao.insert(item)
+    suspend fun deleteFood(item: FoodItem)                = dao.delete(item)
 }

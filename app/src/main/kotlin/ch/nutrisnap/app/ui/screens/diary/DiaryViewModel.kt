@@ -13,23 +13,22 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 data class DiaryUiState(
-    val selectedDate:  LocalDate    = LocalDate.now(),
+    val selectedDate:  LocalDate        = LocalDate.now(),
     val entries:       List<DiaryEntry> = emptyList(),
-    val totalCalories: Float        = 0f,
-    val totalProtein:  Float        = 0f,
-    val totalCarbs:    Float        = 0f,
-    val totalFat:      Float        = 0f,
-    val calorieGoal:   Float        = 2000f,
-    val isLoading:     Boolean      = false
+    val totalCalories: Float            = 0f,
+    val totalProtein:  Float            = 0f,
+    val totalCarbs:    Float            = 0f,
+    val totalFat:      Float            = 0f,
+    val calorieGoal:   Float            = 2000f
 )
 
 class DiaryViewModel(app: Application) : AndroidViewModel(app) {
-    private val db        = NutriDatabase.getInstance(app)
-    private val repo      = DiaryRepository(db)
-    private val foodRepo  = FoodItemRepository(db)
+    private val db       = NutriDatabase.getInstance(app)
+    private val repo     = DiaryRepository(db)
+    private val foodRepo = FoodItemRepository(db)
 
-    private val _date  = MutableStateFlow(LocalDate.now())
-    private val _goal  = MutableStateFlow(2000f)
+    private val _date = MutableStateFlow(LocalDate.now())
+    private val _goal = MutableStateFlow(2000f)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<DiaryUiState> = _date.flatMapLatest { date ->
@@ -46,20 +45,17 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DiaryUiState())
 
-    // Food search state
-    private val _searchQuery   = MutableStateFlow("")
     private val _searchResults = MutableStateFlow<List<FoodItem>>(emptyList())
     private val _isSearching   = MutableStateFlow(false)
     val searchResults: StateFlow<List<FoodItem>> = _searchResults
     val isSearching:   StateFlow<Boolean>        = _isSearching
 
-    fun setDate(date: LocalDate)     { _date.value = date }
-    fun prevDay()                    { _date.value = _date.value.minusDays(1) }
-    fun nextDay()                    { _date.value = _date.value.plusDays(1) }
-    fun setCalorieGoal(goal: Float)  { _goal.value = goal }
+    fun setDate(date: LocalDate) { _date.value = date }
+    fun prevDay() { _date.value = _date.value.minusDays(1) }
+    fun nextDay() { _date.value = _date.value.plusDays(1) }
+    fun setCalorieGoal(goal: Float) { _goal.value = goal }
 
     fun searchFood(query: String) {
-        _searchQuery.value = query
         if (query.isBlank()) { _searchResults.value = emptyList(); return }
         viewModelScope.launch {
             _isSearching.value = true
@@ -68,17 +64,20 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun addEntry(food: FoodItem, grams: Float, meal: MealType) {
+    fun searchBarcode(barcode: String, onResult: (FoodItem?) -> Unit) {
         viewModelScope.launch {
-            repo.addEntry(food, grams, meal, _date.value)
+            _isSearching.value = true
+            val food = foodRepo.searchBarcode(barcode)
+            _isSearching.value = false
+            onResult(food)
         }
+    }
+
+    fun addEntry(food: FoodItem, grams: Float, meal: MealType) {
+        viewModelScope.launch { repo.addEntry(food, grams, meal, _date.value) }
     }
 
     fun deleteEntry(entry: DiaryEntry) {
         viewModelScope.launch { repo.deleteEntry(entry) }
-    }
-
-    fun saveCustomFood(item: FoodItem) {
-        viewModelScope.launch { foodRepo.saveCustomFood(item) }
     }
 }

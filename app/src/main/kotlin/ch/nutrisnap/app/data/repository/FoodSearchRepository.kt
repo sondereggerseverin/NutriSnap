@@ -7,8 +7,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import java.net.URL
-import javax.net.ssl.HttpsURLConnection
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.util.concurrent.TimeUnit
 
 @Serializable
 private data class SingleProductResponse(
@@ -16,23 +17,35 @@ private data class SingleProductResponse(
     val product: OFFProduct? = null
 )
 
-/**
- * Queries the Open Food Facts API (free, no key needed).
- */
 class FoodSearchRepository {
 
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
 
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .addInterceptor { chain ->
+            chain.proceed(
+                chain.request().newBuilder()
+                    .header("User-Agent", "NutriSnap/1.1 (Android; ch.nutrisnap.app)")
+                    .header("Accept", "application/json")
+                    .build()
+            )
+        }
+        .build()
+
     suspend fun searchByName(query: String): List<FoodItem> = withContext(Dispatchers.IO) {
         runCatching {
-            val encoded = java.net.URLEncoder.encode(query, "UTF-8")
+            val encoded = java.net.URLEncoder.encode(query.trim(), "UTF-8")
+            // Use the v2 JSON API which is more reliable
             val url = "https://world.openfoodfacts.org/cgi/search.pl" +
                     "?search_terms=$encoded" +
                     "&search_simple=1" +
                     "&action=process" +
                     "&json=1" +
-                    "&fields=product_name,brands,nutriments,image_url" +
-                    "&page_size=20"
+                    "&fields=product_name,brands,nutriments,image_front_small_url" +
+                    "&page_size=25" +
+                    "&sort_by=unique_scans_n"  // most scanned = most common products first
 
             val raw = fetch(url)
             val resp = json.decodeFromString<OFFSearchResponse>(raw)
@@ -40,10 +53,11 @@ class FoodSearchRepository {
             resp.products.mapNotNull { p ->
                 val name = p.product_name?.trim()?.ifBlank { null } ?: return@mapNotNull null
                 val n    = p.nutriments ?: return@mapNotNull null
+                val kcal = n.energy_kcal_100g ?: return@mapNotNull null
                 FoodItem(
                     name            = name,
                     brand           = p.brands?.split(",")?.firstOrNull()?.trim(),
-                    caloriesPer100g = n.energy_kcal_100g ?: return@mapNotNull null,
+                    caloriesPer100g = kcal,
                     proteinPer100g  = n.proteins_100g ?: 0f,
                     carbsPer100g    = n.carbohydrates_100g ?: 0f,
                     fatPer100g      = n.fat_100g ?: 0f,
@@ -62,7 +76,7 @@ class FoodSearchRepository {
             val p = resp.product ?: return@runCatching null
             val n = p.nutriments ?: return@runCatching null
             FoodItem(
-                name            = p.product_name?.trim() ?: "Unbekannt",
+                name            = p.product_name?.trim()?.ifBlank { "Produkt $barcode" } ?: "Produkt $barcode",
                 brand           = p.brands?.split(",")?.firstOrNull()?.trim(),
                 caloriesPer100g = n.energy_kcal_100g ?: return@runCatching null,
                 proteinPer100g  = n.proteins_100g ?: 0f,
@@ -74,11 +88,10 @@ class FoodSearchRepository {
         }.getOrNull()
     }
 
-    private fun fetch(urlStr: String): String {
-        val conn = URL(urlStr).openConnection() as HttpsURLConnection
-        conn.setRequestProperty("User-Agent", "NutriSnap/1.0 (Android; ch.nutrisnap.app)")
-        conn.connectTimeout = 10_000
-        conn.readTimeout    = 15_000
-        return conn.inputStream.bufferedReader().readText()
+    private fun fetch(url: String): String {
+        val req = Request.Builder().url(url).build()
+        return client.newCall(req).execute().use { resp ->
+            resp.body?.string() ?: throw Exception("Empty response")
+        }
     }
 }

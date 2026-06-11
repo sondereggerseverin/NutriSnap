@@ -2,3 +2,7 @@
 -keepattributes Signature
 -keepattributes *Annotation*
 -dontwarn org.jsoup.**
+-dontwarn okhttp3.**
+-keep class okhttp3.** { *; }
+-keep class com.google.mlkit.** { *; }
+-keep class androidx.camera.** { *; }

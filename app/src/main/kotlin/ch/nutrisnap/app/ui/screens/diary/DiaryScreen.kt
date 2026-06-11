@@ -21,9 +21,9 @@ import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.ui.components.EmptyState
 import ch.nutrisnap.app.ui.components.MacroBar
 import ch.nutrisnap.app.ui.components.SectionHeader
+import ch.nutrisnap.app.ui.screens.food.BarcodeScannerScreen
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
 import java.util.Locale
 
 @Composable
@@ -33,32 +33,25 @@ fun DiaryScreen(vm: DiaryViewModel = viewModel()) {
 
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddSheet = true },
-                containerColor = MaterialTheme.colorScheme.primary
-            ) { Icon(Icons.Default.Add, "Eintrag hinzufügen", tint = MaterialTheme.colorScheme.onPrimary) }
+            FloatingActionButton(onClick = { showAddSheet = true },
+                containerColor = MaterialTheme.colorScheme.primary) {
+                Icon(Icons.Default.Add, "Eintrag hinzufügen", tint = MaterialTheme.colorScheme.onPrimary)
+            }
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.padding(padding).fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 80.dp)
-        ) {
+        LazyColumn(Modifier.padding(padding).fillMaxSize(), contentPadding = PaddingValues(bottom = 80.dp)) {
             item { DateNavigator(state.selectedDate, vm::prevDay, vm::nextDay) }
             item {
                 MacroBar(
-                    calories = state.totalCalories,
-                    goal     = state.calorieGoal,
-                    protein  = state.totalProtein,
-                    carbs    = state.totalCarbs,
-                    fat      = state.totalFat,
+                    calories = state.totalCalories, goal = state.calorieGoal,
+                    protein  = state.totalProtein,  carbs = state.totalCarbs, fat = state.totalFat,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
             if (state.entries.isEmpty()) {
                 item {
                     EmptyState(
-                        icon    = { Icon(Icons.Default.MenuBook, null, Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        icon    = { Icon(Icons.Default.MenuBook, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                         message = "Noch keine Einträge",
                         sub     = "Tippe auf + um Mahlzeiten zu erfassen"
                     )
@@ -75,113 +68,128 @@ fun DiaryScreen(vm: DiaryViewModel = viewModel()) {
             }
         }
     }
-
-    if (showAddSheet) {
-        AddFoodSheet(vm = vm, onDismiss = { showAddSheet = false })
-    }
+    if (showAddSheet) AddFoodSheet(vm = vm, onDismiss = { showAddSheet = false })
 }
 
 @Composable
 private fun DateNavigator(date: LocalDate, onPrev: () -> Unit, onNext: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
-    ) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
         IconButton(onClick = onPrev) { Icon(Icons.Default.ChevronLeft, "Vorheriger Tag") }
         val label = when (date) {
-            LocalDate.now()           -> "Heute"
+            LocalDate.now()              -> "Heute"
             LocalDate.now().minusDays(1) -> "Gestern"
             else -> date.format(DateTimeFormatter.ofPattern("EEE, dd. MMM", Locale.GERMAN))
         }
-        Text(label, fontWeight = FontWeight.SemiBold, fontSize = 16.sp,
-            modifier = Modifier.padding(horizontal = 8.dp))
-        IconButton(
-            onClick = onNext,
-            enabled = date.isBefore(LocalDate.now())
-        ) { Icon(Icons.Default.ChevronRight, "Nächster Tag") }
+        Text(label, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 8.dp))
+        IconButton(onClick = onNext, enabled = date.isBefore(LocalDate.now())) {
+            Icon(Icons.Default.ChevronRight, "Nächster Tag")
+        }
     }
 }
 
 @Composable
 private fun DiaryEntryRow(entry: DiaryEntry, onDelete: () -> Unit) {
     var showConfirm by remember { mutableStateOf(false) }
-    Card(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 3.dp),
+    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 3.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(entry.foodName, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                Text("${entry.amountGrams.toInt()} g",
-                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${entry.amountGrams.toInt()} g", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text("${entry.calories.toInt()} kcal", fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
-                Text("P ${entry.protein.toInt()}  K ${entry.carbs.toInt()}  F ${entry.fat.toInt()}",
-                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${entry.calories.toInt()} kcal", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
+                Text("P ${entry.protein.toInt()}  K ${entry.carbs.toInt()}  F ${entry.fat.toInt()}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             IconButton(onClick = { showConfirm = true }) {
-                Icon(Icons.Default.DeleteOutline, "Löschen", Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.error)
+                Icon(Icons.Default.DeleteOutline, "Löschen", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
             }
         }
     }
     if (showConfirm) {
-        AlertDialog(
-            onDismissRequest = { showConfirm = false },
-            title = { Text("Eintrag löschen?") },
-            text  = { Text(entry.foodName) },
-            confirmButton = {
-                TextButton(onClick = { onDelete(); showConfirm = false }) { Text("Löschen", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showConfirm = false }) { Text("Abbrechen") }
-            }
-        )
+        AlertDialog(onDismissRequest = { showConfirm = false },
+            title = { Text("Eintrag löschen?") }, text = { Text(entry.foodName) },
+            confirmButton = { TextButton(onClick = { onDelete(); showConfirm = false }) { Text("Löschen", color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(onClick = { showConfirm = false }) { Text("Abbrechen") } })
     }
 }
 
-// ── Add Food Bottom Sheet ────────────────────────────────────────────────────
+// ── Add Food Bottom Sheet ──────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
     var query by remember { mutableStateOf("") }
-    var selectedFood by remember { mutableStateOf<ch.nutrisnap.app.data.model.FoodItem?>(null) }
+    var selectedFood by remember { mutableStateOf<FoodItem?>(null) }
     var amountText by remember { mutableStateOf("100") }
     var selectedMeal by remember { mutableStateOf(MealType.LUNCH) }
-    val results by vm.searchResults.collectAsState()
+    var showScanner by remember { mutableStateOf(false) }
+    var barcodeStatus by remember { mutableStateOf("") }
+
+    val results   by vm.searchResults.collectAsState()
     val searching by vm.isSearching.collectAsState()
+
+    if (showScanner) {
+        BarcodeScannerScreen(
+            onBarcodeDetected = { barcode ->
+                showScanner = false
+                barcodeStatus = "Suche Barcode $barcode..."
+                vm.searchBarcode(barcode) { food ->
+                    if (food != null) {
+                        selectedFood = food
+                        barcodeStatus = ""
+                    } else {
+                        barcodeStatus = "Barcode $barcode nicht gefunden"
+                    }
+                }
+            },
+            onDismiss = { showScanner = false }
+        )
+        return
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal = 16.dp).navigationBarsPadding()) {
-            Text("Lebensmittel hinzufügen", fontWeight = FontWeight.Bold, fontSize = 18.sp,
-                modifier = Modifier.padding(bottom = 12.dp))
+            Text("Lebensmittel hinzufügen", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(bottom = 12.dp))
 
             if (selectedFood == null) {
-                OutlinedTextField(
-                    value = query, onValueChange = { query = it; vm.searchFood(it) },
-                    label = { Text("Suchen…") },
-                    leadingIcon = { Icon(Icons.Default.Search, null) },
-                    trailingIcon = { if (searching) CircularProgressIndicator(Modifier.size(20.dp)) },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true
-                )
-                Spacer(Modifier.height(8.dp))
-                if (results.isEmpty() && query.length > 1 && !searching) {
-                    Text("Keine Treffer — eigenes Lebensmittel anlegen?",
-                        fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 8.dp))
+                // Search row + barcode button
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = query, onValueChange = { query = it; vm.searchFood(it) },
+                        label = { Text("Suchen…") },
+                        leadingIcon = { Icon(Icons.Default.Search, null) },
+                        trailingIcon = { if (searching) CircularProgressIndicator(Modifier.size(20.dp)) },
+                        modifier = Modifier.weight(1f), singleLine = true
+                    )
+                    IconButton(onClick = { showScanner = true },
+                        modifier = Modifier.align(Alignment.CenterVertically).size(56.dp)) {
+                        Icon(Icons.Default.QrCodeScanner, "Barcode scannen",
+                            modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
+                    }
                 }
+
+                if (barcodeStatus.isNotBlank()) {
+                    Text(barcodeStatus, fontSize = 13.sp,
+                        color = if ("nicht gefunden" in barcodeStatus) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 4.dp))
+                }
+
+                if (results.isEmpty() && query.length > 1 && !searching) {
+                    Text("Keine Treffer — eigenes Lebensmittel anlegen?", fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
+                }
+
                 LazyColumn(Modifier.heightIn(max = 300.dp)) {
                     items(results) { food ->
                         ListItem(
                             headlineContent = { Text(food.name) },
                             supportingContent = {
-                                Text("${food.caloriesPer100g.toInt()} kcal/100g" +
-                                        (food.brand?.let { " · $it" } ?: ""))
+                                val brand = food.brand?.let { " · $it" } ?: ""
+                                Text("${food.caloriesPer100g.toInt()} kcal/100g$brand")
                             },
                             modifier = Modifier.clickable { selectedFood = food }
                         )
@@ -189,7 +197,6 @@ fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
                     }
                 }
             } else {
-                // Confirm amount & meal
                 val food = selectedFood!!
                 Text(food.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 food.brand?.let { Text(it, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -207,24 +214,19 @@ fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
                 val cals  = food.caloriesPer100g * grams / 100f
                 if (grams > 0) {
                     Spacer(Modifier.height(8.dp))
-                    Text("= ${cals.toInt()} kcal", fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary)
+                    // Macro summary
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Text("${cals.toInt()} kcal", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                        Text("P ${(food.proteinPer100g * grams / 100f).toInt()}g", fontSize = 13.sp)
+                        Text("K ${(food.carbsPer100g * grams / 100f).toInt()}g", fontSize = 13.sp)
+                        Text("F ${(food.fatPer100g * grams / 100f).toInt()}g", fontSize = 13.sp)
+                    }
                 }
                 Spacer(Modifier.height(16.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { selectedFood = null }, Modifier.weight(1f)) {
-                        Text("Zurück")
-                    }
-                    Button(
-                        onClick = {
-                            if (grams > 0) {
-                                vm.addEntry(food, grams, selectedMeal)
-                                onDismiss()
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        enabled = grams > 0
-                    ) { Text("Hinzufügen") }
+                    OutlinedButton(onClick = { selectedFood = null }, Modifier.weight(1f)) { Text("Zurück") }
+                    Button(onClick = { if (grams > 0) { vm.addEntry(food, grams, selectedMeal); onDismiss() } },
+                        modifier = Modifier.weight(1f), enabled = grams > 0) { Text("Hinzufügen") }
                 }
             }
             Spacer(Modifier.height(24.dp))
@@ -248,7 +250,7 @@ private fun MealPicker(selected: MealType, onSelect: (MealType) -> Unit) {
     }
 }
 
-private fun MealType.label() = when(this) {
+fun MealType.label() = when(this) {
     MealType.BREAKFAST -> "Frühstück"
     MealType.LUNCH     -> "Mittagessen"
     MealType.DINNER    -> "Abendessen"

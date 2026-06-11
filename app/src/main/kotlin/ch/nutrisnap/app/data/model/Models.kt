@@ -2,6 +2,7 @@ package ch.nutrisnap.app.data.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.time.LocalDate
 
@@ -24,10 +25,10 @@ data class FoodItem(
 data class DiaryEntry(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val foodItemId: Long,
-    val foodName: String,           // denormalised for fast display
+    val foodName: String,
     val amountGrams: Float,
     val mealType: MealType,
-    val dateStr: String,            // ISO "2025-06-09"
+    val dateStr: String,
     val calories: Float,
     val protein: Float,
     val carbs: Float,
@@ -44,18 +45,19 @@ data class Recipe(
     val title: String,
     val description: String = "",
     val imageUrl: String? = null,
-    val sourceUrl: String? = null,        // original Instagram / web URL
-    val platform: String? = null,         // "instagram", "web", "manual"
-    val ingredients: String = "",         // newline-separated
+    val sourceUrl: String? = null,
+    val platform: String? = null,
+    val ingredients: String = "",
     val instructions: String = "",
     val totalCalories: Float? = null,
     val servings: Int = 1,
     val prepTimeMinutes: Int? = null,
-    val tags: String = "",                // comma-separated
+    val tags: String = "",
     val savedAt: Long = System.currentTimeMillis()
 )
 
-// ─── OpenFoodFacts API (for barcode / name search) ────────────────────────────
+// ─── OpenFoodFacts API ────────────────────────────────────────────────────────
+// Field names use dashes in JSON: "energy-kcal_100g", "proteins_100g" etc.
 
 @Serializable
 data class OFFSearchResponse(
@@ -65,19 +67,31 @@ data class OFFSearchResponse(
 
 @Serializable
 data class OFFProduct(
-    val product_name: String? = null,
+    @SerialName("product_name") val product_name: String? = null,
     val brands: String? = null,
     val nutriments: OFFNutriments? = null,
-    val image_url: String? = null
+    @SerialName("image_url") val image_url: String? = null
 )
 
 @Serializable
 data class OFFNutriments(
-    val energy_kcal_100g: Float? = null,
-    val proteins_100g: Float? = null,
-    val carbohydrates_100g: Float? = null,
-    val fat_100g: Float? = null,
-    val fiber_100g: Float? = null
+    // OpenFoodFacts uses dash in JSON key: "energy-kcal_100g"
+    @SerialName("energy-kcal_100g")   val energyKcal100g: Float? = null,
+    @SerialName("energy-kcal")        val energyKcal: Float? = null,
+    @SerialName("energy_kcal_100g")   val energyKcalAlt: Float? = null,  // fallback
+    @SerialName("proteins_100g")      val proteins100g: Float? = null,
+    @SerialName("carbohydrates_100g") val carbs100g: Float? = null,
+    @SerialName("fat_100g")           val fat100g: Float? = null,
+    @SerialName("fiber_100g")         val fiber100g: Float? = null
+) {
+    // Pick whichever kcal field is available
+    val kcalPer100g: Float? get() = energyKcal100g ?: energyKcalAlt ?: energyKcal
+}
+
+@Serializable
+data class SingleProductResponse(
+    val status: Int = 0,
+    val product: OFFProduct? = null
 )
 
 // ─── UI helpers ───────────────────────────────────────────────────────────────

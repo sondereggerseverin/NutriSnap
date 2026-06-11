@@ -4,339 +4,276 @@ import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeScrapeResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
-import java.net.URL
-import javax.net.ssl.HttpsURLConnection
+import java.util.concurrent.TimeUnit
 
 /**
- * Scrapes recipe data from a given URL.
+ * Multi-strategy Instagram/TikTok/Web scraper.
  *
- * Strategy (same as "All My Meals" app reverse-engineered approach):
- *  1. Instagram/TikTok  → Instagram oEmbed API (public, no auth) → caption parsing
- *  2. Recipe websites   → schema.org/Recipe JSON-LD (structured data)
- *  3. Fallback          → og:tags + heuristic list extraction
+ * Instagram blocks direct HTML requests. Strategies in order:
+ *   1. Instagram oEmbed API  → gets author + thumbnail (no auth, public)
+ *   2. Picuki.com proxy      → public Instagram viewer, no login needed
+ *   3. Direct jsoup attempt  → sometimes works on fresh IPs
  *
- * Key insight from "All My Meals": caption MUST contain ingredients + steps.
- * The app shows: "Für ein gutes Ergebnis sollten Zutaten und Zubereitung
- * in der Post-Beschreibung stehen." — they parse the caption text, not some
- * private API. We do the same, plus oEmbed for the thumbnail.
+ * For recipe websites: schema.org JSON-LD → og:tags fallback.
  */
 class RecipeScraper {
 
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .addInterceptor { chain ->
+            val req = chain.request().newBuilder()
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
+                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                .header("Accept-Language", "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7")
+                .header("Accept-Encoding", "gzip, deflate, br")
+                .header("Cache-Control", "no-cache")
+                .build()
+            chain.proceed(req)
+        }
+        .build()
+
     suspend fun scrape(rawUrl: String): RecipeScrapeResult = withContext(Dispatchers.IO) {
         runCatching {
-            val url = expandUrl(rawUrl.trim())
+            val url = rawUrl.trim()
             val platform = detectPlatform(url)
-
             val recipe = when (platform) {
                 "instagram" -> scrapeInstagram(url)
                 "tiktok"    -> scrapeTikTok(url)
-                else        -> scrapeGenericWeb(url, platform)
+                else        -> scrapeWeb(url, platform)
             }
             RecipeScrapeResult(success = true, recipe = recipe)
         }.getOrElse { e ->
-            RecipeScrapeResult(success = false, error = e.message ?: "Unbekannter Fehler")
+            RecipeScrapeResult(success = false, error = "Fehler: ${e.message}")
         }
     }
 
-    // ── URL expansion (handles t.co, bit.ly, vm.tiktok.com etc.) ─────────────
-
-    private fun expandUrl(url: String): String {
-        return try {
-            val conn = URL(url).openConnection() as HttpsURLConnection
-            conn.instanceFollowRedirects = false
-            conn.connectTimeout = 6_000
-            conn.readTimeout = 6_000
-            conn.connect()
-            val location = conn.getHeaderField("Location")
-            conn.disconnect()
-            if (!location.isNullOrBlank() && location.startsWith("http")) location else url
-        } catch (e: Exception) {
-            url
-        }
+    private fun detectPlatform(url: String) = when {
+        "instagram.com" in url || "instagr.am" in url -> "instagram"
+        "tiktok.com" in url                           -> "tiktok"
+        "youtube.com" in url || "youtu.be" in url     -> "youtube"
+        else                                          -> "web"
     }
 
-    // ── Platform detection ────────────────────────────────────────────────────
-
-    private fun detectPlatform(url: String): String = when {
-        "instagram.com" in url -> "instagram"
-        "instagr.am" in url    -> "instagram"
-        "tiktok.com" in url    -> "tiktok"
-        "vm.tiktok.com" in url -> "tiktok"
-        "youtube.com" in url   -> "youtube"
-        "youtu.be" in url      -> "youtube"
-        else                   -> "web"
-    }
-
-    // ── Instagram ─────────────────────────────────────────────────────────────
-    //
-    // Step 1: Instagram oEmbed API → gets caption + thumbnail (no login needed)
-    //   https://graph.facebook.com/v18.0/instagram_oembed?url=...&fields=thumbnail_url,author_name,title
-    //   BUT: requires App Token. Use the public endpoint instead:
-    //   https://www.instagram.com/p/{shortcode}/?__a=1  → blocked
-    //
-    // Real approach: Jsoup on the Instagram post page reads og:description
-    // which contains the full caption text. This is what "All My Meals" does too.
-    // oEmbed (no-auth public): https://api.instagram.com/oembed/?url=...
-    //   → returns: thumbnail_url, author_name, html (but NO caption in public oEmbed)
-    //
-    // Best combo: oEmbed for thumbnail/author + og:description for caption
+    // ── INSTAGRAM ──────────────────────────────────────────────────────────────
+    // Instagram requires login for HTML. We use a 3-step approach:
+    // 1. oEmbed → thumbnail + author
+    // 2. Picuki.com (public IG viewer proxy) → caption text
+    // 3. Direct fetch as last resort
 
     private fun scrapeInstagram(url: String): Recipe {
-        // 1. Try oEmbed for thumbnail + author
-        val oEmbed = fetchInstagramOEmbed(url)
+        val shortcode = extractInstagramShortcode(url)
 
-        // 2. Fetch the page for the caption (og:description has the full caption)
-        val doc = jsoupGet(url)
-        val caption = doc.select("meta[property=og:description]").attr("content")
-            .ifBlank { doc.select("meta[name=description]").attr("content") }
-            .ifBlank { oEmbed?.get("title") ?: "" }
+        // Step 1: oEmbed for metadata
+        val oEmbed = runCatching { fetchOEmbed("https://api.instagram.com/oembed/?url=${encode(url)}&omitscript=true") }.getOrNull()
+        val thumbnail = oEmbed?.get("thumbnail_url")
+        val author    = oEmbed?.get("author_name")
 
-        val title = buildInstagramTitle(caption, oEmbed?.get("author_name"))
-        val image = oEmbed?.get("thumbnail_url")
-            ?: doc.select("meta[property=og:image]").attr("content").ifBlank { null }
+        // Step 2: Try Picuki proxy (renders Instagram publicly without login)
+        var caption = ""
+        if (shortcode != null) {
+            caption = runCatching {
+                val picukiUrl = "https://www.picuki.com/media/$shortcode"
+                val doc = jsoupGet(picukiUrl)
+                // Picuki puts caption in .photo-description
+                doc.select(".photo-description, .post-description, .caption").text()
+                    .ifBlank {
+                        doc.select("meta[property=og:description]").attr("content")
+                    }
+            }.getOrElse { "" }
+        }
 
-        val (ingredients, instructions) = parseCaptionIntoSections(caption)
+        // Step 3: Direct attempt (works sometimes depending on IP/region)
+        if (caption.isBlank()) {
+            caption = runCatching {
+                val doc = jsoupGet(url)
+                doc.select("meta[property=og:description]").attr("content")
+                    .ifBlank { doc.select("meta[name=description]").attr("content") }
+            }.getOrElse { "" }
+        }
+
+        // Step 4: Try ddinstagram.com proxy (dd prefix trick)
+        if (caption.isBlank() && shortcode != null) {
+            caption = runCatching {
+                val ddUrl = url.replace("www.instagram.com", "www.ddinstagram.com")
+                    .replace("instagram.com", "ddinstagram.com")
+                val doc = jsoupGet(ddUrl)
+                doc.select("meta[property=og:description]").attr("content")
+                    .ifBlank { doc.select("meta[name=description]").attr("content") }
+            }.getOrElse { "" }
+        }
+
+        val title = buildTitle(caption, author)
+        val (ingredients, instructions) = parseCaptionSections(caption)
 
         return Recipe(
             title        = title,
             description  = caption.take(500),
-            imageUrl     = image,
+            imageUrl     = thumbnail,
             sourceUrl    = url,
             platform     = "instagram",
-            ingredients  = ingredients,
+            ingredients  = ingredients.ifBlank { "Caption leer — tippe 'Original-Link öffnen' und kopiere den Text manuell." },
             instructions = instructions,
-            tags         = "instagram,reel"
+            tags         = "instagram"
         )
     }
 
-    /** Public Instagram oEmbed — returns thumbnail_url, author_name, title */
-    private fun fetchInstagramOEmbed(postUrl: String): Map<String, String>? {
-        return try {
-            val encoded = java.net.URLEncoder.encode(postUrl, "UTF-8")
-            val raw = fetch("https://api.instagram.com/oembed/?url=$encoded&omitscript=true")
-            // manual JSON field extraction
-            buildMap {
-                listOf("thumbnail_url", "author_name", "title").forEach { key ->
-                    val regex = Regex(""""$key"\s*:\s*"([^"]*?)"""")
-                    regex.find(raw)?.groupValues?.get(1)?.let { put(key, it) }
-                }
-            }
-        } catch (e: Exception) {
-            null
-        }
+    private fun extractInstagramShortcode(url: String): String? {
+        // Matches /p/CODE/, /reel/CODE/, /tv/CODE/
+        return Regex("/(?:p|reel|tv)/([A-Za-z0-9_-]+)/?").find(url)?.groupValues?.get(1)
     }
 
-    // ── TikTok ────────────────────────────────────────────────────────────────
-    // Same strategy: oEmbed for thumbnail, og:description for caption
+    // ── TIKTOK ─────────────────────────────────────────────────────────────────
 
     private fun scrapeTikTok(url: String): Recipe {
-        val oEmbed = fetchTikTokOEmbed(url)
-        val doc    = try { jsoupGet(url) } catch (e: Exception) { null }
+        val oEmbed = runCatching { fetchOEmbed("https://www.tiktok.com/oembed?url=${encode(url)}") }.getOrNull()
+        val thumbnail = oEmbed?.get("thumbnail_url")
+        val author    = oEmbed?.get("author_name")
+        val title     = oEmbed?.get("title") ?: ""
 
-        val caption = doc?.select("meta[property=og:description]")?.attr("content")
-            ?.ifBlank { null }
-            ?: oEmbed?.get("title")
-            ?: ""
+        // TikTok caption is often in og:description
+        val caption = runCatching {
+            val doc = jsoupGet(url)
+            doc.select("meta[property=og:description]").attr("content")
+                .ifBlank { doc.select("meta[name=description]").attr("content") }
+        }.getOrElse { title }
 
-        val image = oEmbed?.get("thumbnail_url")
-            ?: doc?.select("meta[property=og:image]")?.attr("content")?.ifBlank { null }
-
-        val author = oEmbed?.get("author_name") ?: "TikTok"
-        val title  = buildInstagramTitle(caption, author)
-        val (ingredients, instructions) = parseCaptionIntoSections(caption)
+        val (ingredients, instructions) = parseCaptionSections(caption.ifBlank { title })
 
         return Recipe(
-            title        = title,
+            title        = buildTitle(caption.ifBlank { title }, author),
             description  = caption.take(500),
-            imageUrl     = image,
+            imageUrl     = thumbnail,
             sourceUrl    = url,
             platform     = "tiktok",
-            ingredients  = ingredients,
+            ingredients  = ingredients.ifBlank { "Caption leer — Zutaten manuell ergänzen." },
             instructions = instructions,
-            tags         = "tiktok,reel"
+            tags         = "tiktok"
         )
     }
 
-    private fun fetchTikTokOEmbed(postUrl: String): Map<String, String>? {
-        return try {
-            val encoded = java.net.URLEncoder.encode(postUrl, "UTF-8")
-            val raw = fetch("https://www.tiktok.com/oembed?url=$encoded")
-            buildMap {
-                listOf("thumbnail_url", "author_name", "title").forEach { key ->
-                    Regex(""""$key"\s*:\s*"([^"]*?)"""").find(raw)?.groupValues?.get(1)?.let { put(key, it) }
-                }
-            }
-        } catch (e: Exception) {
-            null
-        }
-    }
+    // ── GENERIC WEB ────────────────────────────────────────────────────────────
 
-    // ── Generic web (schema.org JSON-LD) ─────────────────────────────────────
-
-    private fun scrapeGenericWeb(url: String, platform: String): Recipe {
+    private fun scrapeWeb(url: String, platform: String): Recipe {
         val doc = jsoupGet(url)
 
-        // Try schema.org/Recipe JSON-LD first
+        // Try schema.org JSON-LD
         val jsonLd = doc.select("script[type='application/ld+json']").firstOrNull {
-            it.data().contains("Recipe", ignoreCase = false) ||
-                    it.data().contains("recipe", ignoreCase = false)
+            "Recipe" in it.data() || "recipe" in it.data()
         }?.data()
 
-        if (jsonLd != null) {
-            return parseJsonLdRecipe(jsonLd, url, platform, doc)
-        }
+        if (jsonLd != null) return parseJsonLd(jsonLd, url, platform, doc)
 
-        // Fallback: og-tags + heuristic list
-        val title       = doc.select("meta[property=og:title]").attr("content").ifBlank { doc.title() }
-        val description = doc.select("meta[property=og:description]").attr("content")
-            .ifBlank { doc.select("meta[name=description]").attr("content") }
-        val image       = doc.select("meta[property=og:image]").attr("content").ifBlank { null }
-        val lists       = doc.select("ul li, ol li").take(25).joinToString("\n") { "• ${it.text().trim()}" }
+        val title = doc.select("meta[property=og:title]").attr("content").ifBlank { doc.title() }
+        val desc  = doc.select("meta[property=og:description]").attr("content")
+        val image = doc.select("meta[property=og:image]").attr("content").ifBlank { null }
+        val lists = doc.select("ul li, ol li").take(25).joinToString("\n") { "• ${it.text().trim()}" }
 
         return Recipe(
             title        = cleanTitle(title),
-            description  = description.take(400),
+            description  = desc.take(400),
             imageUrl     = image,
             sourceUrl    = url,
             platform     = platform,
-            ingredients  = lists.ifBlank { "Zutaten nicht gefunden — bitte manuell ergänzen." },
-            instructions = "Bitte Anleitung manuell ergänzen.",
+            ingredients  = lists.ifBlank { "Zutaten nicht gefunden." },
+            instructions = "Anleitung nicht gefunden.",
             tags         = platform
         )
     }
 
-    // ── schema.org JSON-LD parser ─────────────────────────────────────────────
+    // ── JSON-LD Parser ─────────────────────────────────────────────────────────
 
-    private fun parseJsonLdRecipe(json: String, url: String, platform: String, doc: Document): Recipe {
-        fun field(key: String): String? =
-            Regex(""""$key"\s*:\s*"([^"]*?)"""").find(json)?.groupValues?.get(1)
-
+    private fun parseJsonLd(json: String, url: String, platform: String, doc: Document): Recipe {
+        fun field(key: String) = Regex(""""$key"\s*:\s*"([^"]*?)"""").find(json)?.groupValues?.get(1)
         fun listField(key: String): List<String> {
             val arr = Regex(""""$key"\s*:\s*\[([^\]]*?)]""", RegexOption.DOT_MATCHES_ALL)
                 .find(json)?.groupValues?.get(1) ?: return emptyList()
             return Regex(""""([^"]+)"""").findAll(arr).map { it.groupValues[1] }.toList()
         }
-
-        fun intField(key: String): Int? = field(key)?.filter { it.isDigit() }?.toIntOrNull()
-
-        val title      = field("name") ?: doc.title()
-        val desc       = field("description") ?: ""
-        val image      = field("image") ?: doc.select("meta[property=og:image]").attr("content").ifBlank { null }
-        val servings   = intField("recipeYield") ?: 1
-        val prepMin    = field("prepTime")?.let { parseDuration(it) }
-        val cookMin    = field("cookTime")?.let { parseDuration(it) }
-        val totalMin   = (prepMin ?: 0) + (cookMin ?: 0)
-        val ingredients  = listField("recipeIngredient").joinToString("\n") { "• $it" }
-        val instructions = listField("text")
-            .ifEmpty { listField("recipeInstructions") }
-            .mapIndexed { i, s -> "${i + 1}. $s" }
-            .joinToString("\n")
-        val keywords   = field("keywords") ?: ""
+        fun parseDur(iso: String) =
+            (Regex("""(\d+)H""").find(iso)?.groupValues?.get(1)?.toIntOrNull() ?: 0) * 60 +
+            (Regex("""(\d+)M""").find(iso)?.groupValues?.get(1)?.toIntOrNull() ?: 0)
 
         return Recipe(
-            title           = cleanTitle(title),
-            description     = desc.take(400),
-            imageUrl        = image,
-            sourceUrl       = url,
-            platform        = platform,
-            ingredients     = ingredients.ifBlank { "Zutaten nicht gefunden." },
-            instructions    = instructions.ifBlank { "Anleitung nicht gefunden." },
-            servings        = servings,
-            prepTimeMinutes = totalMin.takeIf { it > 0 },
-            tags            = keywords.take(200)
+            title        = cleanTitle(field("name") ?: doc.title()),
+            description  = (field("description") ?: "").take(400),
+            imageUrl     = field("image") ?: doc.select("meta[property=og:image]").attr("content").ifBlank { null },
+            sourceUrl    = url,
+            platform     = platform,
+            ingredients  = listField("recipeIngredient").joinToString("\n") { "• $it" }.ifBlank { "Nicht gefunden." },
+            instructions = listField("text").ifEmpty { listField("recipeInstructions") }
+                .mapIndexed { i, s -> "${i+1}. $s" }.joinToString("\n").ifBlank { "Nicht gefunden." },
+            servings     = field("recipeYield")?.filter { it.isDigit() }?.toIntOrNull() ?: 1,
+            prepTimeMinutes = field("prepTime")?.let { parseDur(it) }?.takeIf { it > 0 },
+            tags         = (field("keywords") ?: "").take(200)
         )
     }
 
-    // ── Caption parser ────────────────────────────────────────────────────────
-    // Splits Instagram/TikTok caption into ingredients + instructions.
-    // "All My Meals" does the same — they parse the caption text.
+    // ── oEmbed ─────────────────────────────────────────────────────────────────
 
-    private fun parseCaptionIntoSections(caption: String): Pair<String, String> {
-        if (caption.isBlank()) return ("Kein Text im Post gefunden." to "")
+    private fun fetchOEmbed(url: String): Map<String, String> {
+        val raw = fetchString(url)
+        return buildMap {
+            listOf("thumbnail_url", "author_name", "title", "html").forEach { key ->
+                Regex(""""$key"\s*:\s*"((?:[^"\\]|\\.)*)"""").find(raw)
+                    ?.groupValues?.get(1)?.let { put(key, it.replace("\\u0026", "&").replace("\\/", "/")) }
+            }
+        }
+    }
 
+    // ── Caption section parser ─────────────────────────────────────────────────
+
+    private fun parseCaptionSections(caption: String): Pair<String, String> {
+        if (caption.isBlank()) return "" to ""
         val lower = caption.lowercase()
+        val instrKw = listOf("zubereitung", "anleitung", "so geht", "preparation",
+            "method", "instructions", "steps", "how to", "zubereiten:")
+        val ingrKw  = listOf("zutaten", "zutaten:", "ingredients", "du brauchst",
+            "das brauchst", "you need", "für das rezept", "für 2", "für 4")
 
-        // Common section keywords in DE/EN
-        val instrKeywords = listOf(
-            "zubereitung", "anleitung", "so geht", "zubereiten", "zubereiten:",
-            "schritt", "preparation", "method", "instructions", "steps", "how to",
-            "directions", "zubereitung:", "so wird", "und so geht"
-        )
-        val ingrKeywords = listOf(
-            "zutaten", "zutaten:", "ingredients", "you need", "du brauchst",
-            "das brauchst", "für", "for the recipe"
-        )
-
-        // Find first instruction keyword position
-        val instrIdx = instrKeywords.firstNotNullOfOrNull { kw ->
-            val i = lower.indexOf(kw)
-            if (i > 5) i else null
-        }
-
-        // Find ingredient keyword position
-        val ingrIdx = ingrKeywords.firstNotNullOfOrNull { kw ->
-            val i = lower.indexOf(kw)
-            if (i >= 0) i else null
-        }
+        val instrIdx = instrKw.firstNotNullOfOrNull { kw -> lower.indexOf(kw).takeIf { it > 5 } }
+        val ingrIdx  = ingrKw.firstNotNullOfOrNull  { kw -> lower.indexOf(kw).takeIf { it >= 0 } }
 
         return when {
-            // Both sections found
-            ingrIdx != null && instrIdx != null && instrIdx > ingrIdx -> {
-                val ingr  = caption.substring(ingrIdx, instrIdx).trim()
-                val instr = caption.substring(instrIdx).trim()
-                ingr to instr
-            }
-            // Only instructions found
-            instrIdx != null -> {
-                val ingr  = caption.substring(0, instrIdx).trim()
-                val instr = caption.substring(instrIdx).trim()
-                ingr to instr
-            }
-            // Only ingredients found
-            ingrIdx != null -> {
+            ingrIdx != null && instrIdx != null && instrIdx > ingrIdx ->
+                caption.substring(ingrIdx, instrIdx).trim() to caption.substring(instrIdx).trim()
+            instrIdx != null ->
+                caption.substring(0, instrIdx).trim() to caption.substring(instrIdx).trim()
+            ingrIdx != null  ->
                 caption.substring(ingrIdx).trim() to ""
-            }
-            // No structure — return everything as ingredients (user can edit)
-            else -> caption to ""
+            else             -> caption to ""
         }
     }
 
-    private fun buildInstagramTitle(caption: String, author: String?): String {
-        // First non-empty, non-emoji line of caption as title
-        val firstLine = caption.lines()
-            .map { it.trim() }
-            .firstOrNull { it.length > 4 && !it.all { c -> !c.isLetter() } }
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
+    private fun buildTitle(caption: String, author: String?): String {
+        val line = caption.lines().map { it.trim() }
+            .firstOrNull { it.length > 4 && it.any { c -> c.isLetter() } }
             ?: caption.take(50)
-        val base = firstLine.take(60).trimEnd()
-        return if (author != null) "$base (@$author)" else base
+        val base = line.take(60).trimEnd()
+        return if (author != null) "$base (@$author)" else base.ifBlank { "Instagram Rezept" }
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private fun parseDuration(iso: String): Int {
-        val h = Regex("""(\d+)H""").find(iso)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-        val m = Regex("""(\d+)M""").find(iso)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-        return h * 60 + m
-    }
-
-    private fun cleanTitle(raw: String): String =
+    private fun cleanTitle(raw: String) =
         raw.replace(Regex("""\s*[-|].*$"""), "").trim().ifBlank { "Rezept" }
 
-    private fun jsoupGet(url: String): Document =
-        Jsoup.connect(url)
-            .userAgent("Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36")
-            .header("Accept-Language", "de-DE,de;q=0.9,en;q=0.8")
-            .followRedirects(true)
-            .timeout(14_000)
-            .get()
+    private fun encode(url: String) = java.net.URLEncoder.encode(url, "UTF-8")
 
-    private fun fetch(urlStr: String): String {
-        val conn = URL(urlStr).openConnection() as HttpsURLConnection
-        conn.setRequestProperty("User-Agent", "NutriSnap/1.0 (Android)")
-        conn.connectTimeout = 8_000
-        conn.readTimeout    = 10_000
-        return conn.inputStream.bufferedReader().readText()
+    private fun jsoupGet(url: String): Document {
+        val html = fetchString(url)
+        return Jsoup.parse(html, url)
+    }
+
+    private fun fetchString(url: String): String {
+        val req = Request.Builder().url(url).build()
+        return client.newCall(req).execute().use { resp ->
+            resp.body?.string() ?: throw Exception("Leere Antwort von $url")
+        }
     }
 }
