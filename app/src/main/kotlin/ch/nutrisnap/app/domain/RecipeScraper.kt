@@ -16,13 +16,22 @@ import java.util.concurrent.TimeUnit
  * Instagram blocks direct HTML. Strategies in order:
  *   1. Instagram oEmbed API  → thumbnail + author (official, no auth)
  *   2. imginn.com proxy      → public IG viewer, extracts caption
- *   3. imgsed.com proxy      → alternative public viewer
- *   4. ddinstagram.com       → dd-prefix trick
- *   5. Direct jsoup          → last resort, works on fresh IPs
+ *   3. picuki.com proxy      → reliable public IG viewer
+ *   4. imgsed.com proxy      → alternative public viewer
+ *   5. ddinstagram.com       → dd-prefix trick
+ *   6. Direct jsoup          → last resort, works on fresh IPs
+ *
+ * If ALL caption strategies fail → throws InstagramBlockedException
+ * so the ViewModel can show the manual-caption flow instead of saving
+ * a broken recipe.
  *
  * For recipe websites: schema.org JSON-LD → og:tags fallback.
  */
 class RecipeScraper {
+
+    /** Thrown when Instagram is detected but no caption could be fetched. */
+    class InstagramBlockedException(url: String) :
+        Exception("INSTAGRAM_BLOCKED:$url")
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -51,7 +60,16 @@ class RecipeScraper {
             }
             RecipeScrapeResult(success = true, recipe = recipe)
         }.getOrElse { e ->
-            RecipeScrapeResult(success = false, error = "Fehler: ${e.message}")
+            when (e) {
+                is InstagramBlockedException ->
+                    RecipeScrapeResult(
+                        success            = false,
+                        error              = e.message,
+                        instagramBlocked   = true
+                    )
+                else ->
+                    RecipeScrapeResult(success = false, error = "Fehler: ${e.message}")
+            }
         }
     }
 
@@ -87,6 +105,16 @@ class RecipeScraper {
         }
 
         if (shortcode != null && caption.isBlank()) {
+            // picuki.com — well-maintained public IG viewer
+            caption = runCatching {
+                val doc = jsoupGet("https://www.picuki.com/media/$shortcode")
+                doc.select(".photo-description, .description, [class*=caption], [class*=desc]").text()
+                    .ifBlank { doc.select("meta[property=og:description]").attr("content") }
+                    .ifBlank { doc.select("meta[name=description]").attr("content") }
+            }.getOrElse { "" }
+        }
+
+        if (shortcode != null && caption.isBlank()) {
             // imgsed.com — another public viewer
             caption = runCatching {
                 val doc = jsoupGet("https://www.imgsed.com/p/$shortcode")
@@ -115,6 +143,11 @@ class RecipeScraper {
             }.getOrElse { "" }
         }
 
+        // All strategies exhausted — signal blocked so UI shows manual flow
+        if (caption.isBlank()) {
+            throw InstagramBlockedException(url)
+        }
+
         val title = buildTitle(caption, author)
         val (ingredients, instructions) = parseCaptionSections(caption)
 
@@ -124,12 +157,7 @@ class RecipeScraper {
             imageUrl     = thumbnail,
             sourceUrl    = url,
             platform     = "instagram",
-            ingredients  = ingredients.ifBlank {
-                if (caption.isBlank())
-                    "Caption konnte nicht geladen werden.\n\nInstagram blockiert externe Zugriffe.\nÖffne den Link und kopiere die Caption manuell."
-                else
-                    caption  // show raw caption if no sections found
-            },
+            ingredients  = ingredients.ifBlank { caption },
             instructions = instructions,
             tags         = "instagram"
         )
