@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.util.Size
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.OptIn
 import androidx.camera.core.*
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -32,7 +33,6 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
 
-@OptIn(ExperimentalGetImage::class)
 @Composable
 fun BarcodeScannerScreen(
     onBarcodeDetected: (String) -> Unit,
@@ -42,7 +42,9 @@ fun BarcodeScannerScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var hasCameraPermission by remember {
-        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        )
     }
     var scanning by remember { mutableStateOf(true) }
 
@@ -60,10 +62,7 @@ fun BarcodeScannerScreen(
             val executor = remember { Executors.newSingleThreadExecutor() }
             val barcodeScanner = remember { BarcodeScanning.getClient() }
 
-            AndroidView(
-                factory = { previewView },
-                modifier = Modifier.fillMaxSize()
-            )
+            AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
 
             LaunchedEffect(Unit) {
                 val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
@@ -77,23 +76,10 @@ fun BarcodeScannerScreen(
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
 
-                    imageAnalysis.setAnalyzer(executor) { imageProxy ->
-                        val mediaImage = imageProxy.image
-                        if (mediaImage != null && scanning) {
-                            val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-                            barcodeScanner.process(image)
-                                .addOnSuccessListener { barcodes ->
-                                    barcodes.firstOrNull { it.format == Barcode.FORMAT_EAN_13 || it.format == Barcode.FORMAT_EAN_8 || it.format == Barcode.FORMAT_UPC_A }
-                                        ?.rawValue?.let { barcode ->
-                                            scanning = false
-                                            onBarcodeDetected(barcode)
-                                        }
-                                }
-                                .addOnCompleteListener { imageProxy.close() }
-                        } else {
-                            imageProxy.close()
-                        }
-                    }
+                    imageAnalysis.setAnalyzer(executor, createAnalyzer(barcodeScanner, { scanning }) { barcode ->
+                        scanning = false
+                        onBarcodeDetected(barcode)
+                    })
 
                     runCatching {
                         cameraProvider.unbindAll()
@@ -102,22 +88,17 @@ fun BarcodeScannerScreen(
                 }, ContextCompat.getMainExecutor(context))
             }
 
-            // Overlay: scan frame
+            // Scan frame overlay
             Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 Spacer(Modifier.weight(1f))
-                Box(
-                    Modifier
-                        .size(260.dp, 160.dp)
-                        .border(3.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
-                )
+                Box(Modifier.size(260.dp, 160.dp).border(3.dp, Color(0xFF2D6A4F), RoundedCornerShape(12.dp)))
                 Spacer(Modifier.height(24.dp))
-                Text("Barcode in den Rahmen halten",
-                    color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                Text("Barcode in den Rahmen halten", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.weight(1f))
             }
         } else if (!hasCameraPermission) {
             Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                Text("Kamera-Berechtigung benötigt", color = Color.White, fontSize = 16.sp)
+                Text("Kamera-Berechtigung benötigt", color = Color.White)
                 Spacer(Modifier.height(16.dp))
                 Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
                     Text("Berechtigung erteilen")
@@ -125,13 +106,31 @@ fun BarcodeScannerScreen(
             }
         }
 
-        // Close button
-        IconButton(
-            onClick = onDismiss,
-            modifier = Modifier.align(Alignment.TopEnd).padding(16.dp).statusBarsPadding()
-        ) {
-            Icon(Icons.Default.Close, "Schliessen",
-                tint = Color.White, modifier = Modifier.size(32.dp))
+        IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.TopEnd).padding(16.dp).statusBarsPadding()) {
+            Icon(Icons.Default.Close, "Schliessen", tint = Color.White, modifier = Modifier.size(32.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalGetImage::class)
+private fun createAnalyzer(
+    scanner: com.google.mlkit.vision.barcode.BarcodeScanner,
+    isScanning: () -> Boolean,
+    onDetected: (String) -> Unit
+): ImageAnalysis.Analyzer {
+    return ImageAnalysis.Analyzer { imageProxy ->
+        val mediaImage = imageProxy.image
+        if (mediaImage != null && isScanning()) {
+            val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+            scanner.process(image)
+                .addOnSuccessListener { barcodes ->
+                    barcodes.firstOrNull {
+                        it.format in listOf(Barcode.FORMAT_EAN_13, Barcode.FORMAT_EAN_8, Barcode.FORMAT_UPC_A)
+                    }?.rawValue?.let { onDetected(it) }
+                }
+                .addOnCompleteListener { imageProxy.close() }
+        } else {
+            imageProxy.close()
         }
     }
 }
