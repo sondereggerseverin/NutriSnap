@@ -24,7 +24,7 @@ data class RecipesUiState(
 )
 
 class RecipesViewModel(app: Application) : AndroidViewModel(app) {
-    private val repo = RecipeRepository(NutriDatabase.getInstance(app))
+    private val repo = RecipeRepository(NutriDatabase.getInstance(app), app)
 
     private val _query            = MutableStateFlow("")
     private val _isImporting      = MutableStateFlow(false)
