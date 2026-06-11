@@ -109,5 +109,7 @@ data class DailyNutrition(
 data class RecipeScrapeResult(
     val success: Boolean,
     val recipe: Recipe? = null,
-    val error: String? = null
+    val error: String? = null,
+    /** True when Instagram blocked all scraping → show manual-caption flow */
+    val instagramBlocked: Boolean = false
 )
