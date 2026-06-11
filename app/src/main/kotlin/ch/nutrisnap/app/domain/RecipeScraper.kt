@@ -13,10 +13,12 @@ import java.util.concurrent.TimeUnit
 /**
  * Multi-strategy Instagram/TikTok/Web scraper.
  *
- * Instagram blocks direct HTML requests. Strategies in order:
- *   1. Instagram oEmbed API  → gets author + thumbnail (no auth, public)
- *   2. Picuki.com proxy      → public Instagram viewer, no login needed
- *   3. Direct jsoup attempt  → sometimes works on fresh IPs
+ * Instagram blocks direct HTML. Strategies in order:
+ *   1. Instagram oEmbed API  → thumbnail + author (official, no auth)
+ *   2. imginn.com proxy      → public IG viewer, extracts caption
+ *   3. imgsed.com proxy      → alternative public viewer
+ *   4. ddinstagram.com       → dd-prefix trick
+ *   5. Direct jsoup          → last resort, works on fresh IPs
  *
  * For recipe websites: schema.org JSON-LD → og:tags fallback.
  */
@@ -24,7 +26,7 @@ class RecipeScraper {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(25, TimeUnit.SECONDS)
         .followRedirects(true)
         .addInterceptor { chain ->
             val req = chain.request().newBuilder()
@@ -61,48 +63,53 @@ class RecipeScraper {
     }
 
     // ── INSTAGRAM ──────────────────────────────────────────────────────────────
-    // Instagram requires login for HTML. We use a 3-step approach:
-    // 1. oEmbed → thumbnail + author
-    // 2. Picuki.com (public IG viewer proxy) → caption text
-    // 3. Direct fetch as last resort
 
     private fun scrapeInstagram(url: String): Recipe {
         val shortcode = extractInstagramShortcode(url)
 
-        // Step 1: oEmbed for metadata
-        val oEmbed = runCatching { fetchOEmbed("https://api.instagram.com/oembed/?url=${encode(url)}&omitscript=true") }.getOrNull()
+        // Step 1: Official oEmbed — always works for public posts, gives thumbnail + author
+        val oEmbed = runCatching {
+            fetchOEmbed("https://api.instagram.com/oembed/?url=${encode(url)}&omitscript=true")
+        }.getOrNull()
         val thumbnail = oEmbed?.get("thumbnail_url")
         val author    = oEmbed?.get("author_name")
 
-        // Step 2: Try Picuki proxy (renders Instagram publicly without login)
+        // Step 2..N: Try several public IG proxy viewers for caption
         var caption = ""
-        if (shortcode != null) {
+
+        if (shortcode != null && caption.isBlank()) {
+            // imginn.com — reliable public IG viewer
             caption = runCatching {
-                val picukiUrl = "https://www.picuki.com/media/$shortcode"
-                val doc = jsoupGet(picukiUrl)
-                // Picuki puts caption in .photo-description
-                doc.select(".photo-description, .post-description, .caption").text()
-                    .ifBlank {
-                        doc.select("meta[property=og:description]").attr("content")
-                    }
+                val doc = jsoupGet("https://imginn.com/p/$shortcode/")
+                doc.select(".desc, .photo-desc, [class*=desc], [class*=caption]").text()
+                    .ifBlank { doc.select("meta[property=og:description]").attr("content") }
             }.getOrElse { "" }
         }
 
-        // Step 3: Direct attempt (works sometimes depending on IP/region)
-        if (caption.isBlank()) {
+        if (shortcode != null && caption.isBlank()) {
+            // imgsed.com — another public viewer
             caption = runCatching {
-                val doc = jsoupGet(url)
+                val doc = jsoupGet("https://www.imgsed.com/p/$shortcode")
                 doc.select("meta[property=og:description]").attr("content")
                     .ifBlank { doc.select("meta[name=description]").attr("content") }
             }.getOrElse { "" }
         }
 
-        // Step 4: Try ddinstagram.com proxy (dd prefix trick)
-        if (caption.isBlank() && shortcode != null) {
+        if (caption.isBlank()) {
+            // ddinstagram proxy
             caption = runCatching {
                 val ddUrl = url.replace("www.instagram.com", "www.ddinstagram.com")
                     .replace("instagram.com", "ddinstagram.com")
                 val doc = jsoupGet(ddUrl)
+                doc.select("meta[property=og:description]").attr("content")
+                    .ifBlank { doc.select("meta[name=description]").attr("content") }
+            }.getOrElse { "" }
+        }
+
+        if (caption.isBlank()) {
+            // Direct attempt (works on some IPs/regions)
+            caption = runCatching {
+                val doc = jsoupGet(url)
                 doc.select("meta[property=og:description]").attr("content")
                     .ifBlank { doc.select("meta[name=description]").attr("content") }
             }.getOrElse { "" }
@@ -117,41 +124,54 @@ class RecipeScraper {
             imageUrl     = thumbnail,
             sourceUrl    = url,
             platform     = "instagram",
-            ingredients  = ingredients.ifBlank { "Caption leer — tippe 'Original-Link öffnen' und kopiere den Text manuell." },
+            ingredients  = ingredients.ifBlank {
+                if (caption.isBlank())
+                    "Caption konnte nicht geladen werden.\n\nInstagram blockiert externe Zugriffe.\nÖffne den Link und kopiere die Caption manuell."
+                else
+                    caption  // show raw caption if no sections found
+            },
             instructions = instructions,
             tags         = "instagram"
         )
     }
 
-    private fun extractInstagramShortcode(url: String): String? {
-        // Matches /p/CODE/, /reel/CODE/, /tv/CODE/
-        return Regex("/(?:p|reel|tv)/([A-Za-z0-9_-]+)/?").find(url)?.groupValues?.get(1)
-    }
+    private fun extractInstagramShortcode(url: String): String? =
+        Regex("/(?:p|reel|tv)/([A-Za-z0-9_-]+)/?").find(url)?.groupValues?.get(1)
 
     // ── TIKTOK ─────────────────────────────────────────────────────────────────
 
     private fun scrapeTikTok(url: String): Recipe {
-        val oEmbed = runCatching { fetchOEmbed("https://www.tiktok.com/oembed?url=${encode(url)}") }.getOrNull()
+        // Expand short URLs (vm.tiktok.com)
+        val expandedUrl = runCatching {
+            if ("vm.tiktok.com" in url || "vt.tiktok.com" in url) {
+                val req = Request.Builder().url(url).head().build()
+                client.newCall(req).execute().use { it.request.url.toString() }
+            } else url
+        }.getOrElse { url }
+
+        val oEmbed = runCatching {
+            fetchOEmbed("https://www.tiktok.com/oembed?url=${encode(expandedUrl)}")
+        }.getOrNull()
         val thumbnail = oEmbed?.get("thumbnail_url")
         val author    = oEmbed?.get("author_name")
-        val title     = oEmbed?.get("title") ?: ""
+        val oEmbedTitle = oEmbed?.get("title") ?: ""
 
-        // TikTok caption is often in og:description
         val caption = runCatching {
-            val doc = jsoupGet(url)
+            val doc = jsoupGet(expandedUrl)
             doc.select("meta[property=og:description]").attr("content")
                 .ifBlank { doc.select("meta[name=description]").attr("content") }
-        }.getOrElse { title }
+        }.getOrElse { oEmbedTitle }
 
-        val (ingredients, instructions) = parseCaptionSections(caption.ifBlank { title })
+        val text = caption.ifBlank { oEmbedTitle }
+        val (ingredients, instructions) = parseCaptionSections(text)
 
         return Recipe(
-            title        = buildTitle(caption.ifBlank { title }, author),
-            description  = caption.take(500),
+            title        = buildTitle(text, author),
+            description  = text.take(500),
             imageUrl     = thumbnail,
             sourceUrl    = url,
             platform     = "tiktok",
-            ingredients  = ingredients.ifBlank { "Caption leer — Zutaten manuell ergänzen." },
+            ingredients  = ingredients.ifBlank { text.ifBlank { "Zutaten manuell ergänzen." } },
             instructions = instructions,
             tags         = "tiktok"
         )
@@ -162,7 +182,6 @@ class RecipeScraper {
     private fun scrapeWeb(url: String, platform: String): Recipe {
         val doc = jsoupGet(url)
 
-        // Try schema.org JSON-LD
         val jsonLd = doc.select("script[type='application/ld+json']").firstOrNull {
             "Recipe" in it.data() || "recipe" in it.data()
         }?.data()
@@ -232,9 +251,9 @@ class RecipeScraper {
         if (caption.isBlank()) return "" to ""
         val lower = caption.lowercase()
         val instrKw = listOf("zubereitung", "anleitung", "so geht", "preparation",
-            "method", "instructions", "steps", "how to", "zubereiten:")
+            "method", "instructions", "steps", "how to", "zubereiten:", "zubereitung:")
         val ingrKw  = listOf("zutaten", "zutaten:", "ingredients", "du brauchst",
-            "das brauchst", "you need", "für das rezept", "für 2", "für 4")
+            "das brauchst", "you need", "für das rezept", "für 2", "für 4", "für 1")
 
         val instrIdx = instrKw.firstNotNullOfOrNull { kw -> lower.indexOf(kw).takeIf { it > 5 } }
         val ingrIdx  = ingrKw.firstNotNullOfOrNull  { kw -> lower.indexOf(kw).takeIf { it >= 0 } }

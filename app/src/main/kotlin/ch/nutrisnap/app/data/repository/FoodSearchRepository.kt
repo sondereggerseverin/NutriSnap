@@ -3,19 +3,13 @@ package ch.nutrisnap.app.data.repository
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.OFFProduct
 import ch.nutrisnap.app.data.model.OFFSearchResponse
+import ch.nutrisnap.app.data.model.SingleProductResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
-
-@Serializable
-private data class SingleProductResponse(
-    val status: Int = 0,
-    val product: OFFProduct? = null
-)
 
 class FoodSearchRepository {
 
@@ -37,7 +31,6 @@ class FoodSearchRepository {
     suspend fun searchByName(query: String): List<FoodItem> = withContext(Dispatchers.IO) {
         runCatching {
             val encoded = java.net.URLEncoder.encode(query.trim(), "UTF-8")
-            // Use the v2 JSON API which is more reliable
             val url = "https://world.openfoodfacts.org/cgi/search.pl" +
                     "?search_terms=$encoded" +
                     "&search_simple=1" +
@@ -45,26 +38,11 @@ class FoodSearchRepository {
                     "&json=1" +
                     "&fields=product_name,brands,nutriments,image_front_small_url" +
                     "&page_size=25" +
-                    "&sort_by=unique_scans_n"  // most scanned = most common products first
+                    "&sort_by=unique_scans_n"
 
             val raw = fetch(url)
             val resp = json.decodeFromString<OFFSearchResponse>(raw)
-
-            resp.products.mapNotNull { p ->
-                val name = p.product_name?.trim()?.ifBlank { null } ?: return@mapNotNull null
-                val n    = p.nutriments ?: return@mapNotNull null
-                val kcal = n.energy_kcal_100g ?: return@mapNotNull null
-                FoodItem(
-                    name            = name,
-                    brand           = p.brands?.split(",")?.firstOrNull()?.trim(),
-                    caloriesPer100g = kcal,
-                    proteinPer100g  = n.proteins_100g ?: 0f,
-                    carbsPer100g    = n.carbohydrates_100g ?: 0f,
-                    fatPer100g      = n.fat_100g ?: 0f,
-                    fiberPer100g    = n.fiber_100g ?: 0f,
-                    isCustom        = false
-                )
-            }
+            resp.products.mapNotNull { it.toFoodItem() }
         }.getOrElse { emptyList() }
     }
 
@@ -73,19 +51,24 @@ class FoodSearchRepository {
             val raw  = fetch("https://world.openfoodfacts.org/api/v0/product/$barcode.json")
             val resp = json.decodeFromString<SingleProductResponse>(raw)
             if (resp.status != 1) return@runCatching null
-            val p = resp.product ?: return@runCatching null
-            val n = p.nutriments ?: return@runCatching null
-            FoodItem(
-                name            = p.product_name?.trim()?.ifBlank { "Produkt $barcode" } ?: "Produkt $barcode",
-                brand           = p.brands?.split(",")?.firstOrNull()?.trim(),
-                caloriesPer100g = n.energy_kcal_100g ?: return@runCatching null,
-                proteinPer100g  = n.proteins_100g ?: 0f,
-                carbsPer100g    = n.carbohydrates_100g ?: 0f,
-                fatPer100g      = n.fat_100g ?: 0f,
-                fiberPer100g    = n.fiber_100g ?: 0f,
-                isCustom        = false
-            )
+            resp.product?.toFoodItem()
         }.getOrNull()
+    }
+
+    private fun OFFProduct.toFoodItem(): FoodItem? {
+        val name = product_name?.trim()?.ifBlank { null } ?: return null
+        val n    = nutriments ?: return null
+        val kcal = n.kcalPer100g ?: return null
+        return FoodItem(
+            name            = name,
+            brand           = brands?.split(",")?.firstOrNull()?.trim(),
+            caloriesPer100g = kcal,
+            proteinPer100g  = n.proteins100g ?: 0f,
+            carbsPer100g    = n.carbs100g    ?: 0f,
+            fatPer100g      = n.fat100g      ?: 0f,
+            fiberPer100g    = n.fiber100g    ?: 0f,
+            isCustom        = false
+        )
     }
 
     private fun fetch(url: String): String {

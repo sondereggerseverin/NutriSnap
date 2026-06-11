@@ -57,7 +57,6 @@ data class Recipe(
 )
 
 // ─── OpenFoodFacts API ────────────────────────────────────────────────────────
-// Field names use dashes in JSON: "energy-kcal_100g", "proteins_100g" etc.
 
 @Serializable
 data class OFFSearchResponse(
@@ -67,10 +66,11 @@ data class OFFSearchResponse(
 
 @Serializable
 data class OFFProduct(
-    @SerialName("product_name") val product_name: String? = null,
+    @SerialName("product_name")            val product_name: String? = null,
     val brands: String? = null,
     val nutriments: OFFNutriments? = null,
-    @SerialName("image_url") val image_url: String? = null
+    @SerialName("image_front_small_url")   val image_front_small_url: String? = null,
+    @SerialName("image_url")               val image_url: String? = null
 )
 
 @Serializable
@@ -78,13 +78,12 @@ data class OFFNutriments(
     // OpenFoodFacts uses dash in JSON key: "energy-kcal_100g"
     @SerialName("energy-kcal_100g")   val energyKcal100g: Float? = null,
     @SerialName("energy-kcal")        val energyKcal: Float? = null,
-    @SerialName("energy_kcal_100g")   val energyKcalAlt: Float? = null,  // fallback
+    @SerialName("energy_kcal_100g")   val energyKcalAlt: Float? = null,
     @SerialName("proteins_100g")      val proteins100g: Float? = null,
     @SerialName("carbohydrates_100g") val carbs100g: Float? = null,
     @SerialName("fat_100g")           val fat100g: Float? = null,
     @SerialName("fiber_100g")         val fiber100g: Float? = null
 ) {
-    // Pick whichever kcal field is available
     val kcalPer100g: Float? get() = energyKcal100g ?: energyKcalAlt ?: energyKcal
 }
 
