@@ -55,4 +55,54 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteRecipe(recipe: Recipe) {
         viewModelScope.launch { repo.deleteRecipe(recipe) }
     }
+
+    /**
+     * Save a recipe from manually pasted caption (Instagram workaround).
+     */
+    fun saveManualRecipe(url: String, title: String?, caption: String) {
+        viewModelScope.launch {
+            val (ingredients, instructions) = parseCaption(caption)
+            val recipe = Recipe(
+                title        = title?.ifBlank { null } ?: buildTitleFromCaption(caption),
+                description  = caption.take(500),
+                sourceUrl    = url.ifBlank { null },
+                platform     = when {
+                    "instagram.com" in url || "instagr.am" in url -> "instagram"
+                    "tiktok.com" in url -> "tiktok"
+                    else -> "web"
+                },
+                ingredients  = ingredients.ifBlank { caption },
+                instructions = instructions,
+                tags         = "manuell"
+            )
+            val saved = recipe.copy(id = repo.saveRecipe(recipe))
+            _lastImport.value = saved
+        }
+    }
+
+    private fun buildTitleFromCaption(caption: String) =
+        caption.lines()
+            .firstOrNull { it.trim().length > 4 && it.any { c -> c.isLetter() } }
+            ?.trim()?.take(60) ?: "Instagram Rezept"
+
+    private fun parseCaption(caption: String): Pair<String, String> {
+        val lower = caption.lowercase()
+        val instrKw = listOf("zubereitung", "anleitung", "so geht", "preparation",
+            "method", "instructions", "steps", "how to", "zubereiten:")
+        val ingrKw  = listOf("zutaten", "zutaten:", "ingredients", "du brauchst",
+            "das brauchst", "you need", "für das rezept")
+
+        val instrIdx = instrKw.firstNotNullOfOrNull { kw -> lower.indexOf(kw).takeIf { it > 5 } }
+        val ingrIdx  = ingrKw.firstNotNullOfOrNull  { kw -> lower.indexOf(kw).takeIf { it >= 0 } }
+
+        return when {
+            ingrIdx != null && instrIdx != null && instrIdx > ingrIdx ->
+                caption.substring(ingrIdx, instrIdx).trim() to caption.substring(instrIdx).trim()
+            instrIdx != null ->
+                caption.substring(0, instrIdx).trim() to caption.substring(instrIdx).trim()
+            ingrIdx != null  ->
+                caption.substring(ingrIdx).trim() to ""
+            else             -> caption to ""
+        }
+    }
 }
