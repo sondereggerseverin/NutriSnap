@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.data.repository
 
+import android.content.Context
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.domain.RecipeScraper
@@ -35,9 +36,9 @@ class DiaryRepository(db: NutriDatabase) {
     suspend fun deleteEntry(entry: DiaryEntry) = dao.delete(entry)
 }
 
-class RecipeRepository(db: NutriDatabase) {
+class RecipeRepository(db: NutriDatabase, context: Context) {
     private val dao     = db.recipeDao()
-    private val scraper = RecipeScraper()
+    private val scraper = RecipeScraper(context)   // Context passed for WebView
 
     fun getAll():           Flow<List<Recipe>> = dao.getAll()
     fun search(q: String):  Flow<List<Recipe>> = dao.search(q)
@@ -64,7 +65,6 @@ class FoodItemRepository(db: NutriDatabase) {
     fun getCustom(): Flow<List<FoodItem>> = dao.getAllCustom()
 
     suspend fun searchAll(query: String): List<FoodItem> {
-        // If query looks like a barcode (all digits, 8-14 chars), try barcode first
         if (query.all { it.isDigit() } && query.length in 8..14) {
             val barcodeResult = remote.searchByBarcode(query)
             if (barcodeResult != null) return listOf(barcodeResult)
