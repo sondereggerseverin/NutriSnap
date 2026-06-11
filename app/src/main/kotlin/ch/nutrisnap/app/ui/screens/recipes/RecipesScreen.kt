@@ -38,6 +38,13 @@ fun RecipesScreen(
         if (!sharedUrl.isNullOrBlank()) showImportSheet = true
     }
 
+    // When Instagram is blocked, open the import sheet directly at Step 2
+    LaunchedEffect(state.instagramBlocked) {
+        if (state.instagramBlocked) {
+            showImportSheet = true
+        }
+    }
+
     Scaffold(
         floatingActionButton = {
             FloatingActionButton(onClick = { showImportSheet = true },
@@ -79,11 +86,16 @@ fun RecipesScreen(
 
     if (showImportSheet) {
         ImportSheet(
-            prefillUrl = sharedUrl ?: "",
-            isLoading  = state.isImporting,
-            error      = state.importError,
-            onImport   = { url -> vm.importFromUrl(url) },
-            onDismiss  = { showImportSheet = false; vm.clearError() }
+            prefillUrl           = if (state.instagramBlocked) state.blockedUrl else (sharedUrl ?: ""),
+            isLoading            = state.isImporting,
+            error                = state.importError,
+            openAtManualCaption  = state.instagramBlocked,
+            onImport             = { url -> vm.importFromUrl(url) },
+            onDismiss            = {
+                showImportSheet = false
+                vm.clearError()
+                vm.clearInstagramBlocked()
+            }
         )
     }
 
@@ -168,31 +180,30 @@ private fun PlatformChip(platform: String) {
     }
 }
 
-// ── Import Bottom Sheet (2-step: URL → falls IG blockiert: Caption manuell) ──
+// ── Import Bottom Sheet ────────────────────────────────────────────────────────
+// openAtManualCaption = true  → skip Step 1, jump straight to caption paste
+// openAtManualCaption = false → normal Step 1 (URL input)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ImportSheet(
-    prefillUrl: String,
-    isLoading:  Boolean,
-    error:      String?,
-    onImport:   (String) -> Unit,
-    onDismiss:  () -> Unit
+    prefillUrl:          String,
+    isLoading:           Boolean,
+    error:               String?,
+    openAtManualCaption: Boolean  = false,
+    onImport:            (String) -> Unit,
+    onDismiss:           () -> Unit
 ) {
     val context = LocalContext.current
     var url     by remember(prefillUrl) { mutableStateOf(prefillUrl) }
-    // Step 2: manual caption entry (shown when Instagram is detected + blocked)
-    var showManualCaption by remember { mutableStateOf(false) }
+
+    // If Instagram was blocked on last attempt, jump directly to Step 2
+    var showManualCaption by remember(openAtManualCaption) { mutableStateOf(openAtManualCaption) }
     var manualTitle       by remember { mutableStateOf("") }
     var manualCaption     by remember { mutableStateOf("") }
     val vm: RecipesViewModel = viewModel()
 
     val isInstagram = "instagram.com" in url || "instagr.am" in url
-
-    // If error appears AND it's Instagram → offer caption fallback
-    LaunchedEffect(error) {
-        if (error != null && isInstagram) showManualCaption = true
-    }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -218,9 +229,9 @@ fun ImportSheet(
                     leadingIcon   = { Icon(Icons.Default.Link, null) },
                     modifier      = Modifier.fillMaxWidth(),
                     singleLine    = true,
-                    isError       = error != null && !showManualCaption
+                    isError       = error != null
                 )
-                if (error != null && !isInstagram) {
+                if (error != null) {
                     Text(error, color = MaterialTheme.colorScheme.error, fontSize = 13.sp,
                         modifier = Modifier.padding(top = 4.dp))
                 }
@@ -276,13 +287,27 @@ fun ImportSheet(
 
             } else {
                 // ── Step 2: Caption manuell einfügen ─────────────────────────
+
+                // Header with back arrow only if we can go back (i.e. not forced)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { showManualCaption = false }) {
-                        Icon(Icons.Default.ArrowBack, "Zurück")
+                    if (!openAtManualCaption) {
+                        IconButton(onClick = { showManualCaption = false }) {
+                            Icon(Icons.Default.ArrowBack, "Zurück")
+                        }
                     }
-                    Text("Caption einfügen", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Column(Modifier.weight(1f)) {
+                        Text("Caption einfügen", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        if (openAtManualCaption) {
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                "Instagram hat den automatischen Import blockiert.",
+                                fontSize = 12.sp,
+                                color    = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
                 }
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(8.dp))
 
                 // Open Instagram button
                 OutlinedButton(
