@@ -30,18 +30,10 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Debug APK
-        id: build
-        run: |
-          ./gradlew assembleDebug 2>&1 | tee /tmp/build.log
-          exit ${PIPESTATUS[0]}
-
-      - name: Show build errors on failure
-        if: failure()
-        run: |
-          echo "=== LAST 200 LINES OF BUILD LOG ==="
-          tail -200 /tmp/build.log
+        run: ./gradlew assembleDebug --stacktrace 2>&1
 
       - name: Find APK
+        if: always()
         run: find . -name "*.apk" -type f 2>/dev/null || echo "No APK found"
 
       - name: Upload Debug APK
