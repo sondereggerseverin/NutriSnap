@@ -1,6 +1,5 @@
 package ch.nutrisnap.app.domain
 
-import android.content.Context
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeScrapeResult
 import kotlinx.coroutines.Dispatchers
@@ -15,22 +14,19 @@ import java.util.concurrent.TimeUnit
  * Multi-strategy scraper for Instagram, TikTok, and recipe websites.
  *
  * Instagram strategy (in order):
- *   1. WebView scraping — full Chromium render + JS injection (works like a real browser,
- *      may share login cookies with IG app on device)
- *   2. Instagram oEmbed API — thumbnail + author, no caption
- *   3. imginn.com / picuki.com / imgsed.com — public proxy viewers
- *   4. ddinstagram.com — embed proxy trick
- *   5. Direct request — works on some IPs
+ *   1. imginn.com proxy
+ *   2. picuki.com proxy
+ *   3. imgsed.com proxy
+ *   4. ddinstagram.com proxy
+ *   5. Direct request
+ *   6. Instagram oEmbed (thumbnail + author only, no caption)
  *
- * If ALL strategies fail → throws InstagramBlockedException
+ * If ALL strategies fail → instagramBlocked = true in result
  * (caller shows manual-caption UI, no broken recipe saved)
  *
  * For recipe websites: schema.org JSON-LD → og:tags fallback.
  */
-class RecipeScraper(private val context: Context) {
-
-    class InstagramBlockedException(url: String) :
-        Exception("INSTAGRAM_BLOCKED:$url")
+class RecipeScraper {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -59,8 +55,8 @@ class RecipeScraper(private val context: Context) {
             }
             RecipeScrapeResult(success = true, recipe = recipe)
         }.getOrElse { e ->
-            when (e) {
-                is InstagramBlockedException ->
+            when {
+                e.message?.startsWith("INSTAGRAM_BLOCKED:") == true ->
                     RecipeScrapeResult(success = false, error = e.message, instagramBlocked = true)
                 else ->
                     RecipeScrapeResult(success = false, error = "Fehler: ${e.message}")
@@ -77,7 +73,7 @@ class RecipeScraper(private val context: Context) {
 
     // ── INSTAGRAM ──────────────────────────────────────────────────────────────
 
-    private suspend fun scrapeInstagram(url: String): Recipe {
+    private fun scrapeInstagram(url: String): Recipe {
         val shortcode = extractInstagramShortcode(url)
 
         // oEmbed: thumbnail + author (official, no auth needed, no caption)
@@ -89,12 +85,7 @@ class RecipeScraper(private val context: Context) {
 
         var caption = ""
 
-        // Strategy 1: WebView — executes JS like a real browser, may use IG login cookies
-        caption = runCatching {
-            InstagramWebViewScraper.extractCaption(context, url) ?: ""
-        }.getOrElse { "" }
-
-        // Strategy 2: imginn.com proxy
+        // Strategy 1: imginn.com proxy
         if (shortcode != null && caption.isBlank()) {
             caption = runCatching {
                 val doc = jsoupGet("https://imginn.com/p/$shortcode/")
@@ -103,7 +94,7 @@ class RecipeScraper(private val context: Context) {
             }.getOrElse { "" }
         }
 
-        // Strategy 3: picuki.com proxy
+        // Strategy 2: picuki.com proxy
         if (shortcode != null && caption.isBlank()) {
             caption = runCatching {
                 val doc = jsoupGet("https://www.picuki.com/media/$shortcode")
@@ -113,7 +104,7 @@ class RecipeScraper(private val context: Context) {
             }.getOrElse { "" }
         }
 
-        // Strategy 4: imgsed.com proxy
+        // Strategy 3: imgsed.com proxy
         if (shortcode != null && caption.isBlank()) {
             caption = runCatching {
                 val doc = jsoupGet("https://www.imgsed.com/p/$shortcode")
@@ -122,7 +113,7 @@ class RecipeScraper(private val context: Context) {
             }.getOrElse { "" }
         }
 
-        // Strategy 5: ddinstagram proxy
+        // Strategy 4: ddinstagram proxy
         if (caption.isBlank()) {
             caption = runCatching {
                 val ddUrl = url.replace("www.instagram.com", "www.ddinstagram.com")
@@ -133,7 +124,7 @@ class RecipeScraper(private val context: Context) {
             }.getOrElse { "" }
         }
 
-        // Strategy 6: Direct request (works on some IPs/regions)
+        // Strategy 5: Direct request (works on some IPs/regions)
         if (caption.isBlank()) {
             caption = runCatching {
                 val doc = jsoupGet(url)
@@ -142,8 +133,8 @@ class RecipeScraper(private val context: Context) {
             }.getOrElse { "" }
         }
 
-        // All strategies exhausted → don't save a broken recipe
-        if (caption.isBlank()) throw InstagramBlockedException(url)
+        // All strategies exhausted → signal blocked so UI can show manual entry
+        if (caption.isBlank()) throw Exception("INSTAGRAM_BLOCKED:$url")
 
         val (ingredients, instructions) = parseCaptionSections(caption)
         return Recipe(
