@@ -117,3 +117,4 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { foodRepo.saveCustomFood(item) }
     }
 }
+

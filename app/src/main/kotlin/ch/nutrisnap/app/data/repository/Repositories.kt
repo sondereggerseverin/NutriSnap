@@ -65,7 +65,7 @@ class DiaryRepository(db: NutriDatabase) {
     suspend fun deleteEntry(entry: DiaryEntry) = dao.delete(entry)
 }
 
-class RecipeRepository(db: NutriDatabase, private val context: android.content.Context) {
+class RecipeRepository(db: NutriDatabase) {
     private val dao     = db.recipeDao()
     private val scraper = RecipeScraper()
 
