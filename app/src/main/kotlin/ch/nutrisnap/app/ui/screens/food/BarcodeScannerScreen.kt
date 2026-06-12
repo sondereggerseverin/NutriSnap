@@ -2,12 +2,13 @@ package ch.nutrisnap.app.ui.screens.food
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.util.Size
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
 import androidx.camera.core.*
 import androidx.camera.core.ExperimentalGetImage
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
@@ -38,12 +39,13 @@ fun BarcodeScannerScreen(
     onBarcodeDetected: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
+    val context        = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var hasCameraPermission by remember {
         mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                    PackageManager.PERMISSION_GRANTED
         )
     }
     var scanning by remember { mutableStateOf(true) }
@@ -58,8 +60,8 @@ fun BarcodeScannerScreen(
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if (hasCameraPermission && scanning) {
-            val previewView = remember { PreviewView(context) }
-            val executor = remember { Executors.newSingleThreadExecutor() }
+            val previewView    = remember { PreviewView(context) }
+            val executor       = remember { Executors.newSingleThreadExecutor() }
             val barcodeScanner = remember { BarcodeScanning.getClient() }
 
             AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
@@ -68,11 +70,18 @@ fun BarcodeScannerScreen(
                 val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
                 cameraProviderFuture.addListener({
                     val cameraProvider = cameraProviderFuture.get()
+
                     val preview = Preview.Builder().build().apply {
                         setSurfaceProvider(previewView.surfaceProvider)
                     }
+
+                    // Fixed: use ResolutionSelector instead of deprecated setTargetResolution
+                    val resolutionSelector = ResolutionSelector.Builder()
+                        .setResolutionStrategy(ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY)
+                        .build()
+
                     val imageAnalysis = ImageAnalysis.Builder()
-                        .setTargetResolution(Size(1280, 720))
+                        .setResolutionSelector(resolutionSelector)
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
 
@@ -83,21 +92,41 @@ fun BarcodeScannerScreen(
 
                     runCatching {
                         cameraProvider.unbindAll()
-                        cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageAnalysis)
+                        cameraProvider.bindToLifecycle(
+                            lifecycleOwner,
+                            CameraSelector.DEFAULT_BACK_CAMERA,
+                            preview,
+                            imageAnalysis
+                        )
                     }
                 }, ContextCompat.getMainExecutor(context))
             }
 
             // Scan frame overlay
-            Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Column(
+                Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
                 Spacer(Modifier.weight(1f))
-                Box(Modifier.size(260.dp, 160.dp).border(3.dp, Color(0xFF2D6A4F), RoundedCornerShape(12.dp)))
+                Box(
+                    Modifier.size(260.dp, 160.dp)
+                        .border(3.dp, Color(0xFF2D6A4F), RoundedCornerShape(12.dp))
+                )
                 Spacer(Modifier.height(24.dp))
-                Text("Barcode in den Rahmen halten", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                Text(
+                    "Barcode in den Rahmen halten",
+                    color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium
+                )
                 Spacer(Modifier.weight(1f))
             }
+
         } else if (!hasCameraPermission) {
-            Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Column(
+                Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
                 Text("Kamera-Berechtigung benötigt", color = Color.White)
                 Spacer(Modifier.height(16.dp))
                 Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
@@ -106,7 +135,13 @@ fun BarcodeScannerScreen(
             }
         }
 
-        IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.TopEnd).padding(16.dp).statusBarsPadding()) {
+        IconButton(
+            onClick  = onDismiss,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
+                .statusBarsPadding()
+        ) {
             Icon(Icons.Default.Close, "Schliessen", tint = Color.White, modifier = Modifier.size(32.dp))
         }
     }
@@ -114,7 +149,7 @@ fun BarcodeScannerScreen(
 
 @OptIn(ExperimentalGetImage::class)
 private fun createAnalyzer(
-    scanner: com.google.mlkit.vision.barcode.BarcodeScanner,
+    scanner:    com.google.mlkit.vision.barcode.BarcodeScanner,
     isScanning: () -> Boolean,
     onDetected: (String) -> Unit
 ): ImageAnalysis.Analyzer {
@@ -125,7 +160,11 @@ private fun createAnalyzer(
             scanner.process(image)
                 .addOnSuccessListener { barcodes ->
                     barcodes.firstOrNull {
-                        it.format in listOf(Barcode.FORMAT_EAN_13, Barcode.FORMAT_EAN_8, Barcode.FORMAT_UPC_A)
+                        it.format in listOf(
+                            Barcode.FORMAT_EAN_13,
+                            Barcode.FORMAT_EAN_8,
+                            Barcode.FORMAT_UPC_A
+                        )
                     }?.rawValue?.let { onDetected(it) }
                 }
                 .addOnCompleteListener { imageProxy.close() }
