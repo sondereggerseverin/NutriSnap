@@ -11,60 +11,71 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
+// Separate state holder to keep combine() under 6 flows
+private data class ImportState(
+    val isImporting:      Boolean = false,
+    val importError:      String? = null,
+    val lastImport:       Recipe? = null,
+    val instagramBlocked: Boolean = false,
+    val blockedUrl:       String  = ""
+)
+
 data class RecipesUiState(
     val recipes:          List<Recipe> = emptyList(),
     val query:            String       = "",
     val isImporting:      Boolean      = false,
     val importError:      String?      = null,
     val lastImport:       Recipe?      = null,
-    /** True when Instagram blocked all scraping attempts → UI should open manual-caption step */
     val instagramBlocked: Boolean      = false,
-    /** The IG URL that was blocked, prefilled in the manual-caption sheet */
     val blockedUrl:       String       = ""
 )
 
 class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = RecipeRepository(NutriDatabase.getInstance(app), app)
 
-    private val _query            = MutableStateFlow("")
-    private val _isImporting      = MutableStateFlow(false)
-    private val _importError      = MutableStateFlow<String?>(null)
-    private val _lastImport       = MutableStateFlow<Recipe?>(null)
-    private val _instagramBlocked = MutableStateFlow(false)
-    private val _blockedUrl       = MutableStateFlow("")
+    private val _query       = MutableStateFlow("")
+    private val _importState = MutableStateFlow(ImportState())
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<RecipesUiState> = combine(
         _query.flatMapLatest { q ->
             if (q.isBlank()) repo.getAll() else repo.search(q)
         },
-        _query, _isImporting, _importError, _lastImport, _instagramBlocked, _blockedUrl
-    ) { recipes, q, importing, error, last, igBlocked, blockedUrl ->
-        RecipesUiState(recipes, q, importing, error, last, igBlocked, blockedUrl)
+        _query,
+        _importState
+    ) { recipes, q, imp ->
+        RecipesUiState(
+            recipes          = recipes,
+            query            = q,
+            isImporting      = imp.isImporting,
+            importError      = imp.importError,
+            lastImport       = imp.lastImport,
+            instagramBlocked = imp.instagramBlocked,
+            blockedUrl       = imp.blockedUrl
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RecipesUiState())
 
     fun setQuery(q: String) { _query.value = q }
-    fun clearError()        { _importError.value = null }
-    fun clearLastImport()   { _lastImport.value = null }
+
+    fun clearError()        { _importState.update { it.copy(importError = null) } }
+    fun clearLastImport()   { _importState.update { it.copy(lastImport = null) } }
     fun clearInstagramBlocked() {
-        _instagramBlocked.value = false
-        _blockedUrl.value = ""
+        _importState.update { it.copy(instagramBlocked = false, blockedUrl = "") }
     }
 
     fun importFromUrl(url: String) {
         viewModelScope.launch {
-            _isImporting.value      = true
-            _importError.value      = null
-            _instagramBlocked.value = false
+            _importState.update { it.copy(isImporting = true, importError = null, instagramBlocked = false) }
             val result: RecipeScrapeResult = repo.importFromUrl(url)
-            _isImporting.value = false
-            when {
-                result.instagramBlocked -> {
-                    _instagramBlocked.value = true
-                    _blockedUrl.value       = url
+            _importState.update { state ->
+                when {
+                    result.instagramBlocked ->
+                        state.copy(isImporting = false, instagramBlocked = true, blockedUrl = url)
+                    result.success ->
+                        state.copy(isImporting = false, lastImport = result.recipe)
+                    else ->
+                        state.copy(isImporting = false, importError = result.error ?: "Fehler beim Importieren")
                 }
-                result.success -> _lastImport.value = result.recipe
-                else           -> _importError.value = result.error ?: "Fehler beim Importieren"
             }
         }
     }
@@ -73,9 +84,6 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { repo.deleteRecipe(recipe) }
     }
 
-    /**
-     * Save a recipe from manually pasted caption (Instagram workaround).
-     */
     fun saveManualRecipe(url: String, title: String?, caption: String) {
         viewModelScope.launch {
             val (ingredients, instructions) = parseCaption(caption)
@@ -93,7 +101,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 tags         = "manuell"
             )
             val saved = recipe.copy(id = repo.saveRecipe(recipe))
-            _lastImport.value = saved
+            _importState.update { it.copy(lastImport = saved) }
         }
     }
 
@@ -108,17 +116,14 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             "method", "instructions", "steps", "how to", "zubereiten:")
         val ingrKw  = listOf("zutaten", "zutaten:", "ingredients", "du brauchst",
             "das brauchst", "you need", "für das rezept")
-
         val instrIdx = instrKw.firstNotNullOfOrNull { kw -> lower.indexOf(kw).takeIf { it > 5 } }
         val ingrIdx  = ingrKw.firstNotNullOfOrNull  { kw -> lower.indexOf(kw).takeIf { it >= 0 } }
-
         return when {
             ingrIdx != null && instrIdx != null && instrIdx > ingrIdx ->
                 caption.substring(ingrIdx, instrIdx).trim() to caption.substring(instrIdx).trim()
             instrIdx != null ->
                 caption.substring(0, instrIdx).trim() to caption.substring(instrIdx).trim()
-            ingrIdx != null  ->
-                caption.substring(ingrIdx).trim() to ""
+            ingrIdx != null  -> caption.substring(ingrIdx).trim() to ""
             else             -> caption to ""
         }
     }
