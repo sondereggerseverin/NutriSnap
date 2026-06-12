@@ -105,11 +105,23 @@ data class OFFProduct(
 
 @Serializable
 data class OFFNutriments(
-    val energy_kcal_100g: Float? = null,
-    val proteins_100g: Float? = null,
-    val carbohydrates_100g: Float? = null,
-    val fat_100g: Float? = null,
-    val fiber_100g: Float? = null
+    @kotlinx.serialization.SerialName("energy-kcal_100g")
+    val kcalPer100g: Float? = null,
+    @kotlinx.serialization.SerialName("proteins_100g")
+    val proteins100g: Float? = null,
+    @kotlinx.serialization.SerialName("carbohydrates_100g")
+    val carbs100g: Float? = null,
+    @kotlinx.serialization.SerialName("fat_100g")
+    val fat100g: Float? = null,
+    @kotlinx.serialization.SerialName("fiber_100g")
+    val fiber100g: Float? = null
+)
+
+/** Wrapper for the single-product barcode lookup endpoint */
+@Serializable
+data class SingleProductResponse(
+    val status: Int = 0,
+    val product: OFFProduct? = null
 )
 
 // ─── UI helpers ───────────────────────────────────────────────────────────────
@@ -128,5 +140,6 @@ data class DailyNutrition(
 data class RecipeScrapeResult(
     val success: Boolean,
     val recipe: Recipe? = null,
-    val error: String? = null
+    val error: String? = null,
+    val instagramBlocked: Boolean = false
 )
