@@ -96,6 +96,12 @@ data class OFFSearchResponse(
 )
 
 @Serializable
+data class SingleProductResponse(
+    val status: Int = 0,
+    val product: OFFProduct? = null
+)
+
+@Serializable
 data class OFFProduct(
     val product_name: String? = null,
     val brands: String? = null,
@@ -122,6 +128,18 @@ data class OFFNutriments(
 data class SingleProductResponse(
     val status: Int = 0,
     val product: OFFProduct? = null
+=======
+    val energy_kcal_100g: Float? = null,
+    @kotlinx.serialization.SerialName("energy-kcal_100g") val kcalPer100g: Float? = null,
+    val proteins_100g: Float? = null,
+    val proteins100g: Float? get() = proteins_100g,
+    val carbohydrates_100g: Float? = null,
+    val carbs100g: Float? get() = carbohydrates_100g,
+    val fat_100g: Float? = null,
+    val fat100g: Float? get() = fat_100g,
+    val fiber_100g: Float? = null,
+    val fiber100g: Float? get() = fiber_100g
+>>>>>>> 6712746 (fix: SingleProductResponse, instagramBlocked, RecipeScraper context, division by zero)
 )
 
 // ─── UI helpers ───────────────────────────────────────────────────────────────
