@@ -19,14 +19,16 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import ch.nutrisnap.app.ui.screens.diary.DiaryScreen
 import ch.nutrisnap.app.ui.screens.recipes.RecipesScreen
+import ch.nutrisnap.app.ui.screens.settings.SettingsScreen
 import ch.nutrisnap.app.ui.theme.NutriSnapTheme
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
-    object Diary   : Screen("diary",   "Tagebuch", Icons.Default.MenuBook)
-    object Recipes : Screen("recipes", "Rezepte",  Icons.Default.Favorite)
+    object Diary    : Screen("diary",    "Tagebuch",  Icons.Default.MenuBook)
+    object Recipes  : Screen("recipes",  "Rezepte",   Icons.Default.Favorite)
+    object Settings : Screen("settings", "Einstellungen", Icons.Default.Settings)
 }
 
-val bottomNavItems = listOf(Screen.Diary, Screen.Recipes)
+val bottomNavItems = listOf(Screen.Diary, Screen.Recipes, Screen.Settings)
 
 class MainActivity : ComponentActivity() {
 
@@ -68,7 +70,6 @@ fun MainScaffold(sharedUrl: String?) {
     val backEntry     by navController.currentBackStackEntryAsState()
     val currentRoute  = backEntry?.destination?.route
 
-    // Navigate to Recipes if a URL was shared
     LaunchedEffect(sharedUrl) {
         if (!sharedUrl.isNullOrBlank()) {
             navController.navigate(Screen.Recipes.route) {
@@ -92,8 +93,8 @@ fun MainScaffold(sharedUrl: String?) {
                                 restoreState    = true
                             }
                         },
-                        icon     = { Icon(screen.icon, contentDescription = screen.label) },
-                        label    = { Text(screen.label) }
+                        icon  = { Icon(screen.icon, contentDescription = screen.label) },
+                        label = { Text(screen.label) }
                     )
                 }
             }
@@ -104,8 +105,9 @@ fun MainScaffold(sharedUrl: String?) {
             startDestination = Screen.Diary.route,
             modifier         = Modifier.padding(innerPadding)
         ) {
-            composable(Screen.Diary.route)   { DiaryScreen() }
-            composable(Screen.Recipes.route) { RecipesScreen(sharedUrl = sharedUrl) }
+            composable(Screen.Diary.route)    { DiaryScreen() }
+            composable(Screen.Recipes.route)  { RecipesScreen(sharedUrl = sharedUrl) }
+            composable(Screen.Settings.route) { SettingsScreen() }
         }
     }
 }
