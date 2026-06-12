@@ -1,6 +1,6 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 package ch.nutrisnap.app.ui.screens.diary
 
-@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
