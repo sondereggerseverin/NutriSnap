@@ -67,7 +67,7 @@ class DiaryRepository(db: NutriDatabase) {
 
 class RecipeRepository(db: NutriDatabase, private val context: android.content.Context) {
     private val dao     = db.recipeDao()
-    private val scraper = RecipeScraper(context)
+    private val scraper = RecipeScraper()
 
     fun getAll():               Flow<List<Recipe>> = dao.getAll()
     fun search(q: String):      Flow<List<Recipe>> = dao.search(q)
