@@ -5,8 +5,6 @@ import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 import java.time.LocalDate
 
-// ─── Food / Nutrition ────────────────────────────────────────────────────────
-
 @Entity(tableName = "food_items")
 data class FoodItem(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -24,10 +22,10 @@ data class FoodItem(
 data class DiaryEntry(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val foodItemId: Long,
-    val foodName: String,           // denormalised for fast display
+    val foodName: String,
     val amountGrams: Float,
     val mealType: MealType,
-    val dateStr: String,            // ISO "2025-06-09"
+    val dateStr: String,
     val calories: Float,
     val protein: Float,
     val carbs: Float,
@@ -35,8 +33,6 @@ data class DiaryEntry(
 )
 
 enum class MealType { BREAKFAST, LUNCH, DINNER, SNACK }
-
-// ─── User Profile ─────────────────────────────────────────────────────────────
 
 @Entity(tableName = "user_profile")
 data class UserProfile(
@@ -48,13 +44,10 @@ data class UserProfile(
     val weightKg: Float? = null,
     val heightCm: Float? = null,
     val age: Int? = null,
-    /** "male" or "female" */
     val sex: String? = null,
-    /** 1.2 sedentary … 1.9 very active */
     val activityFactor: Float = 1.55f,
     val darkMode: Boolean = false
 ) {
-    /** Mifflin-St Jeor TDEE – returns null if profile is incomplete */
     fun computedTdee(): Int? {
         val w = weightKg ?: return null
         val h = heightCm ?: return null
@@ -68,26 +61,22 @@ data class UserProfile(
     }
 }
 
-// ─── Recipes ─────────────────────────────────────────────────────────────────
-
 @Entity(tableName = "recipes")
 data class Recipe(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val title: String,
     val description: String = "",
     val imageUrl: String? = null,
-    val sourceUrl: String? = null,        // original Instagram / web URL
-    val platform: String? = null,         // "instagram", "web", "manual"
-    val ingredients: String = "",         // newline-separated
+    val sourceUrl: String? = null,
+    val platform: String? = null,
+    val ingredients: String = "",
     val instructions: String = "",
     val totalCalories: Float? = null,
     val servings: Int = 1,
     val prepTimeMinutes: Int? = null,
-    val tags: String = "",                // comma-separated
+    val tags: String = "",
     val savedAt: Long = System.currentTimeMillis()
 )
-
-// ─── OpenFoodFacts API (for barcode / name search) ────────────────────────────
 
 @Serializable
 data class OFFSearchResponse(
@@ -122,27 +111,6 @@ data class OFFNutriments(
     @kotlinx.serialization.SerialName("fiber_100g")
     val fiber100g: Float? = null
 )
-
-/** Wrapper for the single-product barcode lookup endpoint */
-@Serializable
-data class SingleProductResponse(
-    val status: Int = 0,
-    val product: OFFProduct? = null
-=======
-    val energy_kcal_100g: Float? = null,
-    @kotlinx.serialization.SerialName("energy-kcal_100g") val kcalPer100g: Float? = null,
-    val proteins_100g: Float? = null,
-    val proteins100g: Float? get() = proteins_100g,
-    val carbohydrates_100g: Float? = null,
-    val carbs100g: Float? get() = carbohydrates_100g,
-    val fat_100g: Float? = null,
-    val fat100g: Float? get() = fat_100g,
-    val fiber_100g: Float? = null,
-    val fiber100g: Float? get() = fiber_100g
->>>>>>> 6712746 (fix: SingleProductResponse, instagramBlocked, RecipeScraper context, division by zero)
-)
-
-// ─── UI helpers ───────────────────────────────────────────────────────────────
 
 data class DailyNutrition(
     val date: LocalDate,
