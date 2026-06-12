@@ -25,7 +25,7 @@ fun MacroBar(
     fat: Float,
     modifier: Modifier = Modifier
 ) {
-    val progress = (calories / goal.coerceAtLeast(1f)).coerceIn(0f, 1f)
+    val progress  = (calories / goal.coerceAtLeast(1f)).coerceIn(0f, 1f)
     val remaining = (goal - calories).coerceAtLeast(0f)
 
     Card(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
@@ -50,17 +50,19 @@ fun MacroBar(
                 }
             }
             Spacer(Modifier.height(12.dp))
+            // Fixed: use lambda form for progress (required by Compose Material3 1.2+)
             LinearProgressIndicator(
-                progress = progress,
-                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                color = if (progress < 1f) Green700 else Coral,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
+                progress        = { progress },
+                modifier        = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                color           = if (progress < 1f) Green700 else Coral,
+                trackColor      = MaterialTheme.colorScheme.surfaceVariant,
+                strokeCap       = androidx.compose.ui.graphics.StrokeCap.Round
             )
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                MacroChip("Protein", protein, Color(0xFF3B82F6))
-                MacroChip("Kohlenh.", carbs,  Color(0xFFF59E0B))
-                MacroChip("Fett",    fat,     Color(0xFFEF4444))
+                MacroChip("Protein",  protein, Color(0xFF3B82F6))
+                MacroChip("Kohlenh.", carbs,   Color(0xFFF59E0B))
+                MacroChip("Fett",     fat,     Color(0xFFEF4444))
             }
         }
     }
