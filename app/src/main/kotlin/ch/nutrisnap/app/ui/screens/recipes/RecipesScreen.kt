@@ -1,12 +1,12 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
-import android.content.Intent
-import android.net.Uri
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -15,34 +15,32 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.ui.components.EmptyState
+
+
 import coil.compose.AsyncImage
 
 @Composable
 fun RecipesScreen(
     vm: RecipesViewModel = viewModel(),
-    sharedUrl: String?   = null
+    diaryVm: ch.nutrisnap.app.ui.screens.diary.DiaryViewModel = viewModel(),
+    sharedUrl: String? = null
 ) {
     val state by vm.uiState.collectAsState()
-    var showImportSheet  by remember { mutableStateOf(false) }
-    var selectedRecipe   by remember { mutableStateOf<Recipe?>(null) }
+    var showImportSheet by remember { mutableStateOf(false) }
+    var selectedRecipe  by remember { mutableStateOf<Recipe?>(null) }
+    var addToDiaryRecipe by remember { mutableStateOf<Recipe?>(null) }
 
     LaunchedEffect(sharedUrl) {
         if (!sharedUrl.isNullOrBlank()) showImportSheet = true
-    }
-
-    // When Instagram is blocked, open the import sheet directly at Step 2
-    LaunchedEffect(state.instagramBlocked) {
-        if (state.instagramBlocked) {
-            showImportSheet = true
-        }
     }
 
     Scaffold(
@@ -56,13 +54,13 @@ fun RecipesScreen(
     ) { padding ->
         Column(Modifier.padding(padding)) {
             OutlinedTextField(
-                value           = state.query,
-                onValueChange   = vm::setQuery,
-                label           = { Text("Rezepte durchsuchen") },
-                leadingIcon     = { Icon(Icons.Default.Search, null) },
-                modifier        = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                singleLine      = true,
-                shape           = RoundedCornerShape(12.dp)
+                value         = state.query,
+                onValueChange = vm::setQuery,
+                label         = { Text("Rezepte durchsuchen") },
+                leadingIcon   = { Icon(Icons.Default.Search, null) },
+                modifier      = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                singleLine    = true,
+                shape         = RoundedCornerShape(12.dp)
             )
 
             if (state.recipes.isEmpty()) {
@@ -70,14 +68,17 @@ fun RecipesScreen(
                     icon    = { Icon(Icons.Default.MenuBook, null, Modifier.size(56.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                     message = "Noch keine Rezepte gespeichert",
-                    sub     = "Tippe auf + und füge einen Instagram-, TikTok- oder Webseiten-Link ein"
+                    sub     = "Importiere Rezepte per Instagram-Link oder einer anderen URL"
                 )
             } else {
                 LazyColumn(contentPadding = PaddingValues(bottom = 80.dp)) {
                     items(state.recipes, key = { it.id }) { recipe ->
-                        RecipeCard(recipe,
-                            onClick   = { selectedRecipe = recipe },
-                            onDelete  = { vm.deleteRecipe(recipe) })
+                        RecipeCard(
+                            recipe        = recipe,
+                            onClick       = { selectedRecipe = recipe },
+                            onDelete      = { vm.deleteRecipe(recipe) },
+                            onAddToDiary  = { addToDiaryRecipe = recipe }
+                        )
                     }
                 }
             }
@@ -85,17 +86,12 @@ fun RecipesScreen(
     }
 
     if (showImportSheet) {
-        ImportSheet(
-            prefillUrl           = if (state.instagramBlocked) state.blockedUrl else (sharedUrl ?: ""),
-            isLoading            = state.isImporting,
-            error                = state.importError,
-            openAtManualCaption  = state.instagramBlocked,
-            onImport             = { url -> vm.importFromUrl(url) },
-            onDismiss            = {
-                showImportSheet = false
-                vm.clearError()
-                vm.clearInstagramBlocked()
-            }
+        ImportUrlSheet(
+            prefillUrl = sharedUrl ?: "",
+            isLoading  = state.isImporting,
+            error      = state.importError,
+            onImport   = { url -> vm.importFromUrl(url) },
+            onDismiss  = { showImportSheet = false; vm.clearError() }
         )
     }
 
@@ -105,32 +101,55 @@ fun RecipesScreen(
             icon    = { Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary) },
             title   = { Text("Rezept importiert!") },
             text    = { Text(recipe.title) },
-            confirmButton = { TextButton(onClick = { selectedRecipe = recipe; vm.clearLastImport() }) { Text("Ansehen") } },
+            confirmButton = {
+                TextButton(onClick = { selectedRecipe = recipe; vm.clearLastImport() }) { Text("Ansehen") }
+            },
             dismissButton = { TextButton(onClick = vm::clearLastImport) { Text("OK") } }
         )
     }
 
     selectedRecipe?.let { recipe ->
-        RecipeDetailSheet(recipe = recipe, onDismiss = { selectedRecipe = null })
+        RecipeDetailSheet(
+            recipe       = recipe,
+            onDismiss    = { selectedRecipe = null },
+            onAddToDiary = { addToDiaryRecipe = recipe; selectedRecipe = null }
+        )
+    }
+
+    addToDiaryRecipe?.let { recipe ->
+        AddRecipeToDiarySheet(
+            recipe    = recipe,
+            onConfirm = { servings, meal -> diaryVm.addRecipeAsMeal(recipe, servings, meal); addToDiaryRecipe = null },
+            onDismiss = { addToDiaryRecipe = null }
+        )
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit) {
+private fun RecipeCard(
+    recipe: Recipe,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+    onAddToDiary: () -> Unit
+) {
     var showConfirm by remember { mutableStateOf(false) }
     Card(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clickable(onClick = onClick),
-        shape  = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .combinedClickable(onClick = onClick),
+        shape     = RoundedCornerShape(14.dp),
+        colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             recipe.imageUrl?.let { url ->
                 AsyncImage(
-                    model             = url,
+                    model              = url,
                     contentDescription = recipe.title,
-                    modifier          = Modifier.size(72.dp).clip(RoundedCornerShape(10.dp)),
-                    contentScale      = ContentScale.Crop
+                    modifier           = Modifier.size(72.dp).clip(RoundedCornerShape(10.dp)),
+                    contentScale       = ContentScale.Crop
                 )
                 Spacer(Modifier.width(12.dp))
             }
@@ -144,18 +163,28 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
                 recipe.prepTimeMinutes?.let {
                     Text("⏱ $it min", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                recipe.totalCalories?.let {
+                    Text("~${it.toInt()} kcal", fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
+                }
             }
-            IconButton(onClick = { showConfirm = true }) {
-                Icon(Icons.Default.DeleteOutline, "Löschen", tint = MaterialTheme.colorScheme.error)
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                IconButton(onClick = onAddToDiary) {
+                    Icon(Icons.Default.PlaylistAdd, "Ins Tagebuch", Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.primary)
+                }
+                IconButton(onClick = { showConfirm = true }) {
+                    Icon(Icons.Default.DeleteOutline, "Löschen", Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.error)
+                }
             }
         }
     }
     if (showConfirm) {
         AlertDialog(
             onDismissRequest = { showConfirm = false },
-            title = { Text("Rezept löschen?") },
-            text  = { Text(recipe.title) },
-            confirmButton = {
+            title            = { Text("Rezept löschen?") },
+            text             = { Text(recipe.title) },
+            confirmButton    = {
                 TextButton(onClick = { onDelete(); showConfirm = false }) {
                     Text("Löschen", color = MaterialTheme.colorScheme.error)
                 }
@@ -180,200 +209,133 @@ private fun PlatformChip(platform: String) {
     }
 }
 
-// ── Import Bottom Sheet ────────────────────────────────────────────────────────
-// openAtManualCaption = true  → skip Step 1, jump straight to caption paste
-// openAtManualCaption = false → normal Step 1 (URL input)
+// ── Add Recipe to Diary Sheet ─────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ImportSheet(
-    prefillUrl:          String,
-    isLoading:           Boolean,
-    error:               String?,
-    openAtManualCaption: Boolean  = false,
-    onImport:            (String) -> Unit,
-    onDismiss:           () -> Unit
+fun AddRecipeToDiarySheet(
+    recipe: Recipe,
+    onConfirm: (Float, MealType) -> Unit,
+    onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
-    var url     by remember(prefillUrl) { mutableStateOf(prefillUrl) }
-
-    // If Instagram was blocked on last attempt, jump directly to Step 2
-    var showManualCaption by remember(openAtManualCaption) { mutableStateOf(openAtManualCaption) }
-    var manualTitle       by remember { mutableStateOf("") }
-    var manualCaption     by remember { mutableStateOf("") }
-    val vm: RecipesViewModel = viewModel()
-
-    val isInstagram = "instagram.com" in url || "instagr.am" in url
+    var servingsText by remember { mutableStateOf("1") }
+    var selectedMeal by remember { mutableStateOf(MealType.LUNCH) }
+    val servings = servingsText.toFloatOrNull() ?: 1f
+    val estimatedCals = (recipe.totalCalories ?: 0f) * servings
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            Modifier
-                .padding(horizontal = 16.dp)
-                .navigationBarsPadding()
-                .padding(bottom = 8.dp)
-        ) {
-            if (!showManualCaption) {
-                // ── Step 1: URL eingeben ──────────────────────────────────────
-                Text("Rezept importieren", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Instagram-, TikTok- oder Webseiten-Link einfügen.",
-                    fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(12.dp))
+        Column(Modifier.padding(horizontal = 16.dp).navigationBarsPadding()) {
+            Text("Ins Tagebuch hinzufügen", fontWeight = FontWeight.Bold, fontSize = 18.sp,
+                modifier = Modifier.padding(bottom = 4.dp))
+            Text(recipe.title, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 12.dp))
 
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
-                    value         = url,
-                    onValueChange = { url = it },
-                    label         = { Text("URL") },
-                    leadingIcon   = { Icon(Icons.Default.Link, null) },
-                    modifier      = Modifier.fillMaxWidth(),
-                    singleLine    = true,
-                    isError       = error != null
+                    value           = servingsText,
+                    onValueChange   = { servingsText = it },
+                    label           = { Text("Portionen") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier        = Modifier.weight(1f),
+                    singleLine      = true
                 )
-                if (error != null) {
-                    Text(error, color = MaterialTheme.colorScheme.error, fontSize = 13.sp,
-                        modifier = Modifier.padding(top = 4.dp))
-                }
+                MealDropdown(selected = selectedMeal) { selectedMeal = it }
+            }
 
-                // Instagram hint
-                if (isInstagram) {
-                    Spacer(Modifier.height(8.dp))
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-                        shape  = RoundedCornerShape(10.dp)
-                    ) {
-                        Row(Modifier.padding(10.dp), verticalAlignment = Alignment.Top) {
-                            Icon(Icons.Default.Info, null, Modifier.size(16.dp).padding(top = 2.dp),
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer)
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                "Instagram blockiert externe Zugriffe. Falls der Import fehlschlägt, " +
-                                "kannst du die Caption direkt einfügen.",
-                                fontSize = 12.sp,
-                                color    = MaterialTheme.colorScheme.onSecondaryContainer,
-                                lineHeight = 17.sp
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(12.dp))
-                Button(
-                    onClick  = { onImport(url.trim()) },
-                    enabled  = url.isNotBlank() && !isLoading,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.dp)
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    Text(if (isLoading) "Importiere…" else "Importieren")
-                }
-
-                // Manual caption fallback button (always visible for Instagram)
-                if (isInstagram) {
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick  = { showManualCaption = true },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.ContentPaste, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Caption manuell einfügen")
-                    }
-                }
-
+            if (estimatedCals > 0) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "≈ ${estimatedCals.toInt()} kcal",
+                    fontWeight = FontWeight.SemiBold,
+                    color      = MaterialTheme.colorScheme.primary
+                )
             } else {
-                // ── Step 2: Caption manuell einfügen ─────────────────────────
-
-                // Header with back arrow only if we can go back (i.e. not forced)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (!openAtManualCaption) {
-                        IconButton(onClick = { showManualCaption = false }) {
-                            Icon(Icons.Default.ArrowBack, "Zurück")
-                        }
-                    }
-                    Column(Modifier.weight(1f)) {
-                        Text("Caption einfügen", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        if (openAtManualCaption) {
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                "Instagram hat den automatischen Import blockiert.",
-                                fontSize = 12.sp,
-                                color    = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
-                }
                 Spacer(Modifier.height(8.dp))
+                Text("Keine Kaloriendaten für dieses Rezept",
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
 
-                // Open Instagram button
-                OutlinedButton(
-                    onClick  = {
-                        runCatching {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url.trim())).apply {
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                            })
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.OpenInNew, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Instagram öffnen & Caption kopieren")
-                }
-
-                Spacer(Modifier.height(8.dp))
-                HorizontalDivider()
-                Spacer(Modifier.height(8.dp))
-
-                Text(
-                    "1. Öffne den Post oben\n" +
-                    "2. Tippe auf ··· → \"Kopieren\"\n" +
-                    "3. Füge die Caption unten ein",
-                    fontSize = 13.sp,
-                    color    = MaterialTheme.colorScheme.onSurfaceVariant,
-                    lineHeight = 20.sp
-                )
-                Spacer(Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value         = manualTitle,
-                    onValueChange = { manualTitle = it },
-                    label         = { Text("Titel (optional)") },
-                    modifier      = Modifier.fillMaxWidth(),
-                    singleLine    = true
-                )
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value         = manualCaption,
-                    onValueChange = { manualCaption = it },
-                    label         = { Text("Caption / Rezepttext hier einfügen") },
-                    modifier      = Modifier.fillMaxWidth().heightIn(min = 140.dp),
-                    maxLines      = 12
-                )
-
-                Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onDismiss, Modifier.weight(1f)) { Text("Abbrechen") }
                 Button(
-                    onClick = {
-                        if (manualCaption.isNotBlank()) {
-                            vm.saveManualRecipe(
-                                url     = url.trim(),
-                                title   = manualTitle.trim().ifBlank { null },
-                                caption = manualCaption.trim()
-                            )
-                            onDismiss()
-                        }
-                    },
-                    enabled  = manualCaption.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth()
+                    onClick  = { onConfirm(servings, selectedMeal) },
+                    modifier = Modifier.weight(1f),
+                    enabled  = servings > 0
                 ) {
-                    Icon(Icons.Default.Save, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Rezept speichern")
+                    Icon(Icons.Default.PlaylistAdd, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Hinzufügen")
                 }
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun MealDropdown(selected: MealType, onSelect: (MealType) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(onClick = { expanded = true }) {
+            Text(selected.label())
+            Icon(Icons.Default.ArrowDropDown, null)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            MealType.values().forEach { meal ->
+                DropdownMenuItem(
+                    text    = { Text(meal.label()) },
+                    onClick = { onSelect(meal); expanded = false }
+                )
+            }
+        }
+    }
+}
+
+// ── Import URL Sheet ──────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ImportUrlSheet(
+    prefillUrl: String,
+    isLoading:  Boolean,
+    error:      String?,
+    onImport:   (String) -> Unit,
+    onDismiss:  () -> Unit
+) {
+    var url by remember(prefillUrl) { mutableStateOf(prefillUrl) }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(16.dp).navigationBarsPadding()) {
+            Text("Rezept importieren", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Spacer(Modifier.height(8.dp))
+            Text("Füge einen Instagram-, TikTok- oder Webseiten-Link ein.",
+                fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value         = url,
+                onValueChange = { url = it },
+                label         = { Text("URL") },
+                leadingIcon   = { Icon(Icons.Default.Link, null) },
+                modifier      = Modifier.fillMaxWidth(),
+                singleLine    = true,
+                isError       = error != null
+            )
+            if (error != null) {
+                Text(error, color = MaterialTheme.colorScheme.error, fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 4.dp))
+            }
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick  = { onImport(url.trim()) },
+                enabled  = url.isNotBlank() && !isLoading,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary)
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(if (isLoading) "Importiere…" else "Importieren")
             }
             Spacer(Modifier.height(8.dp))
         }
@@ -384,8 +346,7 @@ fun ImportSheet(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RecipeDetailSheet(recipe: Recipe, onDismiss: () -> Unit) {
-    val context = LocalContext.current
+fun RecipeDetailSheet(recipe: Recipe, onDismiss: () -> Unit, onAddToDiary: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, modifier = Modifier.fillMaxHeight(0.92f)) {
         LazyColumn(
             contentPadding = PaddingValues(bottom = 32.dp, start = 16.dp, end = 16.dp)
@@ -394,8 +355,7 @@ fun RecipeDetailSheet(recipe: Recipe, onDismiss: () -> Unit) {
                 item {
                     AsyncImage(
                         model = url, contentDescription = recipe.title,
-                        modifier = Modifier.fillMaxWidth().height(220.dp)
-                            .clip(RoundedCornerShape(14.dp)),
+                        modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(14.dp)),
                         contentScale = ContentScale.Crop
                     )
                     Spacer(Modifier.height(12.dp))
@@ -413,6 +373,18 @@ fun RecipeDetailSheet(recipe: Recipe, onDismiss: () -> Unit) {
                     recipe.platform?.let {
                         Text("📌 $it", fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
                     }
+                }
+                recipe.totalCalories?.let {
+                    Spacer(Modifier.height(4.dp))
+                    Text("~${it.toInt()} kcal gesamt", fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                }
+                Spacer(Modifier.height(12.dp))
+                // ── Add to diary button ───────────────────────────────────
+                Button(onClick = onAddToDiary, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.PlaylistAdd, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Heute ins Tagebuch")
                 }
                 Spacer(Modifier.height(16.dp))
             }
@@ -439,21 +411,10 @@ fun RecipeDetailSheet(recipe: Recipe, onDismiss: () -> Unit) {
                     Text(recipe.instructions, fontSize = 14.sp, lineHeight = 22.sp)
                 }
             }
-            recipe.sourceUrl?.let { link ->
+            recipe.sourceUrl?.let {
                 item {
                     Spacer(Modifier.height(16.dp))
-                    OutlinedButton(
-                        onClick  = {
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse(link)).apply {
-                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                    }
-                                )
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
+                    OutlinedButton(onClick = { /* open URL */ }, Modifier.fillMaxWidth()) {
                         Icon(Icons.Default.OpenInNew, null)
                         Spacer(Modifier.width(6.dp))
                         Text("Original-Link öffnen")
@@ -462,4 +423,11 @@ fun RecipeDetailSheet(recipe: Recipe, onDismiss: () -> Unit) {
             }
         }
     }
+}
+
+private fun MealType.label() = when (this) {
+    MealType.BREAKFAST -> "Frühstück"
+    MealType.LUNCH     -> "Mittagessen"
+    MealType.DINNER    -> "Abendessen"
+    MealType.SNACK     -> "Snack"
 }

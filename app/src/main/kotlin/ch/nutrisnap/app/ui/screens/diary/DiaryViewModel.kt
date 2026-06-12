@@ -7,6 +7,7 @@ import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.data.repository.DiaryRepository
 import ch.nutrisnap.app.data.repository.FoodItemRepository
+import ch.nutrisnap.app.data.repository.UserProfileRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -19,41 +20,47 @@ data class DiaryUiState(
     val totalProtein:  Float            = 0f,
     val totalCarbs:    Float            = 0f,
     val totalFat:      Float            = 0f,
-    val calorieGoal:   Float            = 2000f
+    val calorieGoal:   Float            = 2000f,
+    val proteinGoal:   Float            = 120f,
+    val isLoading:     Boolean          = false
 )
 
 class DiaryViewModel(app: Application) : AndroidViewModel(app) {
-    private val db       = NutriDatabase.getInstance(app)
-    private val repo     = DiaryRepository(db)
-    private val foodRepo = FoodItemRepository(db)
+    private val db          = NutriDatabase.getInstance(app)
+    private val repo        = DiaryRepository(db)
+    private val foodRepo    = FoodItemRepository(db)
+    private val profileRepo = UserProfileRepository(db)
 
     private val _date = MutableStateFlow(LocalDate.now())
-    private val _goal = MutableStateFlow(2000f)
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val uiState: StateFlow<DiaryUiState> = _date.flatMapLatest { date ->
-        repo.getEntriesForDate(date).map { entries ->
-            DiaryUiState(
-                selectedDate  = date,
-                entries       = entries,
-                totalCalories = entries.sumOf { it.calories.toDouble() }.toFloat(),
-                totalProtein  = entries.sumOf { it.protein.toDouble() }.toFloat(),
-                totalCarbs    = entries.sumOf { it.carbs.toDouble() }.toFloat(),
-                totalFat      = entries.sumOf { it.fat.toDouble() }.toFloat(),
-                calorieGoal   = _goal.value
-            )
-        }
+    val uiState: StateFlow<DiaryUiState> = combine(
+        _date.flatMapLatest { date ->
+            repo.getEntriesForDate(date).map { date to it }
+        },
+        profileRepo.get()
+    ) { (date, entries), profile ->
+        DiaryUiState(
+            selectedDate  = date,
+            entries       = entries,
+            totalCalories = entries.sumOf { it.calories.toDouble() }.toFloat(),
+            totalProtein  = entries.sumOf { it.protein.toDouble() }.toFloat(),
+            totalCarbs    = entries.sumOf { it.carbs.toDouble() }.toFloat(),
+            totalFat      = entries.sumOf { it.fat.toDouble() }.toFloat(),
+            calorieGoal   = (profile.computedTdee()?.toFloat()) ?: profile.dailyCalorieGoal.toFloat(),
+            proteinGoal   = profile.proteinGoalG
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DiaryUiState())
 
+    // Food search state
     private val _searchResults = MutableStateFlow<List<FoodItem>>(emptyList())
     private val _isSearching   = MutableStateFlow(false)
     val searchResults: StateFlow<List<FoodItem>> = _searchResults
     val isSearching:   StateFlow<Boolean>        = _isSearching
 
     fun setDate(date: LocalDate) { _date.value = date }
-    fun prevDay() { _date.value = _date.value.minusDays(1) }
-    fun nextDay() { _date.value = _date.value.plusDays(1) }
-    fun setCalorieGoal(goal: Float) { _goal.value = goal }
+    fun prevDay()                { _date.value = _date.value.minusDays(1) }
+    fun nextDay()                { _date.value = _date.value.plusDays(1) }
 
     fun searchFood(query: String) {
         if (query.isBlank()) { _searchResults.value = emptyList(); return }
@@ -64,20 +71,49 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun searchBarcode(barcode: String, onResult: (FoodItem?) -> Unit) {
+    fun addEntry(food: FoodItem, grams: Float, meal: MealType) {
         viewModelScope.launch {
-            _isSearching.value = true
-            val food = foodRepo.searchBarcode(barcode)
-            _isSearching.value = false
-            onResult(food)
+            repo.addEntry(food, grams, meal, _date.value)
         }
     }
 
-    fun addEntry(food: FoodItem, grams: Float, meal: MealType) {
-        viewModelScope.launch { repo.addEntry(food, grams, meal, _date.value) }
+    fun addRecipeAsMeal(recipe: Recipe, servingsFactor: Float, meal: MealType) {
+        viewModelScope.launch {
+            repo.addRecipeAsMeal(recipe, servingsFactor, meal, _date.value)
+        }
+    }
+
+    /** Update the amount of an existing entry, recalculating macros */
+    fun updateEntryAmount(entry: DiaryEntry, newGrams: Float) {
+        viewModelScope.launch {
+            if (entry.amountGrams <= 0f) {
+                // recipe entry – scale by ratio
+                val ratio = if (entry.amountGrams > 0f) newGrams / entry.amountGrams else 1f
+                repo.updateEntry(entry.copy(
+                    amountGrams = newGrams,
+                    calories    = entry.calories * ratio,
+                    protein     = entry.protein  * ratio,
+                    carbs       = entry.carbs    * ratio,
+                    fat         = entry.fat      * ratio
+                ))
+            } else {
+                val factor = newGrams / entry.amountGrams
+                repo.updateEntry(entry.copy(
+                    amountGrams = newGrams,
+                    calories    = entry.calories * factor,
+                    protein     = entry.protein  * factor,
+                    carbs       = entry.carbs    * factor,
+                    fat         = entry.fat      * factor
+                ))
+            }
+        }
     }
 
     fun deleteEntry(entry: DiaryEntry) {
         viewModelScope.launch { repo.deleteEntry(entry) }
+    }
+
+    fun saveCustomFood(item: FoodItem) {
+        viewModelScope.launch { foodRepo.saveCustomFood(item) }
     }
 }

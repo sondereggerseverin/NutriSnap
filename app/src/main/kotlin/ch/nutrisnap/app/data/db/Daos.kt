@@ -81,3 +81,15 @@ interface RecipeDao {
     @Query("SELECT * FROM recipes WHERE id = :id")
     suspend fun getById(id: Long): Recipe?
 }
+
+@Dao
+interface UserProfileDao {
+    @Query("SELECT * FROM user_profile WHERE id = 1")
+    fun get(): Flow<UserProfile?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun save(profile: UserProfile)
+
+    @Query("SELECT * FROM user_profile WHERE id = 1")
+    suspend fun getCurrent(): UserProfile?
+}
