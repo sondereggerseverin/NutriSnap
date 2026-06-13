@@ -181,13 +181,16 @@ object RecipeNutritionAnalyzer {
         val lines = recipe.ingredients.lines()
             .map { it.trim() }
             .filter { line ->
-                if (line.isBlank()) return@filter false
                 val stripped = line.trimStart('•', '-', '*', '·', '–', ' ').trim()
-                // Skip pure section headers: no digits and no units
+                if (stripped.isBlank()) return@filter false
+                // Keep lines that have digits (amounts) or known units
                 val hasDigit = stripped.any { it.isDigit() }
-                val hasUnit  = listOf("g","ml","kg","l","oz","cup","tsp","tbsp","tl","el")
-                    .any { u -> stripped.lowercase().contains(u) }
-                hasDigit || hasUnit || stripped.length < 4
+                val lc = stripped.lowercase()
+                val hasUnit = lc.contains("g ") || lc.contains("ml") || lc.contains("kg") ||
+                    lc.contains(" oz") || lc.contains("cup") || lc.contains("tsp") ||
+                    lc.contains("tbsp") || lc.contains(" tl") || lc.contains(" el") ||
+                    lc.contains(" l ") || lc.endsWith("g") || lc.endsWith("ml")
+                hasDigit || hasUnit
             }
 
         // Parse all lines in parallel
