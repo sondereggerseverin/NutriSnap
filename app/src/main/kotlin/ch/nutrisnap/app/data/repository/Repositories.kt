@@ -40,18 +40,31 @@ class DiaryRepository(db: NutriDatabase) {
         mealType: MealType,
         date: LocalDate
     ): Long {
-        val totalCal = (recipe.totalCalories ?: 0f) * servingsFactor
+        // servingsFactor = chosen servings; scale per-serving values
+        val perServing = recipe.servings.coerceAtLeast(1).toFloat()
+        // If user chose e.g. 2 servings on a 4-serving recipe → factor = 2/4 * servingsFactor
+        // But servingsFactor is already the absolute number of portions the user wants
+        val scale = servingsFactor / perServing
+
+        val calsTotal    = (recipe.totalCalories    ?: 0f) * scale * perServing  // totalCalories = total for all servings
+        // Simpler: cals per serving * chosen servings
+        val calsPerServ  = recipe.totalCalories?.let { it / perServing } ?: 0f
+        val calories     = calsPerServ * servingsFactor
+        val protein      = (recipe.proteinPerServing ?: 0f) * servingsFactor
+        val carbs        = (recipe.carbsPerServing   ?: 0f) * servingsFactor
+        val fat          = (recipe.fatPerServing     ?: 0f) * servingsFactor
+
         return dao.insert(
             DiaryEntry(
                 foodItemId  = 0L,
                 foodName    = recipe.title,
-                amountGrams = 0f,   // 0 = recipe entry (not a food-item entry)
+                amountGrams = 0f,
                 mealType    = mealType,
                 dateStr     = date.toString(),
-                calories    = totalCal,
-                protein     = 0f,
-                carbs       = 0f,
-                fat         = 0f
+                calories    = calories,
+                protein     = protein,
+                carbs       = carbs,
+                fat         = fat
             )
         )
     }
