@@ -49,7 +49,7 @@ interface UserProfileDao {
 
 @Database(
     entities = [FoodItem::class, DiaryEntry::class, Recipe::class, UserProfileEntity::class],
-    version  = 2,
+    version  = 3,
     exportSchema = false
 )
 abstract class NutriDatabase : RoomDatabase() {
@@ -77,6 +77,14 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE recipes ADD COLUMN proteinPerServing REAL")
+                db.execSQL("ALTER TABLE recipes ADD COLUMN carbsPerServing REAL")
+                db.execSQL("ALTER TABLE recipes ADD COLUMN fatPerServing REAL")
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -84,7 +92,7 @@ abstract class NutriDatabase : RoomDatabase() {
                     NutriDatabase::class.java,
                     "nutrisnap.db"
                 )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .fallbackToDestructiveMigration()
                 .build()
                 .also { INSTANCE = it }
