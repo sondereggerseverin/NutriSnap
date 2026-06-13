@@ -126,30 +126,43 @@ class RecipeScraper(private val context: Context) {
         Regex("/(?:p|reel|tv)/([A-Za-z0-9_-]+)/?").find(url)?.groupValues?.get(1)
 
     // ── TIKTOK ─────────────────────────────────────────────────────────────────
-    // FIX: vm.tiktok.com short URLs → follow redirect via GET (not HEAD, which TikTok blocks)
+    // Strategy 1: tikwm.com API — free, no auth, returns title + cover + author
+    // Strategy 2: WebView (renders JS, can extract description from DOM)
+    // Strategy 3: oEmbed title as last resort
 
     private suspend fun scrapeTikTok(url: String): Recipe {
-        // Expand short URL by doing a real GET and reading the final URL
+        // Expand vm.tiktok.com short links first
         val expandedUrl = runCatching {
             if ("vm.tiktok.com" in url || "vt.tiktok.com" in url) {
-                // Use a GET request with a small read limit to follow redirects
-                val req = Request.Builder().url(url).get().build()
-                // OkHttp follows redirects automatically; capture the final URL
-                client.newCall(req).execute().use { it.request.url.toString() }
+                client.newCall(Request.Builder().url(url).get().build())
+                    .execute().use { it.request.url.toString() }
             } else url
         }.getOrElse { url }
 
-        val oEmbed      = runCatching { fetchOEmbed("https://www.tiktok.com/oembed?url=${encode(expandedUrl)}") }.getOrNull()
-        val thumbnail   = oEmbed?.get("thumbnail_url")
-        val author      = oEmbed?.get("author_name")
-        val oEmbedTitle = oEmbed?.get("title") ?: ""
+        // Strategy 1: tikwm.com API (most reliable for TikTok content)
+        var caption   = ""
+        var thumbnail: String? = null
+        var author:    String? = null
 
-        // Try WebView first (same as Instagram - renders JS)
-        var caption = runCatching {
-            InstagramWebViewScraper.extractCaption(context, expandedUrl) ?: ""
-        }.getOrElse { "" }
+        runCatching {
+            val apiUrl = "https://www.tikwm.com/api/?url=${encode(expandedUrl)}"
+            val raw    = fetchString(apiUrl)
+            val j      = org.json.JSONObject(raw).optJSONObject("data")
+            if (j != null) {
+                caption   = j.optString("title", "").trim()
+                thumbnail = j.optString("cover", "").ifBlank { null }
+                author    = j.optJSONObject("author")?.optString("nickname")
+            }
+        }
 
-        // Fallback: og:description from direct fetch
+        // Strategy 2: WebView (full JS render)
+        if (caption.isBlank()) {
+            caption = runCatching {
+                InstagramWebViewScraper.extractCaption(context, expandedUrl) ?: ""
+            }.getOrElse { "" }
+        }
+
+        // Strategy 3: og:description via Jsoup
         if (caption.isBlank()) {
             caption = runCatching {
                 jsoupGet(expandedUrl).let {
@@ -159,11 +172,15 @@ class RecipeScraper(private val context: Context) {
             }.getOrElse { "" }
         }
 
-        // Last resort: oEmbed title
-        val text = caption.ifBlank { oEmbedTitle }
+        // Strategy 4: oEmbed
+        if (caption.isBlank() || thumbnail == null) {
+            val oEmbed = runCatching { fetchOEmbed("https://www.tiktok.com/oembed?url=${encode(expandedUrl)}") }.getOrNull()
+            if (caption.isBlank()) caption   = oEmbed?.get("title") ?: ""
+            if (thumbnail == null) thumbnail = oEmbed?.get("thumbnail_url")
+            if (author    == null) author    = oEmbed?.get("author_name")
+        }
 
-        // If still nothing, save a stub with title only
-        if (text.isBlank()) {
+        if (caption.isBlank()) {
             return Recipe(
                 title     = "TikTok Rezept",
                 sourceUrl = url,
@@ -175,9 +192,9 @@ class RecipeScraper(private val context: Context) {
 
         val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
         val parsed = if (apiKey.isNotBlank()) {
-            RecipeAiParser.parse(text, url, "tiktok", thumbnail, apiKey)
+            RecipeAiParser.parse(caption, url, "tiktok", thumbnail, apiKey)
         } else {
-            RecipeAiParser.fallbackParse(text, url, "tiktok", thumbnail)
+            RecipeAiParser.fallbackParse(caption, url, "tiktok", thumbnail)
         }
         return parsed.copy(
             imageUrl  = thumbnail ?: parsed.imageUrl,
