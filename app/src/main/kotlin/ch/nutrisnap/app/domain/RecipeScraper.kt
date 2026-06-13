@@ -14,8 +14,7 @@ import java.util.concurrent.TimeUnit
 
 class RecipeScraper(private val context: Context) {
 
-    class InstagramBlockedException(url: String) :
-        Exception("INSTAGRAM_BLOCKED:$url")
+    class InstagramBlockedException(url: String) : Exception("INSTAGRAM_BLOCKED:$url")
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -55,8 +54,8 @@ class RecipeScraper(private val context: Context) {
 
     private fun detectPlatform(url: String) = when {
         "instagram.com" in url || "instagr.am" in url -> "instagram"
-        "tiktok.com"    in url                        -> "tiktok"
-        "youtube.com"   in url || "youtu.be" in url   -> "youtube"
+        "tiktok.com" in url                           -> "tiktok"
+        "youtube.com" in url || "youtu.be" in url     -> "youtube"
         else                                          -> "web"
     }
 
@@ -64,89 +63,62 @@ class RecipeScraper(private val context: Context) {
 
     private suspend fun scrapeInstagram(url: String): Recipe {
         val shortcode = extractInstagramShortcode(url)
-
         val oEmbed    = runCatching { fetchOEmbed("https://api.instagram.com/oembed/?url=${encode(url)}&omitscript=true") }.getOrNull()
         val thumbnail = oEmbed?.get("thumbnail_url")
         val author    = oEmbed?.get("author_name")
+        var caption   = ""
 
-        var caption = ""
-
-        // Strategy 1: WebView (full JS render, may share IG login cookies)
         caption = runCatching { InstagramWebViewScraper.extractCaption(context, url) ?: "" }.getOrElse { "" }
 
-        // Strategy 2: imginn
         if (shortcode != null && caption.isBlank()) {
             caption = runCatching {
-                val doc = jsoupGet("https://imginn.com/p/$shortcode/")
-                doc.select(".desc, .photo-desc, [class*=desc], [class*=caption]").text()
-                    .ifBlank { doc.select("meta[property=og:description]").attr("content") }
+                jsoupGet("https://imginn.com/p/$shortcode/")
+                    .let { it.select(".desc, .photo-desc, [class*=desc], [class*=caption]").text()
+                        .ifBlank { it.select("meta[property=og:description]").attr("content") } }
             }.getOrElse { "" }
         }
-
-        // Strategy 3: picuki
         if (shortcode != null && caption.isBlank()) {
             caption = runCatching {
-                val doc = jsoupGet("https://www.picuki.com/media/$shortcode")
-                doc.select(".photo-description, .description, [class*=caption], [class*=desc]").text()
-                    .ifBlank { doc.select("meta[property=og:description]").attr("content") }
-                    .ifBlank { doc.select("meta[name=description]").attr("content") }
+                jsoupGet("https://www.picuki.com/media/$shortcode")
+                    .let { it.select(".photo-description, .description, [class*=caption], [class*=desc]").text()
+                        .ifBlank { it.select("meta[property=og:description]").attr("content") }
+                        .ifBlank { it.select("meta[name=description]").attr("content") } }
             }.getOrElse { "" }
         }
-
-        // Strategy 4: imgsed
         if (shortcode != null && caption.isBlank()) {
             caption = runCatching {
-                val doc = jsoupGet("https://www.imgsed.com/p/$shortcode")
-                doc.select("meta[property=og:description]").attr("content")
-                    .ifBlank { doc.select("meta[name=description]").attr("content") }
+                jsoupGet("https://www.imgsed.com/p/$shortcode")
+                    .let { it.select("meta[property=og:description]").attr("content")
+                        .ifBlank { it.select("meta[name=description]").attr("content") } }
             }.getOrElse { "" }
         }
-
-        // Strategy 5: ddinstagram
         if (caption.isBlank()) {
             caption = runCatching {
-                val ddUrl = url.replace("www.instagram.com", "www.ddinstagram.com")
-                               .replace("instagram.com", "ddinstagram.com")
-                val doc = jsoupGet(ddUrl)
-                doc.select("meta[property=og:description]").attr("content")
-                    .ifBlank { doc.select("meta[name=description]").attr("content") }
+                val ddUrl = url.replace("www.instagram.com", "www.ddinstagram.com").replace("instagram.com", "ddinstagram.com")
+                jsoupGet(ddUrl).let { it.select("meta[property=og:description]").attr("content")
+                    .ifBlank { it.select("meta[name=description]").attr("content") } }
             }.getOrElse { "" }
         }
-
-        // Strategy 6: Direct
         if (caption.isBlank()) {
             caption = runCatching {
-                val doc = jsoupGet(url)
-                doc.select("meta[property=og:description]").attr("content")
-                    .ifBlank { doc.select("meta[name=description]").attr("content") }
+                jsoupGet(url).let { it.select("meta[property=og:description]").attr("content")
+                    .ifBlank { it.select("meta[name=description]").attr("content") } }
             }.getOrElse { "" }
         }
 
         if (caption.isBlank()) throw InstagramBlockedException(url)
 
-        // ── AI parsing ────────────────────────────────────────────────────────
         val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
         val parsed = if (apiKey.isNotBlank()) {
-            RecipeAiParser.parse(
-                caption   = caption,
-                sourceUrl = url,
-                platform  = "instagram",
-                imageUrl  = thumbnail,
-                apiKey    = apiKey
-            )
+            RecipeAiParser.parse(caption, url, "instagram", thumbnail, apiKey)
         } else {
             RecipeAiParser.fallbackParse(caption, url, "instagram", thumbnail)
         }
-
-        // Merge: always keep the scraped thumbnail and source URL
         return parsed.copy(
             imageUrl  = thumbnail ?: parsed.imageUrl,
             sourceUrl = url,
             platform  = "instagram",
-            tags      = listOfNotNull(
-                parsed.tags.ifBlank { null },
-                author?.let { "@$it" }
-            ).joinToString(",").take(200)
+            tags      = listOfNotNull(parsed.tags.ifBlank { null }, author?.let { "@$it" }).joinToString(",").take(200)
         )
     }
 
@@ -154,12 +126,16 @@ class RecipeScraper(private val context: Context) {
         Regex("/(?:p|reel|tv)/([A-Za-z0-9_-]+)/?").find(url)?.groupValues?.get(1)
 
     // ── TIKTOK ─────────────────────────────────────────────────────────────────
+    // FIX: vm.tiktok.com short URLs → follow redirect via GET (not HEAD, which TikTok blocks)
 
     private suspend fun scrapeTikTok(url: String): Recipe {
+        // Expand short URL by doing a real GET and reading the final URL
         val expandedUrl = runCatching {
             if ("vm.tiktok.com" in url || "vt.tiktok.com" in url) {
-                client.newCall(Request.Builder().url(url).head().build())
-                    .execute().use { it.request.url.toString() }
+                // Use a GET request with a small read limit to follow redirects
+                val req = Request.Builder().url(url).get().build()
+                // OkHttp follows redirects automatically; capture the final URL
+                client.newCall(req).execute().use { it.request.url.toString() }
             } else url
         }.getOrElse { url }
 
@@ -168,41 +144,69 @@ class RecipeScraper(private val context: Context) {
         val author      = oEmbed?.get("author_name")
         val oEmbedTitle = oEmbed?.get("title") ?: ""
 
-        val caption = runCatching {
-            val doc = jsoupGet(expandedUrl)
-            doc.select("meta[property=og:description]").attr("content")
-                .ifBlank { doc.select("meta[name=description]").attr("content") }
-        }.getOrElse { oEmbedTitle }
+        // Try WebView first (same as Instagram - renders JS)
+        var caption = runCatching {
+            InstagramWebViewScraper.extractCaption(context, expandedUrl) ?: ""
+        }.getOrElse { "" }
 
-        val text   = caption.ifBlank { oEmbedTitle }
+        // Fallback: og:description from direct fetch
+        if (caption.isBlank()) {
+            caption = runCatching {
+                jsoupGet(expandedUrl).let {
+                    it.select("meta[property=og:description]").attr("content")
+                        .ifBlank { it.select("meta[name=description]").attr("content") }
+                }
+            }.getOrElse { "" }
+        }
+
+        // Last resort: oEmbed title
+        val text = caption.ifBlank { oEmbedTitle }
+
+        // If still nothing, save a stub with title only
+        if (text.isBlank()) {
+            return Recipe(
+                title     = "TikTok Rezept",
+                sourceUrl = url,
+                platform  = "tiktok",
+                imageUrl  = thumbnail,
+                tags      = author?.let { "@$it" } ?: "tiktok"
+            )
+        }
+
         val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
-        val parsed = if (apiKey.isNotBlank() && text.isNotBlank()) {
+        val parsed = if (apiKey.isNotBlank()) {
             RecipeAiParser.parse(text, url, "tiktok", thumbnail, apiKey)
         } else {
             RecipeAiParser.fallbackParse(text, url, "tiktok", thumbnail)
         }
-
         return parsed.copy(
             imageUrl  = thumbnail ?: parsed.imageUrl,
             sourceUrl = url,
             platform  = "tiktok",
-            tags      = listOfNotNull(parsed.tags.ifBlank { null }, author?.let { "@$it" })
-                .joinToString(",").take(200)
+            tags      = listOfNotNull(parsed.tags.ifBlank { null }, author?.let { "@$it" }).joinToString(",").take(200)
         )
     }
 
     // ── GENERIC WEB ────────────────────────────────────────────────────────────
+    // FIX: try multiple JSON-LD blocks; also handle arrays and nested @graph
 
     private fun scrapeWeb(url: String, platform: String): Recipe {
         val doc = jsoupGet(url)
-        val jsonLd = doc.select("script[type='application/ld+json']")
-            .firstOrNull { "Recipe" in it.data() || "recipe" in it.data() }?.data()
-        if (jsonLd != null) return parseJsonLd(jsonLd, url, platform, doc)
+
+        // Try all JSON-LD script blocks, not just the first
+        val jsonLdBlocks = doc.select("script[type='application/ld+json']").map { it.data() }
+
+        // Look for Recipe in any block, including @graph arrays
+        for (raw in jsonLdBlocks) {
+            val recipeJson = extractRecipeFromJsonLd(raw) ?: continue
+            return parseJsonLd(recipeJson, url, platform, doc)
+        }
 
         val title = doc.select("meta[property=og:title]").attr("content").ifBlank { doc.title() }
         val desc  = doc.select("meta[property=og:description]").attr("content")
         val image = doc.select("meta[property=og:image]").attr("content").ifBlank { null }
-        val lists = doc.select("ul li, ol li").take(25)
+        // Be more generous: also grab h2/h3 sections + lists
+        val lists = doc.select("ul li, ol li").take(30)
             .joinToString("\n") { "• ${it.text().trim()}" }
 
         return Recipe(
@@ -217,18 +221,60 @@ class RecipeScraper(private val context: Context) {
         )
     }
 
-    // ── JSON-LD ────────────────────────────────────────────────────────────────
+    /** Extract a Recipe JSON object from a JSON-LD block (handles @graph arrays) */
+    private fun extractRecipeFromJsonLd(raw: String): String? {
+        if (raw.isBlank()) return null
+        return try {
+            val obj = org.json.JSONObject(raw)
+            when {
+                // Direct Recipe object
+                obj.optString("@type").contains("Recipe", ignoreCase = true) -> raw
+                // @graph array
+                obj.has("@graph") -> {
+                    val graph = obj.getJSONArray("@graph")
+                    (0 until graph.length())
+                        .map { graph.getJSONObject(it) }
+                        .firstOrNull { it.optString("@type").contains("Recipe", ignoreCase = true) }
+                        ?.toString()
+                }
+                else -> null
+            }
+        } catch (_: Exception) {
+            // Maybe it's a JSON array at top level
+            try {
+                val arr = org.json.JSONArray(raw)
+                (0 until arr.length())
+                    .map { arr.getJSONObject(it) }
+                    .firstOrNull { it.optString("@type").contains("Recipe", ignoreCase = true) }
+                    ?.toString()
+            } catch (_: Exception) { null }
+        }
+    }
+
+    // ── JSON-LD parser ─────────────────────────────────────────────────────────
 
     private fun parseJsonLd(json: String, url: String, platform: String, doc: Document): Recipe {
         fun field(key: String) = Regex(""""$key"\s*:\s*"([^"]*?)"""").find(json)?.groupValues?.get(1)
         fun listField(key: String): List<String> {
+            // Handle both array-of-strings and array-of-objects with "text" field
             val arr = Regex(""""$key"\s*:\s*\[([^\]]*?)]""", RegexOption.DOT_MATCHES_ALL)
                 .find(json)?.groupValues?.get(1) ?: return emptyList()
-            return Regex(""""([^"]+)"""").findAll(arr).map { it.groupValues[1] }.toList()
+            // Try plain strings first
+            val strings = Regex(""""([^"]+)"""").findAll(arr).map { it.groupValues[1] }.toList()
+            if (strings.isNotEmpty()) return strings
+            // Try objects with "text" property
+            return Regex(""""text"\s*:\s*"([^"]+)"""").findAll(arr).map { it.groupValues[1] }.toList()
         }
         fun parseDur(iso: String) =
             (Regex("""(\d+)H""").find(iso)?.groupValues?.get(1)?.toIntOrNull() ?: 0) * 60 +
             (Regex("""(\d+)M""").find(iso)?.groupValues?.get(1)?.toIntOrNull() ?: 0)
+
+        // recipeYield can be string like "4 Portionen" or just "4"
+        val yieldRaw = field("recipeYield") ?: ""
+        val servings = Regex("""\d+""").find(yieldRaw)?.value?.toIntOrNull() ?: 1
+
+        val ingredients = listField("recipeIngredient")
+        val instructions = listField("recipeInstructions").ifEmpty { listField("text") }
 
         return Recipe(
             title           = cleanTitle(field("name") ?: doc.title()),
@@ -236,12 +282,12 @@ class RecipeScraper(private val context: Context) {
             imageUrl        = field("image") ?: doc.select("meta[property=og:image]").attr("content").ifBlank { null },
             sourceUrl       = url,
             platform        = platform,
-            ingredients     = listField("recipeIngredient").joinToString("\n") { "• $it" }.ifBlank { "Nicht gefunden." },
-            instructions    = listField("text").ifEmpty { listField("recipeInstructions") }
-                .mapIndexed { i, s -> "${i+1}. $s" }.joinToString("\n").ifBlank { "Nicht gefunden." },
-            servings        = field("recipeYield")?.filter { it.isDigit() }?.toIntOrNull() ?: 1,
+            ingredients     = ingredients.joinToString("\n") { "• $it" }.ifBlank { "Nicht gefunden." },
+            instructions    = instructions.mapIndexed { i, s -> "${i+1}. $s" }.joinToString("\n").ifBlank { "" },
+            servings        = servings,
             prepTimeMinutes = field("prepTime")?.let { parseDur(it) }?.takeIf { it > 0 },
-            tags            = (field("keywords") ?: "").take(200)
+            tags            = (field("keywords") ?: platform).take(200),
+            totalCalories   = null  // Web recipes rarely have this in JSON-LD
         )
     }
 
@@ -264,8 +310,7 @@ class RecipeScraper(private val context: Context) {
 
     private fun encode(url: String) = java.net.URLEncoder.encode(url, "UTF-8")
 
-    private fun jsoupGet(url: String): Document =
-        Jsoup.parse(fetchString(url), url)
+    private fun jsoupGet(url: String): Document = Jsoup.parse(fetchString(url), url)
 
     private fun fetchString(url: String): String {
         val req = Request.Builder().url(url).build()
