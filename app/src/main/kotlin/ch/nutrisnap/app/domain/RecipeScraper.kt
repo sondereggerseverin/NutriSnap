@@ -110,9 +110,9 @@ class RecipeScraper(private val context: Context) {
 
         val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
         val parsed = if (apiKey.isNotBlank()) {
-            RecipeAiParser.parse(cleanCaption, url, "instagram", thumbnail, apiKey)
+            RecipeAiParser.parse(caption, url, "instagram", thumbnail, apiKey)
         } else {
-            RecipeAiParser.fallbackParse(cleanCaption, url, "instagram", thumbnail)
+            RecipeAiParser.fallbackParse(caption, url, "instagram", thumbnail)
         }
         return parsed.copy(
             imageUrl  = thumbnail ?: parsed.imageUrl,
