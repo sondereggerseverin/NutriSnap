@@ -1,228 +1,230 @@
 package ch.nutrisnap.app.domain
 
 import ch.nutrisnap.app.data.model.FoodItem
-import ch.nutrisnap.app.data.repository.FoodSearchRepository
+import ch.nutrisnap.app.data.model.Recipe
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 
-// ── Data classes ──────────────────────────────────────────────────────────────
+/**
+ * Analyzes recipe ingredients by:
+ * 1. Parsing each ingredient line into (amount, unit, food name)
+ * 2. Searching OpenFoodFacts for each food
+ * 3. Calculating macros per ingredient
+ * 4. Summing everything up per serving
+ *
+ * Returns an enriched Recipe with real calculated macros.
+ */
+object RecipeNutritionAnalyzer {
 
-data class ParsedIngredient(
-    val raw:        String,
-    val amountG:    Float,      // best-effort grams (0 if unknown)
-    val searchTerm: String      // cleaned name for API lookup
-)
+    data class IngredientResult(
+        val line:       String,       // original line
+        val parsed:     ParsedIngredient?,
+        val foodItem:   FoodItem?,    // matched from OFD
+        val calories:   Float = 0f,
+        val protein:    Float = 0f,
+        val carbs:      Float = 0f,
+        val fat:        Float = 0f,
+        val matched:    Boolean = false
+    )
 
-data class AnalyzedIngredient(
-    val parsed:    ParsedIngredient,
-    val foodItem:  FoodItem?,    // null = not found in OFF
-    val calories:  Float,
-    val protein:   Float,
-    val carbs:     Float,
-    val fat:       Float
-) {
-    val found get() = foodItem != null
-}
+    data class ParsedIngredient(
+        val amountG:  Float,          // normalized to grams
+        val name:     String          // search term
+    )
 
-data class RecipeNutritionResult(
-    val ingredients:    List<AnalyzedIngredient>,
-    val totalCalories:  Float,
-    val totalProtein:   Float,
-    val totalCarbs:     Float,
-    val totalFat:       Float,
-    val servings:       Int,
-    val calsPerServing: Float get() = totalCalories / servings.coerceAtLeast(1),
-    val protPerServing: Float get() = totalProtein  / servings.coerceAtLeast(1),
-    val carbsPerServing:Float get() = totalCarbs    / servings.coerceAtLeast(1),
-    val fatPerServing:  Float get() = totalFat      / servings.coerceAtLeast(1)
-)
+    data class AnalysisResult(
+        val ingredients:       List<IngredientResult>,
+        val totalCalories:     Float,
+        val totalProtein:      Float,
+        val totalCarbs:        Float,
+        val totalFat:          Float,
+        val caloriesPerServing: Float,
+        val proteinPerServing:  Float,
+        val carbsPerServing:    Float,
+        val fatPerServing:      Float,
+        val matchedCount:      Int,
+        val totalCount:        Int
+    )
 
-// ── Analyzer ──────────────────────────────────────────────────────────────────
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .build()
 
-class RecipeNutritionAnalyzer(
-    private val remote: FoodSearchRepository = FoodSearchRepository()
-) {
+    // ── Unit conversion to grams/ml ──────────────────────────────────────────
 
-    // ── Public API ────────────────────────────────────────────────────────────
+    private val UNIT_TO_G = mapOf(
+        "kg" to 1000f, "g" to 1f, "mg" to 0.001f,
+        "lb" to 453.6f, "lbs" to 453.6f, "oz" to 28.35f,
+        "l" to 1000f, "ml" to 1f, "dl" to 100f,
+        "cup" to 240f, "cups" to 240f,
+        "tbsp" to 15f, "tbs" to 15f, "el" to 15f,
+        "tsp" to 5f, "tl" to 5f,
+        "fl oz" to 29.57f
+    )
 
-    suspend fun analyze(
-        ingredientText: String,
-        servings: Int = 1
-    ): RecipeNutritionResult = withContext(Dispatchers.IO) {
+    // Average gram weights for countable items
+    private val COUNT_WEIGHTS = mapOf(
+        "egg" to 55f, "eggs" to 55f, "ei" to 55f, "eier" to 55f,
+        "onion" to 110f, "zwiebel" to 110f, "zwiebeln" to 110f,
+        "garlic" to 3f, "knoblauch" to 3f, "clove" to 3f,
+        "lime" to 60f, "lemon" to 80f, "zitrone" to 80f,
+        "tomato" to 120f, "tomate" to 120f,
+        "potato" to 150f, "kartoffel" to 150f,
+        "avocado" to 150f,
+        "banana" to 120f, "banane" to 120f
+    )
 
-        val lines = ingredientText
-            .lines()
-            .map { it.trim() }
-            .filter { it.isNotBlank() && it.length > 2 }
-            // skip header lines like "Zutaten:" "For the sauce:"
-            .filterNot { it.endsWith(":") && it.split(" ").size <= 4 }
+    // ── Ingredient line parser ────────────────────────────────────────────────
 
-        // Parse and fetch in parallel (max concurrency is bounded by OFF rate limits;
-        // grouping by 5 is polite)
-        val parsed = lines.map { parseIngredient(it) }
-        val analyzed = parsed
-            .chunked(5)
-            .flatMap { chunk ->
-                chunk.map { p ->
-                    async { lookupIngredient(p) }
-                }.awaitAll()
+    fun parseIngredientLine(line: String): ParsedIngredient? {
+        val clean = line.trimStart('•', '-', ' ').trim()
+        if (clean.isBlank() || clean.length < 3) return null
+
+        // Pattern: "1200g Chicken" | "2.5 Tsp Salt" | "1 and 1/2 Limes" | "3 large eggs"
+        val numRegex = Regex("""^(\d+(?:[.,/]\d+)?(?:\s+and\s+\d+/\d+)?)\s*""")
+        val numMatch = numRegex.find(clean) ?: return ParsedIngredient(100f, clean) // no number → assume 100g
+
+        val numStr = numMatch.value.trim()
+        val rest   = clean.removePrefix(numMatch.value).trim()
+
+        // Parse fraction/mixed number
+        val amount = parseNumber(numStr)
+
+        // Find unit
+        val unitMatch = UNIT_TO_G.entries
+            .sortedByDescending { it.key.length } // longest first to avoid "g" matching "kg"
+            .firstOrNull { (unit, _) -> rest.lowercase().startsWith(unit) }
+
+        return if (unitMatch != null) {
+            val amountG  = amount * unitMatch.value
+            val foodName = rest.removePrefix(unitMatch.key)
+                .removePrefix(unitMatch.key.uppercase())
+                .trim().trimStart(',').trim()
+                .replace(Regex("""\s*(,|;).*"""), "") // strip after comma
+                .take(50)
+            ParsedIngredient(amountG.coerceAtLeast(1f), foodName.ifBlank { rest })
+        } else {
+            // No unit → might be count ("3 eggs") or just "Olive Oil"
+            val countKey = COUNT_WEIGHTS.keys.firstOrNull { rest.lowercase().startsWith(it) }
+            val gramWeight = if (countKey != null) amount * (COUNT_WEIGHTS[countKey] ?: 100f) else amount * 100f
+            val foodName = rest.replace(Regex("""\s*(,|;).*"""), "").take(50)
+            ParsedIngredient(gramWeight.coerceAtLeast(1f), foodName)
+        }
+    }
+
+    private fun parseNumber(s: String): Float {
+        val clean = s.trim()
+        // "1 and 1/2" or "1 1/2"
+        val mixed = Regex("""(\d+)\s+(?:and\s+)?(\d+)/(\d+)""").find(clean)
+        if (mixed != null) {
+            val whole = mixed.groupValues[1].toFloatOrNull() ?: 0f
+            val num   = mixed.groupValues[2].toFloatOrNull() ?: 0f
+            val den   = mixed.groupValues[3].toFloatOrNull() ?: 1f
+            return whole + num / den
+        }
+        // "3/4"
+        val frac = Regex("""(\d+)/(\d+)""").find(clean)
+        if (frac != null) {
+            val num = frac.groupValues[1].toFloatOrNull() ?: 0f
+            val den = frac.groupValues[2].toFloatOrNull() ?: 1f
+            return num / den
+        }
+        return clean.replace(',', '.').toFloatOrNull() ?: 1f
+    }
+
+    // ── OpenFoodFacts search ──────────────────────────────────────────────────
+
+    private fun searchOFF(query: String): FoodItem? {
+        return runCatching {
+            val encoded = java.net.URLEncoder.encode(query.take(40), "UTF-8")
+            val url = "https://world.openfoodfacts.org/cgi/search.pl?search_terms=$encoded&search_simple=1&action=process&json=1&page_size=5&fields=product_name,brands,nutriments"
+            val req = Request.Builder().url(url)
+                .header("User-Agent", "NutriSnap/1.0 (Android)")
+                .build()
+            val body = client.newCall(req).execute().use { it.body?.string() ?: return null }
+            val products = JSONObject(body).optJSONArray("products") ?: return null
+
+            for (i in 0 until products.length()) {
+                val p  = products.getJSONObject(i)
+                val n  = p.optJSONObject("nutriments") ?: continue
+                val kcal = n.optDouble("energy-kcal_100g", -1.0).toFloat()
+                    .takeIf { it > 0 } ?: n.optDouble("energy_kcal_100g", -1.0).toFloat()
+                    .takeIf { it > 0 } ?: continue
+                val prot  = n.optDouble("proteins_100g",      0.0).toFloat()
+                val carbs = n.optDouble("carbohydrates_100g", 0.0).toFloat()
+                val fat   = n.optDouble("fat_100g",           0.0).toFloat()
+                val name  = p.optString("product_name", query).ifBlank { query }
+                return FoodItem(
+                    name            = name,
+                    caloriesPer100g = kcal,
+                    proteinPer100g  = prot,
+                    carbsPer100g    = carbs,
+                    fatPer100g      = fat,
+                    isCustom        = false
+                )
             }
-
-        val totalCals = analyzed.sumOf { it.calories.toDouble() }.toFloat()
-        val totalProt = analyzed.sumOf { it.protein.toDouble() }.toFloat()
-        val totalCarb = analyzed.sumOf { it.carbs.toDouble() }.toFloat()
-        val totalFat  = analyzed.sumOf { it.fat.toDouble() }.toFloat()
-
-        RecipeNutritionResult(analyzed, totalCals, totalProt, totalCarb, totalFat, servings)
+            null
+        }.getOrNull()
     }
 
-    // ── Ingredient parser ─────────────────────────────────────────────────────
+    // ── Main analysis function ────────────────────────────────────────────────
 
-    fun parseIngredient(raw: String): ParsedIngredient {
-        // Normalize bullet points
-        val line = raw.trimStart('•', '-', '*', '–', '·', ' ')
+    suspend fun analyze(recipe: Recipe): AnalysisResult = withContext(Dispatchers.IO) {
+        val lines = recipe.ingredients.lines()
+            .map { it.trim() }
+            .filter { it.isNotBlank() && !it.matches(Regex("""[A-Z][A-Za-z\s]+:?""")) } // skip section headers
 
-        // Convert imperial → metric first
-        val metricLine = convertToMetric(line)
-
-        val amountG: Float
-        val searchTerm: String
-
-        // Try to extract amount + unit + name
-        val m = AMOUNT_REGEX.find(metricLine)
-        if (m != null) {
-            val numStr = m.groupValues[1].replace(',', '.').replace('/', '÷')
-            val num    = evalFraction(numStr)
-            val unit   = m.groupValues[2].trim().lowercase()
-            val name   = metricLine.substring(m.range.last + 1).trim()
-                .trimStart(':', 'v', 'o', 'n', ' ')   // strip "von" in German
-            amountG    = toGrams(num, unit, name)
-            searchTerm = cleanName(name)
-        } else {
-            // No quantity found — treat whole line as search term, assume 100g
-            amountG    = 100f
-            searchTerm = cleanName(metricLine)
-        }
-
-        return ParsedIngredient(raw, amountG, searchTerm)
-    }
-
-    // ── OFF lookup ────────────────────────────────────────────────────────────
-
-    private suspend fun lookupIngredient(p: ParsedIngredient): AnalyzedIngredient {
-        if (p.searchTerm.isBlank() || p.amountG <= 0f) {
-            return AnalyzedIngredient(p, null, 0f, 0f, 0f, 0f)
-        }
-        val results = runCatching { remote.searchByName(p.searchTerm) }.getOrElse { emptyList() }
-        val best    = results.firstOrNull()
-
-        return if (best == null) {
-            AnalyzedIngredient(p, null, 0f, 0f, 0f, 0f)
-        } else {
-            val f = p.amountG / 100f
-            AnalyzedIngredient(
-                parsed   = p,
-                foodItem = best,
-                calories = best.caloriesPer100g * f,
-                protein  = best.proteinPer100g  * f,
-                carbs    = best.carbsPer100g    * f,
-                fat      = best.fatPer100g      * f
-            )
-        }
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private fun evalFraction(s: String): Float {
-        if (s.contains('÷')) {
-            val parts = s.split('÷')
-            return (parts[0].toFloatOrNull() ?: 1f) / (parts[1].toFloatOrNull() ?: 1f)
-        }
-        return s.toFloatOrNull() ?: 1f
-    }
-
-    /** Best-effort conversion of an amount + unit to grams */
-    private fun toGrams(amount: Float, unit: String, name: String): Float = when {
-        unit in listOf("g", "gr", "gramm", "gram", "grams") -> amount
-        unit in listOf("kg", "kilogramm", "kilogram")        -> amount * 1000f
-        unit in listOf("ml", "milliliter", "millilitre")     -> amount  // water density ≈ 1
-        unit in listOf("l", "liter", "litre", "lt")          -> amount * 1000f
-        unit in listOf("tl", "tsp", "teaspoon")              -> amount * 5f
-        unit in listOf("el", "tbsp", "tablespoon", "esslöffel") -> amount * 15f
-        unit in listOf("cup", "cups", "tasse")               -> amount * 240f
-        unit in listOf("oz", "ounce", "ounces")              -> amount * 28.35f
-        unit in listOf("lb", "lbs", "pound", "pounds")       -> amount * 453.6f
-        unit == "stk" || unit == "stück" || unit == "pcs" || unit == "pc" || unit == "" ->
-            estimateWeightFromName(name, amount)
-        unit == "handvoll" || unit == "handful"              -> 30f * amount
-        unit == "prise" || unit == "pinch"                   -> 2f * amount
-        else -> amount * 15f   // fallback: assume tablespoon-ish
-    }
-
-    /** Rough per-item weight estimates for common ingredients */
-    private fun estimateWeightFromName(name: String, count: Float): Float {
-        val lower = name.lowercase()
-        val perItem = when {
-            "ei" in lower || "egg" in lower                         -> 55f
-            "avocado" in lower                                      -> 170f
-            "banana" in lower || "banane" in lower                  -> 120f
-            "apple" in lower || "apfel" in lower                    -> 150f
-            "potato" in lower || "kartoffel" in lower               -> 130f
-            "sweet potato" in lower || "süsskartoffel" in lower     -> 150f
-            "zucchini" in lower || "zucchetti" in lower             -> 220f
-            "carrot" in lower || "karotte" in lower || "rüebli" in lower -> 80f
-            "onion" in lower || "zwiebel" in lower                  -> 150f
-            "garlic" in lower || "knoblauch" in lower               -> 4f
-            "lemon" in lower || "limette" in lower || "zitrone" in lower -> 85f
-            "lime" in lower                                         -> 67f
-            "tomato" in lower || "tomate" in lower                  -> 120f
-            "mushroom" in lower || "champignon" in lower            -> 20f
-            "bell pepper" in lower || "peperoni" in lower || "paprika" in lower -> 160f
-            "can" in lower || "dose" in lower                       -> 400f
-            "pack" in lower || "packet" in lower || "packung" in lower -> 200f
-            "filet" in lower || "brust" in lower || "breast" in lower -> 200f
-            "scheibe" in lower || "slice" in lower                  -> 30f
-            else                                                    -> 100f
-        }
-        return perItem * count
-    }
-
-    private fun cleanName(raw: String): String =
-        raw
-            .replace(Regex("\\(.*?\\)"), "")          // remove parentheses content
-            .replace(Regex("[,;].*$"), "")             // cut after comma
-            .replace(Regex("\\b(of|von|de|di|fresh|frisch|gehackt|chopped|minced|sliced|diced|gerieben|cooked)\\b", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("\\s{2,}"), " ")
-            .trim()
-            .take(40)
-
-    companion object {
-        // Matches: "200g", "1.5 kg", "2 cups", "½ tsp", "1/2 EL", etc.
-        private val AMOUNT_REGEX = Regex(
-            """^([\d]+(?:[.,/][\d]+)?)\s*(g|gr|kg|ml|l|lt|tl|el|tbsp|tsp|cup|cups|tasse|oz|lb|lbs|stk|stück|pcs|pc|stk\.|handvoll|handful|prise|pinch|dose|can|packung|pack|packet|litre|liter|letre|gramm|gram|grams|kilogramm|teaspoon|tablespoon|esslöffel|milliliter|millilitre)?\b""",
-            setOf(RegexOption.IGNORE_CASE)
-        )
-
-        private val CONVERSIONS = listOf(
-            Regex("""(\d+(?:[.,]\d+)?)\s*(?:cups?|Cup)""") to { v: Double -> "${(v * 240).toInt()}ml" },
-            Regex("""(\d+(?:[.,]\d+)?)\s*(?:tbsp|Tbsp|EL)""") to { v: Double -> "${(v * 15).toInt()}ml" },
-            Regex("""(\d+(?:[.,]\d+)?)\s*(?:tsp|Tsp|TL)""") to { v: Double -> "${(v * 5).toInt()}ml" },
-            Regex("""(\d+(?:[.,]\d+)?)\s*(?:oz|Oz)\b""") to { v: Double -> "${(v * 28.35).toInt()}g" },
-            Regex("""(\d+(?:[.,]\d+)?)\s*(?:lbs?|Lbs?|pounds?)""") to { v: Double -> "${(v * 453.6).toInt()}g" },
-            Regex("""(\d+(?:[.,]\d+)?)\s*fl\.?\s*oz""") to { v: Double -> "${(v * 29.57).toInt()}ml" }
-        )
-
-        fun convertToMetric(text: String): String {
-            var result = text
-            for ((pattern, fn) in CONVERSIONS) {
-                result = pattern.replace(result) { mr ->
-                    val v = mr.groupValues[1].replace(',', '.').toDoubleOrNull() ?: return@replace mr.value
-                    fn(v)
+        // Parse all lines in parallel
+        val results = lines.map { line ->
+            async {
+                val parsed = parseIngredientLine(line)
+                if (parsed == null || parsed.name.isBlank() || parsed.name.length < 2) {
+                    return@async IngredientResult(line, null, null)
+                }
+                val food = searchOFF(parsed.name)
+                if (food != null) {
+                    val factor = parsed.amountG / 100f
+                    IngredientResult(
+                        line     = line,
+                        parsed   = parsed,
+                        foodItem = food,
+                        calories = food.caloriesPer100g * factor,
+                        protein  = food.proteinPer100g  * factor,
+                        carbs    = food.carbsPer100g    * factor,
+                        fat      = food.fatPer100g      * factor,
+                        matched  = true
+                    )
+                } else {
+                    IngredientResult(line, parsed, null)
                 }
             }
-            return result
-        }
+        }.awaitAll()
+
+        val servings = recipe.servings.coerceAtLeast(1).toFloat()
+        val totCal  = results.sumOf { it.calories.toDouble() }.toFloat()
+        val totProt = results.sumOf { it.protein.toDouble() }.toFloat()
+        val totCarb = results.sumOf { it.carbs.toDouble() }.toFloat()
+        val totFat  = results.sumOf { it.fat.toDouble() }.toFloat()
+
+        AnalysisResult(
+            ingredients        = results,
+            totalCalories      = totCal,
+            totalProtein       = totProt,
+            totalCarbs         = totCarb,
+            totalFat           = totFat,
+            caloriesPerServing  = totCal  / servings,
+            proteinPerServing   = totProt / servings,
+            carbsPerServing     = totCarb / servings,
+            fatPerServing       = totFat  / servings,
+            matchedCount       = results.count { it.matched },
+            totalCount         = results.size
+        )
     }
 }
