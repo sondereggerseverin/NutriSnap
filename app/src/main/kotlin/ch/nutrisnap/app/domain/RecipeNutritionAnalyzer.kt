@@ -194,8 +194,9 @@ object RecipeNutritionAnalyzer {
             .map { it.trim() }
             .filter { line -> isIngredientLine(line) }
 
-        // Parse all lines in parallel
-        val results = lines.map { line ->
+        // Parse all lines in parallel using coroutineScope for structured concurrency
+        val results = kotlinx.coroutines.coroutineScope {
+            lines.map { line ->
             async {
                 val parsed = parseIngredientLine(line)
                 if (parsed == null || parsed.name.isBlank() || parsed.name.length < 2) {
@@ -219,6 +220,7 @@ object RecipeNutritionAnalyzer {
                 }
             }
         }.awaitAll()
+        } // end coroutineScope
 
         val servings = recipe.servings.coerceAtLeast(1).toFloat()
         val totCal  = results.sumOf { it.calories.toDouble() }.toFloat()
