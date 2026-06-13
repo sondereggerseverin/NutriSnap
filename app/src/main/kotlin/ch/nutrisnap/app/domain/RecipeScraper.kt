@@ -193,7 +193,7 @@ class RecipeScraper(private val context: Context) {
         if (caption.isBlank()) {
             return Recipe(
                 title        = "TikTok Rezept",
-                description  = "Caption konnte nicht geladen werden. Bearbeite das Rezept manuell (✏️) und füge Zutaten ein.",
+                description  = "Caption konnte nicht geladen werden. Bearbeite das Rezept manuell ((edit)) und füge Zutaten ein.",
                 sourceUrl    = url,
                 platform     = "tiktok",
                 imageUrl     = thumbnail,
