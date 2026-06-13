@@ -169,15 +169,22 @@ Rules:
         val prepTime = if (j.isNull("prep_time_minutes")) null
                        else j.optInt("prep_time_minutes", 0).takeIf { it > 0 }
 
+        val proteinG = if (j.isNull("protein_g")) null else j.optDouble("protein_g").toFloat().takeIf { it > 0 }
+        val carbsG   = if (j.isNull("carbs_g"))   null else j.optDouble("carbs_g").toFloat().takeIf { it > 0 }
+        val fatG     = if (j.isNull("fat_g"))      null else j.optDouble("fat_g").toFloat().takeIf { it > 0 }
+
         return Recipe(
-            title           = j.optString("title", "Rezept").trim().ifBlank { "Rezept" },
-            description     = description,
-            ingredients     = ingredients.ifBlank { "Zutaten nicht gefunden." },
-            instructions    = instructions.ifBlank { "" },
-            servings        = servings,
-            totalCalories   = totalCals,
-            prepTimeMinutes = prepTime,
-            tags            = j.optString("tags", "").take(200)
+            title              = j.optString("title", "Rezept").trim().ifBlank { "Rezept" },
+            description        = description,
+            ingredients        = ingredients.ifBlank { "Zutaten nicht gefunden." },
+            instructions       = instructions.ifBlank { "" },
+            servings           = servings,
+            totalCalories      = totalCals,
+            proteinPerServing  = proteinG,
+            carbsPerServing    = carbsG,
+            fatPerServing      = fatG,
+            prepTimeMinutes    = prepTime,
+            tags               = j.optString("tags", "").take(200)
         )
     }
 
