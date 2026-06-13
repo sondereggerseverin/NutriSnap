@@ -84,6 +84,10 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { repo.deleteRecipe(recipe) }
     }
 
+    fun updateRecipe(recipe: Recipe) {
+        viewModelScope.launch { repo.updateRecipe(recipe) }
+    }
+
     fun saveManualRecipe(url: String, title: String?, caption: String) {
         viewModelScope.launch {
             val (ingredients, instructions) = parseCaption(caption)
