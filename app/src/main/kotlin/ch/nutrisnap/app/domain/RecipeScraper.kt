@@ -180,13 +180,25 @@ class RecipeScraper(private val context: Context) {
             if (author    == null) author    = oEmbed?.get("author_name")
         }
 
+        // Strategy 5: ssstik.io embed API (no auth needed)
+        if (caption.isBlank()) {
+            caption = runCatching {
+                val sssUrl = "https://ssstik.io/abc?url=${encode(expandedUrl)}"
+                val doc = jsoupGet(sssUrl)
+                doc.select("p.maintext, .description, [class*=caption]").text()
+                    .ifBlank { doc.select("meta[property=og:description]").attr("content") }
+            }.getOrElse { "" }
+        }
+
         if (caption.isBlank()) {
             return Recipe(
-                title     = "TikTok Rezept",
-                sourceUrl = url,
-                platform  = "tiktok",
-                imageUrl  = thumbnail,
-                tags      = author?.let { "@$it" } ?: "tiktok"
+                title        = "TikTok Rezept",
+                description  = "Caption konnte nicht geladen werden. Bearbeite das Rezept manuell (✏️) und füge Zutaten ein.",
+                sourceUrl    = url,
+                platform     = "tiktok",
+                imageUrl     = thumbnail,
+                ingredients  = "",
+                tags         = author?.let { "@$it" } ?: "tiktok"
             )
         }
 
