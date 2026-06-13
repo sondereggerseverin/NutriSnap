@@ -7,11 +7,13 @@ import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeScrapeResult
 import ch.nutrisnap.app.data.repository.RecipeRepository
+import ch.nutrisnap.app.domain.AnalyzedIngredient
+import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
+import ch.nutrisnap.app.domain.RecipeNutritionResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-// Separate state holder to keep combine() under 6 flows
 private data class ImportState(
     val isImporting:      Boolean = false,
     val importError:      String? = null,
@@ -21,26 +23,37 @@ private data class ImportState(
 )
 
 data class RecipesUiState(
-    val recipes:          List<Recipe> = emptyList(),
-    val query:            String       = "",
-    val isImporting:      Boolean      = false,
-    val importError:      String?      = null,
-    val lastImport:       Recipe?      = null,
-    val instagramBlocked: Boolean      = false,
-    val blockedUrl:       String       = ""
+    val recipes:          List<Recipe>  = emptyList(),
+    val query:            String        = "",
+    val isImporting:      Boolean       = false,
+    val importError:      String?       = null,
+    val lastImport:       Recipe?       = null,
+    val instagramBlocked: Boolean       = false,
+    val blockedUrl:       String        = ""
 )
 
+// State for the nutrition analysis of a single recipe
+sealed class NutritionAnalysisState {
+    object Idle : NutritionAnalysisState()
+    object Loading : NutritionAnalysisState()
+    data class Done(val result: RecipeNutritionResult) : NutritionAnalysisState()
+    data class Error(val msg: String) : NutritionAnalysisState()
+}
+
 class RecipesViewModel(app: Application) : AndroidViewModel(app) {
-    private val repo = RecipeRepository(NutriDatabase.getInstance(app), app)
+    private val repo     = RecipeRepository(NutriDatabase.getInstance(app), app)
+    private val analyzer = RecipeNutritionAnalyzer()
 
     private val _query       = MutableStateFlow("")
     private val _importState = MutableStateFlow(ImportState())
 
+    // Nutrition analysis state – shared; one analysis at a time
+    private val _analysisState = MutableStateFlow<NutritionAnalysisState>(NutritionAnalysisState.Idle)
+    val analysisState: StateFlow<NutritionAnalysisState> = _analysisState.asStateFlow()
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<RecipesUiState> = combine(
-        _query.flatMapLatest { q ->
-            if (q.isBlank()) repo.getAll() else repo.search(q)
-        },
+        _query.flatMapLatest { q -> if (q.isBlank()) repo.getAll() else repo.search(q) },
         _query,
         _importState
     ) { recipes, q, imp ->
@@ -55,13 +68,13 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RecipesUiState())
 
+    // ── Query / import ─────────────────────────────────────────────────────────
+
     fun setQuery(q: String) { _query.value = q }
 
-    fun clearError()        { _importState.update { it.copy(importError = null) } }
-    fun clearLastImport()   { _importState.update { it.copy(lastImport = null) } }
-    fun clearInstagramBlocked() {
-        _importState.update { it.copy(instagramBlocked = false, blockedUrl = "") }
-    }
+    fun clearError()            { _importState.update { it.copy(importError = null) } }
+    fun clearLastImport()       { _importState.update { it.copy(lastImport = null) } }
+    fun clearInstagramBlocked() { _importState.update { it.copy(instagramBlocked = false, blockedUrl = "") } }
 
     fun importFromUrl(url: String) {
         viewModelScope.launch {
@@ -109,13 +122,44 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ── Nutrition Analysis ─────────────────────────────────────────────────────
+
+    fun analyzeNutrition(recipe: Recipe) {
+        if (recipe.ingredients.isBlank()) {
+            _analysisState.value = NutritionAnalysisState.Error("Keine Zutaten vorhanden")
+            return
+        }
+        viewModelScope.launch {
+            _analysisState.value = NutritionAnalysisState.Loading
+            runCatching {
+                analyzer.analyze(recipe.ingredients, recipe.servings.coerceAtLeast(1))
+            }.onSuccess { result ->
+                _analysisState.value = NutritionAnalysisState.Done(result)
+                // Auto-save updated nutrition back into recipe
+                val updated = recipe.copy(
+                    totalCalories     = result.totalCalories,
+                    proteinPerServing = result.protPerServing,
+                    carbsPerServing   = result.carbsPerServing,
+                    fatPerServing     = result.fatPerServing
+                )
+                repo.updateRecipe(updated)
+            }.onFailure { e ->
+                _analysisState.value = NutritionAnalysisState.Error(e.message ?: "Analysefehler")
+            }
+        }
+    }
+
+    fun resetAnalysis() { _analysisState.value = NutritionAnalysisState.Idle }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
     private fun buildTitleFromCaption(caption: String) =
         caption.lines()
             .firstOrNull { it.trim().length > 4 && it.any { c -> c.isLetter() } }
             ?.trim()?.take(60) ?: "Instagram Rezept"
 
     private fun parseCaption(caption: String): Pair<String, String> {
-        val lower = caption.lowercase()
+        val lower   = caption.lowercase()
         val instrKw = listOf("zubereitung", "anleitung", "so geht", "preparation",
             "method", "instructions", "steps", "how to", "zubereiten:")
         val ingrKw  = listOf("zutaten", "zutaten:", "ingredients", "du brauchst",
