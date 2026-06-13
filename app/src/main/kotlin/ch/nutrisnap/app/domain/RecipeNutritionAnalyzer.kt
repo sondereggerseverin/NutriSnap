@@ -177,21 +177,22 @@ object RecipeNutritionAnalyzer {
 
     // ── Main analysis function ────────────────────────────────────────────────
 
+    private fun isIngredientLine(line: String): Boolean {
+        val stripped = line.trimStart('•', '-', '*', '·', '–', ' ').trim()
+        if (stripped.isBlank()) return false
+        val hasDigit = stripped.any { it.isDigit() }
+        val lc = stripped.lowercase()
+        val hasUnit = lc.contains("g ") || lc.contains("ml") || lc.contains("kg") ||
+            lc.contains(" oz") || lc.contains("cup") || lc.contains("tsp") ||
+            lc.contains("tbsp") || lc.contains(" tl") || lc.contains(" el") ||
+            lc.contains(" l ") || lc.endsWith("g") || lc.endsWith("ml")
+        return hasDigit || hasUnit
+    }
+
     suspend fun analyze(recipe: Recipe): AnalysisResult = withContext(Dispatchers.IO) {
         val lines = recipe.ingredients.lines()
             .map { it.trim() }
-            .filter { line ->
-                val stripped = line.trimStart('•', '-', '*', '·', '–', ' ').trim()
-                if (stripped.isBlank()) return@filter false
-                // Keep lines that have digits (amounts) or known units
-                val hasDigit = stripped.any { it.isDigit() }
-                val lc = stripped.lowercase()
-                val hasUnit = lc.contains("g ") || lc.contains("ml") || lc.contains("kg") ||
-                    lc.contains(" oz") || lc.contains("cup") || lc.contains("tsp") ||
-                    lc.contains("tbsp") || lc.contains(" tl") || lc.contains(" el") ||
-                    lc.contains(" l ") || lc.endsWith("g") || lc.endsWith("ml")
-                hasDigit || hasUnit
-            }
+            .filter { line -> isIngredientLine(line) }
 
         // Parse all lines in parallel
         val results = lines.map { line ->
