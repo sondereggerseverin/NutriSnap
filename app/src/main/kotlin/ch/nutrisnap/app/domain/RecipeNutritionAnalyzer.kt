@@ -85,12 +85,12 @@ object RecipeNutritionAnalyzer {
 
     fun parseIngredientLine(line: String): ParsedIngredient? {
         // Strip all common bullet/prefix chars including * used by some scrapers
-        val clean = line.trimStart('•', '-', '*', '·', '–', '→', ' ').trim()
+        val clean = line.trimStart('•', '-', '*', '*', '-', '->', ' ').trim()
         if (clean.isBlank() || clean.length < 3) return null
 
         // Pattern: "1200g Chicken" | "2.5 Tsp Salt" | "1 and 1/2 Limes" | "3 large eggs"
         val numRegex = Regex("""^(\d+(?:[.,/]\d+)?(?:\s+and\s+\d+/\d+)?)\s*""")
-        val numMatch = numRegex.find(clean) ?: return ParsedIngredient(100f, clean) // no number → assume 100g
+        val numMatch = numRegex.find(clean) ?: return ParsedIngredient(100f, clean) // no number -> assume 100g
 
         val numStr = numMatch.value.trim()
         val rest   = clean.removePrefix(numMatch.value).trim()
@@ -112,7 +112,7 @@ object RecipeNutritionAnalyzer {
                 .take(50)
             ParsedIngredient(amountG.coerceAtLeast(1f), foodName.ifBlank { rest })
         } else {
-            // No unit → might be count ("3 eggs") or just "Olive Oil"
+            // No unit -> might be count ("3 eggs") or just "Olive Oil"
             val countKey = COUNT_WEIGHTS.keys.firstOrNull { rest.lowercase().startsWith(it) }
             val gramWeight = if (countKey != null) amount * (COUNT_WEIGHTS[countKey] ?: 100f) else amount * 100f
             val foodName = rest.replace(Regex("""\s*(,|;).*"""), "").take(50)
@@ -178,7 +178,7 @@ object RecipeNutritionAnalyzer {
     // ── Main analysis function ────────────────────────────────────────────────
 
     private fun isIngredientLine(line: String): Boolean {
-        val stripped = line.trimStart('•', '-', '*', '·', '–', ' ').trim()
+        val stripped = line.trimStart('•', '-', '*', '*', '-', ' ').trim()
         if (stripped.isBlank()) return false
         val hasDigit = stripped.any { it.isDigit() }
         val lc = stripped.lowercase()
