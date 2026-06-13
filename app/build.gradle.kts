@@ -16,6 +16,9 @@ android {
         versionCode = 2
         versionName = "1.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Groq API key injected from GitHub Actions secret GROQ_API_KEY
+        buildConfigField("String", "GROQ_API_KEY",
+            "\"${System.getenv("GROQ_API_KEY") ?: ""}\"")
     }
 
     compileOptions {
@@ -26,7 +29,7 @@ android {
 
     kotlinOptions { jvmTarget = "11" }
 
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
 
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"
