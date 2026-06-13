@@ -84,7 +84,8 @@ object RecipeNutritionAnalyzer {
     // ── Ingredient line parser ────────────────────────────────────────────────
 
     fun parseIngredientLine(line: String): ParsedIngredient? {
-        val clean = line.trimStart('•', '-', ' ').trim()
+        // Strip all common bullet/prefix chars including * used by some scrapers
+        val clean = line.trimStart('•', '-', '*', '·', '–', '→', ' ').trim()
         if (clean.isBlank() || clean.length < 3) return null
 
         // Pattern: "1200g Chicken" | "2.5 Tsp Salt" | "1 and 1/2 Limes" | "3 large eggs"
@@ -179,7 +180,15 @@ object RecipeNutritionAnalyzer {
     suspend fun analyze(recipe: Recipe): AnalysisResult = withContext(Dispatchers.IO) {
         val lines = recipe.ingredients.lines()
             .map { it.trim() }
-            .filter { it.isNotBlank() && !it.matches(Regex("""[A-Z][A-Za-z\s]+:?""")) } // skip section headers
+            .filter { line ->
+                if (line.isBlank()) return@filter false
+                val stripped = line.trimStart('•', '-', '*', '·', '–', ' ').trim()
+                // Skip pure section headers: no digits and no units
+                val hasDigit = stripped.any { it.isDigit() }
+                val hasUnit  = listOf("g","ml","kg","l","oz","cup","tsp","tbsp","tl","el")
+                    .any { u -> stripped.lowercase().contains(u) }
+                hasDigit || hasUnit || stripped.length < 4
+            }
 
         // Parse all lines in parallel
         val results = lines.map { line ->
