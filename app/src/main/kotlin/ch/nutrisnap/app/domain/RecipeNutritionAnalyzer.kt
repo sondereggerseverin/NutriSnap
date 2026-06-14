@@ -75,7 +75,7 @@ object RecipeNutritionAnalyzer {
 
     // Called from outside the withContext block to avoid non-local return issues
     private fun isIngredientLine(line: String): Boolean {
-        val s = line.trimStart('*', '-', 'u2022', ' ').trim()
+        val s = line.trimStart('*', '-', '•', '·', ' ').trim()
         if (s.isBlank() || s.length < 3) return false
         val hasDigit = s.any { it.isDigit() }
         val lc = s.lowercase()
