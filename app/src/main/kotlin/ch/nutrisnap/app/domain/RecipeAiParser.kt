@@ -75,7 +75,7 @@ Respond ONLY with valid JSON matching this exact schema — no markdown, no expl
   "tags": "meal-prep,chicken,high-protein"
 }
 Rules:
-- title: extract ONLY the actual dish name. IGNORE any prefix with likes/comments/follower counts/dates/usernames. The dish name is usually after a colon or quoted, e.g. "... : \"Parmesan Chicken\"" -> "Parmesan Chicken". If no clear dish name exists, use the first ingredient section name.
+- title: DISH NAME ONLY - NEVER include likes/comments/follower counts/dates/usernames/handles. The caption often starts with "X likes, Y comments - username on Date: \"ACTUAL RECIPE NAME\"". Extract only ACTUAL RECIPE NAME. If quoted in caption use the quoted text. If section headers exist use the first one. Last resort: first meaningful ingredient section name
 - ingredient_sections: group ingredients by their section headers (e.g. "Marinade", "Sauce"). If no sections exist, use one section named ""
 - calories_per_serving / protein_g / carbs_g / fat_g: extract if mentioned, else null
 - instructions: extract if present, else null
