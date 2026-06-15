@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.*
+import ch.nutrisnap.app.data.model.favoriteKey
 import ch.nutrisnap.app.ui.components.EmptyState
 import ch.nutrisnap.app.ui.components.MacroBar
 import ch.nutrisnap.app.ui.components.SectionHeader
@@ -130,6 +131,8 @@ fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
 
     val results   by vm.searchResults.collectAsState()
     val searching by vm.isSearching.collectAsState()
+    val favorites by vm.favorites.collectAsState()
+    val favoriteKeys = remember(favorites) { favorites.map { it.favoriteKey() }.toSet() }
 
     if (showScanner) {
         BarcodeScannerScreen(
@@ -178,6 +181,31 @@ fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
                         modifier = Modifier.padding(top = 4.dp))
                 }
 
+                // Quick-pick from favorites when no search query is active
+                if (query.isBlank() && favorites.isNotEmpty()) {
+                    Text("⭐ Favoriten", fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+                    LazyColumn(Modifier.heightIn(max = 220.dp)) {
+                        items(favorites, key = { it.favoriteKey() }) { food ->
+                            ListItem(
+                                headlineContent = { Text(food.name) },
+                                supportingContent = {
+                                    val brand = food.brand?.let { " · $it" } ?: ""
+                                    Text("${food.caloriesPer100g.toInt()} kcal/100g$brand")
+                                },
+                                leadingContent = { Icon(Icons.Default.Star, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
+                                trailingContent = {
+                                    IconButton(onClick = { vm.toggleFavorite(food) }) {
+                                        Icon(Icons.Default.Favorite, "Favorit entfernen", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                                    }
+                                },
+                                modifier = Modifier.clickable { selectedFood = food }
+                            )
+                            HorizontalDivider()
+                        }
+                    }
+                }
+
                 if (results.isEmpty() && query.length > 1 && !searching) {
                     Text("Keine Treffer — eigenes Lebensmittel anlegen?", fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
@@ -185,11 +213,22 @@ fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
 
                 LazyColumn(Modifier.heightIn(max = 300.dp)) {
                     items(results) { food ->
+                        val isFav = food.favoriteKey() in favoriteKeys
                         ListItem(
                             headlineContent = { Text(food.name) },
                             supportingContent = {
                                 val brand = food.brand?.let { " · $it" } ?: ""
                                 Text("${food.caloriesPer100g.toInt()} kcal/100g$brand")
+                            },
+                            trailingContent = {
+                                IconButton(onClick = { vm.toggleFavorite(food) }) {
+                                    Icon(
+                                        if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                        if (isFav) "Favorit entfernen" else "Als Favorit speichern",
+                                        tint = if (isFav) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             },
                             modifier = Modifier.clickable { selectedFood = food }
                         )
@@ -198,8 +237,20 @@ fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
                 }
             } else {
                 val food = selectedFood!!
-                Text(food.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                food.brand?.let { Text(it, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                val isFav = food.favoriteKey() in favoriteKeys
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+                    Column {
+                        Text(food.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        food.brand?.let { Text(it, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
+                    IconButton(onClick = { vm.toggleFavorite(food) }) {
+                        Icon(
+                            if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            if (isFav) "Favorit entfernen" else "Als Favorit speichern",
+                            tint = if (isFav) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
