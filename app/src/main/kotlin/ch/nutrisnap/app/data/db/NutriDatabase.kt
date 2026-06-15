@@ -5,8 +5,10 @@ import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import ch.nutrisnap.app.data.model.DiaryEntry
+import ch.nutrisnap.app.data.model.FavoriteFoodEntity
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.Recipe
+import ch.nutrisnap.app.data.model.WeightEntry
 import ch.nutrisnap.app.data.repository.UserProfile
 
 @Entity(tableName = "user_profile")
@@ -17,6 +19,8 @@ data class UserProfileEntity(
     val ageYears:         Int    = 0,
     val dailyCalorieGoal: Int    = 2000,
     val proteinGoalG:     Float  = 120f,
+    val carbsGoalG:       Float  = 220f,
+    val fatGoalG:         Float  = 65f,
     val activityFactor:   Float  = 1.55f
 )
 
@@ -26,6 +30,8 @@ fun UserProfileEntity.toDomain() = UserProfile(
     ageYears         = ageYears,
     dailyCalorieGoal = dailyCalorieGoal,
     proteinGoalG     = proteinGoalG,
+    carbsGoalG       = carbsGoalG,
+    fatGoalG         = fatGoalG,
     activityFactor   = activityFactor
 )
 
@@ -35,6 +41,8 @@ fun UserProfile.toEntity() = UserProfileEntity(
     ageYears         = ageYears,
     dailyCalorieGoal = dailyCalorieGoal,
     proteinGoalG     = proteinGoalG,
+    carbsGoalG       = carbsGoalG,
+    fatGoalG         = fatGoalG,
     activityFactor   = activityFactor
 )
 
@@ -48,7 +56,14 @@ interface UserProfileDao {
 }
 
 @Database(
-    entities = [FoodItem::class, DiaryEntry::class, Recipe::class, UserProfileEntity::class],
+    entities = [
+        FoodItem::class,
+        DiaryEntry::class,
+        Recipe::class,
+        UserProfileEntity::class,
+        WeightEntry::class,
+        FavoriteFoodEntity::class
+    ],
     version  = 3,
     exportSchema = false
 )
@@ -57,6 +72,8 @@ abstract class NutriDatabase : RoomDatabase() {
     abstract fun diaryDao(): DiaryDao
     abstract fun recipeDao(): RecipeDao
     abstract fun userProfileDao(): UserProfileDao
+    abstract fun weightDao(): WeightDao
+    abstract fun favoriteFoodDao(): FavoriteFoodDao
 
     companion object {
         @Volatile private var INSTANCE: NutriDatabase? = null
@@ -79,9 +96,32 @@ abstract class NutriDatabase : RoomDatabase() {
 
         private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE recipes ADD COLUMN proteinPerServing REAL")
-                db.execSQL("ALTER TABLE recipes ADD COLUMN carbsPerServing REAL")
-                db.execSQL("ALTER TABLE recipes ADD COLUMN fatPerServing REAL")
+                // Extend user_profile with carb/fat goals
+                db.execSQL("ALTER TABLE user_profile ADD COLUMN carbsGoalG REAL NOT NULL DEFAULT 220")
+                db.execSQL("ALTER TABLE user_profile ADD COLUMN fatGoalG REAL NOT NULL DEFAULT 65")
+
+                // Weight tracking
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS weight_entries (
+                        dateStr TEXT NOT NULL PRIMARY KEY,
+                        weightKg REAL NOT NULL
+                    )
+                """.trimIndent())
+
+                // Favorite foods
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS favorite_foods (
+                        foodKey TEXT NOT NULL PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        brand TEXT,
+                        caloriesPer100g REAL NOT NULL,
+                        proteinPer100g REAL NOT NULL,
+                        carbsPer100g REAL NOT NULL,
+                        fatPer100g REAL NOT NULL,
+                        fiberPer100g REAL NOT NULL DEFAULT 0,
+                        addedAt INTEGER NOT NULL
+                    )
+                """.trimIndent())
             }
         }
 
