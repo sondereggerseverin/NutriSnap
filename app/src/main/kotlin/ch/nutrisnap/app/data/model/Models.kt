@@ -116,3 +116,53 @@ data class RecipeScrapeResult(
     /** True when Instagram blocked all scraping → show manual-caption flow */
     val instagramBlocked: Boolean = false
 )
+
+// ─── Weight Tracking ────────────────────────────────────────────────────────
+
+@Entity(tableName = "weight_entries")
+data class WeightEntry(
+    @PrimaryKey val dateStr: String,
+    val weightKg: Float
+)
+
+// ─── Favorites ──────────────────────────────────────────────────────────────
+
+@Entity(tableName = "favorite_foods")
+data class FavoriteFoodEntity(
+    @PrimaryKey val foodKey: String,
+    val name: String,
+    val brand: String? = null,
+    val caloriesPer100g: Float,
+    val proteinPer100g: Float,
+    val carbsPer100g: Float,
+    val fatPer100g: Float,
+    val fiberPer100g: Float = 0f,
+    val addedAt: Long = System.currentTimeMillis()
+)
+
+/** Stable key for a food item across local DB and OpenFoodFacts results */
+fun FoodItem.favoriteKey(): String =
+    "${name.trim().lowercase()}|${brand?.trim()?.lowercase() ?: ""}"
+
+fun FoodItem.toFavoriteEntity() = FavoriteFoodEntity(
+    foodKey         = favoriteKey(),
+    name            = name,
+    brand           = brand,
+    caloriesPer100g = caloriesPer100g,
+    proteinPer100g  = proteinPer100g,
+    carbsPer100g    = carbsPer100g,
+    fatPer100g      = fatPer100g,
+    fiberPer100g    = fiberPer100g
+)
+
+fun FavoriteFoodEntity.toFoodItem() = FoodItem(
+    id              = 0,
+    name            = name,
+    brand           = brand,
+    caloriesPer100g = caloriesPer100g,
+    proteinPer100g  = proteinPer100g,
+    carbsPer100g    = carbsPer100g,
+    fatPer100g      = fatPer100g,
+    fiberPer100g    = fiberPer100g,
+    isCustom        = false
+)
