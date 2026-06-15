@@ -51,6 +51,9 @@ interface DiaryDao {
 
     @Query("SELECT SUM(calories) FROM diary_entries WHERE dateStr = :dateStr")
     suspend fun totalCaloriesForDate(dateStr: String): Float?
+
+    @Query("SELECT EXISTS(SELECT 1 FROM diary_entries WHERE dateStr = :dateStr)")
+    suspend fun hasEntriesForDate(dateStr: String): Boolean
 }
 
 data class DailySummary(
@@ -80,4 +83,40 @@ interface RecipeDao {
 
     @Query("SELECT * FROM recipes WHERE id = :id")
     suspend fun getById(id: Long): Recipe?
+}
+
+@Dao
+interface WeightDao {
+    @Query("SELECT * FROM weight_entries ORDER BY dateStr ASC")
+    fun getAll(): Flow<List<WeightEntry>>
+
+    @Query("SELECT * FROM weight_entries WHERE dateStr >= :fromDate ORDER BY dateStr ASC")
+    fun getSince(fromDate: String): Flow<List<WeightEntry>>
+
+    @Query("SELECT * FROM weight_entries ORDER BY dateStr DESC LIMIT 1")
+    suspend fun getLatest(): WeightEntry?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entry: WeightEntry)
+
+    @Delete
+    suspend fun delete(entry: WeightEntry)
+}
+
+@Dao
+interface FavoriteFoodDao {
+    @Query("SELECT * FROM favorite_foods ORDER BY addedAt DESC")
+    fun getAll(): Flow<List<FavoriteFoodEntity>>
+
+    @Query("SELECT * FROM favorite_foods WHERE foodKey = :key LIMIT 1")
+    suspend fun getByKey(key: String): FavoriteFoodEntity?
+
+    @Query("SELECT EXISTS(SELECT 1 FROM favorite_foods WHERE foodKey = :key)")
+    fun isFavoriteFlow(key: String): Flow<Boolean>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(item: FavoriteFoodEntity)
+
+    @Query("DELETE FROM favorite_foods WHERE foodKey = :key")
+    suspend fun deleteByKey(key: String)
 }
