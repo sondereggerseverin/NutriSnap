@@ -3,7 +3,6 @@ package ch.nutrisnap.app.data.repository
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.db.toDomain
 import ch.nutrisnap.app.data.db.toEntity
-import ch.nutrisnap.app.data.db.UserProfileEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -13,6 +12,8 @@ import kotlinx.coroutines.withContext
 data class UserProfile(
     val dailyCalorieGoal: Int   = 2000,
     val proteinGoalG:     Float = 120f,
+    val carbsGoalG:       Float = 220f,
+    val fatGoalG:         Float = 65f,
     val weightKg:         Float = 0f,
     val heightCm:         Int   = 0,
     val ageYears:         Int   = 0,
