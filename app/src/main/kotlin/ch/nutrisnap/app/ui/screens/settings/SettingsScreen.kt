@@ -28,6 +28,8 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
     var ageText       by remember(profile.ageYears)    { mutableStateOf(if (profile.ageYears > 0) profile.ageYears.toString() else "") }
     var calorieText   by remember(profile.dailyCalorieGoal) { mutableStateOf(profile.dailyCalorieGoal.toString()) }
     var proteinText   by remember(profile.proteinGoalG) { mutableStateOf(profile.proteinGoalG.toInt().toString()) }
+    var carbsText     by remember(profile.carbsGoalG) { mutableStateOf(profile.carbsGoalG.toInt().toString()) }
+    var fatText       by remember(profile.fatGoalG) { mutableStateOf(profile.fatGoalG.toInt().toString()) }
     var activity      by remember(profile.activityFactor) { mutableStateOf(profile.activityFactor) }
     var showSaved     by remember { mutableStateOf(false) }
 
@@ -51,6 +53,8 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
         SettingsCard(title = "Ernährungsziele", icon = Icons.Default.TrackChanges) {
             GoalField("Kalorienziel (kcal)", calorieText, KeyboardType.Number) { calorieText = it }
             GoalField("Proteinziel (g)",     proteinText, KeyboardType.Number) { proteinText = it }
+            GoalField("Kohlenhydratziel (g)", carbsText,  KeyboardType.Number) { carbsText   = it }
+            GoalField("Fettziel (g)",         fatText,    KeyboardType.Number) { fatText     = it }
         }
 
         // Activity card
@@ -88,6 +92,8 @@ fun SettingsScreen(vm: SettingsViewModel = viewModel()) {
                     ageYears        = ageText.toIntOrNull()      ?: 0,
                     dailyCalorieGoal = calorieText.toIntOrNull() ?: 2000,
                     proteinGoalG    = proteinText.toFloatOrNull() ?: 120f,
+                    carbsGoalG      = carbsText.toFloatOrNull() ?: 220f,
+                    fatGoalG        = fatText.toFloatOrNull() ?: 65f,
                     activityFactor  = activity
                 ))
                 showSaved = true
