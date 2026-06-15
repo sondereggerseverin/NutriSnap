@@ -17,18 +17,22 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import ch.nutrisnap.app.ui.screens.analysis.AnalysisScreen
 import ch.nutrisnap.app.ui.screens.diary.DiaryScreen
+import ch.nutrisnap.app.ui.screens.home.HomeScreen
 import ch.nutrisnap.app.ui.screens.recipes.RecipesScreen
 import ch.nutrisnap.app.ui.screens.settings.SettingsScreen
 import ch.nutrisnap.app.ui.theme.NutriSnapTheme
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
+    object Home     : Screen("home",     "Start",     Icons.Default.Home)
     object Diary    : Screen("diary",    "Tagebuch",  Icons.Default.MenuBook)
-    object Recipes  : Screen("recipes",  "Rezepte",   Icons.Default.Favorite)
-    object Settings : Screen("settings", "Einstellungen", Icons.Default.Settings)
+    object Recipes  : Screen("recipes",  "Rezepte",   Icons.Default.RestaurantMenu)
+    object Analysis : Screen("analysis", "Analyse",   Icons.Default.BarChart)
+    object Settings : Screen("settings", "Mehr",      Icons.Default.Settings)
 }
 
-val bottomNavItems = listOf(Screen.Diary, Screen.Recipes, Screen.Settings)
+val bottomNavItems = listOf(Screen.Home, Screen.Diary, Screen.Recipes, Screen.Analysis, Screen.Settings)
 
 class MainActivity : ComponentActivity() {
 
@@ -102,11 +106,21 @@ fun MainScaffold(sharedUrl: String?) {
     ) { innerPadding ->
         NavHost(
             navController    = navController,
-            startDestination = Screen.Diary.route,
+            startDestination = Screen.Home.route,
             modifier         = Modifier.padding(innerPadding)
         ) {
+            composable(Screen.Home.route) {
+                HomeScreen(onNavigateToDiary = {
+                    navController.navigate(Screen.Diary.route) {
+                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                        launchSingleTop = true
+                        restoreState    = true
+                    }
+                })
+            }
             composable(Screen.Diary.route)    { DiaryScreen() }
             composable(Screen.Recipes.route)  { RecipesScreen(sharedUrl = sharedUrl) }
+            composable(Screen.Analysis.route) { AnalysisScreen() }
             composable(Screen.Settings.route) { SettingsScreen() }
         }
     }
