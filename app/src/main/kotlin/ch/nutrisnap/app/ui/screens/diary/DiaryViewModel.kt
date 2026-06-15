@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.data.repository.DiaryRepository
+import ch.nutrisnap.app.data.repository.FavoriteFoodRepository
 import ch.nutrisnap.app.data.repository.FoodItemRepository
 import ch.nutrisnap.app.data.repository.UserProfileRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -30,6 +31,7 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     private val repo        = DiaryRepository(db)
     private val foodRepo    = FoodItemRepository(db)
     private val profileRepo = UserProfileRepository(db)
+    private val favRepo     = FavoriteFoodRepository(db)
 
     private val _date = MutableStateFlow(LocalDate.now())
 
@@ -57,6 +59,16 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     private val _isSearching   = MutableStateFlow(false)
     val searchResults: StateFlow<List<FoodItem>> = _searchResults
     val isSearching:   StateFlow<Boolean>        = _isSearching
+
+    // Favorites
+    val favorites: StateFlow<List<FoodItem>> = favRepo.getAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun isFavorite(food: FoodItem): Flow<Boolean> = favRepo.isFavorite(food)
+
+    fun toggleFavorite(food: FoodItem) {
+        viewModelScope.launch { favRepo.toggle(food) }
+    }
 
     fun setDate(date: LocalDate) { _date.value = date }
     fun prevDay()                { _date.value = _date.value.minusDays(1) }
