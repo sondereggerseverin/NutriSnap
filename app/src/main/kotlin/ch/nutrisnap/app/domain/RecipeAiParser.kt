@@ -46,8 +46,43 @@ object RecipeAiParser {
         imageUrl:  String?,
         apiKey:    String
     ): Recipe = withContext(Dispatchers.IO) {
-        val aiResult = runCatching { callGroq(caption, apiKey) }.getOrNull()
-        aiResult ?: fallbackParse(caption, sourceUrl, platform, imageUrl)
+        val cleaned  = cleanCaption(caption)
+        val aiResult = runCatching { callGroq(cleaned, apiKey) }.getOrNull()
+        aiResult ?: fallbackParse(cleaned, sourceUrl, platform, imageUrl)
+    }
+
+    /**
+     * Strips the "X likes, Y comments - username on Date:" prefix that
+     * Instagram/mirror sites prepend to og:description captions, and removes
+     * surrounding quote marks. Safe to call on already-clean text (no-op).
+     */
+    fun cleanCaption(raw: String): String {
+        val prefixRegex = Regex(
+            """^[\d.,]+\s*(?:likes?|Likes?)\s*,?\s*[\d.,]*\s*(?:comments?|Comments?)?\s*-\s*\S+\s+on\s+[^:]+:\s*""",
+            RegexOption.IGNORE_CASE
+        )
+        var c = prefixRegex.replace(raw.trim(), "").trim()
+        // Strip surrounding straight or curly quotes left over from the caption
+        c = c.removeSurrounding("\"").removeSurrounding("\u201c", "\u201d").trim()
+        return c.ifBlank { raw.trim() }
+    }
+
+    /**
+     * Extracts a clean recipe title (dish name) from a raw caption, stripping
+     * the Instagram metadata prefix and skipping hashtag/metric/date lines.
+     */
+    fun extractTitle(caption: String, fallback: String = "Rezept"): String {
+        val cleaned = cleanCaption(caption)
+        val lines   = cleaned.lines().map { it.trim() }.filter { it.isNotBlank() }
+        return lines.firstOrNull { line ->
+            line.length > 3 &&
+            line.any { it.isLetter() } &&
+            !line.startsWith("#") &&
+            !Regex("""^\d+[.,]?\d*\s*[KkMm]?\s*(likes?|comments?|followers|views)""", RegexOption.IGNORE_CASE).containsMatchIn(line) &&
+            !Regex("""^\d{4}-\d{2}-\d{2}""").containsMatchIn(line) &&
+            !line.lowercase().startsWith("zutaten") &&
+            !line.lowercase().startsWith("zubereitung")
+        }?.take(80) ?: fallback
     }
 
     // ── Groq call ──────────────────────────────────────────────────────────────
@@ -196,24 +231,18 @@ Rules:
         platform:  String,
         imageUrl:  String?
     ): Recipe {
-        val lines  = caption.lines().map { it.trim() }.filter { it.isNotBlank() }
-        val lower  = caption.lowercase()
+        val cleaned = cleanCaption(caption)
+        val lower   = cleaned.lowercase()
 
-        // Title: first non-hashtag, non-metric line
-        val title = lines.firstOrNull { line ->
-            line.length > 4 &&
-            line.any { it.isLetter() } &&
-            !line.startsWith("#") &&
-            !Regex("""^\d+[KkMm]?\s*(likes|comments|followers)""").containsMatchIn(line) &&
-            !Regex("""^\d{4}-\d{2}-\d{2}""").containsMatchIn(line)
-        }?.take(80) ?: "Instagram Rezept"
+        // Title: cleaned caption, first meaningful line without IG metadata
+        val title = extractTitle(cleaned, fallback = "Instagram Rezept")
 
         // Servings
         val servingsMatch = Regex("""(?:makes?|für|ergibt|serves?)\s*(\d+)""", RegexOption.IGNORE_CASE).find(lower)
         val servings = servingsMatch?.groupValues?.get(1)?.toIntOrNull() ?: 1
 
         // Calories
-        val calMatch = Regex("""(\d{3,4})\s*(?:cal|kcal|calories)""", RegexOption.IGNORE_CASE).find(caption)
+        val calMatch = Regex("""(\d{3,4})\s*(?:cal|kcal|calories)""", RegexOption.IGNORE_CASE).find(cleaned)
         val cals = calMatch?.groupValues?.get(1)?.toFloatOrNull()
 
         // Section split
@@ -227,15 +256,15 @@ Rules:
 
         val ingredients = when {
             ingrIdx != null && instrIdx != null && instrIdx > ingrIdx ->
-                caption.substring(ingrIdx, instrIdx).trim()
-            ingrIdx != null -> caption.substring(ingrIdx).trim()
-            else -> caption.lines()
+                cleaned.substring(ingrIdx, instrIdx).trim()
+            ingrIdx != null -> cleaned.substring(ingrIdx).trim()
+            else -> cleaned.lines()
                 .filter { it.startsWith("-") || it.startsWith("•") || it.matches(Regex("""\d+g.*""")) }
-                .joinToString("\n").ifBlank { caption.take(1000) }
+                .joinToString("\n").ifBlank { cleaned.take(1000) }
         }
 
         val instructions = when {
-            instrIdx != null -> caption.substring(instrIdx).trim()
+            instrIdx != null -> cleaned.substring(instrIdx).trim()
             else -> ""
         }
 
