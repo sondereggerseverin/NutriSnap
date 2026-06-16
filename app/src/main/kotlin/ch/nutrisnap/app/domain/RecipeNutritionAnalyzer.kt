@@ -371,7 +371,8 @@ object RecipeNutritionAnalyzer {
         val map = mutableMapOf<String, AiNutritionEntry>()
         for (i in 0 until items.length()) {
             val obj  = items.getJSONObject(i)
-            val name = obj.optString("name").ifBlank { continue }
+            val name = obj.optString("name")
+            if (name.isBlank()) continue
             map[name] = AiNutritionEntry(
                 calories = obj.optDouble("calories", 0.0).toFloat(),
                 protein  = obj.optDouble("protein", 0.0).toFloat(),
