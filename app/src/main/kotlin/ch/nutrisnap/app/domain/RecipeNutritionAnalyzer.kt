@@ -93,7 +93,12 @@ object RecipeNutritionAnalyzer {
         if (clean.isBlank() || clean.length < 2) return null
 
         val numRegex = Regex("""^(\d+(?:[.,/]\d+)?(?:\s+and\s+\d+/\d+)?)\s*""")
-        val numMatch = numRegex.find(clean) ?: return ParsedIngredient(100f, clean.take(50))
+        val numMatch = numRegex.find(clean) ?: run {
+            // No leading quantity (e.g. "Öl-Spray", "Frischer Koriander", "Prise Salz")
+            val lc = clean.lowercase()
+            val amt = if (lc.contains("spray") || lc.contains("prise") || lc.contains("pinch")) 2f else 100f
+            return ParsedIngredient(amt, clean.take(50))
+        }
 
         val amount = parseNumber(numMatch.value.trim())
         val rest   = clean.removePrefix(numMatch.value).trim()
@@ -110,7 +115,8 @@ object RecipeNutritionAnalyzer {
             ParsedIngredient(amountG.coerceAtLeast(1f), foodName.ifBlank { rest }.take(50))
         } else {
             val lc = rest.lowercase()
-            val countKey = COUNT_WEIGHTS.keys.firstOrNull { lc.startsWith(it) }
+            val countKey = COUNT_WEIGHTS.keys.sortedByDescending { it.length }
+                .firstOrNull { lc.contains(it) }
             val gramWeight = if (countKey != null) amount * (COUNT_WEIGHTS[countKey] ?: 100f) else amount * 100f
             val foodName = rest.replace(Regex("""\s*(,|;).*"""), "").take(50)
             ParsedIngredient(gramWeight.coerceAtLeast(1f), foodName)
@@ -176,9 +182,36 @@ object RecipeNutritionAnalyzer {
                         if (parsed == null || parsed.name.isBlank() || parsed.name.length < 2) {
                             return@async IngredientResult(line, null, null)
                         }
+                        val factor = parsed.amountG / 100f
+
+                        // 1) Try curated local nutrition DB first — covers generic
+                        //    ingredients (chicken, rice, onion, spices, ...) that
+                        //    OpenFoodFacts (branded-product focused) often misses.
+                        val local = IngredientNutritionDatabase.lookup(parsed.name)
+                        if (local != null) {
+                            return@async IngredientResult(
+                                line     = line,
+                                parsed   = parsed,
+                                foodItem = FoodItem(
+                                    name            = parsed.name,
+                                    caloriesPer100g = local.calories,
+                                    proteinPer100g  = local.protein,
+                                    carbsPer100g    = local.carbs,
+                                    fatPer100g      = local.fat,
+                                    fiberPer100g    = local.fiber,
+                                    isCustom        = false
+                                ),
+                                calories = local.calories * factor,
+                                protein  = local.protein  * factor,
+                                carbs    = local.carbs    * factor,
+                                fat      = local.fat      * factor,
+                                matched  = true
+                            )
+                        }
+
+                        // 2) Fall back to OpenFoodFacts for branded/specific items
                         val food = searchOFF(parsed.name)
                         if (food != null) {
-                            val factor = parsed.amountG / 100f
                             IngredientResult(
                                 line     = line,
                                 parsed   = parsed,
