@@ -509,7 +509,7 @@ private fun NutritionAnalysisCard(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp,
                         color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    Text("Suche Zutaten in Datenbank…", fontSize = 12.sp,
+                    Text("Suche Zutaten in Datenbank & schätze Rest per KI…", fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
                 Spacer(Modifier.height(8.dp))
@@ -527,8 +527,12 @@ private fun NutritionAnalysisCard(
                     Spacer(Modifier.height(8.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha=0.2f))
                     Spacer(Modifier.height(4.dp))
-                    Text("${r.matchedCount}/${r.totalCount} Zutaten gefunden · Gesamt: ${r.totalCalories.toInt()} kcal",
-                        fontSize = 10.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha=0.7f))
+                    val baseText = "${r.matchedCount}/${r.totalCount} Zutaten gefunden · Gesamt: ${r.totalCalories.toInt()} kcal"
+                    Text(baseText, fontSize = 10.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha=0.7f))
+                    if (r.estimatedCount > 0) {
+                        Text("✨ ${r.estimatedCount} davon per KI geschätzt (kein DB-Treffer)",
+                            fontSize = 10.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha=0.7f))
+                    }
                 }
             } else {
                 Spacer(Modifier.height(8.dp))
