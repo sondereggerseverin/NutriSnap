@@ -64,46 +64,76 @@ class RecipeScraper(private val context: Context) {
     private suspend fun scrapeInstagram(url: String): Recipe {
         val shortcode = extractInstagramShortcode(url)
         val oEmbed    = runCatching { fetchOEmbed("https://api.instagram.com/oembed/?url=${encode(url)}&omitscript=true") }.getOrNull()
-        val thumbnail = oEmbed?.get("thumbnail_url")
+        var thumbnail = oEmbed?.get("thumbnail_url")
         val author    = oEmbed?.get("author_name")
         var caption   = ""
 
         caption = runCatching { InstagramWebViewScraper.extractCaption(context, url) ?: "" }.getOrElse { "" }
 
-        if (shortcode != null && caption.isBlank()) {
-            caption = runCatching {
-                jsoupGet("https://imginn.com/p/$shortcode/")
-                    .let { it.select(".desc, .photo-desc, [class*=desc], [class*=caption]").text()
-                        .ifBlank { it.select("meta[property=og:description]").attr("content") } }
-            }.getOrElse { "" }
+        // Mirror sites: extract both caption AND a preview image (og:image) in one
+        // request each, since Instagram's public oEmbed (and thus thumbnail_url)
+        // is usually unavailable without an authenticated app.
+        if (shortcode != null && (caption.isBlank() || thumbnail.isNullOrBlank())) {
+            runCatching {
+                val doc = jsoupGet("https://imginn.com/p/$shortcode/")
+                if (caption.isBlank()) {
+                    caption = doc.select(".desc, .photo-desc, [class*=desc], [class*=caption]").text()
+                        .ifBlank { doc.select("meta[property=og:description]").attr("content") }
+                }
+                if (thumbnail.isNullOrBlank()) {
+                    thumbnail = extractOgImage(doc)
+                }
+            }
         }
-        if (shortcode != null && caption.isBlank()) {
-            caption = runCatching {
-                jsoupGet("https://www.picuki.com/media/$shortcode")
-                    .let { it.select(".photo-description, .description, [class*=caption], [class*=desc]").text()
-                        .ifBlank { it.select("meta[property=og:description]").attr("content") }
-                        .ifBlank { it.select("meta[name=description]").attr("content") } }
-            }.getOrElse { "" }
+        if (shortcode != null && (caption.isBlank() || thumbnail.isNullOrBlank())) {
+            runCatching {
+                val doc = jsoupGet("https://www.picuki.com/media/$shortcode")
+                if (caption.isBlank()) {
+                    caption = doc.select(".photo-description, .description, [class*=caption], [class*=desc]").text()
+                        .ifBlank { doc.select("meta[property=og:description]").attr("content") }
+                        .ifBlank { doc.select("meta[name=description]").attr("content") }
+                }
+                if (thumbnail.isNullOrBlank()) {
+                    thumbnail = extractOgImage(doc)
+                }
+            }
         }
-        if (shortcode != null && caption.isBlank()) {
-            caption = runCatching {
-                jsoupGet("https://www.imgsed.com/p/$shortcode")
-                    .let { it.select("meta[property=og:description]").attr("content")
-                        .ifBlank { it.select("meta[name=description]").attr("content") } }
-            }.getOrElse { "" }
+        if (shortcode != null && (caption.isBlank() || thumbnail.isNullOrBlank())) {
+            runCatching {
+                val doc = jsoupGet("https://www.imgsed.com/p/$shortcode")
+                if (caption.isBlank()) {
+                    caption = doc.select("meta[property=og:description]").attr("content")
+                        .ifBlank { doc.select("meta[name=description]").attr("content") }
+                }
+                if (thumbnail.isNullOrBlank()) {
+                    thumbnail = extractOgImage(doc)
+                }
+            }
         }
-        if (caption.isBlank()) {
-            caption = runCatching {
+        if (caption.isBlank() || thumbnail.isNullOrBlank()) {
+            runCatching {
                 val ddUrl = url.replace("www.instagram.com", "www.ddinstagram.com").replace("instagram.com", "ddinstagram.com")
-                jsoupGet(ddUrl).let { it.select("meta[property=og:description]").attr("content")
-                    .ifBlank { it.select("meta[name=description]").attr("content") } }
-            }.getOrElse { "" }
+                val doc = jsoupGet(ddUrl)
+                if (caption.isBlank()) {
+                    caption = doc.select("meta[property=og:description]").attr("content")
+                        .ifBlank { doc.select("meta[name=description]").attr("content") }
+                }
+                if (thumbnail.isNullOrBlank()) {
+                    thumbnail = extractOgImage(doc)
+                }
+            }
         }
-        if (caption.isBlank()) {
-            caption = runCatching {
-                jsoupGet(url).let { it.select("meta[property=og:description]").attr("content")
-                    .ifBlank { it.select("meta[name=description]").attr("content") } }
-            }.getOrElse { "" }
+        if (caption.isBlank() || thumbnail.isNullOrBlank()) {
+            runCatching {
+                val doc = jsoupGet(url)
+                if (caption.isBlank()) {
+                    caption = doc.select("meta[property=og:description]").attr("content")
+                        .ifBlank { doc.select("meta[name=description]").attr("content") }
+                }
+                if (thumbnail.isNullOrBlank()) {
+                    thumbnail = extractOgImage(doc)
+                }
+            }
         }
 
         if (caption.isBlank()) throw InstagramBlockedException(url)
@@ -120,6 +150,17 @@ class RecipeScraper(private val context: Context) {
             platform  = "instagram",
             tags      = listOfNotNull(parsed.tags.ifBlank { null }, author?.let { "@$it" }).joinToString(",").take(200)
         )
+    }
+
+    /** Extract og:image / twitter:image from a document, filtering out generic placeholder logos */
+    private fun extractOgImage(doc: Document): String? {
+        val candidates = listOf(
+            doc.select("meta[property=og:image]").attr("content"),
+            doc.select("meta[property=og:image:secure_url]").attr("content"),
+            doc.select("meta[name=twitter:image]").attr("content")
+        )
+        return candidates.firstOrNull { it.isNotBlank() && "default" !in it.lowercase() && "logo" !in it.lowercase() }
+            ?.let { if (it.startsWith("http")) it else null }
     }
 
     private fun extractInstagramShortcode(url: String): String? =
