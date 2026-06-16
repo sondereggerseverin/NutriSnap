@@ -7,6 +7,7 @@ import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeScrapeResult
 import ch.nutrisnap.app.data.repository.RecipeRepository
+import ch.nutrisnap.app.domain.RecipeAiParser
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -128,17 +129,18 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
 
     fun saveManualRecipe(url: String, title: String?, caption: String) {
         viewModelScope.launch {
-            val (ingredients, instructions) = parseCaption(caption)
+            val cleaned = RecipeAiParser.cleanCaption(caption)
+            val (ingredients, instructions) = parseCaption(cleaned)
             val recipe = Recipe(
-                title        = title?.ifBlank { null } ?: buildTitleFromCaption(caption),
-                description  = caption.take(500),
+                title        = title?.ifBlank { null } ?: RecipeAiParser.extractTitle(caption, "Instagram Rezept"),
+                description  = cleaned.take(500),
                 sourceUrl    = url.ifBlank { null },
                 platform     = when {
                     "instagram.com" in url || "instagr.am" in url -> "instagram"
                     "tiktok.com" in url -> "tiktok"
                     else -> "web"
                 },
-                ingredients  = ingredients.ifBlank { caption },
+                ingredients  = ingredients.ifBlank { cleaned },
                 instructions = instructions,
                 tags         = "manuell"
             )
@@ -146,10 +148,6 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             _importState.update { it.copy(lastImport = saved) }
         }
     }
-
-    private fun buildTitleFromCaption(caption: String) =
-        caption.lines().firstOrNull { it.trim().length > 4 && it.any { c -> c.isLetter() } }
-            ?.trim()?.take(60) ?: "Instagram Rezept"
 
     private fun parseCaption(caption: String): Pair<String, String> {
         val lower = caption.lowercase()
