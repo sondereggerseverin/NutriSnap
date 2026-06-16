@@ -70,9 +70,6 @@ class RecipeScraper(private val context: Context) {
 
         caption = runCatching { InstagramWebViewScraper.extractCaption(context, url) ?: "" }.getOrElse { "" }
 
-        // Mirror sites: extract both caption AND a preview image (og:image) in one
-        // request each, since Instagram's public oEmbed (and thus thumbnail_url)
-        // is usually unavailable without an authenticated app.
         if (shortcode != null && (caption.isBlank() || thumbnail.isNullOrBlank())) {
             runCatching {
                 val doc = jsoupGet("https://imginn.com/p/$shortcode/")
@@ -80,9 +77,7 @@ class RecipeScraper(private val context: Context) {
                     caption = doc.select(".desc, .photo-desc, [class*=desc], [class*=caption]").text()
                         .ifBlank { doc.select("meta[property=og:description]").attr("content") }
                 }
-                if (thumbnail.isNullOrBlank()) {
-                    thumbnail = extractOgImage(doc)
-                }
+                if (thumbnail.isNullOrBlank()) thumbnail = extractOgImage(doc)
             }
         }
         if (shortcode != null && (caption.isBlank() || thumbnail.isNullOrBlank())) {
@@ -93,9 +88,7 @@ class RecipeScraper(private val context: Context) {
                         .ifBlank { doc.select("meta[property=og:description]").attr("content") }
                         .ifBlank { doc.select("meta[name=description]").attr("content") }
                 }
-                if (thumbnail.isNullOrBlank()) {
-                    thumbnail = extractOgImage(doc)
-                }
+                if (thumbnail.isNullOrBlank()) thumbnail = extractOgImage(doc)
             }
         }
         if (shortcode != null && (caption.isBlank() || thumbnail.isNullOrBlank())) {
@@ -105,9 +98,7 @@ class RecipeScraper(private val context: Context) {
                     caption = doc.select("meta[property=og:description]").attr("content")
                         .ifBlank { doc.select("meta[name=description]").attr("content") }
                 }
-                if (thumbnail.isNullOrBlank()) {
-                    thumbnail = extractOgImage(doc)
-                }
+                if (thumbnail.isNullOrBlank()) thumbnail = extractOgImage(doc)
             }
         }
         if (caption.isBlank() || thumbnail.isNullOrBlank()) {
@@ -118,9 +109,7 @@ class RecipeScraper(private val context: Context) {
                     caption = doc.select("meta[property=og:description]").attr("content")
                         .ifBlank { doc.select("meta[name=description]").attr("content") }
                 }
-                if (thumbnail.isNullOrBlank()) {
-                    thumbnail = extractOgImage(doc)
-                }
+                if (thumbnail.isNullOrBlank()) thumbnail = extractOgImage(doc)
             }
         }
         if (caption.isBlank() || thumbnail.isNullOrBlank()) {
@@ -130,9 +119,7 @@ class RecipeScraper(private val context: Context) {
                     caption = doc.select("meta[property=og:description]").attr("content")
                         .ifBlank { doc.select("meta[name=description]").attr("content") }
                 }
-                if (thumbnail.isNullOrBlank()) {
-                    thumbnail = extractOgImage(doc)
-                }
+                if (thumbnail.isNullOrBlank()) thumbnail = extractOgImage(doc)
             }
         }
 
@@ -152,7 +139,6 @@ class RecipeScraper(private val context: Context) {
         )
     }
 
-    /** Extract og:image / twitter:image from a document, filtering out generic placeholder logos */
     private fun extractOgImage(doc: Document): String? {
         val candidates = listOf(
             doc.select("meta[property=og:image]").attr("content"),
@@ -167,12 +153,15 @@ class RecipeScraper(private val context: Context) {
         Regex("/(?:p|reel|tv)/([A-Za-z0-9_-]+)/?").find(url)?.groupValues?.get(1)
 
     // ── TIKTOK ─────────────────────────────────────────────────────────────────
-    // Strategy 1: tikwm.com API — free, no auth, returns title + cover + author
-    // Strategy 2: WebView (renders JS, can extract description from DOM)
-    // Strategy 3: oEmbed title as last resort
+    // Strategy order (most reliable first):
+    //  1. tikwm.com API  — free, no auth, returns title + cover + author
+    //  2. snaptik / musicaldown mirror sites (og:description)
+    //  3. Dedicated TikTok WebView scraper (desktop UA + TikTok DOM selectors)
+    //  4. Generic og:description via Jsoup
+    //  5. oEmbed title (lowest quality, no body text)
 
     private suspend fun scrapeTikTok(url: String): Recipe {
-        // Expand vm.tiktok.com short links first
+        // Expand vm.tiktok.com / vt.tiktok.com short links
         val expandedUrl = runCatching {
             if ("vm.tiktok.com" in url || "vt.tiktok.com" in url) {
                 client.newCall(Request.Builder().url(url).get().build())
@@ -180,61 +169,100 @@ class RecipeScraper(private val context: Context) {
             } else url
         }.getOrElse { url }
 
-        // Strategy 1: tikwm.com API (most reliable for TikTok content)
-        var caption   = ""
+        var caption:   String? = null
         var thumbnail: String? = null
         var author:    String? = null
 
+        // ── 1. tikwm.com API ─────────────────────────────────────────────────
         runCatching {
-            val apiUrl = "https://www.tikwm.com/api/?url=${encode(expandedUrl)}"
-            val raw    = fetchString(apiUrl)
-            val j      = org.json.JSONObject(raw).optJSONObject("data")
-            if (j != null) {
-                caption   = j.optString("title", "").trim()
-                thumbnail = j.optString("cover", "").ifBlank { null }
-                author    = j.optJSONObject("author")?.optString("nickname")
+            // tikwm accepts both full URLs and short links; try both
+            for (tryUrl in listOf(expandedUrl, url).distinct()) {
+                val apiUrl = "https://www.tikwm.com/api/?url=${encode(tryUrl)}"
+                val raw = fetchStringWithUA(apiUrl,
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36")
+                val j = org.json.JSONObject(raw).optJSONObject("data")
+                if (j != null && j.optInt("code", -1) != -1) {
+                    val t = j.optString("title", "").trim()
+                    if (t.isNotBlank()) { caption = t; break }
+                }
+                // Also check top-level response for some tikwm response formats
+                val root = org.json.JSONObject(raw)
+                val t2 = root.optString("title", "").ifBlank { root.optString("desc", "") }.trim()
+                if (t2.isNotBlank()) { caption = t2; break }
+                thumbnail = j?.optString("cover", "")?.ifBlank { null } ?: thumbnail
+                author    = j?.optJSONObject("author")?.optString("nickname") ?: author
             }
         }
 
-        // Strategy 2: WebView (full JS render)
-        if (caption.isBlank()) {
-            caption = runCatching {
-                InstagramWebViewScraper.extractCaption(context, expandedUrl) ?: ""
-            }.getOrElse { "" }
-        }
-
-        // Strategy 3: og:description via Jsoup
-        if (caption.isBlank()) {
-            caption = runCatching {
-                jsoupGet(expandedUrl).let {
-                    it.select("meta[property=og:description]").attr("content")
-                        .ifBlank { it.select("meta[name=description]").attr("content") }
+        // ── 2. Mirror sites with og:description ──────────────────────────────
+        if (caption.isNullOrBlank() || thumbnail == null) {
+            // snaptik — often has full descriptions in og:description
+            runCatching {
+                val doc = jsoupGetWithUA("https://snaptik.app/en?url=${encode(expandedUrl)}",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36")
+                if (caption.isNullOrBlank()) {
+                    caption = doc.select("meta[property=og:description]").attr("content")
+                        .ifBlank { doc.select(".video-title, .description, [class*=title]").text() }
+                        .ifBlank { null }
                 }
-            }.getOrElse { "" }
+                if (thumbnail == null) thumbnail = extractOgImage(doc)
+            }
         }
 
-        // Strategy 4: oEmbed
-        if (caption.isBlank() || thumbnail == null) {
-            val oEmbed = runCatching { fetchOEmbed("https://www.tiktok.com/oembed?url=${encode(expandedUrl)}") }.getOrNull()
-            if (caption.isBlank()) caption   = oEmbed?.get("title") ?: ""
+        if (caption.isNullOrBlank() || thumbnail == null) {
+            // tikmate.online — another free mirror
+            runCatching {
+                val doc = jsoupGetWithUA("https://tikmate.online/?url=${encode(expandedUrl)}",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36")
+                if (caption.isNullOrBlank()) {
+                    caption = doc.select("meta[property=og:description]").attr("content")
+                        .ifBlank { doc.select(".video-info, .caption, h2").text() }
+                        .ifBlank { null }
+                }
+                if (thumbnail == null) thumbnail = extractOgImage(doc)
+            }
+        }
+
+        // ── 3. Dedicated TikTok WebView scraper ──────────────────────────────
+        if (caption.isNullOrBlank()) {
+            val webViewResult = runCatching {
+                TikTokWebViewScraper.extract(context, expandedUrl)
+            }.getOrNull()
+            if (webViewResult != null) {
+                if (caption.isNullOrBlank()) caption = webViewResult.caption
+                if (author == null) author = webViewResult.author
+            }
+        }
+
+        // ── 4. Jsoup og:description ───────────────────────────────────────────
+        if (caption.isNullOrBlank() || thumbnail == null) {
+            runCatching {
+                val doc = jsoupGetWithUA(expandedUrl,
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36")
+                if (caption.isNullOrBlank()) {
+                    caption = doc.select("meta[property=og:description]").attr("content")
+                        .ifBlank { doc.select("meta[name=description]").attr("content") }
+                        .ifBlank { null }
+                }
+                if (thumbnail == null) thumbnail = extractOgImage(doc)
+            }
+        }
+
+        // ── 5. oEmbed (title only, no body) ──────────────────────────────────
+        if (caption.isNullOrBlank() || thumbnail == null) {
+            val oEmbed = runCatching {
+                fetchOEmbed("https://www.tiktok.com/oembed?url=${encode(expandedUrl)}")
+            }.getOrNull()
+            if (caption.isNullOrBlank()) caption = oEmbed?.get("title")
             if (thumbnail == null) thumbnail = oEmbed?.get("thumbnail_url")
-            if (author    == null) author    = oEmbed?.get("author_name")
+            if (author == null) author = oEmbed?.get("author_name")
         }
 
-        // Strategy 5: ssstik.io embed API (no auth needed)
-        if (caption.isBlank()) {
-            caption = runCatching {
-                val sssUrl = "https://ssstik.io/abc?url=${encode(expandedUrl)}"
-                val doc = jsoupGet(sssUrl)
-                doc.select("p.maintext, .description, [class*=caption]").text()
-                    .ifBlank { doc.select("meta[property=og:description]").attr("content") }
-            }.getOrElse { "" }
-        }
-
-        if (caption.isBlank()) {
+        // Nothing worked → placeholder with edit hint
+        if (caption.isNullOrBlank()) {
             return Recipe(
                 title        = "TikTok Rezept",
-                description  = "Caption konnte nicht geladen werden. Bearbeite das Rezept manuell ((edit)) und füge Zutaten ein.",
+                description  = "Caption konnte nicht geladen werden. Tippe auf ✏️ und füge die Zutaten manuell ein.",
                 sourceUrl    = url,
                 platform     = "tiktok",
                 imageUrl     = thumbnail,
@@ -245,9 +273,9 @@ class RecipeScraper(private val context: Context) {
 
         val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
         val parsed = if (apiKey.isNotBlank()) {
-            RecipeAiParser.parse(caption, url, "tiktok", thumbnail, apiKey)
+            RecipeAiParser.parse(caption!!, url, "tiktok", thumbnail, apiKey)
         } else {
-            RecipeAiParser.fallbackParse(caption, url, "tiktok", thumbnail)
+            RecipeAiParser.fallbackParse(caption!!, url, "tiktok", thumbnail)
         }
         return parsed.copy(
             imageUrl  = thumbnail ?: parsed.imageUrl,
@@ -258,15 +286,11 @@ class RecipeScraper(private val context: Context) {
     }
 
     // ── GENERIC WEB ────────────────────────────────────────────────────────────
-    // FIX: try multiple JSON-LD blocks; also handle arrays and nested @graph
 
     private fun scrapeWeb(url: String, platform: String): Recipe {
         val doc = jsoupGet(url)
 
-        // Try all JSON-LD script blocks, not just the first
         val jsonLdBlocks = doc.select("script[type='application/ld+json']").map { it.data() }
-
-        // Look for Recipe in any block, including @graph arrays
         for (raw in jsonLdBlocks) {
             val recipeJson = extractRecipeFromJsonLd(raw) ?: continue
             return parseJsonLd(recipeJson, url, platform, doc)
@@ -275,7 +299,6 @@ class RecipeScraper(private val context: Context) {
         val title = doc.select("meta[property=og:title]").attr("content").ifBlank { doc.title() }
         val desc  = doc.select("meta[property=og:description]").attr("content")
         val image = doc.select("meta[property=og:image]").attr("content").ifBlank { null }
-        // Be more generous: also grab h2/h3 sections + lists
         val lists = doc.select("ul li, ol li").take(30)
             .joinToString("\n") { "• ${it.text().trim()}" }
 
@@ -291,15 +314,12 @@ class RecipeScraper(private val context: Context) {
         )
     }
 
-    /** Extract a Recipe JSON object from a JSON-LD block (handles @graph arrays) */
     private fun extractRecipeFromJsonLd(raw: String): String? {
         if (raw.isBlank()) return null
         return try {
             val obj = org.json.JSONObject(raw)
             when {
-                // Direct Recipe object
                 obj.optString("@type").contains("Recipe", ignoreCase = true) -> raw
-                // @graph array
                 obj.has("@graph") -> {
                     val graph = obj.getJSONArray("@graph")
                     (0 until graph.length())
@@ -310,7 +330,6 @@ class RecipeScraper(private val context: Context) {
                 else -> null
             }
         } catch (_: Exception) {
-            // Maybe it's a JSON array at top level
             try {
                 val arr = org.json.JSONArray(raw)
                 (0 until arr.length())
@@ -321,29 +340,22 @@ class RecipeScraper(private val context: Context) {
         }
     }
 
-    // ── JSON-LD parser ─────────────────────────────────────────────────────────
-
     private fun parseJsonLd(json: String, url: String, platform: String, doc: Document): Recipe {
         fun field(key: String) = Regex(""""$key"\s*:\s*"([^"]*?)"""").find(json)?.groupValues?.get(1)
         fun listField(key: String): List<String> {
-            // Handle both array-of-strings and array-of-objects with "text" field
             val arr = Regex(""""$key"\s*:\s*\[([^\]]*?)]""", RegexOption.DOT_MATCHES_ALL)
                 .find(json)?.groupValues?.get(1) ?: return emptyList()
-            // Try plain strings first
             val strings = Regex(""""([^"]+)"""").findAll(arr).map { it.groupValues[1] }.toList()
             if (strings.isNotEmpty()) return strings
-            // Try objects with "text" property
             return Regex(""""text"\s*:\s*"([^"]+)"""").findAll(arr).map { it.groupValues[1] }.toList()
         }
         fun parseDur(iso: String) =
             (Regex("""(\d+)H""").find(iso)?.groupValues?.get(1)?.toIntOrNull() ?: 0) * 60 +
             (Regex("""(\d+)M""").find(iso)?.groupValues?.get(1)?.toIntOrNull() ?: 0)
 
-        // recipeYield can be string like "4 Portionen" or just "4"
         val yieldRaw = field("recipeYield") ?: ""
         val servings = Regex("""\d+""").find(yieldRaw)?.value?.toIntOrNull() ?: 1
-
-        val ingredients = listField("recipeIngredient")
+        val ingredients  = listField("recipeIngredient")
         val instructions = listField("recipeInstructions").ifEmpty { listField("text") }
 
         return Recipe(
@@ -357,11 +369,9 @@ class RecipeScraper(private val context: Context) {
             servings        = servings,
             prepTimeMinutes = field("prepTime")?.let { parseDur(it) }?.takeIf { it > 0 },
             tags            = (field("keywords") ?: platform).take(200),
-            totalCalories   = null  // Web recipes rarely have this in JSON-LD
+            totalCalories   = null
         )
     }
-
-    // ── oEmbed ─────────────────────────────────────────────────────────────────
 
     private fun fetchOEmbed(url: String): Map<String, String> {
         val raw = fetchString(url)
@@ -373,8 +383,6 @@ class RecipeScraper(private val context: Context) {
         }
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
-
     private fun cleanTitle(raw: String) =
         raw.replace(Regex("""\s*[-|].*$"""), "").trim().ifBlank { "Rezept" }
 
@@ -382,8 +390,25 @@ class RecipeScraper(private val context: Context) {
 
     private fun jsoupGet(url: String): Document = Jsoup.parse(fetchString(url), url)
 
+    private fun jsoupGetWithUA(url: String, ua: String): Document {
+        val raw = fetchStringWithUA(url, ua)
+        return Jsoup.parse(raw, url)
+    }
+
     private fun fetchString(url: String): String {
         val req = Request.Builder().url(url).build()
+        return client.newCall(req).execute().use { resp ->
+            resp.body?.string() ?: throw Exception("Leere Antwort von $url")
+        }
+    }
+
+    private fun fetchStringWithUA(url: String, ua: String): String {
+        val req = Request.Builder()
+            .url(url)
+            .header("User-Agent", ua)
+            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            .header("Accept-Language", "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7")
+            .build()
         return client.newCall(req).execute().use { resp ->
             resp.body?.string() ?: throw Exception("Leere Antwort von $url")
         }
