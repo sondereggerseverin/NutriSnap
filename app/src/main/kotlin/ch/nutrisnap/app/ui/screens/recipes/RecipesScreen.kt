@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -175,12 +176,8 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            recipe.imageUrl?.let { url ->
-                AsyncImage(model = url, contentDescription = recipe.title,
-                    modifier = Modifier.size(72.dp).clip(RoundedCornerShape(10.dp)),
-                    contentScale = ContentScale.Crop)
-                Spacer(Modifier.width(12.dp))
-            }
+            RecipeThumbnail(recipe = recipe, size = 72.dp)
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(recipe.title, fontWeight = FontWeight.Bold, fontSize = 15.sp,
                     maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -227,6 +224,47 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
         Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.secondary)
     }
 }
+
+/**
+ * Recipe image with a graceful fallback. If [Recipe.imageUrl] is set, shows it
+ * via AsyncImage; otherwise shows a platform-tinted gradient with a fork/knife
+ * icon, so cards never look "empty" the way a missing-image gap used to.
+ */
+@Composable
+private fun RecipeThumbnail(
+    recipe:   Recipe,
+    modifier: Modifier = Modifier,
+    size:     androidx.compose.ui.unit.Dp? = null,
+    shape:    RoundedCornerShape = RoundedCornerShape(10.dp)
+) {
+    val box = if (size != null) modifier.then(Modifier.size(size)) else modifier
+    val url = recipe.imageUrl
+
+    if (!url.isNullOrBlank()) {
+        AsyncImage(
+            model = url, contentDescription = recipe.title,
+            modifier = box.clip(shape),
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        val (gradientColors, icon) = platformVisuals(recipe.platform)
+        Box(
+            modifier = box.clip(shape).background(Brush.linearGradient(gradientColors)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = Color.White.copy(alpha = 0.9f),
+                modifier = Modifier.size((size ?: 64.dp) * 0.4f))
+        }
+    }
+}
+
+private fun platformVisuals(platform: String?): Pair<List<Color>, androidx.compose.ui.graphics.vector.ImageVector> =
+    when (platform?.lowercase()) {
+        "instagram" -> listOf(Color(0xFFFEDA77), Color(0xFFDC2743), Color(0xFF962FBF)) to Icons.Default.CameraAlt
+        "tiktok"    -> listOf(Color(0xFF25F4EE), Color(0xFF000000), Color(0xFFFE2C55)) to Icons.Default.VideoLibrary
+        else        -> listOf(Color(0xFF2D6A4F), Color(0xFF40916C)) to Icons.Default.RestaurantMenu
+    }
+
 @Composable private fun MiniChip(text: String) =
     Text(text, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
@@ -306,13 +344,9 @@ fun RecipeDetailSheet(
     ModalBottomSheet(onDismissRequest = onDismiss, modifier = Modifier.fillMaxHeight(0.94f)) {
         LazyColumn(contentPadding = PaddingValues(bottom = 32.dp, start = 16.dp, end = 16.dp)) {
 
-            recipe.imageUrl?.let { url ->
-                item {
-                    AsyncImage(model=url, contentDescription=recipe.title,
-                        modifier=Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(14.dp)),
-                        contentScale=ContentScale.Crop)
-                    Spacer(Modifier.height(14.dp))
-                }
+            item {
+                RecipeThumbnail(recipe = recipe, modifier = Modifier.fillMaxWidth().height(220.dp), shape = RoundedCornerShape(14.dp))
+                Spacer(Modifier.height(14.dp))
             }
 
             item {
