@@ -61,6 +61,7 @@ interface UserProfileDao {
     version = 4,
     exportSchema = false
 )
+@TypeConverters(Converters::class)
 abstract class NutriDatabase : RoomDatabase() {
     abstract fun foodItemDao(): FoodItemDao
     abstract fun diaryDao(): DiaryDao
