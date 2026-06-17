@@ -6,44 +6,36 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import ch.nutrisnap.app.data.model.DiaryEntry
 import ch.nutrisnap.app.data.model.FavoriteFoodEntity
+import ch.nutrisnap.app.data.model.FastingSession
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.Recipe
+import ch.nutrisnap.app.data.model.WaterEntry
 import ch.nutrisnap.app.data.model.WeightEntry
 import ch.nutrisnap.app.data.repository.UserProfile
 
 @Entity(tableName = "user_profile")
 data class UserProfileEntity(
     @PrimaryKey val id: Int = 1,
-    val weightKg:         Float  = 0f,
-    val heightCm:         Int    = 0,
-    val ageYears:         Int    = 0,
-    val dailyCalorieGoal: Int    = 2000,
-    val proteinGoalG:     Float  = 120f,
-    val carbsGoalG:       Float  = 220f,
-    val fatGoalG:         Float  = 65f,
-    val activityFactor:   Float  = 1.55f
+    val weightKg: Float = 0f,
+    val heightCm: Int = 0,
+    val ageYears: Int = 0,
+    val dailyCalorieGoal: Int = 2000,
+    val proteinGoalG: Float = 120f,
+    val carbsGoalG: Float = 220f,
+    val fatGoalG: Float = 65f,
+    val activityFactor: Float = 1.55f
 )
 
 fun UserProfileEntity.toDomain() = UserProfile(
-    weightKg         = weightKg,
-    heightCm         = heightCm,
-    ageYears         = ageYears,
-    dailyCalorieGoal = dailyCalorieGoal,
-    proteinGoalG     = proteinGoalG,
-    carbsGoalG       = carbsGoalG,
-    fatGoalG         = fatGoalG,
-    activityFactor   = activityFactor
+    weightKg = weightKg, heightCm = heightCm, ageYears = ageYears,
+    dailyCalorieGoal = dailyCalorieGoal, proteinGoalG = proteinGoalG,
+    carbsGoalG = carbsGoalG, fatGoalG = fatGoalG, activityFactor = activityFactor
 )
 
 fun UserProfile.toEntity() = UserProfileEntity(
-    weightKg         = weightKg,
-    heightCm         = heightCm,
-    ageYears         = ageYears,
-    dailyCalorieGoal = dailyCalorieGoal,
-    proteinGoalG     = proteinGoalG,
-    carbsGoalG       = carbsGoalG,
-    fatGoalG         = fatGoalG,
-    activityFactor   = activityFactor
+    weightKg = weightKg, heightCm = heightCm, ageYears = ageYears,
+    dailyCalorieGoal = dailyCalorieGoal, proteinGoalG = proteinGoalG,
+    carbsGoalG = carbsGoalG, fatGoalG = fatGoalG, activityFactor = activityFactor
 )
 
 @Dao
@@ -62,9 +54,11 @@ interface UserProfileDao {
         Recipe::class,
         UserProfileEntity::class,
         WeightEntry::class,
-        FavoriteFoodEntity::class
+        FavoriteFoodEntity::class,
+        WaterEntry::class,
+        FastingSession::class
     ],
-    version  = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class NutriDatabase : RoomDatabase() {
@@ -74,6 +68,7 @@ abstract class NutriDatabase : RoomDatabase() {
     abstract fun userProfileDao(): UserProfileDao
     abstract fun weightDao(): WeightDao
     abstract fun favoriteFoodDao(): FavoriteFoodDao
+    abstract fun waterEntryDao(): WaterEntryDao
 
     companion object {
         @Volatile private var INSTANCE: NutriDatabase? = null
@@ -96,19 +91,14 @@ abstract class NutriDatabase : RoomDatabase() {
 
         private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Extend user_profile with carb/fat goals
                 db.execSQL("ALTER TABLE user_profile ADD COLUMN carbsGoalG REAL NOT NULL DEFAULT 220")
                 db.execSQL("ALTER TABLE user_profile ADD COLUMN fatGoalG REAL NOT NULL DEFAULT 65")
-
-                // Weight tracking
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS weight_entries (
                         dateStr TEXT NOT NULL PRIMARY KEY,
                         weightKg REAL NOT NULL
                     )
                 """.trimIndent())
-
-                // Favorite foods
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS favorite_foods (
                         foodKey TEXT NOT NULL PRIMARY KEY,
@@ -125,6 +115,60 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Extended food_items with barcode, micros, source
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS food_items (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        brand TEXT,
+                        barcode TEXT,
+                        calories REAL NOT NULL,
+                        protein REAL NOT NULL,
+                        carbs REAL NOT NULL,
+                        fat REAL NOT NULL,
+                        servingSize REAL NOT NULL DEFAULT 100,
+                        servingUnit TEXT NOT NULL DEFAULT 'g',
+                        fiber REAL,
+                        sugar REAL,
+                        saturatedFat REAL,
+                        sodium REAL,
+                        potassium REAL,
+                        calcium REAL,
+                        iron REAL,
+                        vitaminC REAL,
+                        vitaminD REAL,
+                        vitaminB12 REAL,
+                        source TEXT NOT NULL DEFAULT 'MANUAL',
+                        completenessScore INTEGER NOT NULL DEFAULT 0,
+                        timesUsed INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
+
+                // Water tracking
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS water_entries (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        date TEXT NOT NULL,
+                        amountMl INTEGER NOT NULL,
+                        timestamp TEXT NOT NULL
+                    )
+                """.trimIndent())
+
+                // Fasting sessions
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS fasting_sessions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        startTime TEXT NOT NULL,
+                        endTime TEXT,
+                        goalHours INTEGER NOT NULL DEFAULT 16,
+                        isCompleted INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -132,10 +176,10 @@ abstract class NutriDatabase : RoomDatabase() {
                     NutriDatabase::class.java,
                     "nutrisnap.db"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
-                .fallbackToDestructiveMigration()
-                .build()
-                .also { INSTANCE = it }
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .fallbackToDestructiveMigration()
+                    .build()
+                    .also { INSTANCE = it }
             }
     }
 }
