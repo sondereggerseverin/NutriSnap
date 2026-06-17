@@ -32,7 +32,22 @@ jobs:
       - name: Build Debug APK
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-        run: ./gradlew assembleDebug --stacktrace 2>&1
+        run: ./gradlew assembleDebug --stacktrace > build_output.log 2>&1 || true
+
+      - name: Show build output
+        if: always()
+        run: cat build_output.log
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build_output.log
+          retention-days: 14
+
+      - name: Fail if build actually failed
+        run: grep -q "BUILD SUCCESSFUL" build_output.log
 
       - name: Find APK
         if: always()
