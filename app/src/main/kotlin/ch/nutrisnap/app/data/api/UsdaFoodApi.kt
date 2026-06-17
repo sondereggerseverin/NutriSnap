@@ -9,12 +9,27 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
+/**
+ * NEU: USDA FoodData Central API Integration.
+ *
+ * SETUP:
+ *  1. Kostenloser API-Key unter: https://fdc.nal.usda.gov/api-key-signup
+ *  2. Key in local.properties eintragen: USDA_API_KEY=dein_key_hier
+ *  3. In build.gradle.kts:
+ *     buildConfigField("String", "USDA_API_KEY", localProperties["USDA_API_KEY"].toString())
+ *
+ * Stärke: Sehr gute Abdeckung generischer Lebensmittel (Banane, Hähnchenbrust, etc.)
+ */
 class UsdaFoodApi(private val apiKey: String) {
 
     companion object {
         private const val BASE_URL = "https://api.nal.usda.gov/fdc/v1"
     }
 
+    /**
+     * Sucht Lebensmittel per Textsuche.
+     * Gibt bis zu 25 Ergebnisse zurück, sortiert nach Relevanz.
+     */
     suspend fun search(query: String): List<FoodItem> = withContext(Dispatchers.IO) {
         try {
             val encodedQuery = URLEncoder.encode(query, "UTF-8")
@@ -34,6 +49,25 @@ class UsdaFoodApi(private val apiKey: String) {
         }
     }
 
+    /**
+     * Lookup per FDC-ID (z.B. nach Barcode-Treffer in anderem System).
+     */
+    suspend fun getById(fdcId: String): FoodItem? = withContext(Dispatchers.IO) {
+        try {
+            val url = URL("$BASE_URL/food/$fdcId?api_key=$apiKey")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("Accept", "application/json")
+
+            if (connection.responseCode != 200) return@withContext null
+
+            val response = connection.inputStream.bufferedReader().readText()
+            parseSingleFood(JSONObject(response))
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     private fun parseSearchResponse(json: String): List<FoodItem> {
         return try {
             val root = JSONObject(json)
@@ -48,9 +82,10 @@ class UsdaFoodApi(private val apiKey: String) {
 
     private fun parseSingleFood(obj: JSONObject): FoodItem? {
         return try {
-            val name = obj.optString("description", "").ifEmpty { return null }
+            val name = obj.optString("description", "") .ifEmpty { return null }
             val nutrients = obj.optJSONArray("foodNutrients") ?: return null
 
+            // USDA Nutrient IDs: 208=Energie, 203=Protein, 205=Kohlenhydrate, 204=Fett
             var calories = 0f; var protein = 0f; var carbs = 0f; var fat = 0f
             var fiber: Float? = null; var sodium: Float? = null; var sugar: Float? = null
             var saturatedFat: Float? = null; var potassium: Float? = null

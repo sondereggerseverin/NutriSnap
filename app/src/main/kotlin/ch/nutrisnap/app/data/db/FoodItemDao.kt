@@ -4,6 +4,15 @@ import androidx.room.*
 import ch.nutrisnap.app.data.model.FoodItem
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Erweiterter DAO gegenüber Original.
+ *
+ * NEU:
+ *  - getRecentFoods()   → zuletzt verwendete Lebensmittel (für Suchverlauf)
+ *  - getFrequentFoods() → häufig verwendete Lebensmittel
+ *  - searchByBarcode()  → Barcode-Lookup im lokalen Cache
+ *  - incrementUsage()   → wird nach jeder Verwendung aufgerufen
+ */
 @Dao
 interface FoodItemDao {
 
@@ -16,6 +25,7 @@ interface FoodItemDao {
     @Query("SELECT * FROM food_items ORDER BY id DESC LIMIT 1")
     suspend fun getLastInserted(): FoodItem?
 
+    // NEU: Zuletzt verwendete Lebensmittel (aus DiaryEntries ableiten)
     @Query("""
         SELECT fi.* FROM food_items fi
         INNER JOIN diary_entries de ON fi.id = de.foodItemId
@@ -25,6 +35,7 @@ interface FoodItemDao {
     """)
     fun getRecentFoods(): Flow<List<FoodItem>>
 
+    // NEU: Häufig verwendete Lebensmittel
     @Query("""
         SELECT fi.* FROM food_items fi
         INNER JOIN diary_entries de ON fi.id = de.foodItemId
@@ -40,6 +51,7 @@ interface FoodItemDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(foods: List<FoodItem>)
 
+    // NEU: Nutzungszähler erhöhen (nach jeder Verwendung aufrufen)
     @Query("UPDATE food_items SET timesUsed = timesUsed + 1 WHERE id = :id")
     suspend fun incrementUsage(id: Int)
 

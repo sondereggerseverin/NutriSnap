@@ -9,6 +9,18 @@ import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 
+/**
+ * NEU: Nutritionix API Integration.
+ *
+ * SETUP (kostenloser Account, 500 Anfragen/Tag reichen für Personal Use):
+ *  1. Account unter: https://www.nutritionix.com/business/api
+ *  2. In local.properties:
+ *       NUTRITIONIX_APP_ID=deine_app_id
+ *       NUTRITIONIX_API_KEY=dein_api_key
+ *
+ * STÄRKE: Natural Language Parsing ("2 Scheiben Vollkornbrot mit Butter")
+ *         + Restaurant/Fast-Food-Daten (McDonalds, Subway, etc.)
+ */
 class NutritionixApi(
     private val appId: String,
     private val apiKey: String
@@ -18,6 +30,10 @@ class NutritionixApi(
         private const val BASE_URL = "https://trackapi.nutritionix.com/v2"
     }
 
+    /**
+     * Natural Language Food Search.
+     * Parst Freitexteingaben wie "250g Hähnchenbrust gebraten" oder "ein Apfel".
+     */
     suspend fun parseNaturalLanguage(query: String): List<FoodItem> = withContext(Dispatchers.IO) {
         try {
             val url = URL("$BASE_URL/natural/nutrients")
@@ -41,6 +57,9 @@ class NutritionixApi(
         }
     }
 
+    /**
+     * Suche nach Branded Foods (Markenprodukte + Restaurants).
+     */
     suspend fun searchBranded(query: String): List<FoodItem> = withContext(Dispatchers.IO) {
         try {
             val url = URL("$BASE_URL/search/instant?query=${java.net.URLEncoder.encode(query, "UTF-8")}&branded=true&self=false")
@@ -95,7 +114,7 @@ class NutritionixApi(
                     name = f.optString("food_name", ""),
                     brand = f.optString("brand_name").ifEmpty { null },
                     calories = f.optDouble("nf_calories", 0.0).toFloat(),
-                    protein = 0f, carbs = 0f, fat = 0f,
+                    protein = 0f, carbs = 0f, fat = 0f, // werden beim Detail-Abruf befüllt
                     servingSize = f.optDouble("serving_weight_grams", 100.0).toFloat(),
                     servingUnit = f.optString("serving_unit", "g"),
                     source = FoodSource.NUTRITIONIX,
