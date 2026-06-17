@@ -74,6 +74,8 @@ dependencies {
     implementation(libs.jsoup)
     implementation(libs.coil.compose)
     implementation(libs.okhttp)
+    implementation("androidx.biometric:biometric:1.2.0-alpha05")
+    implementation("androidx.activity:activity-compose:1.9.0")
     // CameraX
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
