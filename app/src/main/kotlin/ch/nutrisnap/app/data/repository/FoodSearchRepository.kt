@@ -1,80 +1,59 @@
 package ch.nutrisnap.app.data.repository
 
+import ch.nutrisnap.app.data.api.NutritionixApi
+import ch.nutrisnap.app.data.api.UsdaFoodApi
+import ch.nutrisnap.app.data.db.FoodItemDao
 import ch.nutrisnap.app.data.model.FoodItem
-import ch.nutrisnap.app.data.model.OFFProduct
-import ch.nutrisnap.app.data.model.OFFSearchResponse
-import ch.nutrisnap.app.data.model.SingleProductResponse
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
 
-class FoodSearchRepository {
+class FoodSearchRepository(
+    private val foodItemDao: FoodItemDao,
+    private val usdaApi: UsdaFoodApi,
+    private val nutritionixApi: NutritionixApi,
+    private val openFoodFactsSearch: suspend (String) -> List<FoodItem>
+) {
 
-    private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
+    suspend fun search(query: String): List<FoodItem> {
+        val cached = foodItemDao.searchFoods(query)
+        if (cached.size >= 5) return cached.sortedByDescending { it.completenessScore }
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .addInterceptor { chain ->
-            chain.proceed(
-                chain.request().newBuilder()
-                    .header("User-Agent", "NutriSnap/1.1 (Android; ch.nutrisnap.app)")
-                    .header("Accept", "application/json")
-                    .build()
-            )
-        }
-        .build()
+        return coroutineScope {
+            val offDeferred = async { runCatching { openFoodFactsSearch(query) }.getOrDefault(emptyList()) }
+            val usdaDeferred = async { runCatching { usdaApi.search(query) }.getOrDefault(emptyList()) }
+            val off = offDeferred.await()
+            val usda = usdaDeferred.await()
+            var combined = (cached + off + usda)
 
-    suspend fun searchByName(query: String): List<FoodItem> = withContext(Dispatchers.IO) {
-        runCatching {
-            val encoded = java.net.URLEncoder.encode(query.trim(), "UTF-8")
-            val url = "https://world.openfoodfacts.org/cgi/search.pl" +
-                    "?search_terms=$encoded" +
-                    "&search_simple=1" +
-                    "&action=process" +
-                    "&json=1" +
-                    "&fields=product_name,brands,nutriments,image_front_small_url" +
-                    "&page_size=25" +
-                    "&sort_by=unique_scans_n"
+            if (combined.size < 5) {
+                val nutritionix = runCatching { nutritionixApi.searchBranded(query) }.getOrDefault(emptyList())
+                combined = combined + nutritionix
+            }
 
-            val raw = fetch(url)
-            val resp = json.decodeFromString<OFFSearchResponse>(raw)
-            resp.products.mapNotNull { it.toFoodItem() }
-        }.getOrElse { emptyList() }
-    }
+            val result = combined
+                .distinctBy { normalizeKey(it) }
+                .sortedByDescending { it.completenessScore }
 
-    suspend fun searchByBarcode(barcode: String): FoodItem? = withContext(Dispatchers.IO) {
-        runCatching {
-            val raw  = fetch("https://world.openfoodfacts.org/api/v0/product/$barcode.json")
-            val resp = json.decodeFromString<SingleProductResponse>(raw)
-            if (resp.status != 1) return@runCatching null
-            resp.product?.toFoodItem()
-        }.getOrNull()
-    }
-
-    private fun OFFProduct.toFoodItem(): FoodItem? {
-        val name = product_name?.trim()?.ifBlank { null } ?: return null
-        val n    = nutriments ?: return null
-        val kcal = n.kcalPer100g ?: return null
-        return FoodItem(
-            name            = name,
-            brand           = brands?.split(",")?.firstOrNull()?.trim(),
-            caloriesPer100g = kcal,
-            proteinPer100g  = n.proteins100g ?: 0f,
-            carbsPer100g    = n.carbs100g    ?: 0f,
-            fatPer100g      = n.fat100g      ?: 0f,
-            fiberPer100g    = n.fiber100g    ?: 0f,
-            isCustom        = false
-        )
-    }
-
-    private fun fetch(url: String): String {
-        val req = Request.Builder().url(url).build()
-        return client.newCall(req).execute().use { resp ->
-            resp.body?.string() ?: throw Exception("Empty response")
+            foodItemDao.insertAll(result.take(20))
+            result
         }
     }
+
+    suspend fun searchNaturalLanguage(query: String): List<FoodItem> =
+        runCatching { nutritionixApi.parseNaturalLanguage(query) }.getOrDefault(emptyList())
+
+    suspend fun searchByBarcode(barcode: String): FoodItem? =
+        foodItemDao.searchByBarcode(barcode)
+            ?: runCatching { openFoodFactsSearch("barcode:$barcode").firstOrNull() }.getOrNull()
+
+    fun getRecentFoods(): Flow<List<FoodItem>> = foodItemDao.getRecentFoods()
+    fun getFrequentFoods(): Flow<List<FoodItem>> = foodItemDao.getFrequentFoods()
+
+    suspend fun incrementUsage(foodItem: FoodItem) {
+        if (foodItem.id != 0) foodItemDao.incrementUsage(foodItem.id)
+    }
+
+    private fun normalizeKey(item: FoodItem): String =
+        (item.barcode ?: item.name.lowercase().trim())
 }
