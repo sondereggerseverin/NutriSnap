@@ -175,11 +175,11 @@ object RecipeNutritionAnalyzer {
                 val name = p.optString("product_name", query).ifBlank { query }
                 return FoodItem(
                     name            = name,
-                    caloriesPer100g = kcal,
-                    proteinPer100g  = n.optDouble("proteins_100g", 0.0).toFloat(),
-                    carbsPer100g    = n.optDouble("carbohydrates_100g", 0.0).toFloat(),
-                    fatPer100g      = n.optDouble("fat_100g", 0.0).toFloat(),
-                    isCustom        = false
+                    calories = kcal,
+                    protein  = n.optDouble("proteins_100g", 0.0).toFloat(),
+                    carbs    = n.optDouble("carbohydrates_100g", 0.0).toFloat(),
+                    fat      = n.optDouble("fat_100g", 0.0).toFloat(),
+                    source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
                 )
             }
             null
@@ -209,12 +209,12 @@ object RecipeNutritionAnalyzer {
                                 parsed   = parsed,
                                 foodItem = FoodItem(
                                     name            = parsed.name,
-                                    caloriesPer100g = local.calories,
-                                    proteinPer100g  = local.protein,
-                                    carbsPer100g    = local.carbs,
-                                    fatPer100g      = local.fat,
-                                    fiberPer100g    = local.fiber,
-                                    isCustom        = false
+                                    calories = local.calories,
+                                    protein  = local.protein,
+                                    carbs    = local.carbs,
+                                    fat      = local.fat,
+                                    fiber    = local.fiber,
+                                    source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
                                 ),
                                 calories = local.calories * factor,
                                 protein  = local.protein  * factor,
@@ -230,10 +230,10 @@ object RecipeNutritionAnalyzer {
                                 line     = line,
                                 parsed   = parsed,
                                 foodItem = food,
-                                calories = food.caloriesPer100g * factor,
-                                protein  = food.proteinPer100g  * factor,
-                                carbs    = food.carbsPer100g    * factor,
-                                fat      = food.fatPer100g      * factor,
+                                calories = food.calories * factor,
+                                protein  = food.protein  * factor,
+                                carbs    = food.carbs    * factor,
+                                fat      = food.fat      * factor,
                                 matched  = true
                             )
                         } else {
@@ -264,11 +264,11 @@ object RecipeNutritionAnalyzer {
                     r.copy(
                         foodItem = FoodItem(
                             name            = r.parsed.name,
-                            caloriesPer100g = est.calories,
-                            proteinPer100g  = est.protein,
-                            carbsPer100g    = est.carbs,
-                            fatPer100g      = est.fat,
-                            isCustom        = false
+                            calories = est.calories,
+                            protein  = est.protein,
+                            carbs    = est.carbs,
+                            fat      = est.fat,
+                            source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
                         ),
                         calories  = est.calories * factor,
                         protein   = est.protein  * factor,

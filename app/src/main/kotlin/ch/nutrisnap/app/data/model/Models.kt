@@ -6,28 +6,15 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.time.LocalDate
 
-// ─── Food / Nutrition ────────────────────────────────────────────────────────
-@Entity(tableName = "food_items")
-data class FoodItem(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val name: String,
-    val brand: String? = null,
-    val caloriesPer100g: Float,
-    val proteinPer100g: Float,
-    val carbsPer100g: Float,
-    val fatPer100g: Float,
-    val fiberPer100g: Float = 0f,
-    val isCustom: Boolean = true
-)
-
+// ─── Diary ───────────────────────────────────────────────────────────────────
 @Entity(tableName = "diary_entries")
 data class DiaryEntry(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val foodItemId: Long,
+    val foodItemId: Int,           // Int to match FoodItem.id
     val foodName: String,
     val amountGrams: Float,
     val mealType: MealType,
-    val dateStr: String,
+    val dateStr: String,           // "yyyy-MM-dd"
     val calories: Float,
     val protein: Float,
     val carbs: Float,
@@ -66,9 +53,9 @@ data class Recipe(
     val servings: Int = 1,
     val prepTimeMinutes: Int? = null,
     val tags: String = "",          // Komma-separierte DietTag-Namen
-    val collectionId: Long? = null, // NEU: Sammlung
-    val isFavorite: Boolean = false, // NEU: Favorit
-    val showNutrition: Boolean = true, // NEU: Nährwert-Toggle
+    val collectionId: Long? = null,
+    val isFavorite: Boolean = false,
+    val showNutrition: Boolean = true,
     val savedAt: Long = System.currentTimeMillis()
 ) {
     fun getDietTags(): List<DietTag> =
@@ -137,24 +124,42 @@ data class RecipeScrapeResult(
 data class WeightEntry(@PrimaryKey val dateStr: String, val weightKg: Float)
 
 // ─── Favorites ───────────────────────────────────────────────────────────────
+// Note: DB column names kept as-is for backward compatibility with Migration 2→3 SQL
 @Entity(tableName = "favorite_foods")
 data class FavoriteFoodEntity(
     @PrimaryKey val foodKey: String,
-    val name: String, val brand: String? = null,
-    val caloriesPer100g: Float, val proteinPer100g: Float,
-    val carbsPer100g: Float, val fatPer100g: Float,
+    val name: String,
+    val brand: String? = null,
+    val caloriesPer100g: Float,   // column name kept for DB compat
+    val proteinPer100g: Float,
+    val carbsPer100g: Float,
+    val fatPer100g: Float,
     val fiberPer100g: Float = 0f,
     val addedAt: Long = System.currentTimeMillis()
 )
 
+// Extension functions updated to use new FoodItem schema (FoodItem.kt)
 fun FoodItem.favoriteKey(): String = "${name.trim().lowercase()}|${brand?.trim()?.lowercase() ?: ""}"
+
 fun FoodItem.toFavoriteEntity() = FavoriteFoodEntity(
-    foodKey = favoriteKey(), name = name, brand = brand,
-    caloriesPer100g = caloriesPer100g, proteinPer100g = proteinPer100g,
-    carbsPer100g = carbsPer100g, fatPer100g = fatPer100g, fiberPer100g = fiberPer100g
+    foodKey        = favoriteKey(),
+    name           = name,
+    brand          = brand,
+    caloriesPer100g = calories,
+    proteinPer100g  = protein,
+    carbsPer100g    = carbs,
+    fatPer100g      = fat,
+    fiberPer100g    = fiber ?: 0f
 )
+
 fun FavoriteFoodEntity.toFoodItem() = FoodItem(
-    id = 0, name = name, brand = brand,
-    caloriesPer100g = caloriesPer100g, proteinPer100g = proteinPer100g,
-    carbsPer100g = carbsPer100g, fatPer100g = fatPer100g, fiberPer100g = fiberPer100g, isCustom = false
+    id       = 0,
+    name     = name,
+    brand    = brand,
+    calories = caloriesPer100g,
+    protein  = proteinPer100g,
+    carbs    = carbsPer100g,
+    fat      = fatPer100g,
+    fiber    = fiberPer100g,
+    source   = FoodSource.MANUAL
 )

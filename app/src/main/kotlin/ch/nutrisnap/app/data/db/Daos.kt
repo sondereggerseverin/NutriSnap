@@ -4,23 +4,7 @@ import androidx.room.*
 import ch.nutrisnap.app.data.model.*
 import kotlinx.coroutines.flow.Flow
 
-@Dao
-interface FoodItemDao {
-    @Query("SELECT * FROM food_items WHERE name LIKE '%' || :query || '%' OR brand LIKE '%' || :query || '%' ORDER BY name LIMIT 50")
-    suspend fun search(query: String): List<FoodItem>
-
-    @Query("SELECT * FROM food_items WHERE isCustom = 1 ORDER BY name")
-    fun getAllCustom(): Flow<List<FoodItem>>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(item: FoodItem): Long
-
-    @Delete
-    suspend fun delete(item: FoodItem)
-
-    @Query("SELECT * FROM food_items WHERE id = :id")
-    suspend fun getById(id: Long): FoodItem?
-}
+// NOTE: FoodItemDao is defined in FoodItemDao.kt — do NOT redeclare it here.
 
 @Dao
 interface DiaryDao {

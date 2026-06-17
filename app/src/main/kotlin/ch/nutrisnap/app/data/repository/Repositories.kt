@@ -1,6 +1,10 @@
 package ch.nutrisnap.app.data.repository
 
 import android.content.Context
+import ch.nutrisnap.app.BuildConfig
+import ch.nutrisnap.app.data.api.NutritionixApi
+import ch.nutrisnap.app.data.api.OpenFoodFactsApi
+import ch.nutrisnap.app.data.api.UsdaFoodApi
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.domain.RecipeScraper
@@ -25,10 +29,10 @@ class DiaryRepository(db: NutriDatabase) {
                 amountGrams = amountGrams,
                 mealType    = mealType,
                 dateStr     = date.toString(),
-                calories    = food.caloriesPer100g * f,
-                protein     = food.proteinPer100g  * f,
-                carbs       = food.carbsPer100g    * f,
-                fat         = food.fatPer100g      * f
+                calories    = food.calories * f,
+                protein     = food.protein  * f,
+                carbs       = food.carbs    * f,
+                fat         = food.fat      * f
             )
         )
     }
@@ -40,23 +44,16 @@ class DiaryRepository(db: NutriDatabase) {
         mealType: MealType,
         date: LocalDate
     ): Long {
-        // servingsFactor = chosen servings; scale per-serving values
-        val perServing = recipe.servings.coerceAtLeast(1).toFloat()
-        // If user chose e.g. 2 servings on a 4-serving recipe → factor = 2/4 * servingsFactor
-        // But servingsFactor is already the absolute number of portions the user wants
-        val scale = servingsFactor / perServing
-
-        val calsTotal    = (recipe.totalCalories    ?: 0f) * scale * perServing  // totalCalories = total for all servings
-        // Simpler: cals per serving * chosen servings
-        val calsPerServ  = recipe.totalCalories?.let { it / perServing } ?: 0f
-        val calories     = calsPerServ * servingsFactor
-        val protein      = (recipe.proteinPerServing ?: 0f) * servingsFactor
-        val carbs        = (recipe.carbsPerServing   ?: 0f) * servingsFactor
-        val fat          = (recipe.fatPerServing     ?: 0f) * servingsFactor
+        val perServing  = recipe.servings.coerceAtLeast(1).toFloat()
+        val calsPerServ = recipe.totalCalories?.let { it / perServing } ?: 0f
+        val calories    = calsPerServ * servingsFactor
+        val protein     = (recipe.proteinPerServing ?: 0f) * servingsFactor
+        val carbs       = (recipe.carbsPerServing   ?: 0f) * servingsFactor
+        val fat         = (recipe.fatPerServing     ?: 0f) * servingsFactor
 
         return dao.insert(
             DiaryEntry(
-                foodItemId  = 0L,
+                foodItemId  = 0,             // 0 = recipe entry (no food_items row)
                 foodName    = recipe.title,
                 amountGrams = 0f,
                 mealType    = mealType,
@@ -77,8 +74,8 @@ class RecipeRepository(db: NutriDatabase, context: Context) {
     private val dao     = db.recipeDao()
     private val scraper = RecipeScraper(context)
 
-    fun getAll():           Flow<List<Recipe>> = dao.getAll()
-    fun search(q: String):  Flow<List<Recipe>> = dao.search(q)
+    fun getAll():          Flow<List<Recipe>> = dao.getAll()
+    fun search(q: String): Flow<List<Recipe>> = dao.search(q)
 
     suspend fun saveRecipe(r: Recipe): Long  = dao.insert(r)
     suspend fun updateRecipe(r: Recipe)      = dao.update(r)
@@ -96,23 +93,38 @@ class RecipeRepository(db: NutriDatabase, context: Context) {
 }
 
 class FoodItemRepository(db: NutriDatabase) {
-    private val dao        = db.foodItemDao()
-    private val remoteRepo = FoodSearchRepository()   // renamed to avoid conflict
+    private val dao = db.foodItemDao()
+
+    /**
+     * FoodSearchRepository wired with real API clients.
+     * API keys are read from BuildConfig; empty strings are safe — both
+     * UsdaFoodApi and NutritionixApi catch exceptions gracefully.
+     */
+    private val remoteRepo = FoodSearchRepository(
+        foodItemDao         = dao,
+        usdaApi             = UsdaFoodApi(apiKey = BuildConfig.USDA_API_KEY),
+        nutritionixApi      = NutritionixApi(
+            appId  = BuildConfig.NUTRITIONIX_APP_ID,
+            apiKey = BuildConfig.NUTRITIONIX_API_KEY
+        ),
+        openFoodFactsSearch = { query -> OpenFoodFactsApi.search(query) }
+    )
 
     fun getCustom(): Flow<List<FoodItem>> = dao.getAllCustom()
 
     suspend fun searchAll(query: String): List<FoodItem> {
+        // Barcode shortcut: pure digit string 8–14 chars
         if (query.all { it.isDigit() } && query.length in 8..14) {
             val barcodeResult = remoteRepo.searchByBarcode(query)
             if (barcodeResult != null) return listOf(barcodeResult)
         }
         val local      = dao.search(query)
-        val remoteList = remoteRepo.searchByName(query)
+        val remoteList = remoteRepo.search(query)
         val names      = local.map { it.name.lowercase() }.toSet()
         return local + remoteList.filter { it.name.lowercase() !in names }
     }
 
     suspend fun searchBarcode(barcode: String): FoodItem? = remoteRepo.searchByBarcode(barcode)
-    suspend fun saveCustomFood(item: FoodItem): Long      = dao.insert(item)
-    suspend fun deleteFood(item: FoodItem)                = dao.delete(item)
+    suspend fun saveCustomFood(item: FoodItem): Long       = dao.insert(item)
+    suspend fun deleteFood(item: FoodItem)                 = dao.delete(item)
 }
