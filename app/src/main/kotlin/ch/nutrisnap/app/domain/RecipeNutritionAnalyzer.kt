@@ -1,19 +1,30 @@
 package ch.nutrisnap.app.domain
 
+import ch.nutrisnap.app.BuildConfig
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.Recipe
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
- * Analyzes recipe ingredients by searching OpenFoodFacts for each item
- * and computing total + per-serving macros.
+ * Analyzes recipe ingredients by looking up macros for each line, in order:
+ *  1. Curated local nutrition DB (covers ~200 common generic ingredients)
+ *  2. OpenFoodFacts search (covers specific/branded products)
+ *  3. AI estimate via Groq (covers anything neither source has — spice
+ *     blends, regional ingredients, prepared products, typos, etc.)
+ *
+ * The AI step is a single batched call for ALL still-unmatched ingredients
+ * (not one call per ingredient), so a 14-ingredient recipe with 3 unknown
+ * items costs exactly one extra request, not three.
  */
 object RecipeNutritionAnalyzer {
 
@@ -25,7 +36,9 @@ object RecipeNutritionAnalyzer {
         val protein:  Float = 0f,
         val carbs:    Float = 0f,
         val fat:      Float = 0f,
-        val matched:  Boolean = false
+        val matched:  Boolean = false,
+        /** True if this result came from the AI estimate step rather than a real DB. */
+        val estimated: Boolean = false
     )
 
     data class ParsedIngredient(
@@ -44,13 +57,22 @@ object RecipeNutritionAnalyzer {
         val carbsPerServing:    Float,
         val fatPerServing:      Float,
         val matchedCount:       Int,
-        val totalCount:         Int
+        val totalCount:         Int,
+        /** How many of the matched ingredients came from the AI estimate (vs. real DB data). */
+        val estimatedCount:     Int = 0
     )
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
+
+    private val aiClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(25, TimeUnit.SECONDS)
+        .build()
+
+    private const val GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
     private val UNIT_TO_G = mapOf(
         "kg" to 1000f, "g" to 1f,
@@ -73,9 +95,8 @@ object RecipeNutritionAnalyzer {
         "knoblauchzehen" to 3f
     )
 
-    // Called from outside the withContext block to avoid non-local return issues
     private fun isIngredientLine(line: String): Boolean {
-        val s = line.trimStart('*', '-', '•', '·', ' ').trim()
+        val s = line.trimStart('*', '-', '\u2022', '\u00b7', ' ').trim()
         if (s.isBlank() || s.length < 3) return false
         val hasDigit = s.any { it.isDigit() }
         val lc = s.lowercase()
@@ -88,13 +109,11 @@ object RecipeNutritionAnalyzer {
     }
 
     fun parseIngredientLine(line: String): ParsedIngredient? {
-        // Strip bullet/asterisk/dash prefixes
         val clean = line.trimStart('*', '-', '\u2022', '\u00b7', ' ').trim()
         if (clean.isBlank() || clean.length < 2) return null
 
         val numRegex = Regex("""^(\d+(?:[.,/]\d+)?(?:\s+and\s+\d+/\d+)?)\s*""")
         val numMatch = numRegex.find(clean) ?: run {
-            // No leading quantity (e.g. "Öl-Spray", "Frischer Koriander", "Prise Salz")
             val lc = clean.lowercase()
             val amt = if (lc.contains("spray") || lc.contains("prise") || lc.contains("pinch")) 2f else 100f
             return ParsedIngredient(amt, clean.take(50))
@@ -103,7 +122,6 @@ object RecipeNutritionAnalyzer {
         val amount = parseNumber(numMatch.value.trim())
         val rest   = clean.removePrefix(numMatch.value).trim()
 
-        // Find unit (longest match first)
         val unitMatch = UNIT_TO_G.entries
             .sortedByDescending { it.key.length }
             .firstOrNull { (unit, _) -> rest.lowercase().startsWith(unit) && (rest.length == unit.length || !rest[unit.length].isLetter()) }
@@ -173,8 +191,8 @@ object RecipeNutritionAnalyzer {
             .map { it.trim() }
             .filter { isIngredientLine(it) }
 
-        // coroutineScope provides the CoroutineScope needed for async{}
-        val results = withContext(Dispatchers.IO) {
+        // ── Pass 1: local DB + OpenFoodFacts (parallel, per-ingredient) ───────────
+        val firstPass = withContext(Dispatchers.IO) {
             coroutineScope {
                 lines.map { line ->
                     async {
@@ -184,9 +202,6 @@ object RecipeNutritionAnalyzer {
                         }
                         val factor = parsed.amountG / 100f
 
-                        // 1) Try curated local nutrition DB first — covers generic
-                        //    ingredients (chicken, rice, onion, spices, ...) that
-                        //    OpenFoodFacts (branded-product focused) often misses.
                         val local = IngredientNutritionDatabase.lookup(parsed.name)
                         if (local != null) {
                             return@async IngredientResult(
@@ -209,7 +224,6 @@ object RecipeNutritionAnalyzer {
                             )
                         }
 
-                        // 2) Fall back to OpenFoodFacts for branded/specific items
                         val food = searchOFF(parsed.name)
                         if (food != null) {
                             IngredientResult(
@@ -230,6 +244,43 @@ object RecipeNutritionAnalyzer {
             }
         }
 
+        // ── Pass 2: AI estimate for whatever is still unmatched ────────────────────
+        val unmatched = firstPass.filter { !it.matched && it.parsed != null }
+        val results: List<IngredientResult> = if (unmatched.isEmpty()) {
+            firstPass
+        } else {
+            val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
+            val estimates = if (apiKey.isNotBlank()) {
+                runCatching { estimateViaAi(unmatched.map { it.parsed!!.name }, apiKey) }.getOrNull()
+            } else null
+
+            if (estimates == null) {
+                firstPass
+            } else {
+                firstPass.map { r ->
+                    if (r.matched || r.parsed == null) return@map r
+                    val est = estimates[r.parsed.name] ?: return@map r
+                    val factor = r.parsed.amountG / 100f
+                    r.copy(
+                        foodItem = FoodItem(
+                            name            = r.parsed.name,
+                            caloriesPer100g = est.calories,
+                            proteinPer100g  = est.protein,
+                            carbsPer100g    = est.carbs,
+                            fatPer100g      = est.fat,
+                            isCustom        = false
+                        ),
+                        calories  = est.calories * factor,
+                        protein   = est.protein  * factor,
+                        carbs     = est.carbs    * factor,
+                        fat       = est.fat      * factor,
+                        matched   = true,
+                        estimated = true
+                    )
+                }
+            }
+        }
+
         val servings = recipe.servings.coerceAtLeast(1).toFloat()
         val totCal   = results.sumOf { it.calories.toDouble() }.toFloat()
         val totProt  = results.sumOf { it.protein.toDouble() }.toFloat()
@@ -247,7 +298,88 @@ object RecipeNutritionAnalyzer {
             carbsPerServing    = totCarb / servings,
             fatPerServing      = totFat  / servings,
             matchedCount       = results.count { it.matched },
-            totalCount         = results.size
+            totalCount         = results.size,
+            estimatedCount     = results.count { it.estimated }
         )
+    }
+
+    // ── AI nutrition estimate ───────────────────────────────────────────────────
+
+    private data class AiNutritionEntry(
+        val calories: Float, val protein: Float, val carbs: Float, val fat: Float
+    )
+
+    /**
+     * Asks Groq to estimate per-100g macros for a batch of ingredient names that
+     * neither the local DB nor OpenFoodFacts could resolve. One request covers
+     * the whole batch, returning a JSON object keyed by ingredient name so
+     * results can be matched back up regardless of response order.
+     */
+    private fun estimateViaAi(names: List<String>, apiKey: String): Map<String, AiNutritionEntry>? {
+        val distinctNames = names.distinct().take(25) // sane upper bound per recipe
+        if (distinctNames.isEmpty()) return null
+
+        val listText = distinctNames.joinToString("\n") { "- $it" }
+        val systemPrompt = """
+            You are a nutrition database. For each food/ingredient name given, return
+            estimated nutrition values PER 100 GRAMS (raw/uncooked unless the name
+            implies otherwise, e.g. "cooked rice"). Use standard reference values
+            (USDA-style) — best estimate, not a real lookup, is fine.
+
+            Respond with ONLY a JSON object, no markdown, no explanation, in this
+            exact shape:
+            {"items": [
+              {"name": "<the exact name as given>", "calories": <kcal per 100g>, "protein": <g per 100g>, "carbs": <g per 100g>, "fat": <g per 100g>}
+            ]}
+
+            If a name is not a real food (e.g. "optional", "to taste", "garnish"),
+            return zeros for all four values for that item — do not omit it.
+        """.trimIndent()
+
+        val payload = JSONObject().apply {
+            put("model", "llama-3.1-8b-instant")
+            put("temperature", 0.2)
+            put("max_tokens", 1200)
+            put("messages", JSONArray().apply {
+                put(JSONObject().apply { put("role", "system"); put("content", systemPrompt) })
+                put(JSONObject().apply { put("role", "user"); put("content", "Ingredients:\n$listText") })
+            })
+        }
+
+        val req = Request.Builder()
+            .url(GROQ_URL)
+            .header("Authorization", "Bearer $apiKey")
+            .header("Content-Type", "application/json")
+            .post(payload.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+
+        val raw = aiClient.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) return null
+            resp.body?.string() ?: return null
+        }
+
+        val content = JSONObject(raw)
+            .optJSONArray("choices")?.optJSONObject(0)
+            ?.optJSONObject("message")?.optString("content")
+            ?: return null
+
+        // Strip potential markdown code fences before parsing
+        val jsonText = content.trim()
+            .removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+
+        val items = JSONObject(jsonText).optJSONArray("items") ?: return null
+        val map = mutableMapOf<String, AiNutritionEntry>()
+        for (i in 0 until items.length()) {
+            val obj  = items.getJSONObject(i)
+            val name = obj.optString("name")
+            if (name.isBlank()) continue
+            map[name] = AiNutritionEntry(
+                calories = obj.optDouble("calories", 0.0).toFloat(),
+                protein  = obj.optDouble("protein", 0.0).toFloat(),
+                carbs    = obj.optDouble("carbs", 0.0).toFloat(),
+                fat      = obj.optDouble("fat", 0.0).toFloat()
+            )
+        }
+        return map.ifEmpty { null }
     }
 }

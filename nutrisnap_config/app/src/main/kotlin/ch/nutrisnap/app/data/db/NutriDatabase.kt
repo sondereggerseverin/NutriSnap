@@ -40,8 +40,11 @@ fun UserProfile.toEntity() = UserProfileEntity(
 
 @Dao
 interface UserProfileDao {
-    @Query("SELECT * FROM user_profile WHERE id = 1") suspend fun get(): UserProfileEntity?
-    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsert(profile: UserProfileEntity)
+    @Query("SELECT * FROM user_profile WHERE id = 1")
+    suspend fun get(): UserProfileEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(profile: UserProfileEntity)
 }
 
 @Database(
@@ -58,7 +61,6 @@ interface UserProfileDao {
     version = 4,
     exportSchema = false
 )
-@TypeConverters(Converters::class)
 abstract class NutriDatabase : RoomDatabase() {
     abstract fun foodItemDao(): FoodItemDao
     abstract fun diaryDao(): DiaryDao
@@ -73,9 +75,20 @@ abstract class NutriDatabase : RoomDatabase() {
 
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("CREATE TABLE IF NOT EXISTS user_profile (id INTEGER NOT NULL PRIMARY KEY, weightKg REAL NOT NULL DEFAULT 0, heightCm INTEGER NOT NULL DEFAULT 0, ageYears INTEGER NOT NULL DEFAULT 0, dailyCalorieGoal INTEGER NOT NULL DEFAULT 2000, proteinGoalG REAL NOT NULL DEFAULT 120, activityFactor REAL NOT NULL DEFAULT 1.55)")
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS user_profile (
+                        id INTEGER NOT NULL PRIMARY KEY,
+                        weightKg REAL NOT NULL DEFAULT 0,
+                        heightCm INTEGER NOT NULL DEFAULT 0,
+                        ageYears INTEGER NOT NULL DEFAULT 0,
+                        dailyCalorieGoal INTEGER NOT NULL DEFAULT 2000,
+                        proteinGoalG REAL NOT NULL DEFAULT 120,
+                        activityFactor REAL NOT NULL DEFAULT 1.55
+                    )
+                """.trimIndent())
             }
         }
+
         private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE user_profile ADD COLUMN carbsGoalG REAL NOT NULL DEFAULT 220")
