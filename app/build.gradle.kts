@@ -81,6 +81,8 @@ dependencies {
     implementation(libs.androidx.camera.view)
     // ML Kit Barcode
     implementation(libs.mlkit.barcode)
+    // Biometric
+    implementation(libs.androidx.biometric)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 }

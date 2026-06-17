@@ -9,6 +9,7 @@ import ch.nutrisnap.app.data.model.FavoriteFoodEntity
 import ch.nutrisnap.app.data.model.FastingSession
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.Recipe
+import ch.nutrisnap.app.data.model.RecipeCollection
 import ch.nutrisnap.app.data.model.WaterEntry
 import ch.nutrisnap.app.data.model.WeightEntry
 import ch.nutrisnap.app.data.repository.UserProfile
@@ -49,13 +50,14 @@ interface UserProfileDao {
         FoodItem::class,
         DiaryEntry::class,
         Recipe::class,
+        RecipeCollection::class,
         UserProfileEntity::class,
         WeightEntry::class,
         FavoriteFoodEntity::class,
         WaterEntry::class,
         FastingSession::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -67,6 +69,7 @@ abstract class NutriDatabase : RoomDatabase() {
     abstract fun weightDao(): WeightDao
     abstract fun favoriteFoodDao(): FavoriteFoodDao
     abstract fun waterEntryDao(): WaterEntryDao
+    abstract fun recipeCollectionDao(): RecipeCollectionDao
 
     companion object {
         @Volatile private var INSTANCE: NutriDatabase? = null
@@ -156,6 +159,24 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS recipe_collections (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        emoji TEXT NOT NULL DEFAULT '📁',
+                        createdAt INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                // Recipe gained collection/favorite/nutrition-visibility fields
+                db.execSQL("ALTER TABLE recipes ADD COLUMN collectionId INTEGER")
+                db.execSQL("ALTER TABLE recipes ADD COLUMN isFavorite INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE recipes ADD COLUMN showNutrition INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE recipes ADD COLUMN savedAt INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -163,7 +184,7 @@ abstract class NutriDatabase : RoomDatabase() {
                     NutriDatabase::class.java,
                     "nutrisnap.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { INSTANCE = it }

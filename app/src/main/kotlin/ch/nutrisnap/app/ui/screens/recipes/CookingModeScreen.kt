@@ -16,14 +16,15 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.nutrisnap.app.data.model.Recipe
-import androidx.activity.compose.LocalActivity
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CookingModeScreen(recipe: Recipe, onBack: () -> Unit) {
 
     // Wakelock: Bildschirm bleibt an waehrend des Kochens
-    val activity = LocalActivity.current
+    val context = LocalContext.current
+    val activity = context as? android.app.Activity
     DisposableEffect(Unit) {
         activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         onDispose {
