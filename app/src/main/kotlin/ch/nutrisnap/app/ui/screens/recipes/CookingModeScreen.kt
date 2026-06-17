@@ -33,15 +33,13 @@ fun CookingModeScreen(recipe: Recipe, onBack: () -> Unit) {
 
     val steps = remember(recipe.instructions) {
         recipe.instructions
-            .split("
-")
+            .split("\n")
             .filter { it.isNotBlank() }
             .mapIndexed { i, step -> step.trim().removePrefix("${i + 1}.").trim() }
     }
 
     val ingredients = remember(recipe.ingredients) {
-        recipe.ingredients.split("
-").filter { it.isNotBlank() }
+        recipe.ingredients.split("\n").filter { it.isNotBlank() }
     }
 
     var currentStep by remember { mutableStateOf(0) }
