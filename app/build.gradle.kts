@@ -19,6 +19,12 @@ android {
         // Groq API key injected from GitHub Actions secret GROQ_API_KEY
         buildConfigField("String", "GROQ_API_KEY",
             "\"${System.getenv("GROQ_API_KEY") ?: ""}\"")
+        buildConfigField("String", "USDA_API_KEY",
+            "\"${System.getenv("USDA_API_KEY") ?: ""}\"")
+        buildConfigField("String", "NUTRITIONIX_APP_ID",
+            "\"${System.getenv("NUTRITIONIX_APP_ID") ?: ""}\"")
+        buildConfigField("String", "NUTRITIONIX_API_KEY",
+            "\"${System.getenv("NUTRITIONIX_API_KEY") ?: ""}\"")
     }
 
     compileOptions {

@@ -191,7 +191,7 @@ fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
                                 headlineContent = { Text(food.name) },
                                 supportingContent = {
                                     val brand = food.brand?.let { " · $it" } ?: ""
-                                    Text("${food.caloriesPer100g.toInt()} kcal/100g$brand")
+                                    Text("${food.calories.toInt()} kcal/100g$brand")
                                 },
                                 leadingContent = { Icon(Icons.Default.Star, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
                                 trailingContent = {
@@ -218,7 +218,7 @@ fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
                             headlineContent = { Text(food.name) },
                             supportingContent = {
                                 val brand = food.brand?.let { " · $it" } ?: ""
-                                Text("${food.caloriesPer100g.toInt()} kcal/100g$brand")
+                                Text("${food.calories.toInt()} kcal/100g$brand")
                             },
                             trailingContent = {
                                 IconButton(onClick = { vm.toggleFavorite(food) }) {
@@ -262,15 +262,15 @@ fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
                     MealPicker(selected = selectedMeal) { selectedMeal = it }
                 }
                 val grams = amountText.toFloatOrNull() ?: 0f
-                val cals  = food.caloriesPer100g * grams / 100f
+                val cals  = food.calories * grams / 100f
                 if (grams > 0) {
                     Spacer(Modifier.height(8.dp))
                     // Macro summary
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Text("${cals.toInt()} kcal", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                        Text("P ${(food.proteinPer100g * grams / 100f).toInt()}g", fontSize = 13.sp)
-                        Text("K ${(food.carbsPer100g * grams / 100f).toInt()}g", fontSize = 13.sp)
-                        Text("F ${(food.fatPer100g * grams / 100f).toInt()}g", fontSize = 13.sp)
+                        Text("P ${(food.protein * grams / 100f).toInt()}g", fontSize = 13.sp)
+                        Text("K ${(food.carbs * grams / 100f).toInt()}g", fontSize = 13.sp)
+                        Text("F ${(food.fat * grams / 100f).toInt()}g", fontSize = 13.sp)
                     }
                 }
                 Spacer(Modifier.height(16.dp))

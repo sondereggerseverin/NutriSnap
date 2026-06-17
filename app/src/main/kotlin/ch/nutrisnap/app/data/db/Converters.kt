@@ -2,6 +2,7 @@ package ch.nutrisnap.app.data.db
 
 import androidx.room.TypeConverter
 import ch.nutrisnap.app.data.model.FoodSource
+import ch.nutrisnap.app.data.model.MealType
 import java.time.LocalDate
 import java.time.LocalDateTime
 
@@ -23,4 +24,10 @@ class Converters {
 
     @TypeConverter
     fun toFoodSource(value: String?): FoodSource? = value?.let { FoodSource.valueOf(it) }
+
+    @TypeConverter
+    fun fromMealType(mealType: MealType?): String? = mealType?.name
+
+    @TypeConverter
+    fun toMealType(value: String?): MealType? = value?.let { MealType.valueOf(it) }
 }
