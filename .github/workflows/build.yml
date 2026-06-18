@@ -28,13 +28,24 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: ./gradlew assembleDebug --stacktrace 2>&1 | tee build_output.log; exit ${PIPESTATUS[0]}
-      - name: Show build errors
+      - name: Post errors as Gist
         if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "=== LAST 200 LINES OF BUILD OUTPUT ==="
-          tail -200 build_output.log
-          echo "=== ERROR LINES ==="
-          grep -i "error\|unresolved\|cannot\|not found\|FAILED" build_output.log | grep -v "^[0-9]" | tail -50
+          ERRORS=$(grep -E "error:|FAILED|unresolved reference|cannot find" build_output.log | tail -80 || true)
+          LAST=$(tail -100 build_output.log)
+          BODY=$(printf "## Build Errors\n\n### Error lines\n\`\`\`\n%s\n\`\`\`\n\n### Last 100 lines\n\`\`\`\n%s\n\`\`\`" "$ERRORS" "$LAST")
+          PAYLOAD=$(jq -n --arg desc "NutriSnap build errors" --arg content "$BODY" \
+            '{"description":$desc,"public":true,"files":{"build_errors.md":{"content":$content}}}')
+          GIST_URL=$(curl -s -X POST https://api.github.com/gists \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" | jq -r '.html_url')
+          echo "## Build Errors" >> $GITHUB_STEP_SUMMARY
+          echo "Gist: $GIST_URL" >> $GITHUB_STEP_SUMMARY
+          echo "::error::Build failed - errors at $GIST_URL"
+          echo "$ERRORS"
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
