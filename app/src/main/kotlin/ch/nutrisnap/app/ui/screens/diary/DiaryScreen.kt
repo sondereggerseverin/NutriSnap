@@ -301,7 +301,7 @@ private fun MealPicker(selected: MealType, onSelect: (MealType) -> Unit) {
     }
 }
 
-fun MealType.label() = when(this) {
+private fun MealType.label() = when(this) {
     MealType.BREAKFAST -> "Frühstück"
     MealType.LUNCH     -> "Mittagessen"
     MealType.DINNER    -> "Abendessen"
