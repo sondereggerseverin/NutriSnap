@@ -7,6 +7,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -45,6 +48,19 @@ jobs:
           name: build-log
           path: build_output.log
           retention-days: 14
+
+      - name: Post build output as commit comment (debug)
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tail -c 60000 build_output.log > build_output_tail.log
+          jq -Rs '{body: ("```\n" + . + "\n```")}' build_output_tail.log > comment.json
+          curl -s -X POST \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/commits/${{ github.sha }}/comments" \
+            -d @comment.json
 
       - name: Fail if build actually failed
         run: grep -q "BUILD SUCCESSFUL" build_output.log
