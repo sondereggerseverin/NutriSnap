@@ -99,7 +99,7 @@ fun BarcodeScannerScreen(
                 .padding(16.dp)
         ) {
             Icon(
-                imageVector = androidx.compose.material.icons.Icons.Default.ArrowBack,
+                imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Zurück",
                 tint = MaterialTheme.colorScheme.onPrimary
             )
