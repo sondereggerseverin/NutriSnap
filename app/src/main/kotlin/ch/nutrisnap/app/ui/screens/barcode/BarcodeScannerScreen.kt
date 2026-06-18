@@ -18,6 +18,7 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 
 /**
  * NEU: Barcode-Scanner Screen mit ML Kit.
@@ -99,7 +100,7 @@ fun BarcodeScannerScreen(
                 .padding(16.dp)
         ) {
             Icon(
-                imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack,
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Zurück",
                 tint = MaterialTheme.colorScheme.onPrimary
             )
