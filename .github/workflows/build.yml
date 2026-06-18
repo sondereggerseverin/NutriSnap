@@ -28,24 +28,18 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: ./gradlew assembleDebug --stacktrace 2>&1 | tee build_output.log; exit ${PIPESTATUS[0]}
-      - name: Post errors as Gist
+      - name: Commit build errors to repo
         if: failure()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ERRORS=$(grep -E "error:|FAILED|unresolved reference|cannot find" build_output.log | tail -80 || true)
-          LAST=$(tail -100 build_output.log)
-          BODY=$(printf "## Build Errors\n\n### Error lines\n\`\`\`\n%s\n\`\`\`\n\n### Last 100 lines\n\`\`\`\n%s\n\`\`\`" "$ERRORS" "$LAST")
-          PAYLOAD=$(jq -n --arg desc "NutriSnap build errors" --arg content "$BODY" \
-            '{"description":$desc,"public":true,"files":{"build_errors.md":{"content":$content}}}')
-          GIST_URL=$(curl -s -X POST https://api.github.com/gists \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD" | jq -r '.html_url')
-          echo "## Build Errors" >> $GITHUB_STEP_SUMMARY
-          echo "Gist: $GIST_URL" >> $GITHUB_STEP_SUMMARY
-          echo "::error::Build failed - errors at $GIST_URL"
-          echo "$ERRORS"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Extract relevant error lines
+          grep -E "e: |error:|FAILED|Unresolved reference|Cannot find|not found|duplicate" build_output.log | tail -100 > build_errors.txt || true
+          echo "---LAST 150 LINES---" >> build_errors.txt
+          tail -150 build_output.log >> build_errors.txt
+          git add build_errors.txt
+          git commit -m "ci: build errors from run ${{ github.run_number }}" || true
+          git push
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
