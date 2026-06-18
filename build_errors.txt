@@ -1,11 +1,11 @@
-# Build errors - run 137
+# Build errors - run 138
 
 ## Error lines
 ```
 Unable to strip the following libraries, packaging them as they are: libbarhopper_v3.so, libdatastore_shared_counter.so, libimage_processing_util_jni.so.
 > Task :app:compileDebugKotlin FAILED
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/barcode/BarcodeScannerScreen.kt:102:89 Unresolved reference: ArrowBack
-BUILD FAILED in 3m 48s
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/barcode/BarcodeScannerScreen.kt:103:31 Unresolved reference: Icons
+BUILD FAILED in 3m 50s
 ```
 
 ## Last 150 lines
@@ -158,6 +158,6 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilat
 	... 2 more
 
 
-BUILD FAILED in 3m 48s
+BUILD FAILED in 3m 50s
 33 actionable tasks: 33 executed
 ```
