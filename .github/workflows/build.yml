@@ -28,17 +28,61 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: ./gradlew assembleDebug --stacktrace 2>&1 | tee build_output.log; exit ${PIPESTATUS[0]}
-      - name: Show errors
+      - name: Upload errors to repo
         if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_NUM: ${{ github.run_number }}
         run: |
-          echo "### Kotlin errors" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          grep -E "^.*\.kt:[0-9]+:[0-9]+: error:|e: .*\.kt|Unresolved reference|Cannot find symbol|not found|FAILED|> Task" build_output.log | tail -60 >> $GITHUB_STEP_SUMMARY || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "### Last 80 lines" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -80 build_output.log >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          python3 - <<'PYEOF'
+          import urllib.request, json, base64, os
+
+          token = os.environ['GH_TOKEN']
+          repo = os.environ['REPO']
+          run_num = os.environ['RUN_NUM']
+
+          with open('build_output.log', 'r', errors='replace') as f:
+              lines = f.readlines()
+
+          error_lines = [l for l in lines if any(k in l for k in [
+              'e: ', 'error:', 'Unresolved reference', 'Cannot find',
+              'cannot find', 'FAILED', 'unresolved', 'not found'
+          ])]
+
+          content = (
+              f"# Build errors - run {run_num}\n\n"
+              "## Error lines\n```\n" +
+              "".join(error_lines[-80:]) +
+              "```\n\n## Last 150 lines\n```\n" +
+              "".join(lines[-150:]) +
+              "```\n"
+          )
+
+          encoded = base64.b64encode(content.encode()).decode()
+
+          # Check if file exists
+          api_url = f"https://api.github.com/repos/{repo}/contents/build_errors.txt"
+          req = urllib.request.Request(api_url, headers={"Authorization": f"token {token}"})
+          try:
+              existing = json.load(urllib.request.urlopen(req))
+              file_sha = existing['sha']
+          except:
+              file_sha = None
+
+          payload = {"message": f"ci: errors run {run_num}", "content": encoded}
+          if file_sha:
+              payload["sha"] = file_sha
+
+          put_req = urllib.request.Request(
+              api_url,
+              data=json.dumps(payload).encode(),
+              headers={"Authorization": f"token {token}", "Content-Type": "application/json"},
+              method="PUT"
+          )
+          resp = json.load(urllib.request.urlopen(put_req))
+          print("Committed:", resp.get('commit', {}).get('sha', 'unknown')[:12])
+          PYEOF
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
