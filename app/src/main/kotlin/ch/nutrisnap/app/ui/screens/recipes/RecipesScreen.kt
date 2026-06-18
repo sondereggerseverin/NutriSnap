@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -301,7 +302,7 @@ fun ImportSheet(prefillUrl: String, isLoading: Boolean, error: String?,
                 }
             } else {
                 Row(verticalAlignment=Alignment.CenterVertically) {
-                    if (!openAtManualCaption) IconButton(onClick={showManual=false}) { Icon(Icons.Default.ArrowBack,"Zurück") }
+                    if (!openAtManualCaption) IconButton(onClick={showManual=false}) { Icon(Icons.AutoMirrored.Filled.ArrowBack,"Zurück") }
                     Column(Modifier.weight(1f)) {
                         Text("Caption einfügen", fontWeight=FontWeight.Bold, fontSize=18.sp)
                         if (openAtManualCaption) Text("Instagram blockiert automatischen Import.", fontSize=12.sp, color=MaterialTheme.colorScheme.error)
