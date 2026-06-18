@@ -1,46 +1,33 @@
 name: Build APK
-
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
-
 permissions:
   contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
           cache-disabled: true
-
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
-
       - name: Build Debug APK
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-        run: ./gradlew assembleDebug --stacktrace > build_output.log 2>&1 || true
-
-      - name: Show build output
-        if: always()
-        run: cat build_output.log
-
+        run: ./gradlew assembleDebug --stacktrace 2>&1 | tee build_output.log; exit ${PIPESTATUS[0]}
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
@@ -48,31 +35,11 @@ jobs:
           name: build-log
           path: build_output.log
           retention-days: 14
-
-      - name: Post build output as commit comment (debug)
-        if: always()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          tail -c 60000 build_output.log > build_output_tail.log
-          jq -Rs '{body: ("```\n" + . + "\n```")}' build_output_tail.log > comment.json
-          curl -s -X POST \
-            -H "Authorization: token $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/commits/${{ github.sha }}/comments" \
-            -d @comment.json
-
-      - name: Fail if build actually failed
-        run: grep -q "BUILD SUCCESSFUL" build_output.log
-
-      - name: Find APK
-        if: always()
-        run: find . -name "*.apk" -type f 2>/dev/null || echo "No APK found"
-
       - name: Upload Debug APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: NutriSnap-debug
           path: app/build/outputs/apk/debug/
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14
