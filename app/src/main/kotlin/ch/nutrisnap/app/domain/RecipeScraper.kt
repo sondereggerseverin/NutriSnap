@@ -180,17 +180,15 @@ class RecipeScraper(private val context: Context) {
                 val apiUrl = "https://www.tikwm.com/api/?url=${encode(tryUrl)}"
                 val raw = fetchStringWithUA(apiUrl,
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36")
-                val j = org.json.JSONObject(raw).optJSONObject("data")
-                if (j != null && j.optInt("code", -1) != -1) {
-                    val t = j.optString("title", "").trim()
-                    if (t.isNotBlank()) { caption = t; break }
-                }
-                // Also check top-level response for some tikwm response formats
                 val root = org.json.JSONObject(raw)
-                val t2 = root.optString("title", "").ifBlank { root.optString("desc", "") }.trim()
-                if (t2.isNotBlank()) { caption = t2; break }
-                thumbnail = j?.optString("cover", "")?.ifBlank { null } ?: thumbnail
-                author    = j?.optJSONObject("author")?.optString("nickname") ?: author
+                    val code = root.optInt("code", -1)
+                    val j = root.optJSONObject("data")
+                    if (code == 0 && j != null) {
+                        val t = j.optString("title", "").ifBlank { j.optString("desc", "") }.trim()
+                        if (t.isNotBlank()) { caption = t; break }
+                        thumbnail = j.optString("cover", "").ifBlank { null } ?: thumbnail
+                        author    = j.optJSONObject("author")?.optString("nickname") ?: author
+                    }
             }
         }
 
