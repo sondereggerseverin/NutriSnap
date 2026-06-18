@@ -28,6 +28,13 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: ./gradlew assembleDebug --stacktrace 2>&1 | tee build_output.log; exit ${PIPESTATUS[0]}
+      - name: Show build errors
+        if: failure()
+        run: |
+          echo "=== LAST 200 LINES OF BUILD OUTPUT ==="
+          tail -200 build_output.log
+          echo "=== ERROR LINES ==="
+          grep -i "error\|unresolved\|cannot\|not found\|FAILED" build_output.log | grep -v "^[0-9]" | tail -50
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
