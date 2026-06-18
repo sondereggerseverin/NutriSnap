@@ -28,32 +28,17 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: ./gradlew assembleDebug --stacktrace 2>&1 | tee build_output.log; exit ${PIPESTATUS[0]}
-      - name: Push errors via API
+      - name: Show errors
         if: failure()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ERROR_LINES=$(grep -E "e: |error:|FAILED|Unresolved reference|Cannot find|cannot find|not found" build_output.log | tail -80 || echo "no grep matches")
-          LAST_LINES=$(tail -150 build_output.log)
-          FULL="${ERROR_LINES}
-=== LAST 150 LINES ===
-${LAST_LINES}"
-          B64=$(echo "$FULL" | base64 -w 0)
-          # Try to get existing file SHA
-          EXISTING=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/contents/build_errors.txt")
-          FILE_SHA=$(echo "$EXISTING" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('sha',''))" 2>/dev/null || echo "")
-          if [ -n "$FILE_SHA" ]; then
-            PAYLOAD=$(python3 -c "import json; print(json.dumps({'message':'ci: build errors run ${{ github.run_number }}','content':'$B64','sha':'$FILE_SHA'}))")
-          else
-            PAYLOAD=$(python3 -c "import json; print(json.dumps({'message':'ci: build errors run ${{ github.run_number }}','content':'$B64'}))")
-          fi
-          curl -s -X PUT \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD" \
-            "https://api.github.com/repos/${{ github.repository }}/contents/build_errors.txt" | \
-            python3 -c "import sys,json; d=json.load(sys.stdin); print('Pushed:', d.get('commit',{}).get('sha','FAILED:'+str(d.get('message','')))[:60])"
+          echo "### Kotlin errors" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -E "^.*\.kt:[0-9]+:[0-9]+: error:|e: .*\.kt|Unresolved reference|Cannot find symbol|not found|FAILED|> Task" build_output.log | tail -60 >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "### Last 80 lines" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -80 build_output.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
