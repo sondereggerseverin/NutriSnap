@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -33,13 +35,15 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Extract relevant error lines
-          grep -E "e: |error:|FAILED|Unresolved reference|Cannot find|not found|duplicate" build_output.log | tail -100 > build_errors.txt || true
-          echo "---LAST 150 LINES---" >> build_errors.txt
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+          grep -E "e: |error:|FAILED|Unresolved reference|Cannot find|cannot find|not found|duplicate" build_output.log | tail -100 > build_errors.txt 2>/dev/null || true
+          echo "" >> build_errors.txt
+          echo "=== LAST 150 LINES ===" >> build_errors.txt
           tail -150 build_output.log >> build_errors.txt
+          git pull --rebase origin main
           git add build_errors.txt
-          git commit -m "ci: build errors from run ${{ github.run_number }}" || true
-          git push
+          git diff --staged --quiet || git commit -m "ci: build errors from run ${{ github.run_number }}"
+          git push origin main
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
