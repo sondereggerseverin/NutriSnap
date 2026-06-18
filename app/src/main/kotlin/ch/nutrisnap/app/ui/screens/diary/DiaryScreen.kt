@@ -22,7 +22,7 @@ import ch.nutrisnap.app.data.model.favoriteKey
 import ch.nutrisnap.app.ui.components.EmptyState
 import ch.nutrisnap.app.ui.components.MacroBar
 import ch.nutrisnap.app.ui.components.SectionHeader
-import ch.nutrisnap.app.ui.screens.food.BarcodeScannerScreen
+import ch.nutrisnap.app.ui.screens.barcode.BarcodeScannerScreen
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -148,7 +148,7 @@ fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
                     }
                 }
             },
-            onDismiss = { showScanner = false }
+            onNavigateBack = { showScanner = false }
         )
         return
     }
