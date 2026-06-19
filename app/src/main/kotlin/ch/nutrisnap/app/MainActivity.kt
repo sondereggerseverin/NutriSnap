@@ -42,12 +42,12 @@ import ch.nutrisnap.app.utils.NetworkMonitor
 import kotlinx.coroutines.flow.map
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
-    object Home     : Screen("home",     "Start",      Icons.Default.Home)
-    object Diary    : Screen("diary",    "Tagebuch",   Icons.Default.MenuBook)
-    object Recipes  : Screen("recipes",  "Rezepte",    Icons.Default.RestaurantMenu)
-    object Analysis : Screen("analysis", "Analyse",    Icons.Default.BarChart)
-    object Health   : Screen("health",   "Gesundheit", Icons.Default.FavoriteBorder)
-    object Settings : Screen("settings", "Mehr",       Icons.Default.Settings)
+    object Home     : Screen("home",     "Start",   Icons.Default.Home)
+    object Diary    : Screen("diary",    "Buch",    Icons.Default.MenuBook)
+    object Recipes  : Screen("recipes",  "Rezepte", Icons.Default.RestaurantMenu)
+    object Analysis : Screen("analysis", "Analyse", Icons.Default.BarChart)
+    object Health   : Screen("health",   "Health",  Icons.Default.FavoriteBorder)
+    object Settings : Screen("settings", "Mehr",    Icons.Default.Settings)
 }
 
 val bottomNavItems = listOf(
@@ -62,7 +62,7 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { granted -> if (granted) NotificationScheduler.scheduleAll(this) }
 
-    // Health Connect permission launcher
+    // Health Connect: launcher expects Set<String> permission strings
     private val healthConnectPermLauncher = registerForActivityResult(
         PermissionController.createRequestPermissionResultContract()
     ) { granted ->
@@ -93,10 +93,8 @@ class MainActivity : ComponentActivity() {
                     .map { it[KEY_BIOMETRIC_LOCK] ?: false }.collectAsState(initial = false)
                 var isUnlocked by remember { mutableStateOf(true) }
 
-                // Hold reference to HealthConnectViewModel so permission callback can reach it
                 val hcVm: HealthConnectViewModel = viewModel()
                 LaunchedEffect(Unit) { healthConnectViewModel = hcVm }
-
                 LaunchedEffect(biometricEnabled) { if (biometricEnabled) isUnlocked = false }
 
                 Column(modifier = Modifier.fillMaxSize()) {
@@ -108,6 +106,7 @@ class MainActivity : ComponentActivity() {
                             sharedUrl = sharedUrl,
                             hcVm = hcVm,
                             onRequestHealthPermission = {
+                                // Launch with the String permission set (required by HC SDK)
                                 healthConnectPermLauncher.launch(
                                     HealthConnectManager.REQUIRED_PERMISSIONS
                                 )
@@ -163,7 +162,7 @@ fun MainScaffold(
                         }
                     },
                     icon = { Icon(screen.icon, contentDescription = screen.label) },
-                    label = { Text(screen.label) }
+                    label = { Text(screen.label, maxLines = 1) }
                 )
             }
         }
