@@ -225,7 +225,7 @@ Rules:
 
     // ── Fallback (no AI) ───────────────────────────────────────────────────────
 
-    fun fallbackParse_OLD(
+    fun fallbackParse(
         caption:   String,
         sourceUrl: String?,
         platform:  String,
@@ -233,45 +233,59 @@ Rules:
     ): Recipe {
         val cleaned = cleanCaption(caption)
         val lower   = cleaned.lowercase()
+        val lines   = cleaned.lines().map { it.trim() }.filter { it.isNotBlank() }
 
-        // Title: cleaned caption, first meaningful line without IG metadata
-        val title = extractTitle(cleaned, fallback = "Instagram Rezept")
+        val title = extractTitle(cleaned,
+            fallback = if (platform == "tiktok") "TikTok Rezept" else "Instagram Rezept")
 
-        // Servings
-        val servingsMatch = Regex("""(?:makes?|für|ergibt|serves?)\s*(\d+)""", RegexOption.IGNORE_CASE).find(lower)
-        val servings = servingsMatch?.groupValues?.get(1)?.toIntOrNull() ?: 1
+        val servings = Regex("""(?:makes?|für|ergibt|serves?|portionen?|servings?)\s*(\d+)""",
+            RegexOption.IGNORE_CASE).find(lower)?.groupValues?.get(1)?.toIntOrNull() ?: 1
 
-        // Calories
-        val calMatch = Regex("""(\d{3,4})\s*(?:cal|kcal|calories)""", RegexOption.IGNORE_CASE).find(cleaned)
-        val cals = calMatch?.groupValues?.get(1)?.toFloatOrNull()
+        val cals = Regex("""(\d{3,4})\s*(?:cal|kcal|calories)""", RegexOption.IGNORE_CASE)
+            .find(cleaned)?.groupValues?.get(1)?.toFloatOrNull()
 
-        // Section split
-        val instrKw = listOf("zubereitung", "anleitung", "preparation", "method",
-            "instructions", "directions", "steps", "how to")
+        val instrKw = listOf("zubereitung", "anleitung", "zubereiten", "preparation",
+            "method", "instructions", "directions", "steps", "how to make", "how to:")
         val ingrKw  = listOf("zutaten", "ingredients", "du brauchst", "you need",
-            "what you need", "ingredients (")
+            "what you need", "you will need", "ingredients:", "what you'll need")
 
         val instrIdx = instrKw.firstNotNullOfOrNull { lower.indexOf(it).takeIf { i -> i > 0 } }
         val ingrIdx  = ingrKw.firstNotNullOfOrNull  { lower.indexOf(it).takeIf { i -> i >= 0 } }
 
+        val ingredientLineRegex = Regex(
+            """^(?:[-•*]|\d+\s*(?:g|ml|l|kg|cup|cups|tbsp?|tsp?|oz|lb|St[üu]ck|stk\.?|EL|TL|Prise|Tasse|Zehe))|""" +
+            """^\d+[.,]?\d*\s+\w""",
+            RegexOption.IGNORE_CASE
+        )
+
         val ingredients = when {
-            ingrIdx != null && instrIdx != null && instrIdx > ingrIdx ->
-                cleaned.substring(ingrIdx, instrIdx).trim()
-            ingrIdx != null -> cleaned.substring(ingrIdx).trim()
-            else -> cleaned.lines()
-                .filter { it.startsWith("-") || it.startsWith("•") || it.matches(Regex("""\d+g.*""")) }
-                .joinToString("\n").ifBlank { cleaned.take(1000) }
+            ingrIdx != null -> {
+                val end = (instrIdx ?: cleaned.length).coerceAtMost(cleaned.length)
+                cleaned.substring(ingrIdx, end).trim()
+            }
+            else -> {
+                val ingrLines = lines.filter { line ->
+                    ingredientLineRegex.containsMatchIn(line) ||
+                    line.startsWith("-") || line.startsWith("•") || line.startsWith("*")
+                }
+                if (ingrLines.size >= 2) {
+                    ingrLines.joinToString("
+")
+                } else {
+                    val hashtagStart = lines.indexOfFirst { it.startsWith("#") }.takeIf { it > 0 }
+                    val bodyLines = lines.drop(1).take(hashtagStart?.minus(1) ?: 30)
+                    bodyLines.joinToString("
+").ifBlank { cleaned.take(1200) }
+                }
+            }
         }
 
-        val instructions = when {
-            instrIdx != null -> cleaned.substring(instrIdx).trim()
-            else -> ""
-        }
+        val instructions = instrIdx?.let { cleaned.substring(it).trim() } ?: ""
 
         return Recipe(
             title           = title,
             description     = cals?.let { "📊 Pro Portion: ${it.toInt()} kcal" } ?: "",
-            ingredients     = ingredients,
+            ingredients     = ingredients.ifBlank { "Tippe ✏️ um Zutaten hinzuzufügen." },
             instructions    = instructions,
             servings        = servings,
             totalCalories   = cals?.let { it * servings },
