@@ -83,6 +83,8 @@ dependencies {
     implementation(libs.mlkit.barcode)
     // Biometric
     implementation(libs.androidx.biometric)
+    // Health Connect
+    implementation(libs.androidx.health.connect)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 }

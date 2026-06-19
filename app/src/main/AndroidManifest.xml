@@ -12,6 +12,19 @@
     <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 
+    <!-- Health Connect Permissions -->
+    <uses-permission android:name="android.permission.health.READ_STEPS"/>
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED"/>
+    <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED"/>
+    <uses-permission android:name="android.permission.health.READ_WEIGHT"/>
+    <uses-permission android:name="android.permission.health.READ_SLEEP"/>
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE"/>
+
+    <!-- Required so Android resolves the Health Connect app -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata"/>
+    </queries>
+
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
 
     <application
@@ -29,6 +42,15 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+        <!-- Required by Health Connect for permission rationale -->
+        <activity
+            android:name=".health.HealthConnectPermissionRationaleActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.health.connect.client.SHOW_PERMISSIONS_RATIONALE"/>
             </intent-filter>
         </activity>
 
