@@ -1,15 +1,69 @@
-# Build errors - run 145
+# Build errors - run 147
 
 ## Error lines
 ```
 Unable to strip the following libraries, packaging them as they are: libbarhopper_v3.so, libdatastore_shared_counter.so, libimage_processing_util_jni.so.
-> Task :app:kaptDebugKotlin FAILED
-error: [MissingType]: Element 'ch.nutrisnap.app.data.db.NutriDatabase' references a type that is not present
-BUILD FAILED in 3m 32s
+> Task :app:compileDebugKotlin FAILED
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:4:17 Unresolved reference: health
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:5:17 Unresolved reference: health
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:6:17 Unresolved reference: health
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:7:17 Unresolved reference: health
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:8:17 Unresolved reference: health
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:17:25 Unresolved reference: HealthConnectClient
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:18:9 Unresolved reference: HealthConnectClient
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:22:13 Unresolved reference: HealthPermission
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:22:48 Unresolved reference: StepsRecord
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:23:13 Unresolved reference: HealthPermission
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:23:48 Unresolved reference: ActiveCaloriesBurnedRecord
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:24:13 Unresolved reference: HealthPermission
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:24:48 Unresolved reference: TotalCaloriesBurnedRecord
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:25:13 Unresolved reference: HealthPermission
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:25:48 Unresolved reference: WeightRecord
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:26:13 Unresolved reference: HealthPermission
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:26:48 Unresolved reference: SleepSessionRecord
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:27:13 Unresolved reference: HealthPermission
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:27:48 Unresolved reference: HeartRateRecord
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:32:13 Unresolved reference: HealthConnectClient
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:33:17 Unresolved reference: HealthConnectClient
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:45:13 Unresolved reference: ReadRecordsRequest
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:45:32 Unresolved reference: StepsRecord
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:45:52 Unresolved reference: TimeRangeFilter
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:47:35 Unresolved reference: it
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:53:13 Unresolved reference: ReadRecordsRequest
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:53:32 Unresolved reference: ActiveCaloriesBurnedRecord
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:53:67 Unresolved reference: TimeRangeFilter
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:55:35 Unresolved reference: it
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:60:13 Unresolved reference: ReadRecordsRequest
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:61:17 Unresolved reference: WeightRecord
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:62:17 Unresolved reference: TimeRangeFilter
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:77:13 Unresolved reference: ReadRecordsRequest
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:77:32 Unresolved reference: SleepSessionRecord
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:77:59 Unresolved reference: TimeRangeFilter
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:79:62 Unresolved reference: it
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:79:76 Unresolved reference: it
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:85:13 Unresolved reference: ReadRecordsRequest
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:85:32 Unresolved reference: HeartRateRecord
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:85:56 Unresolved reference: TimeRangeFilter
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:87:42 Unresolved reference: it
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:88:53 Unresolved reference: it
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:95:13 Unresolved reference: ReadRecordsRequest
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:95:32 Unresolved reference: StepsRecord
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:95:52 Unresolved reference: TimeRangeFilter
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:98:13 Unresolved reference: it
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:99:23 Cannot infer a type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:99:44 Unresolved reference: it
+BUILD FAILED in 3m 39s
 ```
 
 ## Last 150 lines
 ```
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:26)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:157)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.run(DefaultBuildOperationRunner.java:47)
+	at org.gradle.internal.operations.DefaultBuildOperationExecutor.run(DefaultBuildOperationExecutor.java:68)
 	at org.gradle.api.internal.tasks.execution.TaskExecution.executeAction(TaskExecution.java:229)
 	at org.gradle.api.internal.tasks.execution.TaskExecution.executeActions(TaskExecution.java:212)
 	at org.gradle.api.internal.tasks.execution.TaskExecution.executeWithPreviousOutputFiles(TaskExecution.java:195)
@@ -66,7 +120,7 @@ BUILD FAILED in 3m 32s
 	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:64)
 	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:43)
 	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.executeWithNonEmptySources(AbstractSkipEmptyWorkStep.java:125)
-	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:56)
+	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:61)
 	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:36)
 	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsStartedStep.execute(MarkSnapshottingInputsStartedStep.java:38)
 	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.execute(LoadPreviousExecutionStateStep.java:36)
@@ -117,12 +171,10 @@ BUILD FAILED in 3m 32s
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:380)
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
-Caused by: java.lang.reflect.InvocationTargetException
-	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
-	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
-	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
-	at org.jetbrains.kotlin.gradle.internal.KaptExecution.run(KaptWithoutKotlincTask.kt:320)
-	at org.jetbrains.kotlin.gradle.internal.KaptWithoutKotlincTask$KaptExecutionWorkAction.execute(KaptWithoutKotlincTask.kt:266)
+Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilation error. See log for more details
+	at org.jetbrains.kotlin.gradle.tasks.TasksUtilsKt.throwExceptionIfCompilationFailed(tasksUtils.kt:20)
+	at org.jetbrains.kotlin.compilerRunner.GradleKotlinCompilerWork.run(GradleKotlinCompilerWork.kt:141)
+	at org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction.execute(GradleCompilerRunnerWithWorkers.kt:73)
 	at org.gradle.workers.internal.DefaultWorkerServer.execute(DefaultWorkerServer.java:63)
 	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:66)
 	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:62)
@@ -151,13 +203,8 @@ Caused by: java.lang.reflect.InvocationTargetException
 	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.runBatch(DefaultConditionalExecutionQueue.java:157)
 	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.run(DefaultConditionalExecutionQueue.java:126)
 	... 2 more
-Caused by: org.jetbrains.kotlin.kapt3.base.util.KaptBaseError: Error while annotation processing
-	at org.jetbrains.kotlin.kapt3.base.AnnotationProcessingKt.doAnnotationProcessing(annotationProcessing.kt:138)
-	at org.jetbrains.kotlin.kapt3.base.AnnotationProcessingKt.doAnnotationProcessing$default(annotationProcessing.kt:33)
-	at org.jetbrains.kotlin.kapt3.base.Kapt.kapt(Kapt.kt:47)
-	... 34 more
 
 
-BUILD FAILED in 3m 32s
-32 actionable tasks: 32 executed
+BUILD FAILED in 3m 39s
+33 actionable tasks: 33 executed
 ```
