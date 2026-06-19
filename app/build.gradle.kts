@@ -16,7 +16,6 @@ android {
         versionCode = 2
         versionName = "1.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        // Groq API key injected from GitHub Actions secret GROQ_API_KEY
         buildConfigField("String", "GROQ_API_KEY",
             "\"${System.getenv("GROQ_API_KEY") ?: ""}\"")
         buildConfigField("String", "USDA_API_KEY",
@@ -74,13 +73,12 @@ dependencies {
     implementation(libs.jsoup)
     implementation(libs.coil.compose)
     implementation(libs.okhttp)
-    implementation("androidx.biometric:biometric:1.2.0-alpha05")
-    implementation("androidx.activity:activity-compose:1.9.0")
-    // CameraX
+    // CameraX + Guava (ListenableFuture fix)
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
+    implementation("com.google.guava:guava:33.2.1-android")
     // ML Kit Barcode
     implementation(libs.mlkit.barcode)
     // Biometric
