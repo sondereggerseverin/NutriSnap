@@ -8,6 +8,7 @@ import ch.nutrisnap.app.data.model.DiaryEntry
 import ch.nutrisnap.app.data.model.FavoriteFoodEntity
 import ch.nutrisnap.app.data.model.FastingSession
 import ch.nutrisnap.app.data.model.FoodItem
+import ch.nutrisnap.app.data.model.HealthConnectCache
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeCollection
 import ch.nutrisnap.app.data.model.WaterEntry
@@ -50,12 +51,13 @@ interface UserProfileDao {
         FoodItem::class,
         DiaryEntry::class,
         Recipe::class,
-        RecipeCollection::class,
         UserProfileEntity::class,
         WeightEntry::class,
         FavoriteFoodEntity::class,
         WaterEntry::class,
-        FastingSession::class
+        FastingSession::class,
+        RecipeCollection::class,
+        HealthConnectCache::class
     ],
     version = 5,
     exportSchema = false
@@ -70,6 +72,7 @@ abstract class NutriDatabase : RoomDatabase() {
     abstract fun favoriteFoodDao(): FavoriteFoodDao
     abstract fun waterEntryDao(): WaterEntryDao
     abstract fun recipeCollectionDao(): RecipeCollectionDao
+    abstract fun healthConnectDao(): HealthConnectDao
 
     companion object {
         @Volatile private var INSTANCE: NutriDatabase? = null
@@ -104,10 +107,8 @@ abstract class NutriDatabase : RoomDatabase() {
                 """.trimIndent())
             }
         }
-
         private val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Extended food_items with barcode, micros, source
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS food_items (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -135,8 +136,6 @@ abstract class NutriDatabase : RoomDatabase() {
                         timesUsed INTEGER NOT NULL DEFAULT 0
                     )
                 """.trimIndent())
-
-                // Water tracking
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS water_entries (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -145,8 +144,6 @@ abstract class NutriDatabase : RoomDatabase() {
                         timestamp TEXT NOT NULL
                     )
                 """.trimIndent())
-
-                // Fasting sessions
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS fasting_sessions (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -158,7 +155,6 @@ abstract class NutriDatabase : RoomDatabase() {
                 """.trimIndent())
             }
         }
-
         private val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
@@ -166,14 +162,20 @@ abstract class NutriDatabase : RoomDatabase() {
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         name TEXT NOT NULL,
                         emoji TEXT NOT NULL DEFAULT '📁',
-                        createdAt INTEGER NOT NULL
+                        createdAt INTEGER NOT NULL DEFAULT 0
                     )
                 """.trimIndent())
-                // Recipe gained collection/favorite/nutrition-visibility fields
-                db.execSQL("ALTER TABLE recipes ADD COLUMN collectionId INTEGER")
-                db.execSQL("ALTER TABLE recipes ADD COLUMN isFavorite INTEGER NOT NULL DEFAULT 0")
-                db.execSQL("ALTER TABLE recipes ADD COLUMN showNutrition INTEGER NOT NULL DEFAULT 1")
-                db.execSQL("ALTER TABLE recipes ADD COLUMN savedAt INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS health_connect_cache (
+                        date TEXT NOT NULL PRIMARY KEY,
+                        steps INTEGER NOT NULL DEFAULT 0,
+                        activeCaloriesKcal REAL NOT NULL DEFAULT 0.0,
+                        weightKg REAL,
+                        sleepMinutes INTEGER NOT NULL DEFAULT 0,
+                        avgHeartRateBpm INTEGER,
+                        lastUpdated INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
             }
         }
 
