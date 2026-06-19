@@ -1,0 +1,28 @@
+<!-- Füge diese Zeilen in AndroidManifest.xml ein -->
+
+<!-- Permissions (innerhalb von <manifest>) -->
+<uses-permission android:name="android.permission.health.READ_STEPS" />
+<uses-permission android:name="android.permission.health.READ_ACTIVE_ENERGY_BURNED" />
+<uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" />
+<uses-permission android:name="android.permission.health.READ_WEIGHT" />
+<uses-permission android:name="android.permission.health.READ_SLEEP" />
+<uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+
+<!-- Health Connect App-Query (innerhalb von <queries>) -->
+<queries>
+    <package android:name="com.google.android.apps.healthdata" />
+    <package android:name="com.samsung.android.shealth" />
+</queries>
+
+<!-- Activity-Intent-Filter für Health Connect Rationale Screen -->
+<!-- (innerhalb von <application>) -->
+<activity-alias
+    android:name="ViewPermissionUsageActivity"
+    android:exported="true"
+    android:targetActivity=".MainActivity"
+    android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+    <intent-filter>
+        <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+        <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+    </intent-filter>
+</activity-alias>
