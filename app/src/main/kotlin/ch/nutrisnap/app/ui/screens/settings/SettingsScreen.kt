@@ -15,8 +15,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.repository.UserProfile
+import ch.nutrisnap.app.health.HealthConnectManager
+import kotlinx.coroutines.launch
 
 enum class FitnessGoal(val label: String, val emoji: String, val desc: String) {
     LOSE_WEIGHT("Abnehmen",        "🔥", "–500 kcal vom TDEE · mehr Protein"),
@@ -158,6 +162,9 @@ fun SettingsScreen(
                 modifier = Modifier.padding(top = 4.dp))
         }
 
+        // Health Connect
+        HealthConnectCard()
+
         // ── Körperdaten ───────────────────────────────────────────────────────
         SettingsCard(title = "Körperdaten", icon = Icons.Default.Person) {
             GoalField("Gewicht (kg)",  weightText, KeyboardType.Number) {
@@ -288,6 +295,102 @@ fun ActivitySlider(value: Float, onValueChange: (Float) -> Unit) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("Sitzend",    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("Sehr aktiv", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+// ── Health Connect Card ────────────────────────────────────────────────────────
+
+@Composable
+fun HealthConnectCard() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope   = rememberCoroutineScope()
+
+    val isAvailable = remember { HealthConnectManager.isAvailable(context) }
+    var permissionsGranted by remember { mutableStateOf<Boolean?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+
+    // This is the only correct way to request Health Connect permissions
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = PermissionController.createRequestPermissionResultContract()
+    ) { granted ->
+        isLoading = false
+        permissionsGranted = granted.containsAll(HealthConnectManager.REQUIRED_PERMISSIONS)
+    }
+
+    LaunchedEffect(Unit) {
+        if (isAvailable) {
+            runCatching {
+                val manager = HealthConnectManager(context)
+                permissionsGranted = manager.hasAllPermissions()
+            }
+        }
+    }
+
+    SettingsCard(title = "Health Connect", icon = Icons.Default.FavoriteBorder) {
+        if (!isAvailable) {
+            Text(
+                "Health Connect ist auf diesem Gerät nicht verfügbar.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = when (permissionsGranted) {
+                            true  -> "✓ Verbunden"
+                            false -> "Nicht verbunden"
+                            null  -> "Status wird geprüft…"
+                        },
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = when (permissionsGranted) {
+                            true  -> Color(0xFF2E7D32)
+                            else  -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                    Text(
+                        "Schritte, Kalorien, Schlaf, Herzrate",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                if (permissionsGranted != true) {
+                    Button(
+                        onClick = {
+                            isLoading = true
+                            permissionLauncher.launch(HealthConnectManager.REQUIRED_PERMISSIONS)
+                        },
+                        enabled = !isLoading
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                Modifier.size(16.dp), strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        } else {
+                            Text("Verbinden")
+                        }
+                    }
+                } else {
+                    OutlinedButton(onClick = {
+                        scope.launch {
+                            runCatching {
+                                val manager = HealthConnectManager(context)
+                                permissionsGranted = manager.hasAllPermissions()
+                            }
+                        }
+                    }) {
+                        Text("Erneut prüfen", fontSize = 12.sp)
+                    }
+                }
+            }
         }
     }
 }

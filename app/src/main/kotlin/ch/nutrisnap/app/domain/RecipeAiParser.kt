@@ -64,6 +64,11 @@ object RecipeAiParser {
         var c = prefixRegex.replace(raw.trim(), "").trim()
         // Strip surrounding straight or curly quotes left over from the caption
         c = c.removeSurrounding("\"").removeSurrounding("\u201c", "\u201d").trim()
+        // Normalize TikTok's inline "*" ingredient separator → newlines so AI can parse it
+        // e.g. "Makes 1½ cups* 1¼ cups Greek yogurt* 2 garlic cloves*..." → each on its own line
+        if (c.contains("* ") && !c.contains("\n")) {
+            c = c.replace(Regex("\\*(?=\\s*\\d|\\s*[¼½¾])"), "\n•")
+        }
         return c.ifBlank { raw.trim() }
     }
 
@@ -116,6 +121,8 @@ Rules:
 - instructions: extract if present, else null
 - tags: comma-separated, max 5, lowercase
 - All numeric fields must be numbers (not strings), null if unknown
+- IMPORTANT: Some captions (especially TikTok) list ingredients separated by "*" with no newlines, e.g. "* 1 cup flour* 2 eggs* ...". Split these into individual items.
+- IMPORTANT: Ignore promotional text like "Comment X for...", "DM me for...", "Link in bio", hashtags — these are NOT recipe content.
         """.trimIndent()
 
         val userMessage = "Extract recipe from this caption:\n\n$caption"

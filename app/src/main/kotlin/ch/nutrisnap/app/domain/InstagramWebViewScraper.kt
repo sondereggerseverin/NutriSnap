@@ -75,7 +75,7 @@ object InstagramWebViewScraper {
                                         ?.takeIf { it.isNotBlank() && it != "null" }
                                     cont.resume(caption)
                                 }
-                            }, 2_500)
+                            }, 3_500) // Instagram React needs ~3.5s to hydrate caption data
                         }
 
                         override fun onReceivedError(
@@ -107,41 +107,77 @@ object InstagramWebViewScraper {
     private val EXTRACT_JS = """
         (function() {
             try {
-                // 1. Try Instagram's internal data object (best source)
-                var scripts = document.querySelectorAll('script[type="application/json"]');
-                for (var s of scripts) {
+                // Strategy 1: __additionalDataLoaded / window._sharedData (classic IG API)
+                try {
+                    if (window._sharedData) {
+                        var str = JSON.stringify(window._sharedData);
+                        var m = str.match(/"edge_media_to_caption".*?"text":"((?:[^"\\]|\\.)*)"/);
+                        if (m && m[1] && m[1].length > 10) return m[1];
+                    }
+                } catch(e) {}
+
+                // Strategy 2: __additionalDataLoaded (newer IG)
+                try {
+                    var scripts = document.querySelectorAll('script');
+                    for (var s of scripts) {
+                        var txt = s.textContent || '';
+                        if (txt.includes('edge_media_to_caption') || txt.includes('"caption"')) {
+                            var m = txt.match(/"edge_media_to_caption".*?"text":"((?:[^"\\]|\\.)*)"/);
+                            if (!m) m = txt.match(/"caption"\s*:\s*\{[^}]*"text"\s*:\s*"((?:[^"\\]|\\.){20,})"/);
+                            if (m && m[1] && m[1].length > 10) return m[1].replace(/\\n/g, '\n');
+                        }
+                    }
+                } catch(e) {}
+
+                // Strategy 3: application/json script tags (IG hydration data)
+                var jsonScripts = document.querySelectorAll('script[type="application/json"]');
+                for (var js of jsonScripts) {
                     try {
-                        var d = JSON.parse(s.textContent);
-                        var str = JSON.stringify(d);
-                        var m = str.match(/"text"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-                        if (m && m[1] && m[1].length > 20) return m[1];
+                        var str = JSON.stringify(JSON.parse(js.textContent));
+                        // Look specifically for caption text patterns
+                        var patterns = [
+                            /"caption"\s*:\s*\{[^}]*"text"\s*:\s*"((?:[^"\\]|\\.){20,})"/,
+                            /"edge_media_to_caption".*?"text":"((?:[^"\\]|\\.){20,})"/,
+                            /"accessibility_caption":"((?:[^"\\]|\\.){20,})"/
+                        ];
+                        for (var p of patterns) {
+                            var m = str.match(p);
+                            if (m && m[1]) return m[1].replace(/\\n/g, '\n');
+                        }
                     } catch(e) {}
                 }
-                // 2. og:description meta tag (populated after JS render)
+
+                // Strategy 4: og:description meta (populated by JS render)
                 var og = document.querySelector('meta[property="og:description"]');
                 if (og && og.content && og.content.length > 10) return og.content;
-                // 3. article text / h1
-                var article = document.querySelector('article');
+
+                // Strategy 5: h1 or article spans (rendered caption)
+                var article = document.querySelector('article, main');
                 if (article) {
                     var h1 = article.querySelector('h1');
-                    if (h1 && h1.innerText.length > 5) return h1.innerText;
-                    // span with long text
-                    var spans = article.querySelectorAll('span');
+                    if (h1 && h1.innerText && h1.innerText.length > 5) return h1.innerText.trim();
+                    var spans = article.querySelectorAll('span, div[dir]');
+                    var best = '';
                     for (var sp of spans) {
-                        if (sp.innerText && sp.innerText.length > 30) return sp.innerText;
+                        var t = (sp.innerText || '').trim();
+                        if (t.length > best.length && t.length > 30 && t.length < 5000) best = t;
+                    }
+                    if (best.length > 30) return best;
+                }
+
+                // Strategy 6: recipe-keyword scan
+                var keywords = ['zutaten', 'ingredients', 'rezept', 'recipe', 'g ', 'ml ', 'tbsp', 'tsp'];
+                var all = document.querySelectorAll('span[dir], div[dir], p');
+                for (var el of all) {
+                    var t = (el.innerText || '').trim();
+                    if (t.length > 50) {
+                        var lower = t.toLowerCase();
+                        for (var kw of keywords) {
+                            if (lower.includes(kw)) return t;
+                        }
                     }
                 }
-                // 4. Any span/div with recipe-like content
-                var all = document.querySelectorAll('span, div');
-                for (var el of all) {
-                    var t = el.innerText || '';
-                    if (t.length > 50 && (
-                        t.toLowerCase().includes('zutaten') ||
-                        t.toLowerCase().includes('ingredients') ||
-                        t.toLowerCase().includes('rezept') ||
-                        t.toLowerCase().includes('recipe')
-                    )) return t;
-                }
+
                 return null;
             } catch(e) { return null; }
         })()

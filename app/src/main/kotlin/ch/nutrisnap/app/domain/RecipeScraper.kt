@@ -101,6 +101,20 @@ class RecipeScraper(private val context: Context) {
                 if (thumbnail.isNullOrBlank()) thumbnail = extractOgImage(doc)
             }
         }
+        // instagramez.com — active mirror as of mid-2026
+        if (caption.isBlank() || thumbnail.isNullOrBlank()) {
+            runCatching {
+                val ezUrl = url.replace("www.instagram.com", "www.instagramez.com").replace("instagram.com", "instagramez.com")
+                val doc = jsoupGetWithUA(ezUrl,
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+                if (caption.isBlank()) {
+                    caption = doc.select("meta[property=og:description]").attr("content")
+                        .ifBlank { doc.select("meta[name=description]").attr("content") }
+                }
+                if (thumbnail.isNullOrBlank()) thumbnail = extractOgImage(doc)
+            }
+        }
+        // ddinstagram.com — keep as additional fallback
         if (caption.isBlank() || thumbnail.isNullOrBlank()) {
             runCatching {
                 val ddUrl = url.replace("www.instagram.com", "www.ddinstagram.com").replace("instagram.com", "ddinstagram.com")
@@ -121,6 +135,11 @@ class RecipeScraper(private val context: Context) {
                 }
                 if (thumbnail.isNullOrBlank()) thumbnail = extractOgImage(doc)
             }
+        }
+
+        // Last resort thumbnail: Instagram's public post thumbnail endpoint
+        if (thumbnail.isNullOrBlank() && shortcode != null) {
+            thumbnail = "https://www.instagram.com/p/$shortcode/media/?size=l"
         }
 
         if (caption.isBlank()) throw InstagramBlockedException(url)
@@ -180,17 +199,16 @@ class RecipeScraper(private val context: Context) {
                 val apiUrl = "https://www.tikwm.com/api/?url=${encode(tryUrl)}"
                 val raw = fetchStringWithUA(apiUrl,
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36")
-                val j = org.json.JSONObject(raw).optJSONObject("data")
-                if (j != null && j.optInt("code", -1) != -1) {
-                    val t = j.optString("title", "").trim()
+                val root = org.json.JSONObject(raw)
+                val code = root.optInt("code", -1)
+                val j    = root.optJSONObject("data")
+                if (code == 0 && j != null) {
+                    val t = j.optString("title", "").ifBlank { j.optString("desc", "") }.trim()
+                    // Always extract thumbnail + author BEFORE break so they're not skipped
+                    if (thumbnail == null) thumbnail = j.optString("cover", "").ifBlank { null }
+                    if (author == null)    author    = j.optJSONObject("author")?.optString("nickname")
                     if (t.isNotBlank()) { caption = t; break }
                 }
-                // Also check top-level response for some tikwm response formats
-                val root = org.json.JSONObject(raw)
-                val t2 = root.optString("title", "").ifBlank { root.optString("desc", "") }.trim()
-                if (t2.isNotBlank()) { caption = t2; break }
-                thumbnail = j?.optString("cover", "")?.ifBlank { null } ?: thumbnail
-                author    = j?.optJSONObject("author")?.optString("nickname") ?: author
             }
         }
 
