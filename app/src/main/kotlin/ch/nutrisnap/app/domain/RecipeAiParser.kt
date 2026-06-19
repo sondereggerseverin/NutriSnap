@@ -225,7 +225,7 @@ Rules:
 
     // ── Fallback (no AI) ───────────────────────────────────────────────────────
 
-    fun fallbackParse(
+    fun fallbackParse_OLD(
         caption:   String,
         sourceUrl: String?,
         platform:  String,
