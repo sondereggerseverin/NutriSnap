@@ -1,12 +1,11 @@
-# Build errors - run 144
+# Build errors - run 145
 
 ## Error lines
 ```
 Unable to strip the following libraries, packaging them as they are: libbarhopper_v3.so, libdatastore_shared_counter.so, libimage_processing_util_jni.so.
 > Task :app:kaptDebugKotlin FAILED
-/home/runner/work/NutriSnap/NutriSnap/app/build/tmp/kapt3/stubs/debug/ch/nutrisnap/app/data/db/NutriDatabase.java:18: error: cannot find symbol
 error: [MissingType]: Element 'ch.nutrisnap.app.data.db.NutriDatabase' references a type that is not present
-BUILD FAILED in 3m 45s
+BUILD FAILED in 3m 32s
 ```
 
 ## Last 150 lines
@@ -159,6 +158,6 @@ Caused by: org.jetbrains.kotlin.kapt3.base.util.KaptBaseError: Error while annot
 	... 34 more
 
 
-BUILD FAILED in 3m 45s
+BUILD FAILED in 3m 32s
 32 actionable tasks: 32 executed
 ```
