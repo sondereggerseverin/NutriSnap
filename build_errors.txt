@@ -1,18 +1,18 @@
-# Build errors - run 161
+# Build errors - run 162
 
 ## Error lines
 ```
 Unable to strip the following libraries, packaging them as they are: libbarhopper_v3.so, libdatastore_shared_counter.so, libimage_processing_util_jni.so.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeAiParser.kt:272:45 Expecting '"'
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeAiParser.kt:272:45 Expecting ','
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeAiParser.kt:273:3 Expecting '"'
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeAiParser.kt:273:3 Expecting ')'
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeAiParser.kt:277:45 Expecting '"'
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeAiParser.kt:277:45 Expecting ','
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeAiParser.kt:278:34 Expecting '"'
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeAiParser.kt:278:34 Expecting ')'
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeAiParser.kt:279:45 Expecting '"'
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeAiParser.kt:279:45 Expecting ','
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeAiParser.kt:280:3 Expecting '"'
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeAiParser.kt:280:3 Expecting ')'
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeAiParser.kt:284:45 Expecting '"'
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeAiParser.kt:284:45 Expecting ','
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeAiParser.kt:285:34 Expecting '"'
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeAiParser.kt:285:34 Expecting ')'
 > Task :app:kaptGenerateStubsDebugKotlin FAILED
-BUILD FAILED in 3m 39s
+BUILD FAILED in 3m 32s
 ```
 
 ## Last 150 lines
@@ -165,6 +165,6 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/8.11.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD FAILED in 3m 39s
+BUILD FAILED in 3m 32s
 31 actionable tasks: 31 executed
 ```
