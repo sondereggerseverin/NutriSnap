@@ -15,20 +15,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import ch.nutrisnap.app.health.HealthConnectManager
 import ch.nutrisnap.app.service.NotificationHelper
 import ch.nutrisnap.app.service.NotificationScheduler
 import ch.nutrisnap.app.ui.components.OfflineBanner
+import ch.nutrisnap.app.ui.screens.HealthConnectScreen
 import ch.nutrisnap.app.ui.screens.analysis.AnalysisScreen
-import ch.nutrisnap.app.ui.screens.barcode.BarcodeScannerScreen
 import ch.nutrisnap.app.ui.screens.diary.DiaryScreen
-import ch.nutrisnap.app.ui.screens.fasting.FastingScreen
-import ch.nutrisnap.app.ui.screens.fasting.FastingViewModel
 import ch.nutrisnap.app.ui.screens.home.HomeScreen
 import ch.nutrisnap.app.ui.screens.recipes.RecipesScreen
 import ch.nutrisnap.app.ui.screens.security.BiometricLockScreen
@@ -36,23 +36,24 @@ import ch.nutrisnap.app.ui.screens.settings.KEY_BIOMETRIC_LOCK
 import ch.nutrisnap.app.ui.screens.settings.NotificationSettingsScreen
 import ch.nutrisnap.app.ui.screens.settings.SettingsScreen
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
-import ch.nutrisnap.app.ui.screens.stats.WeeklyStatsScreen
-import ch.nutrisnap.app.ui.screens.stats.WeeklyStatsViewModel
-import ch.nutrisnap.app.ui.screens.water.WaterTrackingScreen
-import ch.nutrisnap.app.ui.screens.water.WaterViewModel
 import ch.nutrisnap.app.ui.theme.NutriSnapTheme
+import ch.nutrisnap.app.ui.viewmodel.HealthConnectViewModel
 import ch.nutrisnap.app.utils.NetworkMonitor
 import kotlinx.coroutines.flow.map
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
-    object Home     : Screen("home",     "Start",    Icons.Default.Home)
-    object Diary    : Screen("diary",    "Tagebuch", Icons.Default.MenuBook)
-    object Recipes  : Screen("recipes",  "Rezepte",  Icons.Default.RestaurantMenu)
-    object Analysis : Screen("analysis", "Analyse",  Icons.Default.BarChart)
-    object Settings : Screen("settings", "Mehr",     Icons.Default.Settings)
+    object Home     : Screen("home",     "Start",      Icons.Default.Home)
+    object Diary    : Screen("diary",    "Tagebuch",   Icons.Default.MenuBook)
+    object Recipes  : Screen("recipes",  "Rezepte",    Icons.Default.RestaurantMenu)
+    object Analysis : Screen("analysis", "Analyse",    Icons.Default.BarChart)
+    object Health   : Screen("health",   "Gesundheit", Icons.Default.FavoriteBorder)
+    object Settings : Screen("settings", "Mehr",       Icons.Default.Settings)
 }
 
-val bottomNavItems = listOf(Screen.Home, Screen.Diary, Screen.Recipes, Screen.Analysis, Screen.Settings)
+val bottomNavItems = listOf(
+    Screen.Home, Screen.Diary, Screen.Recipes,
+    Screen.Analysis, Screen.Health, Screen.Settings
+)
 
 class MainActivity : ComponentActivity() {
     private var sharedUrl: String? = null
@@ -60,6 +61,17 @@ class MainActivity : ComponentActivity() {
     private val notifPermLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted -> if (granted) NotificationScheduler.scheduleAll(this) }
+
+    // Health Connect permission launcher
+    private val healthConnectPermLauncher = registerForActivityResult(
+        PermissionController.createRequestPermissionResultContract()
+    ) { granted ->
+        if (granted.containsAll(HealthConnectManager.REQUIRED_PERMISSIONS)) {
+            healthConnectViewModel?.onPermissionGranted()
+        }
+    }
+
+    private var healthConnectViewModel: HealthConnectViewModel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,6 +93,10 @@ class MainActivity : ComponentActivity() {
                     .map { it[KEY_BIOMETRIC_LOCK] ?: false }.collectAsState(initial = false)
                 var isUnlocked by remember { mutableStateOf(true) }
 
+                // Hold reference to HealthConnectViewModel so permission callback can reach it
+                val hcVm: HealthConnectViewModel = viewModel()
+                LaunchedEffect(Unit) { healthConnectViewModel = hcVm }
+
                 LaunchedEffect(biometricEnabled) { if (biometricEnabled) isUnlocked = false }
 
                 Column(modifier = Modifier.fillMaxSize()) {
@@ -88,7 +104,15 @@ class MainActivity : ComponentActivity() {
                     if (!isUnlocked) {
                         BiometricLockScreen(onUnlocked = { isUnlocked = true })
                     } else {
-                        MainScaffold(sharedUrl = sharedUrl)
+                        MainScaffold(
+                            sharedUrl = sharedUrl,
+                            hcVm = hcVm,
+                            onRequestHealthPermission = {
+                                healthConnectPermLauncher.launch(
+                                    HealthConnectManager.REQUIRED_PERMISSIONS
+                                )
+                            }
+                        )
                     }
                 }
             }
@@ -109,15 +133,14 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainScaffold(sharedUrl: String?) {
+fun MainScaffold(
+    sharedUrl: String?,
+    hcVm: HealthConnectViewModel,
+    onRequestHealthPermission: () -> Unit
+) {
     val navController = rememberNavController()
     val backEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backEntry?.destination?.route
-
-    // ViewModels auf Scaffold-Ebene damit Timer/Zustand bei Navigation erhalten bleibt
-    val fastingViewModel: FastingViewModel = viewModel()
-    val waterViewModel: WaterViewModel = viewModel()
-    val weeklyStatsViewModel: WeeklyStatsViewModel = viewModel()
 
     LaunchedEffect(sharedUrl) {
         if (!sharedUrl.isNullOrBlank()) {
@@ -145,11 +168,8 @@ fun MainScaffold(sharedUrl: String?) {
             }
         }
     }) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = Screen.Home.route,
-            modifier = Modifier.padding(innerPadding)
-        ) {
+        NavHost(navController = navController, startDestination = Screen.Home.route,
+            modifier = Modifier.padding(innerPadding)) {
             composable(Screen.Home.route) {
                 HomeScreen(onNavigateToDiary = {
                     navController.navigate(Screen.Diary.route) {
@@ -161,36 +181,17 @@ fun MainScaffold(sharedUrl: String?) {
             composable(Screen.Diary.route)    { DiaryScreen() }
             composable(Screen.Recipes.route)  { RecipesScreen(sharedUrl = sharedUrl) }
             composable(Screen.Analysis.route) { AnalysisScreen() }
-            composable(Screen.Settings.route) {
-                SettingsScreen(
-                    onNavigateToNotifSettings = { navController.navigate("notif_settings") },
-                    onNavigateToWater         = { navController.navigate("water") },
-                    onNavigateToFasting       = { navController.navigate("fasting") },
-                    onNavigateToStats         = { navController.navigate("stats") }
+            composable(Screen.Health.route) {
+                HealthConnectScreen(
+                    viewModel = hcVm,
+                    onRequestPermission = onRequestHealthPermission
                 )
+            }
+            composable(Screen.Settings.route) {
+                SettingsScreen(onNavigateToNotifSettings = { navController.navigate("notif_settings") })
             }
             composable("notif_settings") {
                 NotificationSettingsScreen(onBack = { navController.popBackStack() })
-            }
-            composable("fasting") {
-                FastingScreen(viewModel = fastingViewModel)
-            }
-            composable("water") {
-                WaterTrackingScreen(viewModel = waterViewModel)
-            }
-            composable("stats") {
-                WeeklyStatsScreen(viewModel = weeklyStatsViewModel)
-            }
-            composable("barcode") {
-                BarcodeScannerScreen(
-                    onBarcodeDetected = { barcode ->
-                        navController.previousBackStackEntry
-                            ?.savedStateHandle
-                            ?.set("scanned_barcode", barcode)
-                        navController.popBackStack()
-                    },
-                    onNavigateBack = { navController.popBackStack() }
-                )
             }
         }
     }
