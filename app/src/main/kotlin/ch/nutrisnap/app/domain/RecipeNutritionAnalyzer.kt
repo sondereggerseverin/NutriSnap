@@ -98,14 +98,31 @@ object RecipeNutritionAnalyzer {
     private fun isIngredientLine(line: String): Boolean {
         val s = line.trimStart('*', '-', '\u2022', '\u00b7', ' ').trim()
         if (s.isBlank() || s.length < 3) return false
-        val hasDigit = s.any { it.isDigit() }
+
         val lc = s.lowercase()
-        val hasUnit = lc.contains("g ") || lc.contains("ml") || lc.contains("kg") ||
+
+        // Skip obvious non-ingredients
+        val skipPrefixes = listOf("schritt", "step", "zubereitung", "instructions", "method",
+            "preparation", "storage", "aufbewahrung", "heating", "erhitzen",
+            "note:", "hinweis", "tip:", "tipp:", "#", "http", "www.", "@",
+            "comment", "kommentar", "dm me", "link in bio", "per serving", "pro portion",
+            "gesamtnährwerte", "total nutrition", "kcal:", "kalorien:", "calories:",
+            "fett:", "protein:", "kohlenhydrate:", "for the", "für die", "für den",
+            "sauce:", "dressing:", "topping:", "marinade:", "das rezept")
+        if (skipPrefixes.any { lc.startsWith(it) }) return false
+
+        val hasDigit = s.any { it.isDigit() }
+        val hasUnit = lc.contains(" g ") || lc.contains(" g,") || lc.endsWith(" g") ||
+            lc.contains("ml") || lc.contains(" kg") || lc.contains(" l ") ||
             lc.contains("oz") || lc.contains("cup") || lc.contains("tsp") ||
-            lc.contains("tbsp") || lc.endsWith("g") || lc.endsWith("ml") ||
-            lc.contains(" tl") || lc.contains(" el") || lc.contains("liter") ||
-            lc.contains("scharlotte") || lc.contains("knoblauch") || lc.contains("zehe")
-        return hasDigit || hasUnit
+            lc.contains("tbsp") || lc.contains(" tl") || lc.contains(" el") ||
+            lc.contains("liter") || lc.contains("prise") || lc.contains("pinch")
+        // Count-nouns that appear without a unit
+        val hasCountNoun = lc.contains("zehe") || lc.contains("knoblauch") ||
+            lc.contains("scheibe") || lc.contains("zweig") || lc.contains("stück") ||
+            lc.contains("clove") || lc.contains("slice") || lc.contains("sprig")
+
+        return hasDigit || hasUnit || hasCountNoun
     }
 
     fun parseIngredientLine(line: String): ParsedIngredient? {
@@ -159,9 +176,49 @@ object RecipeNutritionAnalyzer {
         return clean.replace(',', '.').toFloatOrNull() ?: 1f
     }
 
+    /**
+     * Simplifies an ingredient name for better database matching.
+     * "600g Proteinpasta" -> ["proteinpasta", "protein pasta", "pasta"]
+     * "veganes Hack (Erbse)" -> ["veganes hack erbse", "hack erbse", "hackfleisch"]
+     */
+    private fun simplifyForSearch(name: String): List<String> {
+        val n = name.lowercase()
+            .replace(Regex("\(.*?\)"), " ") // remove parentheses
+            .replace(Regex("[^a-zäöüß0-9 ]"), " ")
+            .replace(Regex("\s+"), " ")
+            .trim()
+
+        val queries = mutableListOf<String>()
+        queries.add(n)
+
+        // Remove common adjectives to find the base food
+        val stripped = n
+            .replace(Regex("\b(veganes?|veganer?|vegan|fettarm|fettarme[rns]?|mager|light|frisch[er]*|gegart|gekocht|roh|gewürfelt[e]?|gehackt[e]?|getrocknet[e]?|optional|bio|low[- ]fat|high[- ]protein|protein)\b"), "")
+            .replace(Regex("\s+"), " ").trim()
+        if (stripped != n && stripped.length >= 3) queries.add(stripped)
+
+        // Try first meaningful word(s) if compound word
+        val words = stripped.split(" ").filter { it.length >= 3 }
+        if (words.size >= 2) queries.add(words.takeLast(1).joinToString(" ")) // last word often the actual food
+        if (words.size >= 2) queries.add(words.take(2).joinToString(" "))
+
+        return queries.distinct().filter { it.length >= 3 }
+    }
+
     private fun searchOFF(query: String): FoodItem? {
         return runCatching {
-            val encoded = java.net.URLEncoder.encode(query.take(40), "UTF-8")
+            val searchQueries = simplifyForSearch(query)
+            for (searchTerm in searchQueries) {
+                val result = searchOFFSingle(searchTerm, query) ?: continue
+                return result
+            }
+            null
+        }.getOrNull()
+    }
+
+    private fun searchOFFSingle(searchTerm: String, originalName: String): FoodItem? {
+        return runCatching {
+            val encoded = java.net.URLEncoder.encode(searchTerm.take(50), "UTF-8")
             val url = "https://world.openfoodfacts.org/cgi/search.pl?search_terms=$encoded&search_simple=1&action=process&json=1&page_size=5&fields=product_name,brands,nutriments"
             val req = Request.Builder().url(url).header("User-Agent", "NutriSnap/1.0 (Android)").build()
             val body = client.newCall(req).execute().use { it.body?.string() ?: return null }
@@ -172,9 +229,9 @@ object RecipeNutritionAnalyzer {
                 val kcal = (n.optDouble("energy-kcal_100g", -1.0).toFloat()
                     .takeIf { it > 0 } ?: n.optDouble("energy_kcal_100g", -1.0).toFloat()
                     .takeIf { it > 0 }) ?: continue
-                val name = p.optString("product_name", query).ifBlank { query }
+                val name = p.optString("product_name", originalName).ifBlank { originalName }
                 return FoodItem(
-                    name            = name,
+                    name     = name,
                     calories = kcal,
                     protein  = n.optDouble("proteins_100g", 0.0).toFloat(),
                     carbs    = n.optDouble("carbohydrates_100g", 0.0).toFloat(),
@@ -202,7 +259,12 @@ object RecipeNutritionAnalyzer {
                         }
                         val factor = parsed.amountG / 100f
 
-                        val local = IngredientNutritionDatabase.lookup(parsed.name)
+                        // Try local DB with original name + simplified versions
+                        val localSearchTerms = listOf(parsed.name) +
+                            listOf(parsed.name.lowercase()
+                                .replace(Regex("\\b(veganes?|veganer?|vegan|fettarm|fettarme[rns]?|mager|light|frisch[er]*|bio|protein|high[- ]protein|low[- ]fat)\\b"), "")
+                                .replace(Regex("\\s+"), " ").trim())
+                        val local = localSearchTerms.firstNotNullOfOrNull { IngredientNutritionDatabase.lookup(it) }
                         if (local != null) {
                             return@async IngredientResult(
                                 line     = line,
