@@ -276,13 +276,11 @@ Rules:
                     line.startsWith("-") || line.startsWith("•") || line.startsWith("*")
                 }
                 if (ingrLines.size >= 2) {
-                    ingrLines.joinToString("
-")
+                    ingrLines.joinToString("\n")
                 } else {
                     val hashtagStart = lines.indexOfFirst { it.startsWith("#") }.takeIf { it > 0 }
                     val bodyLines = lines.drop(1).take(hashtagStart?.minus(1) ?: 30)
-                    bodyLines.joinToString("
-").ifBlank { cleaned.take(1200) }
+                    bodyLines.joinToString("\n").ifBlank { cleaned.take(1200) }
                 }
             }
         }
