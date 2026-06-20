@@ -64,10 +64,19 @@ object RecipeAiParser {
         var c = prefixRegex.replace(raw.trim(), "").trim()
         // Strip surrounding straight or curly quotes left over from the caption
         c = c.removeSurrounding("\"").removeSurrounding("\u201c", "\u201d").trim()
-        // Normalize TikTok's inline "*" ingredient separator → newlines so AI can parse it
-        // e.g. "Makes 1½ cups* 1¼ cups Greek yogurt* 2 garlic cloves*..." → each on its own line
+        // Normalize TikTok/Instagram "*" ingredient separator → newlines
         if (c.contains("* ") && !c.contains("\n")) {
             c = c.replace(Regex("\\*(?=\\s*\\d|\\s*[¼½¾])"), "\n•")
+        }
+        // Normalize Instagram captions with no newlines but numbered steps/sections
+        // e.g. "Zutaten:200g Mehl1 Ei..." → add newlines before numbers+units or section keywords
+        if (!c.contains("\n") && c.length > 100) {
+            // Before quantities like "200g", "1 EL", "2 TL", "1/2 cup"
+            c = c.replace(Regex("(?<=[a-zäöüA-ZÄÖÜ,)])(?=\\d+[\\s,./]*(g|kg|ml|l|EL|TL|cup|tbsp|tsp|oz|lb|Stück|Stk|pcs|Scheiben|Zehe|Zweig|Prise)\\b)"), "\n")
+            // Before section headers like "Für die Sauce", "Topping:", "Zubereitung:"
+            c = c.replace(Regex("(?=(?:Für |For |Sauce|Dressing|Topping|Marinade|Zubereitung|Instructions?|Preparation|Steps?|Method):?)"), "\n")
+            // Before numbered steps "1.", "2.", etc.
+            c = c.replace(Regex("(?<=\\s)(?=[2-9]\\.|1[0-9]\\.)"), "\n")
         }
         return c.ifBlank { raw.trim() }
     }
@@ -97,7 +106,7 @@ object RecipeAiParser {
 You are a recipe extraction assistant. Extract structured recipe data from social media captions.
 Respond ONLY with valid JSON matching this exact schema — no markdown, no explanation:
 {
-  "title": "Clean recipe name without hashtags/metrics (string)",
+  "title": "Clean recipe dish name (string)",
   "description": "1-2 sentence description of the dish (string)",
   "servings": 4,
   "calories_per_serving": 548,
@@ -115,21 +124,26 @@ Respond ONLY with valid JSON matching this exact schema — no markdown, no expl
   "tags": "meal-prep,chicken,high-protein"
 }
 Rules:
-- title: DISH NAME ONLY - NEVER include likes/comments/follower counts/dates/usernames/handles. The caption often starts with "X likes, Y comments - username on Date: \"ACTUAL RECIPE NAME\"". Extract only ACTUAL RECIPE NAME. If quoted in caption use the quoted text. If section headers exist use the first one. Last resort: first meaningful ingredient section name
-- ingredient_sections: group ingredients by their section headers (e.g. "Marinade", "Sauce"). If no sections exist, use one section named ""
-- calories_per_serving / protein_g / carbs_g / fat_g: extract if mentioned, else null
-- instructions: extract if present, else null
+- title: Extract the DISH NAME ONLY. Rules in priority order:
+  1. If caption contains a line that IS clearly a food/dish name (e.g. "High Protein Pasta Salad", "Butter Chicken Burritos"), use that
+  2. If caption starts with descriptive text ("Wirklich ausgezeichnet...", "This is amazing..."), look for a dish name LATER in the caption near the ingredient list
+  3. NEVER use: likes/comments counts, usernames, dates, hashtags, promotional text, generic phrases like "Check this out"
+  4. If truly no dish name exists, construct one from the main ingredients (e.g. "Pasta Salat mit Thunfisch")
+- servings: extract the number of PORTIONS/SERVINGS this recipe makes. Look for "Makes X", "Ergibt X", "für X Personen", "X Portionen". If the caption says "Per Burrito" or "Per Serving" that means 1 serving in the macros. Default to 1 if unclear, NOT a random number.
+- ingredient_sections: group by section headers (e.g. "Marinade", "Sauce", "Topping"). Items separated by "-", "•", "*", or newlines. If no sections, use one section named "".
+- CRITICAL: Each ingredient item must be ONE ingredient only (e.g. "200g Hähnchenbrust"), NOT a full sentence or instruction.
+- calories_per_serving / protein_g / carbs_g / fat_g: extract PER SERVING values if mentioned, else null
+- instructions: numbered steps only, no ingredient lists. null if not present.
 - tags: comma-separated, max 5, lowercase
 - All numeric fields must be numbers (not strings), null if unknown
-- IMPORTANT: Some captions (especially TikTok) list ingredients separated by "*" with no newlines, e.g. "* 1 cup flour* 2 eggs* ...". Split these into individual items.
-- IMPORTANT: Ignore promotional text like "Comment X for...", "DM me for...", "Link in bio", hashtags — these are NOT recipe content.
+- Ignore: "Comment X for...", "DM me for...", "Link in bio", hashtags, storage/heating tips unless they are actual steps
         """.trimIndent()
 
         val userMessage = "Extract recipe from this caption:\n\n$caption"
 
         val body = JSONObject().apply {
-            put("model", "llama-3.1-8b-instant")
-            put("max_tokens", 1200)
+            put("model", "llama-3.3-70b-versatile")
+            put("max_tokens", 2000)
             put("temperature", 0.1)
             put("messages", JSONArray().apply {
                 put(JSONObject().apply { put("role", "system"); put("content", systemPrompt) })
