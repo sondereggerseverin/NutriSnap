@@ -1,6 +1,8 @@
 package ch.nutrisnap.app.health
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.*
@@ -14,8 +16,10 @@ import java.time.ZoneId
 
 class HealthConnectManager(context: Context) {
 
-    private val client: HealthConnectClient =
+    // Lazy so we don't crash if HC is not installed
+    private val client: HealthConnectClient by lazy {
         HealthConnectClient.getOrCreate(context.applicationContext)
+    }
 
     companion object {
         val REQUIRED_PERMISSIONS = setOf(
@@ -27,10 +31,26 @@ class HealthConnectManager(context: Context) {
             HealthPermission.getReadPermission(HeartRateRecord::class),
         )
 
-        /** Check if Health Connect is available on this device */
+        enum class Status { AVAILABLE, NEEDS_UPDATE, NOT_AVAILABLE }
+
+        fun getStatus(context: Context): Status = when (HealthConnectClient.getSdkStatus(context)) {
+            HealthConnectClient.SDK_AVAILABLE                          -> Status.AVAILABLE
+            HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> Status.NEEDS_UPDATE
+            else                                                       -> Status.NOT_AVAILABLE
+        }
+
+        /** Convenience for quick available check */
         fun isAvailable(context: Context): Boolean =
-            HealthConnectClient.getSdkStatus(context) ==
-                HealthConnectClient.SDK_AVAILABLE
+            getStatus(context) == Status.AVAILABLE
+
+        /** Opens Play Store to install / update Health Connect */
+        fun openPlayStore(context: Context) {
+            val uri = Uri.parse("market://details?id=com.google.android.apps.healthdata")
+            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            runCatching { context.startActivity(intent) }
+        }
     }
 
     suspend fun checkPermissions(): Set<String> =

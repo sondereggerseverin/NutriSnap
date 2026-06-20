@@ -306,11 +306,10 @@ fun HealthConnectCard() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope   = rememberCoroutineScope()
 
-    val isAvailable = remember { HealthConnectManager.isAvailable(context) }
+    val status = remember { HealthConnectManager.getStatus(context) }
     var permissionsGranted by remember { mutableStateOf<Boolean?>(null) }
     var isLoading by remember { mutableStateOf(false) }
 
-    // This is the only correct way to request Health Connect permissions
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = PermissionController.createRequestPermissionResultContract()
     ) { granted ->
@@ -318,76 +317,96 @@ fun HealthConnectCard() {
         permissionsGranted = granted.containsAll(HealthConnectManager.REQUIRED_PERMISSIONS)
     }
 
-    LaunchedEffect(Unit) {
-        if (isAvailable) {
+    LaunchedEffect(status) {
+        if (status == HealthConnectManager.Status.AVAILABLE) {
             runCatching {
                 val manager = HealthConnectManager(context)
                 permissionsGranted = manager.hasAllPermissions()
-            }
+            }.onFailure { permissionsGranted = false }
         }
     }
 
-    SettingsCard(title = "Health Connect", icon = Icons.Default.FavoriteBorder) {
-        if (!isAvailable) {
-            Text(
-                "Health Connect ist auf diesem Gerät nicht verfügbar.",
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
+    SettingsCard(title = "Health Connect", icon = Icons.Default.Favorite) {
+        when (status) {
+            HealthConnectManager.Status.NOT_AVAILABLE -> {
+                Text(
+                    "Health Connect ist auf diesem Gerät nicht verfügbar.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            HealthConnectManager.Status.NEEDS_UPDATE -> {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = when (permissionsGranted) {
-                            true  -> "✓ Verbunden"
-                            false -> "Nicht verbunden"
-                            null  -> "Status wird geprüft…"
-                        },
+                        "Health Connect muss aktualisiert werden.",
                         fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = when (permissionsGranted) {
-                            true  -> Color(0xFF2E7D32)
-                            else  -> MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                    )
-                    Text(
-                        "Schritte, Kalorien, Schlaf, Herzrate",
-                        fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                }
-
-                if (permissionsGranted != true) {
-                    Button(
-                        onClick = {
-                            isLoading = true
-                            permissionLauncher.launch(HealthConnectManager.REQUIRED_PERMISSIONS)
-                        },
-                        enabled = !isLoading
+                    OutlinedButton(
+                        onClick = { HealthConnectManager.openPlayStore(context) },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(
-                                Modifier.size(16.dp), strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                        } else {
-                            Text("Verbinden")
-                        }
+                        Icon(Icons.Default.Launch, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Im Play Store aktualisieren")
                     }
-                } else {
-                    OutlinedButton(onClick = {
-                        scope.launch {
-                            runCatching {
-                                val manager = HealthConnectManager(context)
-                                permissionsGranted = manager.hasAllPermissions()
+                }
+            }
+            HealthConnectManager.Status.AVAILABLE -> {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = when (permissionsGranted) {
+                                true  -> "✓ Verbunden"
+                                false -> "Nicht verbunden"
+                                null  -> "Wird geprüft…"
+                            },
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = when (permissionsGranted) {
+                                true  -> Color(0xFF2E7D32)
+                                else  -> MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                        Text(
+                            "Schritte, Kalorien, Schlaf, Herzrate",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    if (permissionsGranted != true) {
+                        Button(
+                            onClick = {
+                                isLoading = true
+                                permissionLauncher.launch(HealthConnectManager.REQUIRED_PERMISSIONS)
+                            },
+                            enabled = !isLoading
+                        ) {
+                            if (isLoading) {
+                                CircularProgressIndicator(
+                                    Modifier.size(16.dp), strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            } else {
+                                Text("Verbinden")
                             }
                         }
-                    }) {
-                        Text("Erneut prüfen", fontSize = 12.sp)
+                    } else {
+                        OutlinedButton(onClick = {
+                            scope.launch {
+                                runCatching {
+                                    val manager = HealthConnectManager(context)
+                                    permissionsGranted = manager.hasAllPermissions()
+                                }
+                            }
+                        }) {
+                            Text("Erneut prüfen", fontSize = 12.sp)
+                        }
                     }
                 }
             }
