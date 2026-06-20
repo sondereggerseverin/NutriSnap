@@ -1,19 +1,11 @@
-# Build errors - run 164
+# Build errors - run 168
 
 ## Error lines
 ```
-Unable to strip the following libraries, packaging them as they are: libbarhopper_v3.so, libdatastore_shared_counter.so, libimage_processing_util_jni.so.
-> Task :app:compileDebugKotlin FAILED
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/settings/SettingsScreen.kt:321:13 Comparison of incompatible enums 'HealthConnectManager.Companion.Status' and '[Error type: Error property type]' is always unsuccessful
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/settings/SettingsScreen.kt:321:44 Unresolved reference: Status
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/settings/SettingsScreen.kt:330:9 'when' expression must be exhaustive, add necessary 'AVAILABLE', 'NEEDS_UPDATE', 'NOT_AVAILABLE' branches or 'else' branch instead
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/settings/SettingsScreen.kt:331:13 Comparison of incompatible enums 'HealthConnectManager.Companion.Status' and '[Error type: Error property type]' is always unsuccessful
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/settings/SettingsScreen.kt:331:34 Unresolved reference: Status
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/settings/SettingsScreen.kt:338:13 Comparison of incompatible enums 'HealthConnectManager.Companion.Status' and '[Error type: Error property type]' is always unsuccessful
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/settings/SettingsScreen.kt:338:34 Unresolved reference: Status
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/settings/SettingsScreen.kt:355:13 Comparison of incompatible enums 'HealthConnectManager.Companion.Status' and '[Error type: Error property type]' is always unsuccessful
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/settings/SettingsScreen.kt:355:34 Unresolved reference: Status
-BUILD FAILED in 4m 16s
+> Task :app:kaptGenerateStubsDebugKotlin FAILED
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/IngredientNutritionDatabase.kt:242:73 Expecting '"'
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/IngredientNutritionDatabase.kt:242:73 Expecting ','
+BUILD FAILED in 3m 27s
 ```
 
 ## Last 150 lines
@@ -77,7 +69,7 @@ BUILD FAILED in 4m 16s
 	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:64)
 	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:43)
 	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.executeWithNonEmptySources(AbstractSkipEmptyWorkStep.java:125)
-	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:61)
+	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:56)
 	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:36)
 	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsStartedStep.execute(MarkSnapshottingInputsStartedStep.java:38)
 	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.execute(LoadPreviousExecutionStateStep.java:36)
@@ -166,6 +158,6 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/8.11.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD FAILED in 4m 16s
-33 actionable tasks: 33 executed
+BUILD FAILED in 3m 27s
+24 actionable tasks: 24 executed
 ```
