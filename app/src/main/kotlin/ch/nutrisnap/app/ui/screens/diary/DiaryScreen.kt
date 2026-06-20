@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -31,28 +32,35 @@ import java.util.Locale
 fun DiaryScreen(vm: DiaryViewModel = viewModel()) {
     val state by vm.uiState.collectAsState()
     var showAddSheet by remember { mutableStateOf(false) }
+    var editEntry    by remember { mutableStateOf<DiaryEntry?>(null) }
 
     Scaffold(
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddSheet = true },
                 containerColor = MaterialTheme.colorScheme.primary) {
-                Icon(Icons.Default.Add, "Eintrag hinzufügen", tint = MaterialTheme.colorScheme.onPrimary)
+                Icon(Icons.Default.Add, "Eintrag hinzufügen",
+                    tint = MaterialTheme.colorScheme.onPrimary)
             }
         }
     ) { padding ->
-        LazyColumn(Modifier.padding(padding).fillMaxSize(), contentPadding = PaddingValues(bottom = 80.dp)) {
+        LazyColumn(
+            Modifier.padding(padding).fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 80.dp)
+        ) {
             item { DateNavigator(state.selectedDate, vm::prevDay, vm::nextDay) }
             item {
                 MacroBar(
                     calories = state.totalCalories, goal = state.calorieGoal,
-                    protein  = state.totalProtein,  carbs = state.totalCarbs, fat = state.totalFat,
+                    protein  = state.totalProtein,  carbs = state.totalCarbs,
+                    fat      = state.totalFat,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
             if (state.entries.isEmpty()) {
                 item {
                     EmptyState(
-                        icon    = { Icon(Icons.Default.MenuBook, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        icon    = { Icon(Icons.Default.MenuBook, null, Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                         message = "Noch keine Einträge",
                         sub     = "Tippe auf + um Mahlzeiten zu erfassen"
                     )
@@ -63,26 +71,107 @@ fun DiaryScreen(vm: DiaryViewModel = viewModel()) {
                     val mealEntries = grouped[meal] ?: return@forEach
                     item { SectionHeader(meal.label()) }
                     items(mealEntries, key = { it.id }) { entry ->
-                        DiaryEntryRow(entry) { vm.deleteEntry(entry) }
+                        DiaryEntryRow(
+                            entry    = entry,
+                            onEdit   = { editEntry = entry },
+                            onDelete = { vm.deleteEntry(entry) }
+                        )
                     }
                 }
             }
         }
     }
+
     if (showAddSheet) AddFoodSheet(vm = vm, onDismiss = { showAddSheet = false })
+
+    // Edit-Dialog: Menge/Portionen anpassen
+    editEntry?.let { entry ->
+        EditEntryDialog(
+            entry    = entry,
+            onSave   = { newAmount -> vm.updateEntryAmount(entry, newAmount); editEntry = null },
+            onDelete = { vm.deleteEntry(entry); editEntry = null },
+            onDismiss = { editEntry = null }
+        )
+    }
+}
+
+@Composable
+private fun EditEntryDialog(
+    entry: DiaryEntry,
+    onSave: (Float) -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    // Detect if this is a recipe entry (amountGrams = servings * 100 or amountGrams == 0)
+    val isRecipe = entry.amountGrams == 0f || entry.foodItemId < 0
+    var amountText by remember { mutableStateOf(
+        if (isRecipe) "1" else entry.amountGrams.toInt().toString()
+    ) }
+    val unit = if (isRecipe) "Port." else "g"
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(entry.foodName, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleMedium)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = { amountText = it },
+                    label = { Text("Menge ($unit)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                // Live macro preview
+                val amount = amountText.toFloatOrNull() ?: 0f
+                if (amount > 0 && entry.amountGrams > 0) {
+                    val factor = amount / entry.amountGrams
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("${(entry.calories * factor).toInt()} kcal",
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary)
+                        Text("P ${(entry.protein * factor).toInt()}g", fontSize = 12.sp)
+                        Text("K ${(entry.carbs * factor).toInt()}g", fontSize = 12.sp)
+                        Text("F ${(entry.fat * factor).toInt()}g", fontSize = 12.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                val v = amountText.toFloatOrNull()
+                if (v != null && v > 0) onSave(v)
+            }) { Text("Speichern") }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onDelete) {
+                    Text("Löschen", color = MaterialTheme.colorScheme.error)
+                }
+                TextButton(onClick = onDismiss) { Text("Abbrechen") }
+            }
+        }
+    )
 }
 
 @Composable
 private fun DateNavigator(date: LocalDate, onPrev: () -> Unit, onNext: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
         IconButton(onClick = onPrev) { Icon(Icons.Default.ChevronLeft, "Vorheriger Tag") }
         val label = when (date) {
             LocalDate.now()              -> "Heute"
             LocalDate.now().minusDays(1) -> "Gestern"
             else -> date.format(DateTimeFormatter.ofPattern("EEE, dd. MMM", Locale.GERMAN))
         }
-        Text(label, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 8.dp))
+        Text(label, fontWeight = FontWeight.SemiBold, fontSize = 16.sp,
+            modifier = Modifier.padding(horizontal = 8.dp))
         IconButton(onClick = onNext, enabled = date.isBefore(LocalDate.now())) {
             Icon(Icons.Default.ChevronRight, "Nächster Tag")
         }
@@ -90,43 +179,76 @@ private fun DateNavigator(date: LocalDate, onPrev: () -> Unit, onNext: () -> Uni
 }
 
 @Composable
-private fun DiaryEntryRow(entry: DiaryEntry, onDelete: () -> Unit) {
+private fun DiaryEntryRow(entry: DiaryEntry, onEdit: () -> Unit, onDelete: () -> Unit) {
     var showConfirm by remember { mutableStateOf(false) }
-    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 3.dp),
+
+    // Determine display unit: recipe entries have amountGrams==0 (portionen-based)
+    val isRecipeEntry = entry.amountGrams == 0f || entry.foodItemId < 0
+    val amountLabel   = if (isRecipeEntry) "1 Port." else "${entry.amountGrams.toInt()} g"
+
+    Card(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 3.dp)
+            .clickable { onEdit() },
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(entry.foodName, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                Text("${entry.amountGrams.toInt()} g", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    entry.foodName,
+                    fontWeight = FontWeight.Medium,
+                    fontSize   = 14.sp,
+                    maxLines   = 1,
+                    overflow   = TextOverflow.Ellipsis
+                )
+                Text(amountLabel, fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.End) {
-                Text("${entry.calories.toInt()} kcal", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
-                Text("P ${entry.protein.toInt()}  K ${entry.carbs.toInt()}  F ${entry.fat.toInt()}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${entry.calories.toInt()} kcal",
+                    fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.primary)
+                Text("P ${entry.protein.toInt()}  K ${entry.carbs.toInt()}  F ${entry.fat.toInt()}",
+                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             IconButton(onClick = { showConfirm = true }) {
-                Icon(Icons.Default.DeleteOutline, "Löschen", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                Icon(Icons.Default.DeleteOutline, "Löschen",
+                    Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
             }
         }
     }
+
     if (showConfirm) {
-        AlertDialog(onDismissRequest = { showConfirm = false },
-            title = { Text("Eintrag löschen?") }, text = { Text(entry.foodName) },
-            confirmButton = { TextButton(onClick = { onDelete(); showConfirm = false }) { Text("Löschen", color = MaterialTheme.colorScheme.error) } },
-            dismissButton = { TextButton(onClick = { showConfirm = false }) { Text("Abbrechen") } })
+        AlertDialog(
+            onDismissRequest = { showConfirm = false },
+            title   = { Text("Eintrag löschen?") },
+            text    = { Text(entry.foodName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            confirmButton = {
+                TextButton(onClick = { onDelete(); showConfirm = false }) {
+                    Text("Löschen", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirm = false }) { Text("Abbrechen") }
+            }
+        )
     }
 }
 
-// ── Add Food Bottom Sheet ──────────────────────────────────────────────────────
+// ── Add Food Bottom Sheet ─────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
-    var query by remember { mutableStateOf("") }
+    var query        by remember { mutableStateOf("") }
     var selectedFood by remember { mutableStateOf<FoodItem?>(null) }
-    var amountText by remember { mutableStateOf("100") }
+    var amountText   by remember { mutableStateOf("100") }
     var selectedMeal by remember { mutableStateOf(MealType.LUNCH) }
-    var showScanner by remember { mutableStateOf(false) }
+    var showScanner  by remember { mutableStateOf(false) }
     var barcodeStatus by remember { mutableStateOf("") }
 
     val results   by vm.searchResults.collectAsState()
@@ -140,12 +262,8 @@ fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
                 showScanner = false
                 barcodeStatus = "Suche Barcode $barcode..."
                 vm.searchBarcode(barcode) { food ->
-                    if (food != null) {
-                        selectedFood = food
-                        barcodeStatus = ""
-                    } else {
-                        barcodeStatus = "Barcode $barcode nicht gefunden"
-                    }
+                    if (food != null) { selectedFood = food; barcodeStatus = "" }
+                    else barcodeStatus = "Barcode $barcode nicht gefunden"
                 }
             },
             onNavigateBack = { showScanner = false }
@@ -155,51 +273,42 @@ fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal = 16.dp).navigationBarsPadding()) {
-            Text("Lebensmittel hinzufügen", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(bottom = 12.dp))
+            Text("Lebensmittel hinzufügen", fontWeight = FontWeight.Bold, fontSize = 18.sp,
+                modifier = Modifier.padding(bottom = 12.dp))
 
             if (selectedFood == null) {
-                // Search row + barcode button
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = query, onValueChange = { query = it; vm.searchFood(it) },
                         label = { Text("Suchen…") },
-                        leadingIcon = { Icon(Icons.Default.Search, null) },
+                        leadingIcon  = { Icon(Icons.Default.Search, null) },
                         trailingIcon = { if (searching) CircularProgressIndicator(Modifier.size(20.dp)) },
                         modifier = Modifier.weight(1f), singleLine = true
                     )
                     IconButton(onClick = { showScanner = true },
                         modifier = Modifier.align(Alignment.CenterVertically).size(56.dp)) {
-                        Icon(Icons.Default.QrCodeScanner, "Barcode scannen",
-                            modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Default.QrCodeScanner, "Barcode",
+                            Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
                     }
                 }
 
                 if (barcodeStatus.isNotBlank()) {
                     Text(barcodeStatus, fontSize = 13.sp,
-                        color = if ("nicht gefunden" in barcodeStatus) MaterialTheme.colorScheme.error
-                                else MaterialTheme.colorScheme.primary,
+                        color = if ("nicht gefunden" in barcodeStatus)
+                            MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(top = 4.dp))
                 }
 
-                // Quick-pick from favorites when no search query is active
                 if (query.isBlank() && favorites.isNotEmpty()) {
                     Text("⭐ Favoriten", fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
                         modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
                     LazyColumn(Modifier.heightIn(max = 220.dp)) {
                         items(favorites, key = { it.favoriteKey() }) { food ->
                             ListItem(
-                                headlineContent = { Text(food.name) },
-                                supportingContent = {
-                                    val brand = food.brand?.let { " · $it" } ?: ""
-                                    Text("${food.calories.toInt()} kcal/100g$brand")
-                                },
-                                leadingContent = { Icon(Icons.Default.Star, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
-                                trailingContent = {
-                                    IconButton(onClick = { vm.toggleFavorite(food) }) {
-                                        Icon(Icons.Default.Favorite, "Favorit entfernen", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
-                                    }
-                                },
-                                modifier = Modifier.clickable { selectedFood = food }
+                                headlineContent   = { Text(food.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                supportingContent = { Text("${food.calories.toInt()} kcal/100g${food.brand?.let { " · $it" } ?: ""}") },
+                                leadingContent    = { Icon(Icons.Default.Star, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
+                                modifier          = Modifier.clickable { selectedFood = food }
                             )
                             HorizontalDivider()
                         }
@@ -207,25 +316,24 @@ fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
                 }
 
                 if (results.isEmpty() && query.length > 1 && !searching) {
-                    Text("Keine Treffer — eigenes Lebensmittel anlegen?", fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 8.dp))
+                    Text("Keine Treffer", fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 8.dp))
                 }
 
                 LazyColumn(Modifier.heightIn(max = 300.dp)) {
                     items(results) { food ->
                         val isFav = food.favoriteKey() in favoriteKeys
                         ListItem(
-                            headlineContent = { Text(food.name) },
-                            supportingContent = {
-                                val brand = food.brand?.let { " · $it" } ?: ""
-                                Text("${food.calories.toInt()} kcal/100g$brand")
-                            },
-                            trailingContent = {
+                            headlineContent   = { Text(food.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            supportingContent = { Text("${food.calories.toInt()} kcal/100g${food.brand?.let { " · $it" } ?: ""}") },
+                            trailingContent   = {
                                 IconButton(onClick = { vm.toggleFavorite(food) }) {
                                     Icon(
                                         if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                        if (isFav) "Favorit entfernen" else "Als Favorit speichern",
-                                        tint = if (isFav) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        null,
+                                        tint = if (isFav) MaterialTheme.colorScheme.error
+                                               else MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
@@ -236,18 +344,22 @@ fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
                     }
                 }
             } else {
-                val food = selectedFood!!
+                val food  = selectedFood!!
                 val isFav = food.favoriteKey() in favoriteKeys
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-                    Column {
-                        Text(food.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        food.brand?.let { Text(it, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                Row(Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.Top) {
+                    Column(Modifier.weight(1f)) {
+                        Text(food.name, fontWeight = FontWeight.Bold, fontSize = 16.sp,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        food.brand?.let { Text(it, fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
                     IconButton(onClick = { vm.toggleFavorite(food) }) {
                         Icon(
-                            if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            if (isFav) "Favorit entfernen" else "Als Favorit speichern",
-                            tint = if (isFav) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                            if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null,
+                            tint = if (isFav) MaterialTheme.colorScheme.error
+                                   else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -262,12 +374,12 @@ fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
                     MealPicker(selected = selectedMeal) { selectedMeal = it }
                 }
                 val grams = amountText.toFloatOrNull() ?: 0f
-                val cals  = food.calories * grams / 100f
                 if (grams > 0) {
                     Spacer(Modifier.height(8.dp))
-                    // Macro summary
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Text("${cals.toInt()} kcal", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                        Text("${(food.calories * grams / 100f).toInt()} kcal",
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary)
                         Text("P ${(food.protein * grams / 100f).toInt()}g", fontSize = 13.sp)
                         Text("K ${(food.carbs * grams / 100f).toInt()}g", fontSize = 13.sp)
                         Text("F ${(food.fat * grams / 100f).toInt()}g", fontSize = 13.sp)
@@ -275,9 +387,13 @@ fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
                 }
                 Spacer(Modifier.height(16.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { selectedFood = null }, Modifier.weight(1f)) { Text("Zurück") }
-                    Button(onClick = { if (grams > 0) { vm.addEntry(food, grams, selectedMeal); onDismiss() } },
-                        modifier = Modifier.weight(1f), enabled = grams > 0) { Text("Hinzufügen") }
+                    OutlinedButton(onClick = { selectedFood = null }, Modifier.weight(1f)) {
+                        Text("Zurück")
+                    }
+                    Button(
+                        onClick  = { if (grams > 0) { vm.addEntry(food, grams, selectedMeal); onDismiss() } },
+                        modifier = Modifier.weight(1f), enabled = grams > 0
+                    ) { Text("Hinzufügen") }
                 }
             }
             Spacer(Modifier.height(24.dp))
@@ -295,13 +411,16 @@ private fun MealPicker(selected: MealType, onSelect: (MealType) -> Unit) {
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             MealType.values().forEach { meal ->
-                DropdownMenuItem(text = { Text(meal.label()) }, onClick = { onSelect(meal); expanded = false })
+                DropdownMenuItem(
+                    text    = { Text(meal.label()) },
+                    onClick = { onSelect(meal); expanded = false }
+                )
             }
         }
     }
 }
 
-private fun MealType.label() = when(this) {
+private fun MealType.label() = when (this) {
     MealType.BREAKFAST -> "Frühstück"
     MealType.LUNCH     -> "Mittagessen"
     MealType.DINNER    -> "Abendessen"
