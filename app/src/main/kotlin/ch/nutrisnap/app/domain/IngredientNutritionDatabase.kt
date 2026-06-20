@@ -239,7 +239,6 @@ object IngredientNutritionDatabase {
         "zwiebelpulver"         to Entry(341f, 10f, 79f, 1f,  15f),
         "brühe"                 to Entry(5f,   0.5f,0.5f,0.1f),
         "broth"                 to Entry(5f,   0.5f,0.5f,0.1f),
-        "        "stock"                 to Entry(5f,   0.5f,0.5f,0.1f),
 
         // ── Protein / Fitness products ────────────────────────────────────────
         "proteinpasta"          to Entry(340f, 32f,  42f,  3f,  8f),
