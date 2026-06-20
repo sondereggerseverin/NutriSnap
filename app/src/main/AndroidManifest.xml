@@ -45,14 +45,26 @@
             </intent-filter>
         </activity>
 
-        <!-- Required by Health Connect for permission rationale -->
+        <!-- Required by Health Connect: rationale + VIEW_PERMISSION_USAGE alias -->
         <activity
             android:name=".health.HealthConnectPermissionRationaleActivity"
             android:exported="true">
             <intent-filter>
-                <action android:name="androidx.health.connect.client.SHOW_PERMISSIONS_RATIONALE"/>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"/>
             </intent-filter>
         </activity>
+
+        <!-- Required for Android 14+: lets Health Connect show permission usage -->
+        <activity-alias
+            android:name=".health.HealthConnectViewPermissionUsageActivity"
+            android:exported="true"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE"
+            android:targetActivity=".health.HealthConnectPermissionRationaleActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE"/>
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS"/>
+            </intent-filter>
+        </activity-alias>
 
         <service
             android:name=".service.FastingTimerService"
