@@ -37,7 +37,12 @@ class DiaryRepository(db: NutriDatabase) {
         )
     }
 
-    /** Add a recipe as a diary entry (amountGrams = 0 to flag recipe-type entries) */
+    /**
+     * Add a recipe as a diary entry.
+     * amountGrams stores the servingsFactor (e.g. 1.0 = 1 portion, 2.0 = 2 portions)
+     * so the edit dialog can show and modify portions correctly.
+     * foodItemId = -(recipe.id) to mark as recipe-type entry.
+     */
     suspend fun addRecipeAsMeal(
         recipe: Recipe,
         servingsFactor: Float,
@@ -53,9 +58,9 @@ class DiaryRepository(db: NutriDatabase) {
 
         return dao.insert(
             DiaryEntry(
-                foodItemId  = 0,             // 0 = recipe entry (no food_items row)
+                foodItemId  = -(recipe.id.toInt()).coerceAtMost(-1), // negative = recipe entry
                 foodName    = recipe.title,
-                amountGrams = 0f,
+                amountGrams = servingsFactor,   // stores portions, not grams
                 mealType    = mealType,
                 dateStr     = date.toString(),
                 calories    = calories,
