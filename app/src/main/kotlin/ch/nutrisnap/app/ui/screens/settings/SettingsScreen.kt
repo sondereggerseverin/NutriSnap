@@ -20,6 +20,7 @@ import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.repository.UserProfile
 import ch.nutrisnap.app.health.HealthConnectManager
+import ch.nutrisnap.app.health.HealthConnectStatus
 import kotlinx.coroutines.launch
 
 enum class FitnessGoal(val label: String, val emoji: String, val desc: String) {
@@ -318,7 +319,7 @@ fun HealthConnectCard() {
     }
 
     LaunchedEffect(status) {
-        if (status == HealthConnectManager.Status.AVAILABLE) {
+        if (status == HealthConnectStatus.AVAILABLE) {
             runCatching {
                 val manager = HealthConnectManager(context)
                 permissionsGranted = manager.hasAllPermissions()
@@ -328,14 +329,14 @@ fun HealthConnectCard() {
 
     SettingsCard(title = "Health Connect", icon = Icons.Default.Favorite) {
         when (status) {
-            HealthConnectManager.Status.NOT_AVAILABLE -> {
+            HealthConnectStatus.NOT_AVAILABLE -> {
                 Text(
                     "Health Connect ist auf diesem Gerät nicht verfügbar.",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            HealthConnectManager.Status.NEEDS_UPDATE -> {
+            HealthConnectStatus.NEEDS_UPDATE -> {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         "Health Connect muss aktualisiert werden.",
@@ -352,7 +353,7 @@ fun HealthConnectCard() {
                     }
                 }
             }
-            HealthConnectManager.Status.AVAILABLE -> {
+            HealthConnectStatus.AVAILABLE -> {
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,

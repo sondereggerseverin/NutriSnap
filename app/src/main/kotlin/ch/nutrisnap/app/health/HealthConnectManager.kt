@@ -14,6 +14,8 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
+enum class HealthConnectStatus { AVAILABLE, NEEDS_UPDATE, NOT_AVAILABLE }
+
 class HealthConnectManager(context: Context) {
 
     // Lazy so we don't crash if HC is not installed
@@ -31,19 +33,15 @@ class HealthConnectManager(context: Context) {
             HealthPermission.getReadPermission(HeartRateRecord::class),
         )
 
-        enum class Status { AVAILABLE, NEEDS_UPDATE, NOT_AVAILABLE }
-
-        fun getStatus(context: Context): Status = when (HealthConnectClient.getSdkStatus(context)) {
-            HealthConnectClient.SDK_AVAILABLE                          -> Status.AVAILABLE
-            HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> Status.NEEDS_UPDATE
-            else                                                       -> Status.NOT_AVAILABLE
+        fun getStatus(context: Context): HealthConnectStatus = when (HealthConnectClient.getSdkStatus(context)) {
+            HealthConnectClient.SDK_AVAILABLE                            -> HealthConnectStatus.AVAILABLE
+            HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> HealthConnectStatus.NEEDS_UPDATE
+            else                                                         -> HealthConnectStatus.NOT_AVAILABLE
         }
 
-        /** Convenience for quick available check */
         fun isAvailable(context: Context): Boolean =
-            getStatus(context) == Status.AVAILABLE
+            getStatus(context) == HealthConnectStatus.AVAILABLE
 
-        /** Opens Play Store to install / update Health Connect */
         fun openPlayStore(context: Context) {
             val uri = Uri.parse("market://details?id=com.google.android.apps.healthdata")
             val intent = Intent(Intent.ACTION_VIEW, uri).apply {
