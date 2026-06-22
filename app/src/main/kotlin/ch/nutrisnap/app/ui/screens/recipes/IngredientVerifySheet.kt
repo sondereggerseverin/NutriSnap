@@ -120,7 +120,10 @@ fun IngredientVerifySheet(
                 val state = verifyStates[index]
                 IngredientVerifyRow(
                     state = state,
-                    onScan = { scanTarget = index }
+                    onScan = { scanTarget = index },
+                    onDelete = {
+                        verifyStates = verifyStates.toMutableList().also { it.removeAt(index) }
+                    }
                 )
                 HorizontalDivider(
                     Modifier.padding(horizontal = 16.dp),
@@ -171,85 +174,135 @@ fun IngredientVerifySheet(
 @Composable
 private fun IngredientVerifyRow(
     state: IngredientVerifyState,
-    onScan: () -> Unit
+    onScan: () -> Unit,
+    onDelete: () -> Unit
 ) {
-    val isMatched = state.isVerified
     val isOverride = state.override != null
+    val isMatched  = state.isVerified
+    var showActions by remember { mutableStateOf(false) }
 
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable { if (!isMatched) onScan() }
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // Status icon
-        Box(
+    Column(Modifier.fillMaxWidth()) {
+        Row(
             Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(
-                    when {
-                        isOverride -> Color(0xFF1565C0).copy(alpha = 0.15f)
-                        isMatched  -> Color(0xFF2E7D32).copy(alpha = 0.12f)
-                        else       -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
-                    }
-                ),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .clickable { showActions = !showActions }
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(
-                imageVector = when {
-                    isOverride -> Icons.Default.QrCodeScanner
-                    isMatched  -> Icons.Default.Check
-                    else       -> Icons.Default.QuestionMark
-                },
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = when {
-                    isOverride -> Color(0xFF1565C0)
-                    isMatched  -> Color(0xFF2E7D32)
-                    else       -> MaterialTheme.colorScheme.error
-                }
-            )
-        }
-
-        // Name + source
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = state.result.line.trimStart('•', '-', ' '),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2
-            )
-            Text(
-                text = when {
-                    isOverride  -> "✓ ${state.override?.name ?: ""} (gescannt)"
-                    isMatched   -> "✓ ${state.effectiveFood?.name ?: "gematcht"}"
-                    else        -> "Tippen um zu scannen / suchen"
-                },
-                fontSize = 11.sp,
-                color = when {
-                    isOverride -> Color(0xFF1565C0)
-                    isMatched  -> Color(0xFF2E7D32)
-                    else       -> MaterialTheme.colorScheme.error
-                }
-            )
-        }
-
-        // Calories + scan button
-        Column(horizontalAlignment = Alignment.End) {
-            if (state.effectiveCalories > 0f) {
-                Text(
-                    "${state.effectiveCalories.toInt()} kcal",
-                    fontSize = 12.sp, fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            // Status icon
+            Box(
+                Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(
+                        when {
+                            isOverride -> Color(0xFF1565C0).copy(alpha = 0.15f)
+                            isMatched  -> Color(0xFF2E7D32).copy(alpha = 0.12f)
+                            else       -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
+                        }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = when {
+                        isOverride -> Icons.Default.QrCodeScanner
+                        isMatched  -> Icons.Default.Check
+                        else       -> Icons.Default.QuestionMark
+                    },
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = when {
+                        isOverride -> Color(0xFF1565C0)
+                        isMatched  -> Color(0xFF2E7D32)
+                        else       -> MaterialTheme.colorScheme.error
+                    }
                 )
             }
-            if (!isMatched) {
-                Spacer(Modifier.height(4.dp))
-                SmallScanButton(onClick = onScan)
+
+            // Name + source
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = state.result.line.trimStart('•', '-', ' '),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2
+                )
+                Text(
+                    text = when {
+                        isOverride -> "✓ ${state.override?.name ?: ""} (gescannt/gesucht)"
+                        isMatched  -> "✓ ${state.effectiveFood?.name ?: "gematcht"}"
+                        else       -> "Nicht gefunden · Tippen für Optionen"
+                    },
+                    fontSize = 11.sp,
+                    color = when {
+                        isOverride -> Color(0xFF1565C0)
+                        isMatched  -> Color(0xFF2E7D32)
+                        else       -> MaterialTheme.colorScheme.error
+                    }
+                )
+            }
+
+            // Calories + chevron
+            Column(horizontalAlignment = Alignment.End) {
+                if (state.effectiveCalories > 0f) {
+                    Text(
+                        "${state.effectiveCalories.toInt()} kcal",
+                        fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Icon(
+                    if (showActions) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    null, Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        // Action row — shown when expanded
+        if (showActions) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Edit / Scan
+                OutlinedButton(
+                    onClick = { showActions = false; onScan() },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.QrCodeScanner, null, Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Bearbeiten", fontSize = 12.sp)
+                }
+                // Keep as-is (close actions)
+                OutlinedButton(
+                    onClick = { showActions = false },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.Check, null, Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Belassen", fontSize = 12.sp)
+                }
+                // Delete
+                OutlinedButton(
+                    onClick = { showActions = false; onDelete() },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.Delete, null, Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Löschen", fontSize = 12.sp)
+                }
             }
         }
     }
