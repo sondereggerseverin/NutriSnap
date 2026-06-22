@@ -26,7 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.FoodSource
-import ch.nutrisnap.app.data.repository.FoodSearchRepository
+import ch.nutrisnap.app.data.db.NutriDatabase
+import ch.nutrisnap.app.data.repository.FoodItemRepository
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import kotlinx.coroutines.launch
 
@@ -307,8 +308,8 @@ fun IngredientIdentifySheet(
             IdentifyMode.Barcode -> BarcodeLookupScreen(
                 onBarcodeScanned = { barcode ->
                     scope.launch {
-                        val repo = FoodSearchRepository(context)
-                        val food = runCatching { repo.searchByBarcode(barcode) }.getOrNull()
+                        val repo = FoodItemRepository(NutriDatabase.getInstance(context))
+                        val food = runCatching { repo.searchAll(barcode).firstOrNull() }.getOrNull()
                         if (food != null) onFoodSelected(food)
                         else mode = IdentifyMode.Search(barcode)
                     }
@@ -482,8 +483,8 @@ private fun FoodSearchScreen(
             isSearching = true
             errorMsg = null
             runCatching {
-                val repo = FoodSearchRepository(context)
-                results = repo.search(query)
+                val repo = FoodItemRepository(NutriDatabase.getInstance(context))
+                results = repo.searchAll(query)
             }.onFailure { errorMsg = it.message }
             isSearching = false
         }
@@ -506,8 +507,8 @@ private fun FoodSearchScreen(
                     scope.launch {
                         isSearching = true; errorMsg = null
                         runCatching {
-                            val repo = FoodSearchRepository(context)
-                            results = repo.search(searchText)
+                            val repo = FoodItemRepository(NutriDatabase.getInstance(context))
+                            results = repo.searchAll(searchText)
                         }.onFailure { errorMsg = it.message }
                         isSearching = false
                     }
