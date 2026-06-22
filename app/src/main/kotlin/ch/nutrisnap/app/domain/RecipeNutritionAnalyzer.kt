@@ -183,9 +183,9 @@ object RecipeNutritionAnalyzer {
      */
     private fun simplifyForSearch(name: String): List<String> {
         val n = name.lowercase()
-            .replace(Regex("\\(.*?\\)"), " ") // remove parentheses
+            .replace(Regex("""\(.*?\)"""), " ") // remove parentheses
             .replace(Regex("[^a-zäöüß0-9 ]"), " ")
-            .replace(Regex("\\s+"), " ")
+            .replace(Regex("""\s+"""), " ")
             .trim()
 
         val queries = mutableListOf<String>()
@@ -193,8 +193,8 @@ object RecipeNutritionAnalyzer {
 
         // Remove common adjectives to find the base food
         val stripped = n
-            .replace(Regex("\\b(veganes?|veganer?|vegan|fettarm|fettarme[rns]?|mager|light|frisch[er]*|gegart|gekocht|roh|gewürfelt[e]?|gehackt[e]?|getrocknet[e]?|optional|bio|low[- ]fat|high[- ]protein|protein)\\b"), "")
-            .replace(Regex("\\s+"), " ").trim()
+            .replace(Regex("""\b(veganes?|veganer?|vegan|fettarm|fettarme[rns]?|mager|light|frisch[er]*|gegart|gekocht|roh|gewürfelt[e]?|gehackt[e]?|getrocknet[e]?|optional|bio|low[- ]fat|high[- ]protein|protein)\b"""), "")
+            .replace(Regex("""\s+"""), " ").trim()
         if (stripped != n && stripped.length >= 3) queries.add(stripped)
 
         // Try first meaningful word(s) if compound word
@@ -262,8 +262,8 @@ object RecipeNutritionAnalyzer {
                         // Try local DB with original name + simplified versions
                         val localSearchTerms = listOf(parsed.name) +
                             listOf(parsed.name.lowercase()
-                                .replace(Regex("\\b(veganes?|veganer?|vegan|fettarm|fettarme[rns]?|mager|light|frisch[er]*|bio|protein|high[- ]protein|low[- ]fat)\\b"), "")
-                                .replace(Regex("\\s+"), " ").trim())
+                                .replace(Regex("""\b(veganes?|veganer?|vegan|fettarm|fettarme[rns]?|mager|light|frisch[er]*|bio|protein|high[- ]protein|low[- ]fat)\b"""), "")
+                                .replace(Regex("""\s+"""), " ").trim())
                         val local = localSearchTerms.firstNotNullOfOrNull { IngredientNutritionDatabase.lookup(it) }
                         if (local != null) {
                             return@async IngredientResult(
