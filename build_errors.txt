@@ -1,47 +1,26 @@
-# Build errors - run 169
+# Build errors - run 175
 
 ## Error lines
 ```
 Unable to strip the following libraries, packaging them as they are: libbarhopper_v3.so, libdatastore_shared_counter.so, libimage_processing_util_jni.so.
 > Task :app:compileDebugKotlin FAILED
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeNutritionAnalyzer.kt:186:29 Illegal escape: '\('
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeNutritionAnalyzer.kt:186:34 Illegal escape: '\)'
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeNutritionAnalyzer.kt:188:29 Illegal escape: '\s'
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeNutritionAnalyzer.kt:197:29 Illegal escape: '\s'
-BUILD FAILED in 3m 51s
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:310:57 Type mismatch: inferred type is Context but FoodItemDao was expected
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:310:57 No value passed for parameter 'usdaApi'
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:310:57 No value passed for parameter 'nutritionixApi'
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:310:57 No value passed for parameter 'openFoodFactsSearch'
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:485:49 Type mismatch: inferred type is Context but FoodItemDao was expected
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:485:49 No value passed for parameter 'usdaApi'
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:485:49 No value passed for parameter 'nutritionixApi'
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:485:49 No value passed for parameter 'openFoodFactsSearch'
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:509:61 Type mismatch: inferred type is Context but FoodItemDao was expected
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:509:61 No value passed for parameter 'usdaApi'
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:509:61 No value passed for parameter 'nutritionixApi'
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:509:61 No value passed for parameter 'openFoodFactsSearch'
+BUILD FAILED in 3m 56s
 ```
 
 ## Last 150 lines
 ```
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.run(DefaultBuildOperationRunner.java:47)
-	at org.gradle.api.internal.tasks.execution.TaskExecution.executeAction(TaskExecution.java:229)
-	at org.gradle.api.internal.tasks.execution.TaskExecution.executeActions(TaskExecution.java:212)
-	at org.gradle.api.internal.tasks.execution.TaskExecution.executeWithPreviousOutputFiles(TaskExecution.java:195)
-	at org.gradle.api.internal.tasks.execution.TaskExecution.execute(TaskExecution.java:162)
-	at org.gradle.internal.execution.steps.ExecuteStep.executeInternal(ExecuteStep.java:105)
-	at org.gradle.internal.execution.steps.ExecuteStep.access$000(ExecuteStep.java:44)
-	at org.gradle.internal.execution.steps.ExecuteStep$1.call(ExecuteStep.java:59)
-	at org.gradle.internal.execution.steps.ExecuteStep$1.call(ExecuteStep.java:56)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
-	at org.gradle.internal.execution.steps.ExecuteStep.execute(ExecuteStep.java:56)
-	at org.gradle.internal.execution.steps.ExecuteStep.execute(ExecuteStep.java:44)
-	at org.gradle.internal.execution.steps.CancelExecutionStep.execute(CancelExecutionStep.java:42)
-	at org.gradle.internal.execution.steps.TimeoutStep.executeWithoutTimeout(TimeoutStep.java:75)
-	at org.gradle.internal.execution.steps.TimeoutStep.execute(TimeoutStep.java:55)
-	at org.gradle.internal.execution.steps.PreCreateOutputParentsStep.execute(PreCreateOutputParentsStep.java:50)
-	at org.gradle.internal.execution.steps.PreCreateOutputParentsStep.execute(PreCreateOutputParentsStep.java:28)
-	at org.gradle.internal.execution.steps.RemovePreviousOutputsStep.execute(RemovePreviousOutputsStep.java:67)
-	at org.gradle.internal.execution.steps.RemovePreviousOutputsStep.execute(RemovePreviousOutputsStep.java:37)
-	at org.gradle.internal.execution.steps.BroadcastChangingOutputsStep.execute(BroadcastChangingOutputsStep.java:61)
 	at org.gradle.internal.execution.steps.BroadcastChangingOutputsStep.execute(BroadcastChangingOutputsStep.java:26)
 	at org.gradle.internal.execution.steps.CaptureOutputsAfterExecutionStep.execute(CaptureOutputsAfterExecutionStep.java:69)
 	at org.gradle.internal.execution.steps.CaptureOutputsAfterExecutionStep.execute(CaptureOutputsAfterExecutionStep.java:46)
@@ -120,6 +99,35 @@ BUILD FAILED in 3m 51s
 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:303)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
+	at org.gradle.execution.plan.DefaultPlanExecutor.process(DefaultPlanExecutor.java:111)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.executeWithServices(DefaultTaskExecutionGraph.java:138)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.execute(DefaultTaskExecutionGraph.java:123)
+	at org.gradle.execution.SelectedTaskExecutionAction.execute(SelectedTaskExecutionAction.java:35)
+	at org.gradle.execution.DryRunBuildExecutionAction.execute(DryRunBuildExecutionAction.java:51)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:54)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:43)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor.execute(BuildOperationFiringBuildWorkerExecutor.java:40)
+	at org.gradle.internal.build.DefaultBuildLifecycleController.lambda$executeTasks$10(DefaultBuildLifecycleController.java:313)
+	at org.gradle.internal.model.StateTransitionController.doTransition(StateTransitionController.java:266)
+	at org.gradle.internal.model.StateTransitionController.lambda$tryTransition$8(StateTransitionController.java:177)
+	at org.gradle.internal.work.DefaultSynchronizer.withLock(DefaultSynchronizer.java:46)
+	at org.gradle.internal.model.StateTransitionController.tryTransition(StateTransitionController.java:177)
+	at org.gradle.internal.build.DefaultBuildLifecycleController.executeTasks(DefaultBuildLifecycleController.java:304)
+	at org.gradle.internal.build.DefaultBuildWorkGraphController$DefaultBuildWorkGraph.runWork(DefaultBuildWorkGraphController.java:220)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:263)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:127)
+	at org.gradle.composite.internal.DefaultBuildController.doRun(DefaultBuildController.java:181)
+	at org.gradle.composite.internal.DefaultBuildController.access$000(DefaultBuildController.java:50)
+	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.lambda$run$0(DefaultBuildController.java:198)
+	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:85)
+	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.run(DefaultBuildController.java:198)
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilation error. See log for more details
@@ -161,6 +169,6 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/8.11.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD FAILED in 3m 51s
+BUILD FAILED in 3m 56s
 33 actionable tasks: 33 executed
 ```
