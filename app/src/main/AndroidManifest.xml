@@ -19,6 +19,8 @@
     <uses-permission android:name="android.permission.health.READ_WEIGHT"/>
     <uses-permission android:name="android.permission.health.READ_SLEEP"/>
     <uses-permission android:name="android.permission.health.READ_HEART_RATE"/>
+    <!-- FIX: fehlte – wird von HealthConnectManager.REQUIRED_PERMISSIONS benötigt -->
+    <uses-permission android:name="android.permission.health.READ_EXERCISE"/>
 
     <!-- Required so Android resolves the Health Connect app -->
     <queries>
