@@ -30,6 +30,7 @@ class HealthConnectManager(context: Context) {
             HealthPermission.getReadPermission(WeightRecord::class),
             HealthPermission.getReadPermission(SleepSessionRecord::class),
             HealthPermission.getReadPermission(HeartRateRecord::class),
+            // FIX: ExerciseSessionRecord war in readRecords verwendet aber nicht in REQUIRED_PERMISSIONS
             HealthPermission.getReadPermission(ExerciseSessionRecord::class),
         )
 
@@ -61,10 +62,14 @@ class HealthConnectManager(context: Context) {
     /** Steps today */
     fun getTodaysSteps(): Flow<Long> = flow {
         val (start, end) = todayRange()
-        val resp = client.readRecords(
-            ReadRecordsRequest(StepsRecord::class, TimeRangeFilter.between(start, end))
-        )
-        emit(resp.records.sumOf { it.count })
+        // FIX: runCatching verhindert Crash wenn Samsung Health keine Daten hat
+        val result = runCatching {
+            val resp = client.readRecords(
+                ReadRecordsRequest(StepsRecord::class, TimeRangeFilter.between(start, end))
+            )
+            resp.records.sumOf { it.count }
+        }.getOrDefault(0L)
+        emit(result)
     }
 
     /**
@@ -75,23 +80,25 @@ class HealthConnectManager(context: Context) {
     fun getTodaysActiveCalories(): Flow<Double> = flow {
         val (start, end) = todayRange()
 
-        val activeResp = client.readRecords(
-            ReadRecordsRequest(ActiveCaloriesBurnedRecord::class, TimeRangeFilter.between(start, end))
-        )
-        val activeCals = activeResp.records.sumOf { it.energy.inKilocalories }
+        val activeCals = runCatching {
+            val activeResp = client.readRecords(
+                ReadRecordsRequest(ActiveCaloriesBurnedRecord::class, TimeRangeFilter.between(start, end))
+            )
+            activeResp.records.sumOf { it.energy.inKilocalories }
+        }.getOrDefault(0.0)
 
-        val totalResp = client.readRecords(
-            ReadRecordsRequest(TotalCaloriesBurnedRecord::class, TimeRangeFilter.between(start, end))
-        )
-        val totalCals = totalResp.records.sumOf { it.energy.inKilocalories }
+        val totalCals = runCatching {
+            val totalResp = client.readRecords(
+                ReadRecordsRequest(TotalCaloriesBurnedRecord::class, TimeRangeFilter.between(start, end))
+            )
+            totalResp.records.sumOf { it.energy.inKilocalories }
+        }.getOrDefault(0.0)
 
         // Samsung Health: totalCals includes BMR, so subtract BMR estimate (~1800/day → 75/h)
-        // If total > active significantly, use total - BMR portion; otherwise use active
         val result = when {
             totalCals > activeCals * 1.5 -> {
-                // Total likely includes BMR - estimate activity portion only
                 val hoursElapsed = java.time.Duration.between(start, end).toMinutes() / 60.0
-                val bmrPortion = hoursElapsed * 75.0  // ~1800 kcal/day BMR / 24h
+                val bmrPortion = hoursElapsed * 75.0
                 (totalCals - bmrPortion).coerceAtLeast(activeCals)
             }
             totalCals > 0 -> totalCals
@@ -102,16 +109,19 @@ class HealthConnectManager(context: Context) {
 
     /** Latest weight reading from last 30 days */
     fun getLatestWeight(): Flow<Double?> = flow {
-        val resp = client.readRecords(
-            ReadRecordsRequest(
-                WeightRecord::class,
-                TimeRangeFilter.between(
-                    Instant.now().minusSeconds(30L * 24 * 3600),
-                    Instant.now()
+        val result = runCatching {
+            val resp = client.readRecords(
+                ReadRecordsRequest(
+                    WeightRecord::class,
+                    TimeRangeFilter.between(
+                        Instant.now().minusSeconds(30L * 24 * 3600),
+                        Instant.now()
+                    )
                 )
             )
-        )
-        emit(resp.records.lastOrNull()?.weight?.inKilograms)
+            resp.records.lastOrNull()?.weight?.inKilograms
+        }.getOrDefault(null)
+        emit(result)
     }
 
     /** Last night sleep: 18:00 yesterday → 12:00 today */
@@ -120,34 +130,43 @@ class HealthConnectManager(context: Context) {
             .atZone(ZoneId.systemDefault()).toInstant()
         val to   = LocalDate.now().atTime(12, 0)
             .atZone(ZoneId.systemDefault()).toInstant()
-        val resp = client.readRecords(
-            ReadRecordsRequest(SleepSessionRecord::class, TimeRangeFilter.between(from, to))
-        )
-        emit(resp.records.sumOf {
-            java.time.Duration.between(it.startTime, it.endTime).toMinutes()
-        })
+        val result = runCatching {
+            val resp = client.readRecords(
+                ReadRecordsRequest(SleepSessionRecord::class, TimeRangeFilter.between(from, to))
+            )
+            resp.records.sumOf {
+                java.time.Duration.between(it.startTime, it.endTime).toMinutes()
+            }
+        }.getOrDefault(0L)
+        emit(result)
     }
 
     /** Average heart rate today */
     fun getTodaysAvgHeartRate(): Flow<Long?> = flow {
         val (start, end) = todayRange()
-        val resp = client.readRecords(
-            ReadRecordsRequest(HeartRateRecord::class, TimeRangeFilter.between(start, end))
-        )
-        val all = resp.records.flatMap { it.samples }
-        emit(if (all.isEmpty()) null else all.map { it.beatsPerMinute }.average().toLong())
+        val result = runCatching {
+            val resp = client.readRecords(
+                ReadRecordsRequest(HeartRateRecord::class, TimeRangeFilter.between(start, end))
+            )
+            val all = resp.records.flatMap { it.samples }
+            if (all.isEmpty()) null else all.map { it.beatsPerMinute }.average().toLong()
+        }.getOrDefault(null)
+        emit(result)
     }
 
     /** Steps grouped by day for the last 7 days */
     fun getWeeklySteps(): Flow<Map<LocalDate, Long>> = flow {
         val weekStart = LocalDate.now().minusDays(6)
             .atStartOfDay(ZoneId.systemDefault()).toInstant()
-        val resp = client.readRecords(
-            ReadRecordsRequest(StepsRecord::class, TimeRangeFilter.between(weekStart, Instant.now()))
-        )
-        emit(resp.records.groupBy {
-            it.startTime.atZone(ZoneId.systemDefault()).toLocalDate()
-        }.mapValues { (_, v) -> v.sumOf { it.count } })
+        val result = runCatching {
+            val resp = client.readRecords(
+                ReadRecordsRequest(StepsRecord::class, TimeRangeFilter.between(weekStart, Instant.now()))
+            )
+            resp.records.groupBy {
+                it.startTime.atZone(ZoneId.systemDefault()).toLocalDate()
+            }.mapValues { (_, v) -> v.sumOf { it.count } }
+        }.getOrDefault(emptyMap())
+        emit(result)
     }
 
     private fun todayRange(): Pair<Instant, Instant> {
