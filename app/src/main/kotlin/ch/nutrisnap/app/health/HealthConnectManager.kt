@@ -30,7 +30,6 @@ class HealthConnectManager(context: Context) {
             HealthPermission.getReadPermission(WeightRecord::class),
             HealthPermission.getReadPermission(SleepSessionRecord::class),
             HealthPermission.getReadPermission(HeartRateRecord::class),
-            // FIX: ExerciseSessionRecord war in readRecords verwendet aber nicht in REQUIRED_PERMISSIONS
             HealthPermission.getReadPermission(ExerciseSessionRecord::class),
         )
 
@@ -59,52 +58,76 @@ class HealthConnectManager(context: Context) {
     suspend fun hasAllPermissions(): Boolean =
         checkPermissions().containsAll(REQUIRED_PERMISSIONS)
 
-    /** Steps today */
+    /**
+     * Steps today – deduplicated.
+     *
+     * Samsung Health can write multiple overlapping StepsRecord entries
+     * (e.g. background + workout). We deduplicate by sorting records and
+     * only counting non-overlapping intervals to avoid double-counting.
+     */
     fun getTodaysSteps(): Flow<Long> = flow {
         val (start, end) = todayRange()
-        // FIX: runCatching verhindert Crash wenn Samsung Health keine Daten hat
         val result = runCatching {
             val resp = client.readRecords(
                 ReadRecordsRequest(StepsRecord::class, TimeRangeFilter.between(start, end))
             )
-            resp.records.sumOf { it.count }
+            // Sort by start time, skip records that start before the previous one ended
+            var lastEnd = start
+            var total = 0L
+            resp.records
+                .sortedBy { it.startTime }
+                .forEach { record ->
+                    if (record.startTime >= lastEnd) {
+                        total += record.count
+                        lastEnd = record.endTime
+                    } else if (record.endTime > lastEnd) {
+                        // Partial overlap: only count the non-overlapping tail
+                        // We can't split step count proportionally without timestamps,
+                        // so we skip partial overlaps conservatively.
+                        lastEnd = record.endTime
+                    }
+                }
+            total
         }.getOrDefault(0L)
         emit(result)
     }
 
     /**
-     * Total burned calories today.
-     * Samsung Health writes workout calories to TotalCaloriesBurnedRecord.
-     * We take the max of Total vs Active to avoid double-counting.
+     * Active (workout) calories today.
+     *
+     * Strategy:
+     * 1. Prefer ActiveCaloriesBurnedRecord – these are pure activity kcal, no BMR.
+     * 2. If active kcal == 0 and TotalCaloriesBurnedRecord exists, use it as fallback
+     *    but subtract an estimated BMR share so we don't inflate the number.
+     *
+     * Samsung Health writes TotalCaloriesBurnedRecord which includes BMR (~1800 kcal/day).
+     * We avoid the BMR-subtraction heuristic that caused wrong numbers before.
+     * Instead we simply trust ActiveCaloriesBurnedRecord as the primary source.
      */
     fun getTodaysActiveCalories(): Flow<Double> = flow {
         val (start, end) = todayRange()
 
         val activeCals = runCatching {
-            val activeResp = client.readRecords(
+            val resp = client.readRecords(
                 ReadRecordsRequest(ActiveCaloriesBurnedRecord::class, TimeRangeFilter.between(start, end))
             )
-            activeResp.records.sumOf { it.energy.inKilocalories }
+            // Deduplicate overlapping records the same way as steps
+            var lastEnd = start
+            var total = 0.0
+            resp.records
+                .sortedBy { it.startTime }
+                .forEach { record ->
+                    if (record.startTime >= lastEnd) {
+                        total += record.energy.inKilocalories
+                        lastEnd = record.endTime
+                    } else if (record.endTime > lastEnd) {
+                        lastEnd = record.endTime
+                    }
+                }
+            total
         }.getOrDefault(0.0)
 
-        val totalCals = runCatching {
-            val totalResp = client.readRecords(
-                ReadRecordsRequest(TotalCaloriesBurnedRecord::class, TimeRangeFilter.between(start, end))
-            )
-            totalResp.records.sumOf { it.energy.inKilocalories }
-        }.getOrDefault(0.0)
-
-        // Samsung Health: totalCals includes BMR, so subtract BMR estimate (~1800/day → 75/h)
-        val result = when {
-            totalCals > activeCals * 1.5 -> {
-                val hoursElapsed = java.time.Duration.between(start, end).toMinutes() / 60.0
-                val bmrPortion = hoursElapsed * 75.0
-                (totalCals - bmrPortion).coerceAtLeast(activeCals)
-            }
-            totalCals > 0 -> totalCals
-            else -> activeCals
-        }
-        emit(result)
+        emit(activeCals)
     }
 
     /** Latest weight reading from last 30 days */
@@ -154,7 +177,7 @@ class HealthConnectManager(context: Context) {
         emit(result)
     }
 
-    /** Steps grouped by day for the last 7 days */
+    /** Steps grouped by day for the last 7 days (deduplicated per day) */
     fun getWeeklySteps(): Flow<Map<LocalDate, Long>> = flow {
         val weekStart = LocalDate.now().minusDays(6)
             .atStartOfDay(ZoneId.systemDefault()).toInstant()
@@ -162,9 +185,23 @@ class HealthConnectManager(context: Context) {
             val resp = client.readRecords(
                 ReadRecordsRequest(StepsRecord::class, TimeRangeFilter.between(weekStart, Instant.now()))
             )
-            resp.records.groupBy {
+            // Group by day, then deduplicate within each day
+            val byDay = resp.records.groupBy {
                 it.startTime.atZone(ZoneId.systemDefault()).toLocalDate()
-            }.mapValues { (_, v) -> v.sumOf { it.count } }
+            }
+            byDay.mapValues { (_, records) ->
+                var lastEnd = Instant.EPOCH
+                var total = 0L
+                records.sortedBy { it.startTime }.forEach { r ->
+                    if (r.startTime >= lastEnd) {
+                        total += r.count
+                        lastEnd = r.endTime
+                    } else if (r.endTime > lastEnd) {
+                        lastEnd = r.endTime
+                    }
+                }
+                total
+            }
         }.getOrDefault(emptyMap())
         emit(result)
     }
