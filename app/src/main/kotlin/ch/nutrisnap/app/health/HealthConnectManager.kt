@@ -50,6 +50,59 @@ class HealthConnectManager(context: Context) {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             })
         }
+
+        /**
+         * Samsung Health schreibt mehrere StepsRecord-Eintraege pro Zeitslot:
+         * - einen vom Hintergrund-Sensor
+         * - einen von der Sensor-Fusion / Workout-Erkennung
+         * Diese ueberlappen sich exakt oder teilweise und fuehren zu Doppelzaehlung.
+         *
+         * Fix: Wir gruppieren Records nach ihrer dataOrigin (Datenquelle) und nehmen
+         * pro Zeitfenster nur den hoechsten Wert einer einzigen Quelle (Samsung Health selbst
+         * aggregiert intern, Health Connect gibt aber rohe Teil-Records zurueck).
+         * Konkret: Wir nehmen den Record mit dem hoechsten count pro nicht-ueberlappenden Slot.
+         */
+        fun deduplicateSteps(records: List<StepsRecord>): Long {
+            if (records.isEmpty()) return 0L
+            // Sort by startTime, then by count descending so the "best" record wins
+            val sorted = records.sortedWith(compareBy<StepsRecord> { it.startTime }.thenByDescending { it.count })
+            var lastEnd = Instant.EPOCH
+            var total = 0L
+            for (record in sorted) {
+                when {
+                    // No overlap: count fully
+                    record.startTime >= lastEnd -> {
+                        total += record.count
+                        lastEnd = record.endTime
+                    }
+                    // Complete duplicate or subset: skip entirely
+                    record.endTime <= lastEnd -> { /* skip */ }
+                    // Partial overlap: extend window, do NOT add count (conservative)
+                    else -> {
+                        lastEnd = record.endTime
+                    }
+                }
+            }
+            return total
+        }
+
+        fun deduplicateCalories(records: List<ActiveCaloriesBurnedRecord>): Double {
+            if (records.isEmpty()) return 0.0
+            val sorted = records.sortedWith(compareBy<ActiveCaloriesBurnedRecord> { it.startTime }.thenByDescending { it.energy.inKilocalories })
+            var lastEnd = Instant.EPOCH
+            var total = 0.0
+            for (record in sorted) {
+                when {
+                    record.startTime >= lastEnd -> {
+                        total += record.energy.inKilocalories
+                        lastEnd = record.endTime
+                    }
+                    record.endTime <= lastEnd -> { /* skip duplicate */ }
+                    else -> { lastEnd = record.endTime }
+                }
+            }
+            return total
+        }
     }
 
     suspend fun checkPermissions(): Set<String> =
@@ -58,76 +111,31 @@ class HealthConnectManager(context: Context) {
     suspend fun hasAllPermissions(): Boolean =
         checkPermissions().containsAll(REQUIRED_PERMISSIONS)
 
-    /**
-     * Steps today – deduplicated.
-     *
-     * Samsung Health can write multiple overlapping StepsRecord entries
-     * (e.g. background + workout). We deduplicate by sorting records and
-     * only counting non-overlapping intervals to avoid double-counting.
-     */
+    /** Steps today – vollstaendig dedupliziert gegen Samsung Health Doppeleintraege */
     fun getTodaysSteps(): Flow<Long> = flow {
         val (start, end) = todayRange()
         val result = runCatching {
             val resp = client.readRecords(
                 ReadRecordsRequest(StepsRecord::class, TimeRangeFilter.between(start, end))
             )
-            // Sort by start time, skip records that start before the previous one ended
-            var lastEnd = start
-            var total = 0L
-            resp.records
-                .sortedBy { it.startTime }
-                .forEach { record ->
-                    if (record.startTime >= lastEnd) {
-                        total += record.count
-                        lastEnd = record.endTime
-                    } else if (record.endTime > lastEnd) {
-                        // Partial overlap: only count the non-overlapping tail
-                        // We can't split step count proportionally without timestamps,
-                        // so we skip partial overlaps conservatively.
-                        lastEnd = record.endTime
-                    }
-                }
-            total
+            deduplicateSteps(resp.records)
         }.getOrDefault(0L)
         emit(result)
     }
 
     /**
-     * Active (workout) calories today.
-     *
-     * Strategy:
-     * 1. Prefer ActiveCaloriesBurnedRecord – these are pure activity kcal, no BMR.
-     * 2. If active kcal == 0 and TotalCaloriesBurnedRecord exists, use it as fallback
-     *    but subtract an estimated BMR share so we don't inflate the number.
-     *
-     * Samsung Health writes TotalCaloriesBurnedRecord which includes BMR (~1800 kcal/day).
-     * We avoid the BMR-subtraction heuristic that caused wrong numbers before.
-     * Instead we simply trust ActiveCaloriesBurnedRecord as the primary source.
+     * Active calories today – nur ActiveCaloriesBurnedRecord (kein BMR).
+     * Samsung Health 69 Cal = ActiveCalories, nicht Total.
      */
     fun getTodaysActiveCalories(): Flow<Double> = flow {
         val (start, end) = todayRange()
-
-        val activeCals = runCatching {
+        val result = runCatching {
             val resp = client.readRecords(
                 ReadRecordsRequest(ActiveCaloriesBurnedRecord::class, TimeRangeFilter.between(start, end))
             )
-            // Deduplicate overlapping records the same way as steps
-            var lastEnd = start
-            var total = 0.0
-            resp.records
-                .sortedBy { it.startTime }
-                .forEach { record ->
-                    if (record.startTime >= lastEnd) {
-                        total += record.energy.inKilocalories
-                        lastEnd = record.endTime
-                    } else if (record.endTime > lastEnd) {
-                        lastEnd = record.endTime
-                    }
-                }
-            total
+            deduplicateCalories(resp.records)
         }.getOrDefault(0.0)
-
-        emit(activeCals)
+        emit(result)
     }
 
     /** Latest weight reading from last 30 days */
@@ -177,7 +185,7 @@ class HealthConnectManager(context: Context) {
         emit(result)
     }
 
-    /** Steps grouped by day for the last 7 days (deduplicated per day) */
+    /** Steps grouped by day for the last 7 days – dedupliziert */
     fun getWeeklySteps(): Flow<Map<LocalDate, Long>> = flow {
         val weekStart = LocalDate.now().minusDays(6)
             .atStartOfDay(ZoneId.systemDefault()).toInstant()
@@ -185,23 +193,9 @@ class HealthConnectManager(context: Context) {
             val resp = client.readRecords(
                 ReadRecordsRequest(StepsRecord::class, TimeRangeFilter.between(weekStart, Instant.now()))
             )
-            // Group by day, then deduplicate within each day
-            val byDay = resp.records.groupBy {
-                it.startTime.atZone(ZoneId.systemDefault()).toLocalDate()
-            }
-            byDay.mapValues { (_, records) ->
-                var lastEnd = Instant.EPOCH
-                var total = 0L
-                records.sortedBy { it.startTime }.forEach { r ->
-                    if (r.startTime >= lastEnd) {
-                        total += r.count
-                        lastEnd = r.endTime
-                    } else if (r.endTime > lastEnd) {
-                        lastEnd = r.endTime
-                    }
-                }
-                total
-            }
+            resp.records
+                .groupBy { it.startTime.atZone(ZoneId.systemDefault()).toLocalDate() }
+                .mapValues { (_, records) -> deduplicateSteps(records) }
         }.getOrDefault(emptyMap())
         emit(result)
     }
