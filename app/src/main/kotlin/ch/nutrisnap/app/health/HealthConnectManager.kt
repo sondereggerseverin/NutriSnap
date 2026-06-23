@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.*
+import androidx.health.connect.client.request.AggregateRecordsRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import kotlinx.coroutines.flow.Flow
@@ -58,46 +59,28 @@ class HealthConnectManager(context: Context) {
     suspend fun hasAllPermissions(): Boolean =
         checkPermissions().containsAll(REQUIRED_PERMISSIONS)
 
-    /** Steps today */
+    /** Steps today — aggregate avoids Samsung Health overlapping record double-counting */
     fun getTodaysSteps(): Flow<Long> = flow {
         val (start, end) = todayRange()
-        val resp = client.readRecords(
-            ReadRecordsRequest(StepsRecord::class, TimeRangeFilter.between(start, end))
+        val result = client.aggregate(
+            AggregateRecordsRequest(
+                metrics = setOf(StepsRecord.COUNT_TOTAL),
+                timeRangeFilter = TimeRangeFilter.between(start, end)
+            )
         )
-        emit(resp.records.sumOf { it.count })
+        emit(result[StepsRecord.COUNT_TOTAL] ?: 0L)
     }
 
-    /**
-     * Total burned calories today.
-     * Samsung Health writes workout calories to TotalCaloriesBurnedRecord.
-     * We take the max of Total vs Active to avoid double-counting.
-     */
+    /** Active calories today — aggregate avoids Samsung Health overlapping record double-counting */
     fun getTodaysActiveCalories(): Flow<Double> = flow {
         val (start, end) = todayRange()
-
-        val activeResp = client.readRecords(
-            ReadRecordsRequest(ActiveCaloriesBurnedRecord::class, TimeRangeFilter.between(start, end))
+        val result = client.aggregate(
+            AggregateRecordsRequest(
+                metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
+                timeRangeFilter = TimeRangeFilter.between(start, end)
+            )
         )
-        val activeCals = activeResp.records.sumOf { it.energy.inKilocalories }
-
-        val totalResp = client.readRecords(
-            ReadRecordsRequest(TotalCaloriesBurnedRecord::class, TimeRangeFilter.between(start, end))
-        )
-        val totalCals = totalResp.records.sumOf { it.energy.inKilocalories }
-
-        // Samsung Health: totalCals includes BMR, so subtract BMR estimate (~1800/day → 75/h)
-        // If total > active significantly, use total - BMR portion; otherwise use active
-        val result = when {
-            totalCals > activeCals * 1.5 -> {
-                // Total likely includes BMR - estimate activity portion only
-                val hoursElapsed = java.time.Duration.between(start, end).toMinutes() / 60.0
-                val bmrPortion = hoursElapsed * 75.0  // ~1800 kcal/day BMR / 24h
-                (totalCals - bmrPortion).coerceAtLeast(activeCals)
-            }
-            totalCals > 0 -> totalCals
-            else -> activeCals
-        }
-        emit(result)
+        emit(result[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories ?: 0.0)
     }
 
     /** Latest weight reading from last 30 days */
@@ -138,16 +121,23 @@ class HealthConnectManager(context: Context) {
         emit(if (all.isEmpty()) null else all.map { it.beatsPerMinute }.average().toLong())
     }
 
-    /** Steps grouped by day for the last 7 days */
+    /** Steps grouped by day for the last 7 days — aggregate per day avoids double-counting */
     fun getWeeklySteps(): Flow<Map<LocalDate, Long>> = flow {
-        val weekStart = LocalDate.now().minusDays(6)
-            .atStartOfDay(ZoneId.systemDefault()).toInstant()
-        val resp = client.readRecords(
-            ReadRecordsRequest(StepsRecord::class, TimeRangeFilter.between(weekStart, Instant.now()))
-        )
-        emit(resp.records.groupBy {
-            it.startTime.atZone(ZoneId.systemDefault()).toLocalDate()
-        }.mapValues { (_, v) -> v.sumOf { it.count } })
+        val today = LocalDate.now()
+        val map = mutableMapOf<LocalDate, Long>()
+        for (i in 6 downTo 0) {
+            val day = today.minusDays(i.toLong())
+            val start = day.atStartOfDay(ZoneId.systemDefault()).toInstant()
+            val end   = day.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
+            val result = client.aggregate(
+                AggregateRecordsRequest(
+                    metrics = setOf(StepsRecord.COUNT_TOTAL),
+                    timeRangeFilter = TimeRangeFilter.between(start, end)
+                )
+            )
+            map[day] = result[StepsRecord.COUNT_TOTAL] ?: 0L
+        }
+        emit(map)
     }
 
     private fun todayRange(): Pair<Instant, Instant> {
