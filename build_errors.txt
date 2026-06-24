@@ -1,9 +1,9 @@
-# Build errors - run 190
+# Build errors - run 191
 
 ## Error lines
 ```
 > Task :app:checkDebugAarMetadata FAILED
-BUILD FAILED in 1m 30s
+BUILD FAILED in 1m 35s
 ```
 
 ## Last 150 lines
@@ -156,6 +156,6 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/8.11.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD FAILED in 1m 30s
+BUILD FAILED in 1m 35s
 3 actionable tasks: 3 executed
 ```
