@@ -5,8 +5,14 @@ import android.content.Intent
 import android.net.Uri
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
-import androidx.health.connect.client.records.*
-import androidx.health.connect.client.request.AggregateRecordsRequest
+import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
+import androidx.health.connect.client.records.ExerciseSessionRecord
+import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.SleepSessionRecord
+import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
+import androidx.health.connect.client.records.WeightRecord
+import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import kotlinx.coroutines.flow.Flow
@@ -61,14 +67,13 @@ class HealthConnectManager(context: Context) {
 
     /**
      * Steps today.
-     * AggregateRecordsRequest deduplicates Samsung Health overlapping records internally —
-     * this is the canonical Health Connect API for this use case.
+     * AggregateRequest deduplicates Samsung Health overlapping records internally.
      */
     fun getTodaysSteps(): Flow<Long> = flow {
         val (start, end) = todayRange()
         val result = runCatching {
             client.aggregate(
-                AggregateRecordsRequest(
+                AggregateRequest(
                     metrics = setOf(StepsRecord.COUNT_TOTAL),
                     timeRangeFilter = TimeRangeFilter.between(start, end)
                 )
@@ -79,13 +84,12 @@ class HealthConnectManager(context: Context) {
 
     /**
      * Active calories today.
-     * AggregateRecordsRequest deduplicates Samsung Health overlapping records internally.
      */
     fun getTodaysActiveCalories(): Flow<Double> = flow {
         val (start, end) = todayRange()
         val result = runCatching {
             client.aggregate(
-                AggregateRecordsRequest(
+                AggregateRequest(
                     metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
                     timeRangeFilter = TimeRangeFilter.between(start, end)
                 )
@@ -143,7 +147,6 @@ class HealthConnectManager(context: Context) {
 
     /**
      * Steps per day for the last 7 days.
-     * One AggregateRecordsRequest per day — correct deduplication per day boundary.
      */
     fun getWeeklySteps(): Flow<Map<LocalDate, Long>> = flow {
         val today = LocalDate.now()
@@ -154,7 +157,7 @@ class HealthConnectManager(context: Context) {
             val end   = day.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
             val steps = runCatching {
                 client.aggregate(
-                    AggregateRecordsRequest(
+                    AggregateRequest(
                         metrics = setOf(StepsRecord.COUNT_TOTAL),
                         timeRangeFilter = TimeRangeFilter.between(start, end)
                     )
