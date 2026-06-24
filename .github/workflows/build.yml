@@ -47,7 +47,10 @@ jobs:
 
           error_lines = [l for l in lines if any(k in l for k in [
               'e: ', 'error:', 'Unresolved reference', 'Cannot find',
-              'cannot find', 'FAILED', 'unresolved', 'not found'
+              'cannot find', 'FAILED', 'unresolved', 'not found',
+              'None of the following', 'Overload resolution', 'Type mismatch',
+              'Val cannot be reassigned', 'Expecting', 'Compilation error',
+              'is not defined', 'is not a member'
           ])]
 
           content = (
