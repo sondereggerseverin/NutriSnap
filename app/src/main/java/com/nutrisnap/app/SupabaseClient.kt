@@ -1,5 +1,6 @@
 package com.nutrisnap.app
 
+import ch.nutrisnap.app.BuildConfig
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.postgrest.Postgrest
