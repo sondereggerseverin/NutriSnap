@@ -1,9 +1,9 @@
-# Build errors - run 197
+# Build errors - run 198
 
 ## Error lines
 ```
 > Task :app:checkDebugAarMetadata FAILED
-BUILD FAILED in 1m 34s
+BUILD FAILED in 1m 45s
 ```
 
 ## Last 150 lines
@@ -121,11 +121,11 @@ Caused by: java.lang.RuntimeException: 2 issues were found when checking AAR met
 
   1.  Dependency 'androidx.health.connect:connect-client:1.1.0-rc01' requires Android Gradle plugin 8.9.1 or higher.
 
-      This build currently uses Android Gradle plugin 8.7.3.
+      This build currently uses Android Gradle plugin 8.9.0.
 
   2.  Dependency 'androidx.browser:browser:1.10.0' requires Android Gradle plugin 8.9.1 or higher.
 
-      This build currently uses Android Gradle plugin 8.7.3.
+      This build currently uses Android Gradle plugin 8.9.0.
 	at com.android.build.gradle.internal.tasks.CheckAarMetadataWorkAction.execute(CheckAarMetadataTask.kt:288)
 	at org.gradle.workers.internal.DefaultWorkerServer.execute(DefaultWorkerServer.java:63)
 	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:66)
@@ -156,6 +156,6 @@ Caused by: java.lang.RuntimeException: 2 issues were found when checking AAR met
 	... 2 more
 
 
-BUILD FAILED in 1m 34s
+BUILD FAILED in 1m 45s
 4 actionable tasks: 4 executed
 ```
