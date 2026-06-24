@@ -1,11 +1,13 @@
-# Build errors - run 211
+# Build errors - run 212
 
 ## Error lines
 ```
-Build file '/home/runner/work/NutriSnap/NutriSnap/build.gradle.kts' line: 1
-Plugin [id: 'com.google.devtools.ksp', version: '2.3.21-1.0.32', apply: false] was not found in any of the following sources:
-org.gradle.api.plugins.UnknownPluginException: Plugin [id: 'com.google.devtools.ksp', version: '2.3.21-1.0.32', apply: false] was not found in any of the following sources:
-BUILD FAILED in 35s
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/build.gradle.kts:40:21: Using 'jvmTarget: String' is an error. Please migrate to the compilerOptions DSL. More details are here: https://kotl.in/u1r8ln
+Build file '/home/runner/work/NutriSnap/NutriSnap/app/build.gradle.kts' line: 40
+Script compilation error:
+                               ^ Using 'jvmTarget: String' is an error. Please migrate to the compilerOptions DSL. More details are here: https://kotl.in/u1r8ln
+ScriptCompilationException(scriptCompilationErrors=[ScriptCompilationError(message=Using 'jvmTarget: String' is an error. Please migrate to the compilerOptions DSL. More details are here: https://kotl.in/u1r8ln, location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-15699252960726189047.tmp/build.gradle.kts (40:21))])
+BUILD FAILED in 1m 4s
 ```
 
 ## Last 150 lines
@@ -45,7 +47,7 @@ BUILD FAILED in 35s
 	at org.gradle.api.internal.project.ProjectLifecycleController.ensureSelfConfigured(ProjectLifecycleController.java:85)
 	at org.gradle.api.internal.project.DefaultProjectStateRegistry$ProjectStateImpl.ensureConfigured(DefaultProjectStateRegistry.java:385)
 	at org.gradle.execution.TaskPathProjectEvaluator.configure(TaskPathProjectEvaluator.java:42)
-	at org.gradle.execution.TaskPathProjectEvaluator.configureHierarchy(TaskPathProjectEvaluator.java:56)
+	at org.gradle.execution.TaskPathProjectEvaluator.configureHierarchy(TaskPathProjectEvaluator.java:58)
 	at org.gradle.configuration.DefaultProjectsPreparer.prepareProjects(DefaultProjectsPreparer.java:50)
 	at org.gradle.configuration.BuildTreePreparingProjectsPreparer.prepareProjects(BuildTreePreparingProjectsPreparer.java:65)
 	at org.gradle.configuration.BuildOperationFiringProjectsPreparer$ConfigureBuild.run(BuildOperationFiringProjectsPreparer.java:52)
@@ -159,5 +161,5 @@ BUILD FAILED in 35s
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 
 
-BUILD FAILED in 35s
+BUILD FAILED in 1m 4s
 ```
