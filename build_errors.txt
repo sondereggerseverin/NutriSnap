@@ -1,54 +1,92 @@
-# Build errors - run 191
+# Build errors - run 192
 
 ## Error lines
 ```
-> Task :app:checkDebugAarMetadata FAILED
-BUILD FAILED in 1m 35s
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libbarhopper_v3.so, libdatastore_shared_counter.so, libimage_processing_util_jni.so.
+e: file:///home/runner/.gradle/caches/8.11.1/transforms/0314972e40882b3a93ddf96e69ad6485/transformed/multiplatform-settings-coroutines-debug-api.jar!/META-INF/multiplatform-settings-coroutines_debug.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.1.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/8.11.1/transforms/3eea8404d374ef40f1a285101a3341f9/transformed/kermit-core-debug-api.jar!/META-INF/kermit-core_debug.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.2.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/8.11.1/transforms/648ac80d2371262391ad163d7d92b5c4/transformed/multiplatform-settings-no-arg-debug-api.jar!/META-INF/multiplatform-settings-no-arg_debug.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.1.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/8.11.1/transforms/8f0298c02232d86706a697504e7b9ded/transformed/postgrest-kt-api.jar!/META-INF/postgrest-kt.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/8.11.1/transforms/bda6afb6694ef59536458c5c2e9ba6f2/transformed/auth-kt-api.jar!/META-INF/auth-kt.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/8.11.1/transforms/c9617bf45da26b15b233e35a38147c81/transformed/multiplatform-settings-debug-api.jar!/META-INF/multiplatform-settings_debug.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.1.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/8.11.1/transforms/de92bff3bdb0a351a904043d428614e8/transformed/supabase-kt-api.jar!/META-INF/supabase-kt.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/8.11.1/transforms/e2b7cc209730521a5568a934e09a7d94/transformed/realtime-kt-api.jar!/META-INF/realtime-kt.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/8.11.1/transforms/ea5a6ee42d0c0becd096694aa3f4dcf0/transformed/kermit-debug-api.jar!/META-INF/kermit_debug.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.2.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/com.squareup.okio/okio-jvm/3.17.0/a12d684ec0df9541b3869ae60a4a5257fd3613df/okio-jvm-3.17.0.jar!/META-INF/okio.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.1.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-client-android-jvm/3.4.3/450cebe0ca3088ca1f09f76d47b8e6eb26883f0f/ktor-client-android-jvm-3.4.3.jar!/META-INF/ktor-client-android.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-client-content-negotiation-jvm/3.4.3/18a80220c40429a888d0ae152846b58bf01f3713/ktor-client-content-negotiation-jvm-3.4.3.jar!/META-INF/ktor-client-content-negotiation.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-client-core-jvm/3.4.3/d13ae94f2d8d9a88fafa7299f2115dabc909d3b6/ktor-client-core-jvm-3.4.3.jar!/META-INF/ktor-client-core.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-client-websockets-jvm/3.4.3/d5cad03694cb2baecb8477f2531659fe89a19906/ktor-client-websockets-jvm-3.4.3.jar!/META-INF/ktor-client-websockets.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-events-jvm/3.4.3/21cfaab46ef1538c930781d0fc4ad30817f18bb9/ktor-events-jvm-3.4.3.jar!/META-INF/ktor-events.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-http-cio-jvm/3.4.3/b5009e1cc40b502c90c245ea4fd48f95b4a6a09b/ktor-http-cio-jvm-3.4.3.jar!/META-INF/ktor-http-cio.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-http-jvm/3.4.3/1d6f033087f8d270ce06cc8471bc3d805472381f/ktor-http-jvm-3.4.3.jar!/META-INF/ktor-http.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-io-jvm/3.4.3/743b93999a7451a371cdef23dccecf0d14a99d4/ktor-io-jvm-3.4.3.jar!/META-INF/ktor-io.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-network-jvm/3.4.3/60e35f5740b4526ac4aa384c0956920f00ecd91e/ktor-network-jvm-3.4.3.jar!/META-INF/ktor-network.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-serialization-jvm/3.4.3/9cb3959a7795a303a2b0c9dd9a152cf87c81418b/ktor-serialization-jvm-3.4.3.jar!/META-INF/ktor-serialization.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-serialization-kotlinx-json-jvm/3.4.3/24821671212efaaa060be9036d4b1c680c9621cd/ktor-serialization-kotlinx-json-jvm-3.4.3.jar!/META-INF/ktor-serialization-kotlinx-json.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-serialization-kotlinx-jvm/3.4.3/ba16178b0f5ab132b866650c062f31d539d4ed73/ktor-serialization-kotlinx-jvm-3.4.3.jar!/META-INF/ktor-serialization-kotlinx.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-sse-jvm/3.4.3/f72b604fbe908f7a8f26be2e472dfe8fe0e8ce31/ktor-sse-jvm-3.4.3.jar!/META-INF/ktor-sse.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-utils-jvm/3.4.3/7904b87f28e962b998244f5663236dca4d90bbd/ktor-utils-jvm-3.4.3.jar!/META-INF/ktor-utils.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-websocket-serialization-jvm/3.4.3/428641dfad289035953735480a20605a0a3d388e/ktor-websocket-serialization-jvm-3.4.3.jar!/META-INF/ktor-websocket-serialization.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-websockets-jvm/3.4.3/9b13706fbdb3c7f5065d71e0d1f17eabda34dbc0/ktor-websockets-jvm-3.4.3.jar!/META-INF/ktor-websockets.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-reflect/2.3.21/6acc55c52691ce3fd41b20a0472f3513106521a5/kotlin-reflect-2.3.21.jar!/META-INF/compiler.common.jvm.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.2.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-reflect/2.3.21/6acc55c52691ce3fd41b20a0472f3513106521a5/kotlin-reflect-2.3.21.jar!/META-INF/compiler.common.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.2.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-reflect/2.3.21/6acc55c52691ce3fd41b20a0472f3513106521a5/kotlin-reflect-2.3.21.jar!/META-INF/descriptors.jvm.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-reflect/2.3.21/6acc55c52691ce3fd41b20a0472f3513106521a5/kotlin-reflect-2.3.21.jar!/META-INF/descriptors.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.2.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-reflect/2.3.21/6acc55c52691ce3fd41b20a0472f3513106521a5/kotlin-reflect-2.3.21.jar!/META-INF/descriptors.runtime.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-reflect/2.3.21/6acc55c52691ce3fd41b20a0472f3513106521a5/kotlin-reflect-2.3.21.jar!/META-INF/deserialization.common.jvm.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-reflect/2.3.21/6acc55c52691ce3fd41b20a0472f3513106521a5/kotlin-reflect-2.3.21.jar!/META-INF/deserialization.common.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-reflect/2.3.21/6acc55c52691ce3fd41b20a0472f3513106521a5/kotlin-reflect-2.3.21.jar!/META-INF/deserialization.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-reflect/2.3.21/6acc55c52691ce3fd41b20a0472f3513106521a5/kotlin-reflect-2.3.21.jar!/META-INF/kotlin-metadata-jvm.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-reflect/2.3.21/6acc55c52691ce3fd41b20a0472f3513106521a5/kotlin-reflect-2.3.21.jar!/META-INF/kotlin-metadata.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-reflect/2.3.21/6acc55c52691ce3fd41b20a0472f3513106521a5/kotlin-reflect-2.3.21.jar!/META-INF/kotlin-reflection.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-reflect/2.3.21/6acc55c52691ce3fd41b20a0472f3513106521a5/kotlin-reflect-2.3.21.jar!/META-INF/metadata.jvm.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-reflect/2.3.21/6acc55c52691ce3fd41b20a0472f3513106521a5/kotlin-reflect-2.3.21.jar!/META-INF/util.runtime.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.2.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-stdlib/2.3.21/a2ee2c4e220fee522f0451b723bab2a43f3481a7/kotlin-stdlib-2.3.21.jar!/META-INF/kotlin-stdlib-jdk7.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-stdlib/2.3.21/a2ee2c4e220fee522f0451b723bab2a43f3481a7/kotlin-stdlib-2.3.21.jar!/META-INF/kotlin-stdlib-jdk8.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-stdlib/2.3.21/a2ee2c4e220fee522f0451b723bab2a43f3481a7/kotlin-stdlib-2.3.21.jar!/META-INF/kotlin-stdlib.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-collections-immutable-jvm/0.4.0/82499bf608b0fc3ae6737a5eac1a1f1325279bbf/kotlinx-collections-immutable-jvm-0.4.0.jar!/META-INF/kotlinx-collections-immutable.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.1.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-coroutines-android/1.10.2/c8705d275d81f19e8afaf3ff9b5bf7a4b6b6c19b/kotlinx-coroutines-android-1.10.2.jar!/META-INF/kotlinx-coroutines-android.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.1.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/1.10.2/4a9f78ef49483748e2c129f3d124b8fa249dafbf/kotlinx-coroutines-core-jvm-1.10.2.jar!/META-INF/kotlinx-coroutines-core.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.1.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-datetime-jvm/0.7.1/81c2e0246bd28cc2dcbdf0ab53628322e66a9de9/kotlinx-datetime-jvm-0.7.1.jar!/META-INF/kotlinx-datetime.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.1.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-io-bytestring-jvm/0.9.0/e73a7915234a8ea7954f32b715ef8e42b02f66a3/kotlinx-io-bytestring-jvm-0.9.0.jar!/META-INF/kotlinx-io-bytestring.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-io-core-jvm/0.9.0/7f7536f8f057ffc7f79375714e9730c4b8bdd7c9/kotlinx-io-core-jvm-0.9.0.jar!/META-INF/kotlinx-io-core.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-serialization-core-jvm/1.11.0/c1905c9bf7452b045d5af9248835abe64ddad6bf/kotlinx-serialization-core-jvm-1.11.0.jar!/META-INF/kotlinx-serialization-core.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-serialization-json-io-jvm/1.11.0/645ed54ca9128fc217b30b3686a083141ebe635c/kotlinx-serialization-json-io-jvm-1.11.0.jar!/META-INF/kotlinx-serialization-json-io.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+e: file:///home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-serialization-json-jvm/1.11.0/e7e045e99e56f07599bb9ccb708c2190e2af0606/kotlinx-serialization-json-jvm-1.11.0.jar!/META-INF/kotlinx-serialization-json.kotlin_moduleModule was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.3.0, expected version is 1.9.0.
+> Task :app:kaptDebugKotlin FAILED
+BUILD FAILED in 4m 50s
 ```
 
 ## Last 150 lines
 ```
-	at org.gradle.composite.internal.DefaultBuildController.doRun(DefaultBuildController.java:181)
-	at org.gradle.composite.internal.DefaultBuildController.access$000(DefaultBuildController.java:50)
-	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.lambda$run$0(DefaultBuildController.java:198)
-	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:85)
-	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.run(DefaultBuildController.java:198)
-	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
-	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
-Caused by: org.gradle.api.internal.artifacts.ivyservice.TypedResolveException: Could not resolve all files for configuration ':app:debugRuntimeClasspath'.
-	at org.gradle.api.internal.artifacts.ResolveExceptionMapper.mapFailures(ResolveExceptionMapper.java:56)
-	at org.gradle.api.internal.artifacts.configurations.DefaultConfiguration$DefaultResolutionHost.consolidateFailures(DefaultConfiguration.java:1995)
-	at org.gradle.api.internal.artifacts.configurations.ResolutionHost.rethrowFailuresAndReportProblems(ResolutionHost.java:75)
-	at org.gradle.api.internal.artifacts.configurations.ResolutionBackedFileCollection.maybeThrowResolutionFailures(ResolutionBackedFileCollection.java:87)
-	at org.gradle.api.internal.artifacts.configurations.ResolutionBackedFileCollection.visitContents(ResolutionBackedFileCollection.java:77)
-	at org.gradle.api.internal.file.AbstractFileCollection.visitStructure(AbstractFileCollection.java:360)
-	at org.gradle.api.internal.file.CompositeFileCollection.lambda$visitContents$0(CompositeFileCollection.java:113)
-	at org.gradle.api.internal.file.collections.UnpackingVisitor.add(UnpackingVisitor.java:67)
-	at org.gradle.api.internal.file.collections.UnpackingVisitor.add(UnpackingVisitor.java:92)
-	at org.gradle.api.internal.file.DefaultFileCollectionFactory$ResolvingFileCollection.visitChildren(DefaultFileCollectionFactory.java:306)
-	at org.gradle.api.internal.file.CompositeFileCollection.visitContents(CompositeFileCollection.java:113)
-	at org.gradle.api.internal.file.AbstractFileCollection.visitStructure(AbstractFileCollection.java:360)
-	at org.gradle.api.internal.file.CompositeFileCollection.lambda$visitContents$0(CompositeFileCollection.java:113)
-	at org.gradle.api.internal.tasks.PropertyFileCollection.visitChildren(PropertyFileCollection.java:48)
-	at org.gradle.api.internal.file.CompositeFileCollection.visitContents(CompositeFileCollection.java:113)
-	at org.gradle.api.internal.file.AbstractFileCollection.visitStructure(AbstractFileCollection.java:360)
-	at org.gradle.internal.fingerprint.impl.DefaultFileCollectionSnapshotter.snapshot(DefaultFileCollectionSnapshotter.java:47)
-	at org.gradle.internal.execution.impl.DefaultInputFingerprinter$InputCollectingVisitor.visitInputFileProperty(DefaultInputFingerprinter.java:133)
-	at org.gradle.api.internal.tasks.execution.TaskExecution.visitRegularInputs(TaskExecution.java:324)
-	at org.gradle.internal.execution.impl.DefaultInputFingerprinter.fingerprintInputProperties(DefaultInputFingerprinter.java:63)
-	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.captureExecutionStateWithOutputs(AbstractCaptureStateBeforeExecutionStep.java:109)
-	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.lambda$captureExecutionState$0(AbstractCaptureStateBeforeExecutionStep.java:74)
-	at org.gradle.internal.execution.steps.BuildOperationStep$1.call(BuildOperationStep.java:37)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
-	at org.gradle.internal.execution.steps.BuildOperationStep.operation(BuildOperationStep.java:34)
-	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.captureExecutionState(AbstractCaptureStateBeforeExecutionStep.java:69)
-	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:62)
+	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:64)
 	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:43)
 	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.executeWithNonEmptySources(AbstractSkipEmptyWorkStep.java:125)
 	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:56)
@@ -99,13 +137,21 @@ Caused by: org.gradle.api.internal.artifacts.ivyservice.TypedResolveException: C
 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:303)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
-	at org.gradle.execution.plan.DefaultPlanExecutor.process(DefaultPlanExecutor.java:111)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.executeWithServices(DefaultTaskExecutionGraph.java:138)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.execute(DefaultTaskExecutionGraph.java:123)
-	at org.gradle.execution.SelectedTaskExecutionAction.execute(SelectedTaskExecutionAction.java:35)
-	at org.gradle.execution.DryRunBuildExecutionAction.execute(DryRunBuildExecutionAction.java:51)
-	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:54)
-	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:43)
+	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
+	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
+Caused by: java.lang.reflect.InvocationTargetException
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at org.jetbrains.kotlin.gradle.internal.KaptExecution.run(KaptWithoutKotlincTask.kt:320)
+	at org.jetbrains.kotlin.gradle.internal.KaptWithoutKotlincTask$KaptExecutionWorkAction.execute(KaptWithoutKotlincTask.kt:266)
+	at org.gradle.workers.internal.DefaultWorkerServer.execute(DefaultWorkerServer.java:63)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:66)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:62)
+	at org.gradle.internal.classloader.ClassLoaderUtils.executeInClassloader(ClassLoaderUtils.java:100)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1.lambda$execute$0(NoIsolationWorkerFactory.java:62)
+	at org.gradle.workers.internal.AbstractWorker$1.call(AbstractWorker.java:44)
+	at org.gradle.workers.internal.AbstractWorker$1.call(AbstractWorker.java:41)
 	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
 	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
@@ -113,41 +159,73 @@ Caused by: org.gradle.api.internal.artifacts.ivyservice.TypedResolveException: C
 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
 	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
 	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
-	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor.execute(BuildOperationFiringBuildWorkerExecutor.java:40)
-	at org.gradle.internal.build.DefaultBuildLifecycleController.lambda$executeTasks$10(DefaultBuildLifecycleController.java:313)
-	at org.gradle.internal.model.StateTransitionController.doTransition(StateTransitionController.java:266)
-	at org.gradle.internal.model.StateTransitionController.lambda$tryTransition$8(StateTransitionController.java:177)
-	at org.gradle.internal.work.DefaultSynchronizer.withLock(DefaultSynchronizer.java:46)
-	at org.gradle.internal.model.StateTransitionController.tryTransition(StateTransitionController.java:177)
-	at org.gradle.internal.build.DefaultBuildLifecycleController.executeTasks(DefaultBuildLifecycleController.java:304)
-	at org.gradle.internal.build.DefaultBuildWorkGraphController$DefaultBuildWorkGraph.runWork(DefaultBuildWorkGraphController.java:220)
+	at org.gradle.workers.internal.AbstractWorker.executeWrappedInBuildOperation(AbstractWorker.java:41)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1.execute(NoIsolationWorkerFactory.java:59)
+	at org.gradle.workers.internal.DefaultWorkerExecutor.lambda$submitWork$0(DefaultWorkerExecutor.java:174)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.runExecution(DefaultConditionalExecutionQueue.java:194)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.access$700(DefaultConditionalExecutionQueue.java:127)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner$1.run(DefaultConditionalExecutionQueue.java:169)
+	at org.gradle.internal.Factories$1.create(Factories.java:31)
 	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:263)
 	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:127)
-	at org.gradle.composite.internal.DefaultBuildController.doRun(DefaultBuildController.java:181)
-	at org.gradle.composite.internal.DefaultBuildController.access$000(DefaultBuildController.java:50)
-	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.lambda$run$0(DefaultBuildController.java:198)
-	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:85)
-	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.run(DefaultBuildController.java:198)
-	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
-	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
-Cause 1: org.gradle.internal.resolve.ModuleVersionNotFoundException: Could not find io.github.jan-tennant.supabase:auth-kt:3.1.4.
-Searched in the following locations:
-  - https://dl.google.com/dl/android/maven2/io/github/jan-tennant/supabase/auth-kt/3.1.4/auth-kt-3.1.4.pom
-  - https://repo.maven.apache.org/maven2/io/github/jan-tennant/supabase/auth-kt/3.1.4/auth-kt-3.1.4.pom
-Required by:
-    project :app
-Cause 2: org.gradle.internal.resolve.ModuleVersionNotFoundException: Could not find io.github.jan-tennant.supabase:postgrest-kt:3.1.4.
-Searched in the following locations:
-  - https://dl.google.com/dl/android/maven2/io/github/jan-tennant/supabase/postgrest-kt/3.1.4/postgrest-kt-3.1.4.pom
-  - https://repo.maven.apache.org/maven2/io/github/jan-tennant/supabase/postgrest-kt/3.1.4/postgrest-kt-3.1.4.pom
-Required by:
-    project :app
-Cause 3: org.gradle.internal.resolve.ModuleVersionNotFoundException: Could not find io.github.jan-tennant.supabase:realtime-kt:3.1.4.
-Searched in the following locations:
-  - https://dl.google.com/dl/android/maven2/io/github/jan-tennant/supabase/realtime-kt/3.1.4/realtime-kt-3.1.4.pom
-  - https://repo.maven.apache.org/maven2/io/github/jan-tennant/supabase/realtime-kt/3.1.4/realtime-kt-3.1.4.pom
-Required by:
-    project :app
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:132)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.runBatch(DefaultConditionalExecutionQueue.java:164)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.run(DefaultConditionalExecutionQueue.java:133)
+	... 2 more
+Caused by: java.lang.reflect.InvocationTargetException
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at org.jetbrains.kotlin.kapt3.base.AnnotationProcessingKt.doAnnotationProcessing(annotationProcessing.kt:92)
+	at org.jetbrains.kotlin.kapt3.base.AnnotationProcessingKt.doAnnotationProcessing$default(annotationProcessing.kt:33)
+	at org.jetbrains.kotlin.kapt3.base.Kapt.kapt(Kapt.kt:47)
+	... 33 more
+Caused by: com.sun.tools.javac.processing.AnnotationProcessingError: java.lang.IllegalArgumentException: Provided Metadata instance has version 2.1.0, while maximum supported version is 2.0.0. To support newer versions, update the kotlinx-metadata-jvm library.
+	at jdk.compiler/com.sun.tools.javac.processing.JavacProcessingEnvironment.callProcessor(JavacProcessingEnvironment.java:1035)
+	at jdk.compiler/com.sun.tools.javac.processing.JavacProcessingEnvironment.discoverAndRunProcs(JavacProcessingEnvironment.java:939)
+	at jdk.compiler/com.sun.tools.javac.processing.JavacProcessingEnvironment$Round.run(JavacProcessingEnvironment.java:1267)
+	at jdk.compiler/com.sun.tools.javac.processing.JavacProcessingEnvironment.doProcessing(JavacProcessingEnvironment.java:1382)
+	at jdk.compiler/com.sun.tools.javac.main.JavaCompiler.processAnnotations(JavaCompiler.java:1234)
+	... 39 more
+Caused by: java.lang.IllegalArgumentException: Provided Metadata instance has version 2.1.0, while maximum supported version is 2.0.0. To support newer versions, update the kotlinx-metadata-jvm library.
+	at androidx.room.jarjarred.kotlinx.metadata.jvm.KotlinClassMetadata$Companion.throwIfNotCompatible$kotlinx_metadata_jvm(KotlinClassMetadata.kt:609)
+	at androidx.room.jarjarred.kotlinx.metadata.jvm.KotlinClassMetadata$Companion.checkMetadataVersionForRead(KotlinClassMetadata.kt:600)
+	at androidx.room.jarjarred.kotlinx.metadata.jvm.KotlinClassMetadata$Companion.read(KotlinClassMetadata.kt:579)
+	at androidx.room.compiler.processing.javac.kotlin.KmClassContainer$Companion.createFor(KotlinClassMetadataUtils.kt:184)
+	at androidx.room.compiler.processing.javac.JavacTypeElement$kotlinMetadata$2.invoke(JavacTypeElement.kt:62)
+	at androidx.room.compiler.processing.javac.JavacTypeElement$kotlinMetadata$2.invoke(JavacTypeElement.kt:61)
+	at kotlin.SynchronizedLazyImpl.getValue(LazyJVM.kt:74)
+	at androidx.room.compiler.processing.javac.JavacTypeElement.getKotlinMetadata(JavacTypeElement.kt:61)
+	at androidx.room.compiler.processing.javac.JavacTypeElement$type$2.invoke(JavacTypeElement.kt:241)
+	at androidx.room.compiler.processing.javac.JavacTypeElement$type$2.invoke(JavacTypeElement.kt:238)
+	at kotlin.SynchronizedLazyImpl.getValue(LazyJVM.kt:74)
+	at androidx.room.compiler.processing.javac.JavacTypeElement.getType(JavacTypeElement.kt:238)
+	at androidx.room.compiler.processing.javac.JavacProcessingEnv.findType(JavacProcessingEnv.kt:114)
+	at androidx.room.processor.MethodProcessorDelegateKt.isSuspendAndReturnsDeferredType(MethodProcessorDelegate.kt:143)
+	at androidx.room.processor.InternalQueryProcessor.processQuery(QueryMethodProcessor.kt:114)
+	at androidx.room.processor.QueryMethodProcessor$process$1.invoke(QueryMethodProcessor.kt:72)
+	at androidx.room.processor.QueryMethodProcessor$process$1.invoke(QueryMethodProcessor.kt:66)
+	at androidx.room.processor.Context.collectLogs(Context.kt:192)
+	at androidx.room.processor.QueryMethodProcessor.process(QueryMethodProcessor.kt:66)
+	at androidx.room.processor.DaoProcessor.process(DaoProcessor.kt:134)
+	at androidx.room.processor.DatabaseProcessor$doProcess$daoMethods$3.invoke(DatabaseProcessor.kt:122)
+	at androidx.room.processor.DatabaseProcessor$doProcess$daoMethods$3.invoke(DatabaseProcessor.kt:96)
+	at kotlin.sequences.TransformingSequence$iterator$1.next(Sequences.kt:210)
+	at kotlin.sequences.FilteringSequence$iterator$1.calcNext(Sequences.kt:170)
+	at kotlin.sequences.FilteringSequence$iterator$1.hasNext(Sequences.kt:194)
+	at kotlin.sequences.SequencesKt___SequencesKt.toList(_Sequences.kt:809)
+	at androidx.room.processor.DatabaseProcessor.doProcess(DatabaseProcessor.kt:125)
+	at androidx.room.processor.DatabaseProcessor.process(DatabaseProcessor.kt:60)
+	at androidx.room.DatabaseProcessingStep$process$databases$1$1.invoke(DatabaseProcessingStep.kt:68)
+	at androidx.room.DatabaseProcessingStep$process$databases$1$1.invoke(DatabaseProcessingStep.kt:64)
+	at androidx.room.processor.Context.collectLogs(Context.kt:192)
+	at androidx.room.DatabaseProcessingStep.process(DatabaseProcessingStep.kt:64)
+	at androidx.room.compiler.processing.CommonProcessorDelegate.processRound(XBasicAnnotationProcessor.kt:130)
+	at androidx.room.compiler.processing.javac.JavacBasicAnnotationProcessor.process(JavacBasicAnnotationProcessor.kt:73)
+	at org.jetbrains.kotlin.kapt3.base.incremental.IncrementalProcessor.process(incrementalProcessors.kt:90)
+	at org.jetbrains.kotlin.kapt3.base.ProcessorWrapper.process(annotationProcessing.kt:209)
+	at jdk.compiler/com.sun.tools.javac.processing.JavacProcessingEnvironment.callProcessor(JavacProcessingEnvironment.java:1023)
+	... 43 more
 
 
 Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
@@ -156,6 +234,6 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/8.11.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD FAILED in 1m 35s
-3 actionable tasks: 3 executed
+BUILD FAILED in 4m 50s
+32 actionable tasks: 32 executed
 ```
