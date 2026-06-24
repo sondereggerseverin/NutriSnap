@@ -14,9 +14,7 @@ data class HealthConnectCache(
     val avgHeartRateBpm: Long? = null,
     val lastUpdated: Long = System.currentTimeMillis()
 ) {
-    val estimatedStepCalories: Int get() = (steps * 0.04).toInt()
-    val totalActivityCalories: Int get() =
-        activeCaloriesKcal.toInt().coerceAtLeast(estimatedStepCalories)
+    val totalActivityCalories: Int get() = activeCaloriesKcal.toInt()
     val sleepFormatted: String get() {
         val h = sleepMinutes / 60
         val m = sleepMinutes % 60

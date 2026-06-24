@@ -83,17 +83,42 @@ class HealthConnectManager(context: Context) {
     }
 
     /**
-     * Active calories today.
+     * Activity calories today.
+     *
+     * Samsung Health schreibt Activity Calories in Health Connect als
+     * TotalCaloriesBurned (Grundumsatz + Aktivität). ActiveCaloriesBurned
+     * enthält nur einen Teil davon und weicht stark vom Samsung Health Wert ab.
+     *
+     * Strategie: Lies beide Metriken parallel. Nimm ActiveCalories wenn > 0,
+     * falls nicht verfügbar fall back auf TotalCalories minus geschätzten BMR (1700 kcal/Tag).
+     * Ergebnis entspricht so dem Samsung Health "Activity Calories" Wert.
      */
     fun getTodaysActiveCalories(): Flow<Double> = flow {
         val (start, end) = todayRange()
         val result = runCatching {
-            client.aggregate(
+            val response = client.aggregate(
                 AggregateRequest(
-                    metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
+                    metrics = setOf(
+                        ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL,
+                        TotalCaloriesBurnedRecord.ENERGY_TOTAL
+                    ),
                     timeRangeFilter = TimeRangeFilter.between(start, end)
                 )
-            )[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories ?: 0.0
+            )
+            val activeKcal = response[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories ?: 0.0
+            val totalKcal  = response[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.inKilocalories ?: 0.0
+
+            when {
+                // Samsung Health liefert ActiveCalories korrekt → direkt verwenden
+                activeKcal > 50.0 -> activeKcal
+                // Fallback: TotalCalories minus geschätzter BMR-Anteil für den bisherigen Tagesanteil
+                totalKcal > 0.0 -> {
+                    val elapsedFraction = java.time.Duration.between(start, end).toMinutes() / (24.0 * 60)
+                    val estimatedBmr = 1700.0 * elapsedFraction
+                    (totalKcal - estimatedBmr).coerceAtLeast(0.0)
+                }
+                else -> 0.0
+            }
         }.getOrDefault(0.0)
         emit(result)
     }
