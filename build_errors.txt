@@ -1,4 +1,4 @@
-# Build errors - run 194
+# Build errors - run 195
 
 ## Error lines
 ```
@@ -81,7 +81,7 @@ WARNING: D8: An error occurred when parsing kotlin metadata. This normally happe
 WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
 WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
 WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
-BUILD FAILED in 4m 21s
+BUILD FAILED in 4m 9s
 ```
 
 ## Last 150 lines
@@ -234,6 +234,6 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilat
 	... 2 more
 
 
-BUILD FAILED in 4m 21s
+BUILD FAILED in 4m 9s
 23 actionable tasks: 23 executed
 ```
