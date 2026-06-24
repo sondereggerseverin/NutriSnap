@@ -9,6 +9,7 @@ import ch.nutrisnap.app.data.model.FavoriteFoodEntity
 import ch.nutrisnap.app.data.model.FastingSession
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.HealthConnectCache
+import ch.nutrisnap.app.data.model.IngredientMatch
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeCollection
 import ch.nutrisnap.app.data.model.WaterEntry
@@ -57,9 +58,10 @@ interface UserProfileDao {
         WaterEntry::class,
         FastingSession::class,
         RecipeCollection::class,
-        HealthConnectCache::class
+        HealthConnectCache::class,
+        IngredientMatch::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -73,6 +75,7 @@ abstract class NutriDatabase : RoomDatabase() {
     abstract fun waterEntryDao(): WaterEntryDao
     abstract fun recipeCollectionDao(): RecipeCollectionDao
     abstract fun healthConnectDao(): HealthConnectDao
+    abstract fun ingredientMatchDao(): IngredientMatchDao
 
     companion object {
         @Volatile private var INSTANCE: NutriDatabase? = null
@@ -179,6 +182,27 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS ingredient_matches (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        recipeId INTEGER NOT NULL,
+                        ingredientRaw TEXT NOT NULL,
+                        ingredientName TEXT NOT NULL,
+                        amountGrams REAL NOT NULL DEFAULT 0.0,
+                        matchedFoodItemId INTEGER,
+                        matchedFoodName TEXT,
+                        matchedCalories REAL,
+                        matchedProtein REAL,
+                        matchedCarbs REAL,
+                        matchedFat REAL,
+                        matchSource TEXT NOT NULL DEFAULT 'UNMATCHED'
+                    )
+                """.trimIndent())
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -186,7 +210,7 @@ abstract class NutriDatabase : RoomDatabase() {
                     NutriDatabase::class.java,
                     "nutrisnap.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { INSTANCE = it }

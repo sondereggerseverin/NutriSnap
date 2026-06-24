@@ -24,6 +24,10 @@ android {
             "\"${System.getenv("NUTRITIONIX_APP_ID") ?: ""}\"")
         buildConfigField("String", "NUTRITIONIX_API_KEY",
             "\"${System.getenv("NUTRITIONIX_API_KEY") ?: ""}\"")
+        buildConfigField("String", "SUPABASE_URL",
+            "\"${System.getenv("SUPABASE_URL") ?: ""}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY",
+            "\"${System.getenv("SUPABASE_ANON_KEY") ?: ""}\"")
     }
 
     compileOptions {
@@ -44,6 +48,14 @@ android {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/INDEX.LIST"
+            excludes += "META-INF/DEPENDENCIES"
         }
     }
 }
@@ -85,6 +97,11 @@ dependencies {
     implementation(libs.androidx.biometric)
     // Health Connect
     implementation(libs.androidx.health.connect)
+    // Supabase
+    implementation(libs.supabase.auth)
+    implementation(libs.supabase.postgrest)
+    implementation(libs.supabase.realtime)
+    implementation(libs.ktor.client.android)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 }

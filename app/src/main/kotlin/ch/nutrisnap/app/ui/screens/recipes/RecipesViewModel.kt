@@ -127,6 +127,26 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun applyVerifiedNutrition(recipe: Recipe, kcalPerServ: Float, protPerServ: Float, carbsPerServ: Float, fatPerServ: Float) {
+        viewModelScope.launch {
+            val macroLine = "📊 Pro Portion: ${kcalPerServ.toInt()} kcal" +
+                " · ${protPerServ.toInt()}g Protein" +
+                " · ${carbsPerServ.toInt()}g Kohlenhydrate" +
+                " · ${fatPerServ.toInt()}g Fett (verifiziert)"
+            val baseDesc = recipe.description.lines()
+                .filterNot { it.startsWith("📊") }.joinToString("\n").trim()
+            val newDesc = if (baseDesc.isNotBlank()) "$baseDesc\n\n$macroLine" else macroLine
+            val updated = recipe.copy(
+                totalCalories     = kcalPerServ * recipe.servings,
+                proteinPerServing = protPerServ,
+                carbsPerServing   = carbsPerServ,
+                fatPerServing     = fatPerServ,
+                description       = newDesc
+            )
+            repo.updateRecipe(updated)
+        }
+    }
+
     fun saveManualRecipe(url: String, title: String?, caption: String) {
         viewModelScope.launch {
             val cleaned = RecipeAiParser.cleanCaption(caption)

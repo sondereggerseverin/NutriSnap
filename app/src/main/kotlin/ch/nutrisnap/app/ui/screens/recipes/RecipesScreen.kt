@@ -72,6 +72,7 @@ fun RecipesScreen(
     val state by vm.uiState.collectAsState()
     var showImportSheet   by remember { mutableStateOf(false) }
     var selectedRecipe    by remember { mutableStateOf<Recipe?>(null) }
+    var showVerifySheet    by remember { mutableStateOf(false) }
     var addToDiaryRecipe  by remember { mutableStateOf<Recipe?>(null) }
     var editRecipe        by remember { mutableStateOf<Recipe?>(null) }
 
@@ -135,6 +136,26 @@ fun RecipesScreen(
         )
     }
 
+    // ── Ingredient Verify Sheet ──────────────────────────────────────────────
+    val verifyRecipe = selectedRecipe
+    val verifyResult = if (showVerifySheet) {
+        (vm.uiState.value.nutritionState.result)?.takeIf {
+            vm.uiState.value.nutritionState.recipeId == verifyRecipe?.id
+        }
+    } else null
+    if (showVerifySheet && verifyRecipe != null && verifyResult != null) {
+        IngredientVerifySheet(
+            analysisResult = verifyResult,
+            recipeName     = verifyRecipe.title,
+            servings       = verifyRecipe.servings,
+            onDismiss      = { showVerifySheet = false },
+            onConfirm      = { kcal, prot, carbs, fat ->
+                vm.applyVerifiedNutrition(verifyRecipe, kcal, prot, carbs, fat)
+                showVerifySheet = false
+            }
+        )
+    }
+
     selectedRecipe?.let { recipe ->
         // Always show latest version from state
         val live = state.recipes.find { it.id == recipe.id } ?: recipe
@@ -144,7 +165,8 @@ fun RecipesScreen(
             onDismiss    = { selectedRecipe = null; vm.clearNutrition() },
             onAddToDiary = { r -> addToDiaryRecipe = r; selectedRecipe = null },
             onEdit       = { editRecipe = live; selectedRecipe = null },
-            onAnalyze    = { vm.analyzeNutrition(live) }
+            onAnalyze    = { vm.analyzeNutrition(live) },
+            onVerify     = { showVerifySheet = true }
         )
     }
 
@@ -335,7 +357,8 @@ fun RecipeDetailSheet(
     onDismiss: () -> Unit,
     onAddToDiary: (Recipe) -> Unit,
     onEdit: () -> Unit,
-    onAnalyze: () -> Unit
+    onAnalyze: () -> Unit,
+    onVerify: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var servings   by remember(recipe.id) { mutableStateOf(recipe.servings) }
@@ -394,7 +417,8 @@ fun RecipeDetailSheet(
                     nutritionState = nutritionState,
                     servings       = servings,
                     ratio          = ratio,
-                    onAnalyze      = onAnalyze
+                    onAnalyze      = onAnalyze,
+                    onVerify       = onVerify
                 )
                 Spacer(Modifier.height(8.dp))
                 Button(onClick={onAddToDiary(recipe.copy(servings=servings))}, modifier=Modifier.fillMaxWidth()) {
@@ -473,7 +497,8 @@ private fun NutritionAnalysisCard(
     nutritionState: NutritionState,
     servings: Int,
     ratio: Float,
-    onAnalyze: () -> Unit
+    onAnalyze: () -> Unit,
+    onVerify: () -> Unit = {}
 ) {
     val isForThis = nutritionState.recipeId == recipe.id
     val isAnalyzing = nutritionState.isAnalyzing && isForThis
@@ -530,6 +555,16 @@ private fun NutritionAnalysisCard(
                     Spacer(Modifier.height(4.dp))
                     val baseText = "${r.matchedCount}/${r.totalCount} Zutaten gefunden · Gesamt: ${r.totalCalories.toInt()} kcal"
                     Text(baseText, fontSize = 10.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha=0.7f))
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = onVerify,
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.QrCodeScanner, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Zutaten einzeln verifizieren", fontSize = 13.sp)
+                    }
                     if (r.estimatedCount > 0) {
                         Text("✨ ${r.estimatedCount} davon per KI geschätzt (kein DB-Treffer)",
                             fontSize = 10.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha=0.7f))

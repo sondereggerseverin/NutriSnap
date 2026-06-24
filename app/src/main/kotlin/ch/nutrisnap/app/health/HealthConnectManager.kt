@@ -59,42 +59,56 @@ class HealthConnectManager(context: Context) {
     suspend fun hasAllPermissions(): Boolean =
         checkPermissions().containsAll(REQUIRED_PERMISSIONS)
 
-    /** Steps today — aggregate avoids Samsung Health overlapping record double-counting */
+    /**
+     * Steps today.
+     * AggregateRecordsRequest deduplicates Samsung Health overlapping records internally —
+     * this is the canonical Health Connect API for this use case.
+     */
     fun getTodaysSteps(): Flow<Long> = flow {
         val (start, end) = todayRange()
-        val result = client.aggregate(
-            AggregateRecordsRequest(
-                metrics = setOf(StepsRecord.COUNT_TOTAL),
-                timeRangeFilter = TimeRangeFilter.between(start, end)
-            )
-        )
-        emit(result[StepsRecord.COUNT_TOTAL] ?: 0L)
+        val result = runCatching {
+            client.aggregate(
+                AggregateRecordsRequest(
+                    metrics = setOf(StepsRecord.COUNT_TOTAL),
+                    timeRangeFilter = TimeRangeFilter.between(start, end)
+                )
+            )[StepsRecord.COUNT_TOTAL] ?: 0L
+        }.getOrDefault(0L)
+        emit(result)
     }
 
-    /** Active calories today — aggregate avoids Samsung Health overlapping record double-counting */
+    /**
+     * Active calories today.
+     * AggregateRecordsRequest deduplicates Samsung Health overlapping records internally.
+     */
     fun getTodaysActiveCalories(): Flow<Double> = flow {
         val (start, end) = todayRange()
-        val result = client.aggregate(
-            AggregateRecordsRequest(
-                metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
-                timeRangeFilter = TimeRangeFilter.between(start, end)
-            )
-        )
-        emit(result[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories ?: 0.0)
+        val result = runCatching {
+            client.aggregate(
+                AggregateRecordsRequest(
+                    metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
+                    timeRangeFilter = TimeRangeFilter.between(start, end)
+                )
+            )[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories ?: 0.0
+        }.getOrDefault(0.0)
+        emit(result)
     }
 
     /** Latest weight reading from last 30 days */
     fun getLatestWeight(): Flow<Double?> = flow {
-        val resp = client.readRecords(
-            ReadRecordsRequest(
-                WeightRecord::class,
-                TimeRangeFilter.between(
-                    Instant.now().minusSeconds(30L * 24 * 3600),
-                    Instant.now()
+        val result = runCatching {
+            val resp = client.readRecords(
+                ReadRecordsRequest(
+                    WeightRecord::class,
+                    TimeRangeFilter.between(
+                        Instant.now().minusSeconds(30L * 24 * 3600),
+                        Instant.now()
+                    )
                 )
             )
-        )
-        emit(resp.records.lastOrNull()?.weight?.inKilograms)
+            resp.records.lastOrNull()?.weight?.inKilograms
+        }.getOrDefault(null)
+        emit(result)
     }
 
     /** Last night sleep: 18:00 yesterday → 12:00 today */
@@ -103,39 +117,50 @@ class HealthConnectManager(context: Context) {
             .atZone(ZoneId.systemDefault()).toInstant()
         val to   = LocalDate.now().atTime(12, 0)
             .atZone(ZoneId.systemDefault()).toInstant()
-        val resp = client.readRecords(
-            ReadRecordsRequest(SleepSessionRecord::class, TimeRangeFilter.between(from, to))
-        )
-        emit(resp.records.sumOf {
-            java.time.Duration.between(it.startTime, it.endTime).toMinutes()
-        })
+        val result = runCatching {
+            val resp = client.readRecords(
+                ReadRecordsRequest(SleepSessionRecord::class, TimeRangeFilter.between(from, to))
+            )
+            resp.records.sumOf {
+                java.time.Duration.between(it.startTime, it.endTime).toMinutes()
+            }
+        }.getOrDefault(0L)
+        emit(result)
     }
 
     /** Average heart rate today */
     fun getTodaysAvgHeartRate(): Flow<Long?> = flow {
         val (start, end) = todayRange()
-        val resp = client.readRecords(
-            ReadRecordsRequest(HeartRateRecord::class, TimeRangeFilter.between(start, end))
-        )
-        val all = resp.records.flatMap { it.samples }
-        emit(if (all.isEmpty()) null else all.map { it.beatsPerMinute }.average().toLong())
+        val result = runCatching {
+            val resp = client.readRecords(
+                ReadRecordsRequest(HeartRateRecord::class, TimeRangeFilter.between(start, end))
+            )
+            val all = resp.records.flatMap { it.samples }
+            if (all.isEmpty()) null else all.map { it.beatsPerMinute }.average().toLong()
+        }.getOrDefault(null)
+        emit(result)
     }
 
-    /** Steps grouped by day for the last 7 days — aggregate per day avoids double-counting */
+    /**
+     * Steps per day for the last 7 days.
+     * One AggregateRecordsRequest per day — correct deduplication per day boundary.
+     */
     fun getWeeklySteps(): Flow<Map<LocalDate, Long>> = flow {
         val today = LocalDate.now()
         val map = mutableMapOf<LocalDate, Long>()
         for (i in 6 downTo 0) {
-            val day = today.minusDays(i.toLong())
+            val day   = today.minusDays(i.toLong())
             val start = day.atStartOfDay(ZoneId.systemDefault()).toInstant()
             val end   = day.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
-            val result = client.aggregate(
-                AggregateRecordsRequest(
-                    metrics = setOf(StepsRecord.COUNT_TOTAL),
-                    timeRangeFilter = TimeRangeFilter.between(start, end)
-                )
-            )
-            map[day] = result[StepsRecord.COUNT_TOTAL] ?: 0L
+            val steps = runCatching {
+                client.aggregate(
+                    AggregateRecordsRequest(
+                        metrics = setOf(StepsRecord.COUNT_TOTAL),
+                        timeRangeFilter = TimeRangeFilter.between(start, end)
+                    )
+                )[StepsRecord.COUNT_TOTAL] ?: 0L
+            }.getOrDefault(0L)
+            map[day] = steps
         }
         emit(map)
     }

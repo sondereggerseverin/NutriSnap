@@ -111,6 +111,13 @@ object RecipeNutritionAnalyzer {
             "sauce:", "dressing:", "topping:", "marinade:", "das rezept")
         if (skipPrefixes.any { lc.startsWith(it) }) return false
 
+        // Filter pure macro lines: "292 kcal", "6g Fett", "11g KH", "47g Protein", "Fett: 56g"
+        val isMacroLine = Regex("""^\d+\s*(?:kcal|kalorien|calories)${'$'}""").matches(s.trim()) ||
+            Regex("""^\d+\s*g\s*(?:fett|fat|protein|eiweiss|eiweißs?|kh|kohlenhydrate?|carbs?)${'$'}""", RegexOption.IGNORE_CASE).matches(s.trim()) ||
+            Regex("""^(?:fett|protein|kh|kohlenhydrate?|eiweiss|calories?|kcal)\s*[:=]\s*\d""", RegexOption.IGNORE_CASE).matches(s.trim()) ||
+            Regex("""^\d+\s*(?:kcal|kalorien)""").matches(s.trim()) && s.length < 15
+        if (isMacroLine) return false
+
         val hasDigit = s.any { it.isDigit() }
         val hasUnit = lc.contains(" g ") || lc.contains(" g,") || lc.endsWith(" g") ||
             lc.contains("ml") || lc.contains(" kg") || lc.contains(" l ") ||

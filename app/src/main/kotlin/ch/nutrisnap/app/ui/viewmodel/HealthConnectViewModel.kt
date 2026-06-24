@@ -7,6 +7,7 @@ import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.HealthConnectCache
 import ch.nutrisnap.app.data.repository.HealthConnectRepository
 import ch.nutrisnap.app.health.HealthConnectManager
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -59,7 +60,9 @@ class HealthConnectViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val hasPerm = runCatching { repository.hasPermissions() }.getOrDefault(false)
             _uiState.update { it.copy(hasPermission = hasPerm) }
-            if (hasPerm) syncNow()
+            if (hasPerm) {
+                syncNow()
+            }
         }
     }
 
@@ -68,17 +71,35 @@ class HealthConnectViewModel(app: Application) : AndroidViewModel(app) {
             _uiState.update { it.copy(isLoading = true, syncError = null) }
             repository.syncToday()
                 .onSuccess { cache ->
-                    _uiState.update { it.copy(isLoading = false, todayData = cache) }
+                    _uiState.update { it.copy(isLoading = false, todayData = cache, syncError = null) }
                 }
                 .onFailure { err ->
-                    _uiState.update { it.copy(isLoading = false,
-                        syncError = err.message ?: "Fehler beim Laden") }
+                    // FIX: Vollständiger Fehler wird angezeigt inkl. Exception-Typ
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            syncError = "${err::class.simpleName}: ${err.message ?: "Unbekannter Fehler"}"
+                        )
+                    }
                 }
         }
     }
 
     fun onPermissionGranted() {
-        _uiState.update { it.copy(hasPermission = true) }
-        syncNow()
+        viewModelScope.launch {
+            // FIX: Kurze Verzögerung damit Health Connect die Permissions vollständig registriert
+            delay(500)
+            val hasPerm = runCatching { repository.hasPermissions() }.getOrDefault(false)
+            _uiState.update { it.copy(hasPermission = hasPerm) }
+            if (hasPerm) syncNow()
+        }
+    }
+
+    /** Manueller Retry nach Fehler */
+    fun retrySync() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(syncError = null) }
+            checkPermissionsAndSync()
+        }
     }
 }

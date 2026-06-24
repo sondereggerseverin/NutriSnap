@@ -18,11 +18,23 @@ class HealthConnectRepository(
 
     suspend fun syncToday(): Result<HealthConnectCache> = runCatching {
         coroutineScope {
-            val steps     = async { manager.getTodaysSteps().firstOrNull() ?: 0L }
-            val calories  = async { manager.getTodaysActiveCalories().firstOrNull() ?: 0.0 }
-            val weight    = async { manager.getLatestWeight().firstOrNull() }
-            val sleep     = async { manager.getLastNightSleep().firstOrNull() ?: 0L }
-            val heartRate = async { manager.getTodaysAvgHeartRate().firstOrNull() }
+            // FIX: Jeden Datentyp einzeln absichern – Samsung Health kann partial liefern
+            // ohne dass ein Fehler den gesamten Sync abbricht
+            val steps = async {
+                runCatching { manager.getTodaysSteps().firstOrNull() ?: 0L }.getOrDefault(0L)
+            }
+            val calories = async {
+                runCatching { manager.getTodaysActiveCalories().firstOrNull() ?: 0.0 }.getOrDefault(0.0)
+            }
+            val weight = async {
+                runCatching { manager.getLatestWeight().firstOrNull() }.getOrDefault(null)
+            }
+            val sleep = async {
+                runCatching { manager.getLastNightSleep().firstOrNull() ?: 0L }.getOrDefault(0L)
+            }
+            val heartRate = async {
+                runCatching { manager.getTodaysAvgHeartRate().firstOrNull() }.getOrDefault(null)
+            }
 
             val cache = HealthConnectCache(
                 date = LocalDate.now(),
