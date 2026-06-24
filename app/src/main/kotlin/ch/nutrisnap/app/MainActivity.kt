@@ -28,6 +28,8 @@ import ch.nutrisnap.app.service.NotificationScheduler
 import ch.nutrisnap.app.ui.components.OfflineBanner
 import ch.nutrisnap.app.ui.screens.HealthConnectScreen
 import ch.nutrisnap.app.ui.screens.analysis.AnalysisScreen
+import ch.nutrisnap.app.ui.screens.auth.AuthViewModel
+import ch.nutrisnap.app.ui.screens.auth.LoginScreen
 import ch.nutrisnap.app.ui.screens.diary.DiaryScreen
 import ch.nutrisnap.app.ui.screens.home.HomeScreen
 import ch.nutrisnap.app.ui.screens.recipes.RecipesScreen
@@ -62,7 +64,6 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { granted -> if (granted) NotificationScheduler.scheduleAll(this) }
 
-    // Health Connect: launcher expects Set<String> permission strings
     private val healthConnectPermLauncher = registerForActivityResult(
         PermissionController.createRequestPermissionResultContract()
     ) { granted ->
@@ -87,31 +88,37 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             NutriSnapTheme {
-                val networkMonitor = remember { NetworkMonitor(this) }
-                val isOnline by networkMonitor.isOnline.collectAsState(initial = true)
-                val biometricEnabled by notifDataStore.data
-                    .map { it[KEY_BIOMETRIC_LOCK] ?: false }.collectAsState(initial = false)
-                var isUnlocked by remember { mutableStateOf(true) }
+                val authVm: AuthViewModel = viewModel()
+                val isLoggedIn by authVm.isLoggedIn.collectAsState()
 
-                val hcVm: HealthConnectViewModel = viewModel()
-                LaunchedEffect(Unit) { healthConnectViewModel = hcVm }
-                LaunchedEffect(biometricEnabled) { if (biometricEnabled) isUnlocked = false }
+                if (!isLoggedIn) {
+                    LoginScreen(onLoggedIn = { authVm.onLoggedIn() })
+                } else {
+                    val networkMonitor = remember { NetworkMonitor(this) }
+                    val isOnline by networkMonitor.isOnline.collectAsState(initial = true)
+                    val biometricEnabled by notifDataStore.data
+                        .map { it[KEY_BIOMETRIC_LOCK] ?: false }.collectAsState(initial = false)
+                    var isUnlocked by remember { mutableStateOf(true) }
 
-                Column(modifier = Modifier.fillMaxSize()) {
-                    OfflineBanner(isOnline = isOnline)
-                    if (!isUnlocked) {
-                        BiometricLockScreen(onUnlocked = { isUnlocked = true })
-                    } else {
-                        MainScaffold(
-                            sharedUrl = sharedUrl,
-                            hcVm = hcVm,
-                            onRequestHealthPermission = {
-                                // Launch with the String permission set (required by HC SDK)
-                                healthConnectPermLauncher.launch(
-                                    HealthConnectManager.REQUIRED_PERMISSIONS
-                                )
-                            }
-                        )
+                    val hcVm: HealthConnectViewModel = viewModel()
+                    LaunchedEffect(Unit) { healthConnectViewModel = hcVm }
+                    LaunchedEffect(biometricEnabled) { if (biometricEnabled) isUnlocked = false }
+
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        OfflineBanner(isOnline = isOnline)
+                        if (!isUnlocked) {
+                            BiometricLockScreen(onUnlocked = { isUnlocked = true })
+                        } else {
+                            MainScaffold(
+                                sharedUrl = sharedUrl,
+                                hcVm = hcVm,
+                                onRequestHealthPermission = {
+                                    healthConnectPermLauncher.launch(
+                                        HealthConnectManager.REQUIRED_PERMISSIONS
+                                    )
+                                }
+                            )
+                        }
                     }
                 }
             }
