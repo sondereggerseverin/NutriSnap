@@ -1,4 +1,4 @@
-# Build errors - run 208
+# Build errors - run 209
 
 ## Error lines
 ```
@@ -13,7 +13,7 @@ ERROR: /home/runner/work/NutriSnap/NutriSnap/app/src/main/res/layout/activity_lo
 ERROR: /home/runner/work/NutriSnap/NutriSnap/app/src/main/res/layout/activity_login.xml:6: AAPT: error: attribute passwordToggleEnabled (aka ch.nutrisnap.app:passwordToggleEnabled) not found.
 ERROR: /home/runner/work/NutriSnap/NutriSnap/app/src/main/res/layout/activity_login.xml:8: AAPT: error: attribute strokeColor (aka ch.nutrisnap.app:strokeColor) not found.
 ERROR: /home/runner/work/NutriSnap/NutriSnap/app/src/main/res/layout/activity_login.xml:8: AAPT: error: resource style/Widget.MaterialComponents.Button.OutlinedButton (aka ch.nutrisnap.app:style/Widget.MaterialComponents.Button.OutlinedButton) not found.
-BUILD FAILED in 2m 7s
+BUILD FAILED in 2m
 ```
 
 ## Last 150 lines
@@ -166,6 +166,6 @@ ERROR: /home/runner/work/NutriSnap/NutriSnap/app/src/main/res/layout/activity_lo
 	... 2 more
 
 
-BUILD FAILED in 2m 7s
+BUILD FAILED in 2m
 19 actionable tasks: 19 executed
 ```
