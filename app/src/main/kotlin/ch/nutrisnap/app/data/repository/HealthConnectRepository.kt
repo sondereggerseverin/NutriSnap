@@ -7,7 +7,9 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 
 class HealthConnectRepository(
     private val manager: HealthConnectManager,
@@ -15,11 +17,10 @@ class HealthConnectRepository(
 ) {
     fun getTodayData(): Flow<HealthConnectCache?> = dao.getCacheForDate(LocalDate.now())
     fun getLast7Days(): Flow<List<HealthConnectCache>> = dao.getLast7Days()
+    fun getLast30Days(): Flow<List<HealthConnectCache>> = dao.getLast30Days()
 
     suspend fun syncToday(): Result<HealthConnectCache> = runCatching {
         coroutineScope {
-            // FIX: Jeden Datentyp einzeln absichern – Samsung Health kann partial liefern
-            // ohne dass ein Fehler den gesamten Sync abbricht
             val steps = async {
                 runCatching { manager.getTodaysSteps().firstOrNull() ?: 0L }.getOrDefault(0L)
             }
@@ -48,6 +49,46 @@ class HealthConnectRepository(
             dao.deleteOlderThan(LocalDate.now().minusDays(30))
             cache
         }
+    }
+
+    /**
+     * Syncs historical data for the last [days] days.
+     * Skips days that are already in the cache (date exists in DB).
+     * Also fills in weight readings from Health Connect for each day.
+     */
+    suspend fun syncHistorical(days: Int = 30): Result<Int> = runCatching {
+        val today = LocalDate.now()
+        // Fetch all weight data in one API call for efficiency
+        val weightFrom = today.minusDays(days.toLong())
+            .atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val weightMap = runCatching {
+            manager.getWeightForRange(weightFrom, Instant.now())
+        }.getOrDefault(emptyMap())
+
+        var synced = 0
+        for (i in 1..days) {
+            val date = today.minusDays(i.toLong())
+            // Skip today (handled by syncToday) and days already cached with data
+            val existing = dao.getCacheForDateOnce(date)
+            if (existing != null && existing.steps > 0) continue
+
+            val steps = runCatching { manager.getStepsForDay(date) }.getOrDefault(0L)
+            val calories = runCatching { manager.getActiveCaloriesForDay(date) }.getOrDefault(0.0)
+            val sleep = runCatching { manager.getSleepForNight(date) }.getOrDefault(0L)
+            val weight = weightMap[date] ?: existing?.weightKg
+
+            val cache = HealthConnectCache(
+                date = date,
+                steps = steps,
+                activeCaloriesKcal = calories,
+                weightKg = weight,
+                sleepMinutes = sleep,
+                avgHeartRateBpm = existing?.avgHeartRateBpm
+            )
+            dao.insertOrUpdate(cache)
+            synced++
+        }
+        synced
     }
 
     suspend fun hasPermissions(): Boolean = manager.hasAllPermissions()
