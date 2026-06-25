@@ -12,6 +12,13 @@ object AuthRepository {
     val currentUser: UserInfo? get() = auth.currentUserOrNull()
     val isLoggedIn: Boolean get() = currentUser != null
 
+    /** Wartet bis Supabase die gespeicherte Session wiederhergestellt hat. */
+    suspend fun awaitSession() {
+        // Mit autoLoadFromStorage=true lädt Supabase die Session beim Client-Init.
+        // Kurze Verzögerung reicht damit der Auth-State gesetzt ist.
+        runCatching { auth.awaitInitialization() }
+    }
+
     suspend fun signUp(email: String, password: String) {
         auth.signUpWith(Email) {
             this.email = email

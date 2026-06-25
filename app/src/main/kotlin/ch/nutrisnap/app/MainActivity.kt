@@ -91,9 +91,15 @@ class MainActivity : ComponentActivity() {
                 val authVm: AuthViewModel = viewModel()
                 val isLoggedIn by authVm.isLoggedIn.collectAsState()
 
-                if (!isLoggedIn) {
-                    LoginScreen(onLoggedIn = { authVm.onLoggedIn() })
-                } else {
+                when (isLoggedIn) {
+                    null -> {
+                        // Session wird geladen – leerer Splash damit kein Login-Flash
+                        Box(modifier = Modifier.fillMaxSize())
+                    }
+                    false -> {
+                        LoginScreen(onLoggedIn = { authVm.onLoggedIn() })
+                    }
+                    true -> {
                     val networkMonitor = remember { NetworkMonitor(this) }
                     val isOnline by networkMonitor.isOnline.collectAsState(initial = true)
                     val biometricEnabled by notifDataStore.data

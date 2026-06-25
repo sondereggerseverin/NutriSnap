@@ -11,7 +11,12 @@ object SupabaseClient {
         supabaseUrl = BuildConfig.SUPABASE_URL,
         supabaseKey = BuildConfig.SUPABASE_ANON_KEY
     ) {
-        install(Auth)
+        install(Auth) {
+            // Session automatisch in SharedPreferences speichern und beim Start wiederherstellen
+            autoLoadFromStorage = true
+            autoSaveToStorage = true
+            alwaysAutoRefresh = true
+        }
         install(Postgrest)
         install(Realtime)
     }
