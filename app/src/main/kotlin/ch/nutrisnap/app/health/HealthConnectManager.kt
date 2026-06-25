@@ -83,26 +83,48 @@ class HealthConnectManager(context: Context) {
     }
 
     /**
-     * Activity calories today (Active Calories = ohne Grundumsatz).
+     * Activity calories heute.
      *
-     * Samsung Health schreibt ActiveCaloriesBurned korrekt in Health Connect.
-     * TotalCaloriesBurned enthält zusätzlich den Grundumsatz (~1700 kcal/Tag)
-     * und ist deshalb für "Aktivitätskalorien" ungeeignet.
+     * Samsung Health schreibt Schritt-Kalorien NICHT als ActiveCaloriesBurnedRecord
+     * in Health Connect — nur explizite Workout-Sessions landen dort. Deshalb war
+     * der Wert immer 0 wenn kein Workout aufgezeichnet wurde.
      *
-     * Hinweis: Samsung Health "Activity Calories" (578) ≠ ActiveCaloriesBurned (483)
-     * weil Samsung Health intern auch Kalorien aus passiven Aktivitäten einrechnet,
-     * die nicht als ExerciseSession erfasst werden. Diese Differenz ist systembedingt
-     * und kann über Health Connect nicht exakt repliziert werden.
+     * Korrekte Strategie:
+     * 1. Lese TotalCaloriesBurnedRecord (enthält alles: BMR + Aktivität)
+     * 2. Ziehe den anteiligen BMR für die vergangene Tageszeit ab
+     * BMR = 2000 kcal/Tag für 89 kg Mann (Mifflin-St Jeor ~2050, gerundet)
+     * Das Ergebnis entspricht annähernd Samsung Health "Activity Calories".
      */
     fun getTodaysActiveCalories(): Flow<Double> = flow {
         val (start, end) = todayRange()
         val result = runCatching {
-            client.aggregate(
+            val response = client.aggregate(
                 AggregateRequest(
-                    metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
+                    metrics = setOf(
+                        ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL,
+                        TotalCaloriesBurnedRecord.ENERGY_TOTAL
+                    ),
                     timeRangeFilter = TimeRangeFilter.between(start, end)
                 )
-            )[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories ?: 0.0
+            )
+            val activeKcal = response[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]
+                ?.inKilocalories ?: 0.0
+            val totalKcal  = response[TotalCaloriesBurnedRecord.ENERGY_TOTAL]
+                ?.inKilocalories ?: 0.0
+
+            when {
+                // Workout-Session vorhanden → ActiveCalories direkt verwenden
+                activeKcal > 10.0 -> activeKcal
+                // Normaler Tag mit nur Schritten → TotalCalories minus BMR-Anteil
+                totalKcal > 50.0 -> {
+                    val minutesElapsed = java.time.Duration.between(start, end).toMinutes()
+                        .coerceAtLeast(1L)
+                    // BMR pro Minute: 2000 kcal / 1440 min = 1.389 kcal/min
+                    val bmrSoFar = minutesElapsed * (2000.0 / 1440.0)
+                    (totalKcal - bmrSoFar).coerceAtLeast(0.0)
+                }
+                else -> 0.0
+            }
         }.getOrDefault(0.0)
         emit(result)
     }
