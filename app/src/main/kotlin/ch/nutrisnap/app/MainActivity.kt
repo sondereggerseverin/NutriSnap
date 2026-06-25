@@ -93,37 +93,38 @@ class MainActivity : ComponentActivity() {
 
                 when (isLoggedIn) {
                     null -> {
-                        // Session wird geladen – leerer Splash damit kein Login-Flash
+                        // Session wird geladen – leerer Screen damit kein Login-Flash
                         Box(modifier = Modifier.fillMaxSize())
                     }
                     false -> {
                         LoginScreen(onLoggedIn = { authVm.onLoggedIn() })
                     }
                     true -> {
-                    val networkMonitor = remember { NetworkMonitor(this) }
-                    val isOnline by networkMonitor.isOnline.collectAsState(initial = true)
-                    val biometricEnabled by notifDataStore.data
-                        .map { it[KEY_BIOMETRIC_LOCK] ?: false }.collectAsState(initial = false)
-                    var isUnlocked by remember { mutableStateOf(true) }
+                        val networkMonitor = remember { NetworkMonitor(this) }
+                        val isOnline by networkMonitor.isOnline.collectAsState(initial = true)
+                        val biometricEnabled by notifDataStore.data
+                            .map { it[KEY_BIOMETRIC_LOCK] ?: false }.collectAsState(initial = false)
+                        var isUnlocked by remember { mutableStateOf(true) }
 
-                    val hcVm: HealthConnectViewModel = viewModel()
-                    LaunchedEffect(Unit) { healthConnectViewModel = hcVm }
-                    LaunchedEffect(biometricEnabled) { if (biometricEnabled) isUnlocked = false }
+                        val hcVm: HealthConnectViewModel = viewModel()
+                        LaunchedEffect(Unit) { healthConnectViewModel = hcVm }
+                        LaunchedEffect(biometricEnabled) { if (biometricEnabled) isUnlocked = false }
 
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        OfflineBanner(isOnline = isOnline)
-                        if (!isUnlocked) {
-                            BiometricLockScreen(onUnlocked = { isUnlocked = true })
-                        } else {
-                            MainScaffold(
-                                sharedUrl = sharedUrl,
-                                hcVm = hcVm,
-                                onRequestHealthPermission = {
-                                    healthConnectPermLauncher.launch(
-                                        HealthConnectManager.REQUIRED_PERMISSIONS
-                                    )
-                                }
-                            )
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            OfflineBanner(isOnline = isOnline)
+                            if (!isUnlocked) {
+                                BiometricLockScreen(onUnlocked = { isUnlocked = true })
+                            } else {
+                                MainScaffold(
+                                    sharedUrl = sharedUrl,
+                                    hcVm = hcVm,
+                                    onRequestHealthPermission = {
+                                        healthConnectPermLauncher.launch(
+                                            HealthConnectManager.REQUIRED_PERMISSIONS
+                                        )
+                                    }
+                                )
+                            }
                         }
                     }
                 }
