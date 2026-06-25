@@ -16,6 +16,9 @@ interface HealthConnectDao {
     @Query("SELECT * FROM health_connect_cache ORDER BY date DESC LIMIT 7")
     fun getLast7Days(): Flow<List<HealthConnectCache>>
 
+    @Query("SELECT * FROM health_connect_cache ORDER BY date DESC LIMIT 30")
+    fun getLast30Days(): Flow<List<HealthConnectCache>>
+
     @Query("SELECT * FROM health_connect_cache WHERE date = :date")
     suspend fun getCacheForDateOnce(date: LocalDate): HealthConnectCache?
 
