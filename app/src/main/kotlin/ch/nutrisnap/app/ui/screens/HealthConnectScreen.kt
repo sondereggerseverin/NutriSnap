@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,7 +10,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -17,6 +21,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.HealthConnectCache
 import ch.nutrisnap.app.data.model.SleepQuality
 import ch.nutrisnap.app.ui.viewmodel.HealthConnectViewModel
+import ch.nutrisnap.app.ui.viewmodel.WeeklyStats
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -27,6 +32,7 @@ fun HealthConnectScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val adjustedGoal by viewModel.adjustedCalorieGoal.collectAsState()
+    val weeklyStats by viewModel.weeklyStats.collectAsState()
 
     if (!uiState.isAvailable) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -48,13 +54,24 @@ fun HealthConnectScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            Text("Aktivität & Gesundheit", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            Text(
-                if (uiState.hasPermission) "✅ Verbunden mit Samsung Health / Health Connect"
-                else "Nicht verbunden",
-                fontSize = 13.sp,
-                color = if (uiState.hasPermission) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text("Aktivität & Gesundheit", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (uiState.hasPermission) "✅ Verbunden mit Samsung Health / Health Connect"
+                        else "Nicht verbunden",
+                        fontSize = 13.sp,
+                        color = if (uiState.hasPermission) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error
+                    )
+                }
+                if (uiState.isHistoricalSyncing) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                }
+            }
         }
 
         uiState.syncError?.let { error ->
@@ -80,8 +97,21 @@ fun HealthConnectScreen(
             )
         }
 
+        // Weekly averages - shown when data is available
+        weeklyStats?.let { stats ->
+            if (stats.daysWithWeight > 0 || stats.daysWithKcal > 0) {
+                item { WeeklyAveragesCard(stats = stats) }
+            }
+        }
+
         if (uiState.weeklyData.isNotEmpty()) {
             item { WeeklyStepsCard(weeklyData = uiState.weeklyData) }
+        }
+
+        // Weight chart (only if we have weight data)
+        val weightData = uiState.weeklyData.filter { it.weightKg != null }
+        if (weightData.size >= 2) {
+            item { WeightTrendCard(weeklyData = uiState.weeklyData) }
         }
 
         if (uiState.weeklyData.any { it.sleepMinutes > 0 }) {
@@ -155,6 +185,145 @@ private fun TodayOverviewCard(
                                 fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeeklyAveragesCard(stats: WeeklyStats) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Ø Diese Woche", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Spacer(Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+
+                // Weight average + trend
+                if (stats.avgWeightKg != null) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("⚖️", fontSize = 22.sp)
+                        Text(
+                            String.format("%.1f kg", stats.avgWeightKg),
+                            fontWeight = FontWeight.Bold, fontSize = 18.sp,
+                            color = Color(0xFF9C27B0)
+                        )
+                        Text("Ø Gewicht", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (stats.weightTrend != null) {
+                            val trendColor = when {
+                                stats.weightTrend < -0.1 -> Color(0xFF4CAF50)  // lost weight = green
+                                stats.weightTrend > 0.1  -> Color(0xFFEF5350)  // gained = red
+                                else                      -> MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                            val trendIcon = when {
+                                stats.weightTrend < -0.1 -> "↓"
+                                stats.weightTrend > 0.1  -> "↑"
+                                else                      -> "→"
+                            }
+                            Text(
+                                "$trendIcon ${String.format("%+.1f", stats.weightTrend)} kg",
+                                fontSize = 11.sp, color = trendColor, fontWeight = FontWeight.Medium
+                            )
+                        }
+                        Text("${stats.daysWithWeight} Tage Daten", fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                if (stats.avgWeightKg != null && stats.daysWithKcal > 0) {
+                    VerticalDivider(modifier = Modifier.height(80.dp))
+                }
+
+                // Calorie average + trend
+                if (stats.daysWithKcal > 0) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("🔥", fontSize = 22.sp)
+                        Text(
+                            "${stats.avgActiveKcal.toInt()} kcal",
+                            fontWeight = FontWeight.Bold, fontSize = 18.sp,
+                            color = Color(0xFFFF5722)
+                        )
+                        Text("Ø Akt. Kalorien", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (stats.kcalTrend != null) {
+                            val trendColor = when {
+                                stats.kcalTrend > 50  -> Color(0xFF4CAF50)  // more activity = green
+                                stats.kcalTrend < -50 -> Color(0xFFEF5350)
+                                else                   -> MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                            val trendIcon = if (stats.kcalTrend >= 0) "↑" else "↓"
+                            Text(
+                                "$trendIcon ${String.format("%+.0f", stats.kcalTrend)} kcal",
+                                fontSize = 11.sp, color = trendColor, fontWeight = FontWeight.Medium
+                            )
+                        }
+                        Text("${stats.daysWithKcal} Tage Daten", fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeightTrendCard(weeklyData: List<HealthConnectCache>) {
+    val dataPoints = weeklyData
+        .filter { it.weightKg != null }
+        .sortedBy { it.date }
+
+    if (dataPoints.size < 2) return
+
+    val minWeight = dataPoints.minOf { it.weightKg!! }
+    val maxWeight = dataPoints.maxOf { it.weightKg!! }
+    val range = (maxWeight - minWeight).coerceAtLeast(0.5)
+
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val dotColor = Color(0xFF9C27B0)
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Gewichtsverlauf – letzte 7 Tage", fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+
+            // Min / max labels
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(String.format("%.1f kg", minWeight), fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(String.format("%.1f kg", maxWeight), fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
+            Canvas(modifier = Modifier.fillMaxWidth().height(80.dp)) {
+                val w = size.width
+                val h = size.height
+                val pts = dataPoints.mapIndexed { i, d ->
+                    val x = if (dataPoints.size == 1) w / 2f
+                    else i.toFloat() / (dataPoints.size - 1) * w
+                    val y = h - ((d.weightKg!! - minWeight) / range * h).toFloat()
+                    Offset(x, y.coerceIn(4f, h - 4f))
+                }
+                // Draw line
+                if (pts.size >= 2) {
+                    val path = Path()
+                    path.moveTo(pts[0].x, pts[0].y)
+                    for (k in 1 until pts.size) path.lineTo(pts[k].x, pts[k].y)
+                    drawPath(path, color = primaryColor, style = Stroke(width = 3f))
+                }
+                // Draw dots
+                pts.forEach { pt ->
+                    drawCircle(color = dotColor, radius = 6f, center = pt)
+                    drawCircle(color = Color.White, radius = 3f, center = pt)
+                }
+            }
+
+            Spacer(Modifier.height(4.dp))
+            // X-axis labels
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                dataPoints.forEach { d ->
+                    Text(
+                        d.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.GERMAN),
+                        fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
