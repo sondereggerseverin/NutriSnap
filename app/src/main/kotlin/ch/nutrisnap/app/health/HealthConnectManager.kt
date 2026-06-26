@@ -174,16 +174,13 @@ class HealthConnectManager(context: Context) {
     /**
      * Activity calories for a specific day.
      *
-     * Samsung Health writes its "Cal" (Aktivitätskalorien) into TotalCaloriesBurnedRecord.
-     * ActiveCaloriesBurnedRecord is NOT written by Samsung Health on most devices.
+     * Samsung Health writes BOTH ActiveCaloriesBurnedRecord AND TotalCaloriesBurnedRecord.
+     * Samsung Health's dashboard "Cal" value = TotalCaloriesBurnedRecord (which on Samsung
+     * devices = activity-only calories, NOT including BMR).
      *
-     * Strategy:
-     * 1. Try ActiveCaloriesBurnedRecord aggregate (works on non-Samsung devices).
-     * 2. Fall back to individual ActiveCaloriesBurnedRecords.
-     * 3. Samsung fallback: TotalCaloriesBurnedRecord — no BMR subtraction,
-     *    because Samsung Health's "Cal" IS already just the activity calories
-     *    (not total energy expenditure). Samsung writes activity-only cal into
-     *    TotalCaloriesBurnedRecord directly.
+     * Strategy: take the MAXIMUM of Active and Total aggregates, because Samsung Health
+     * sometimes writes its full activity cal into TotalCaloriesBurnedRecord and only a
+     * subset into ActiveCaloriesBurnedRecord.
      */
     suspend fun getActiveCaloriesForDay(date: LocalDate): Double {
         val start = date.atStartOfDay(ZoneId.systemDefault()).toInstant()
@@ -192,48 +189,26 @@ class HealthConnectManager(context: Context) {
 
         return runCatching {
             // 1. Aggregate active calories
-            val aggregated = client.aggregate(
+            val activeAgg = client.aggregate(
                 AggregateRequest(
                     metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
                     timeRangeFilter = TimeRangeFilter.between(start, end)
                 )
             )[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories ?: 0.0
 
-            if (aggregated > 0.0) return@runCatching aggregated
-
-            // 2. Fallback: sum individual ActiveCaloriesBurnedRecords
-            val records = client.readRecords(
-                ReadRecordsRequest(
-                    ActiveCaloriesBurnedRecord::class,
-                    TimeRangeFilter.between(start, end)
-                )
-            ).records
-
-            if (records.isNotEmpty()) {
-                val sorted = records.sortedWith(compareBy({ it.startTime }, { -it.energy.inKilocalories }))
-                var lastEnd = Instant.MIN
-                var total = 0.0
-                for (record in sorted) {
-                    if (record.startTime >= lastEnd) {
-                        total += record.energy.inKilocalories
-                        if (record.endTime > lastEnd) lastEnd = record.endTime
-                    }
-                }
-                if (total > 0.0) return@runCatching total
-            }
-
-            // 3. Samsung Health fallback: TotalCaloriesBurnedRecord
-            // Samsung Health writes its activity-only "Cal" value into TotalCaloriesBurnedRecord.
-            // This is NOT total energy expenditure — Samsung strips BMR before writing to HC.
-            // So we take it directly without subtracting BMR.
-            val totalCalories = client.aggregate(
+            // 2. Aggregate total calories (Samsung Health writes its "Cal" here)
+            val totalAgg = client.aggregate(
                 AggregateRequest(
                     metrics = setOf(TotalCaloriesBurnedRecord.ENERGY_TOTAL),
                     timeRangeFilter = TimeRangeFilter.between(start, end)
                 )
             )[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.inKilocalories ?: 0.0
 
-            totalCalories
+            Log.d(TAG, "getActiveCaloriesForDay($date): activeAgg=$activeAgg, totalAgg=$totalAgg -> using max=${maxOf(activeAgg, totalAgg)}")
+
+            // Take the maximum — Samsung Health's "Cal" (totalAgg) is typically higher
+            // and matches what Samsung Health displays on its dashboard.
+            maxOf(activeAgg, totalAgg)
 
         }.getOrDefault(0.0)
     }
