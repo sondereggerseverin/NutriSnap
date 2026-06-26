@@ -71,6 +71,32 @@ class DiaryRepository(db: NutriDatabase) {
         )
     }
 
+    /**
+     * Manual entry: user types name + kcal + optional macros directly.
+     * foodItemId = -999 marks manual entries. amountGrams = 0 (no gram-based amount).
+     */
+    suspend fun addManualEntry(
+        name: String,
+        kcal: Float,
+        protein: Float,
+        carbs: Float,
+        fat: Float,
+        mealType: MealType,
+        date: LocalDate
+    ): Long = dao.insert(
+        DiaryEntry(
+            foodItemId  = -999,
+            foodName    = name,
+            amountGrams = 0f,
+            mealType    = mealType,
+            dateStr     = date.toString(),
+            calories    = kcal,
+            protein     = protein,
+            carbs       = carbs,
+            fat         = fat
+        )
+    )
+
     suspend fun updateEntry(entry: DiaryEntry) = dao.update(entry)
     suspend fun deleteEntry(entry: DiaryEntry) = dao.delete(entry)
 }
