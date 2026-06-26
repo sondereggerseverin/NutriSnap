@@ -6,14 +6,16 @@ import androidx.lifecycle.viewModelScope
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.CustomFoodItem
 import ch.nutrisnap.app.data.repository.CustomFoodRepository
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
+@OptIn(FlowPreview::class)
 class CustomFoodViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = CustomFoodRepository(NutriDatabase.getInstance(app).customFoodDao())
 
     private val _query = MutableStateFlow("")
-    val query: StateFlow<String> = _query
+    val query: StateFlow<String> = _query.asStateFlow()
 
     val foods: StateFlow<List<CustomFoodItem>> = _query
         .debounce(200)
