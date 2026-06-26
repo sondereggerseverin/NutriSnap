@@ -47,12 +47,12 @@ import ch.nutrisnap.app.utils.NetworkMonitor
 import kotlinx.coroutines.flow.map
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
-    object Home      : Screen("home",      "Start",    Icons.Default.Home)
-    object Diary     : Screen("diary",     "Tagebuch", Icons.Default.MenuBook)
-    object Recipes   : Screen("recipes",   "Rezepte",  Icons.Default.RestaurantMenu)
-    object AiRecipes : Screen("ai_recipes","KI-Koch",  Icons.Default.AutoAwesome)
-    object Analysis  : Screen("analysis",  "Analyse",  Icons.Default.BarChart)
-    object Settings  : Screen("settings",  "Mehr",     Icons.Default.Settings)
+    object Home      : Screen("home",       "Start",    Icons.Default.Home)
+    object Diary     : Screen("diary",      "Tagebuch", Icons.Default.MenuBook)
+    object Recipes   : Screen("recipes",    "Rezepte",  Icons.Default.RestaurantMenu)
+    object AiRecipes : Screen("ai_recipes", "KI-Koch",  Icons.Default.AutoAwesome)
+    object Analysis  : Screen("analysis",   "Analyse",  Icons.Default.BarChart)
+    object Settings  : Screen("settings",   "Mehr",     Icons.Default.Settings)
 }
 
 val bottomNavItems = listOf(
@@ -81,7 +81,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         sharedUrl = extractSharedUrl(intent)
-
         NotificationHelper.createChannels(this)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -95,9 +94,9 @@ class MainActivity : ComponentActivity() {
                 val isLoggedIn by authVm.isLoggedIn.collectAsState()
 
                 when (isLoggedIn) {
-                    null -> Box(modifier = Modifier.fillMaxSize())
+                    null  -> Box(modifier = Modifier.fillMaxSize())
                     false -> LoginScreen(onLoggedIn = { authVm.onLoggedIn() })
-                    true -> {
+                    true  -> {
                         val networkMonitor = remember { NetworkMonitor(this) }
                         val isOnline by networkMonitor.isOnline.collectAsState(initial = true)
                         val biometricEnabled by notifDataStore.data
@@ -179,15 +178,22 @@ fun MainScaffold(
             }
         }
     }) { innerPadding ->
-        NavHost(navController = navController, startDestination = Screen.Home.route,
-            modifier = Modifier.padding(innerPadding)) {
+        NavHost(
+            navController = navController,
+            startDestination = Screen.Home.route,
+            modifier = Modifier.padding(innerPadding)
+        ) {
             composable(Screen.Home.route) {
-                HomeScreen(onNavigateToDiary = {
-                    navController.navigate(Screen.Diary.route) {
-                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                        launchSingleTop = true; restoreState = true
-                    }
-                })
+                HomeScreen(
+                    hcVm = hcVm,
+                    onNavigateToDiary = {
+                        navController.navigate(Screen.Diary.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true; restoreState = true
+                        }
+                    },
+                    onNavigateToHealth = { navController.navigate("health") }
+                )
             }
             composable(Screen.Diary.route)     { DiaryScreen() }
             composable(Screen.Recipes.route)   { RecipesScreen(sharedUrl = sharedUrl) }
@@ -196,6 +202,12 @@ fun MainScaffold(
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onNavigateToNotifSettings = { navController.navigate("notif_settings") }
+                )
+            }
+            composable("health") {
+                HealthConnectScreen(
+                    viewModel = hcVm,
+                    onRequestPermission = onRequestHealthPermission
                 )
             }
             composable("notif_settings") {
@@ -208,12 +220,6 @@ fun MainScaffold(
                 MealTemplateScreen(
                     onBack = { navController.popBackStack() },
                     onTemplateSelected = { navController.popBackStack() }
-                )
-            }
-            composable(Screen.Settings.route + "/health") {
-                HealthConnectScreen(
-                    viewModel = hcVm,
-                    onRequestPermission = onRequestHealthPermission
                 )
             }
         }
