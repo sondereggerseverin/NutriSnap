@@ -15,6 +15,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.MealTemplate
 import ch.nutrisnap.app.data.model.MealTemplateItem
 import ch.nutrisnap.app.data.model.MealType
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,7 +34,7 @@ fun MealTemplateScreen(
             TopAppBar(
                 title = { Text("Mahlzeit-Vorlagen") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Zurück") }
+                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Zurueck") }
                 }
             )
         },
@@ -50,23 +51,19 @@ fun MealTemplateScreen(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(12.dp))
                     Text("Noch keine Vorlagen", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Tippe auf + um eine Vorlage zu erstellen",
+                    Text("Tippe auf + um eine Vorlage zu erstellen",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         } else {
-            LazyColumn(
-                Modifier.padding(padding).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            LazyColumn(Modifier.padding(padding).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(templates, key = { it.id }) { template ->
                     TemplateCard(
                         template = template,
                         onUse = {
-                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                            scope.launch {
                                 val items: List<MealTemplateItem> = vm.getItems(template.id)
                                 onTemplateSelected(items)
                             }
@@ -91,11 +88,11 @@ fun MealTemplateScreen(
     toDelete?.let { t ->
         AlertDialog(
             onDismissRequest = { toDelete = null },
-            title = { Text("Vorlage löschen?") },
+            title = { Text("Vorlage loeschen?") },
             text = { Text(t.name) },
             confirmButton = {
                 TextButton(onClick = { vm.delete(t); toDelete = null }) {
-                    Text("Löschen", color = MaterialTheme.colorScheme.error)
+                    Text("Loeschen", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
@@ -106,25 +103,17 @@ fun MealTemplateScreen(
 }
 
 @Composable
-private fun TemplateCard(
-    template: MealTemplate,
-    onUse: () -> Unit,
-    onDelete: () -> Unit
-) {
+private fun TemplateCard(template: MealTemplate, onUse: () -> Unit, onDelete: () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(template.name, fontWeight = FontWeight.SemiBold)
-                Text(
-                    template.mealType.label(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Text(template.mealType.label(), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             TextButton(onClick = onUse) { Text("Verwenden") }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.DeleteOutline, "Löschen",
-                    tint = MaterialTheme.colorScheme.error)
+                Icon(Icons.Default.DeleteOutline, "Loeschen", tint = MaterialTheme.colorScheme.error)
             }
         }
     }
@@ -132,10 +121,7 @@ private fun TemplateCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CreateTemplateDialog(
-    onDismiss: () -> Unit,
-    onSave: (String, MealType) -> Unit
-) {
+private fun CreateTemplateDialog(onDismiss: () -> Unit, onSave: (String, MealType) -> Unit) {
     var name by remember { mutableStateOf("") }
     var mealType by remember { mutableStateOf(MealType.LUNCH) }
     var expanded by remember { mutableStateOf(false) }
@@ -145,52 +131,32 @@ private fun CreateTemplateDialog(
         title = { Text("Neue Vorlage") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Name der Vorlage") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = it }
-                ) {
-                    OutlinedTextField(
-                        value = mealType.label(),
-                        onValueChange = {},
-                        readOnly = true,
+                OutlinedTextField(value = name, onValueChange = { name = it },
+                    label = { Text("Name der Vorlage") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth())
+                ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+                    OutlinedTextField(value = mealType.label(), onValueChange = {}, readOnly = true,
                         label = { Text("Mahlzeit-Typ") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth()
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
-                    ) {
+                        modifier = Modifier.menuAnchor().fillMaxWidth())
+                    ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                         MealType.values().forEach { mt ->
-                            DropdownMenuItem(
-                                text = { Text(mt.label()) },
-                                onClick = { mealType = mt; expanded = false }
-                            )
+                            DropdownMenuItem(text = { Text(mt.label()) },
+                                onClick = { mealType = mt; expanded = false })
                         }
                     }
                 }
             }
         },
         confirmButton = {
-            Button(onClick = { if (name.isNotBlank()) onSave(name, mealType) }) {
-                Text("Erstellen")
-            }
+            Button(onClick = { if (name.isNotBlank()) onSave(name, mealType) }) { Text("Erstellen") }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Abbrechen") }
-        }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } }
     )
 }
 
 private fun MealType.label(): String = when (this) {
-    MealType.BREAKFAST -> "Frühstück"
+    MealType.BREAKFAST -> "Fruehstueck"
     MealType.LUNCH     -> "Mittagessen"
     MealType.DINNER    -> "Abendessen"
     MealType.SNACK     -> "Snack"
