@@ -25,7 +25,7 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
     private val json = Json { ignoreUnknownKeys = true }
 
     private val _state = MutableStateFlow(RecipeGenUiState())
-    val state: StateFlow<RecipeGenUiState> = _state
+    val state: StateFlow<RecipeGenUiState> = _state.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -42,7 +42,6 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
             service.generateRecipe(userInput).fold(
                 onSuccess = { recipe ->
                     _state.update { it.copy(isLoading = false, recipe = recipe) }
-                    // Save to history
                     dao.insert(GeneratedRecipeEntity(
                         title = recipe.title,
                         description = recipe.description,
