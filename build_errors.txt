@@ -1,4 +1,4 @@
-# Build errors - run 263
+# Build errors - run 264
 
 ## Error lines
 ```
@@ -7,8 +7,8 @@ e: file:///home/runner/work/NutriSnap/NutriSnap/app/build.gradle.kts:23:29: Unre
 Build file '/home/runner/work/NutriSnap/NutriSnap/app/build.gradle.kts' line: 21
                                          ^ Unresolved reference: util
                                        ^ Unresolved reference: load
-ScriptCompilationException(scriptCompilationErrors=[ScriptCompilationError(message=Unresolved reference: util, location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-3350143361282382126.tmp/build.gradle.kts (21:31)), ScriptCompilationError(message=Unresolved reference: load, location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-3350143361282382126.tmp/build.gradle.kts (23:29))])
-BUILD FAILED in 1m 2s
+ScriptCompilationException(scriptCompilationErrors=[ScriptCompilationError(message=Unresolved reference: util, location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-14433718824030042119.tmp/build.gradle.kts (21:31)), ScriptCompilationError(message=Unresolved reference: load, location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-14433718824030042119.tmp/build.gradle.kts (23:29))])
+BUILD FAILED in 1m 3s
 ```
 
 ## Last 150 lines
@@ -162,5 +162,5 @@ BUILD FAILED in 1m 2s
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 
 
-BUILD FAILED in 1m 2s
+BUILD FAILED in 1m 3s
 ```
