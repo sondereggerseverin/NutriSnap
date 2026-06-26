@@ -3,6 +3,7 @@ package ch.nutrisnap.app.health
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
@@ -23,6 +24,19 @@ import java.time.ZoneId
 
 enum class HealthConnectStatus { AVAILABLE, NEEDS_UPDATE, NOT_AVAILABLE }
 
+/**
+ * Diagnostic data class for debugging what Samsung Health writes into Health Connect.
+ */
+data class CalorieDiagnostics(
+    val activeCaloriesAggregate: Double,
+    val activeCaloriesRecordCount: Int,
+    val activeCaloriesRecordSum: Double,
+    val totalCaloriesAggregate: Double,
+    val exerciseSessionCount: Int,
+    val exerciseSessionCaloriesSum: Double,
+    val elapsedMinutes: Long
+)
+
 class HealthConnectManager(context: Context) {
 
     private val client: HealthConnectClient by lazy {
@@ -30,6 +44,8 @@ class HealthConnectManager(context: Context) {
     }
 
     companion object {
+        private const val TAG = "HealthConnect"
+
         val REQUIRED_PERMISSIONS = setOf(
             HealthPermission.getReadPermission(StepsRecord::class),
             HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
@@ -80,14 +96,94 @@ class HealthConnectManager(context: Context) {
     }
 
     /**
+     * Reads all calorie-related data from Health Connect and logs everything
+     * for debugging what Samsung Health actually writes into HC.
+     * Check Logcat with tag "HealthConnect" after calling this.
+     */
+    suspend fun getDiagnosticsForToday(): CalorieDiagnostics {
+        val date = LocalDate.now()
+        val start = date.atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val end = Instant.now()
+        val elapsedMinutes = java.time.Duration.between(start, end).toMinutes()
+
+        // 1. ActiveCaloriesBurnedRecord aggregate
+        val activeAgg = runCatching {
+            client.aggregate(
+                AggregateRequest(
+                    metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
+                    timeRangeFilter = TimeRangeFilter.between(start, end)
+                )
+            )[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories ?: 0.0
+        }.getOrDefault(0.0)
+
+        // 2. ActiveCaloriesBurnedRecord individual records
+        val activeRecords = runCatching {
+            client.readRecords(
+                ReadRecordsRequest(ActiveCaloriesBurnedRecord::class, TimeRangeFilter.between(start, end))
+            ).records
+        }.getOrDefault(emptyList())
+        val activeRecordSum = activeRecords.sumOf { it.energy.inKilocalories }
+
+        // 3. TotalCaloriesBurnedRecord aggregate
+        val totalAgg = runCatching {
+            client.aggregate(
+                AggregateRequest(
+                    metrics = setOf(TotalCaloriesBurnedRecord.ENERGY_TOTAL),
+                    timeRangeFilter = TimeRangeFilter.between(start, end)
+                )
+            )[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.inKilocalories ?: 0.0
+        }.getOrDefault(0.0)
+
+        // 4. ExerciseSessionRecord individual records + their active calories
+        val exerciseSessions = runCatching {
+            client.readRecords(
+                ReadRecordsRequest(ExerciseSessionRecord::class, TimeRangeFilter.between(start, end))
+            ).records
+        }.getOrDefault(emptyList())
+        val exerciseCalSum = exerciseSessions.sumOf {
+            it.exerciseRouteResult.let { _ -> 0.0 } // ExerciseSessionRecord has no direct calorie field
+        }
+
+        // Log everything
+        Log.d(TAG, "=== CALORIE DIAGNOSTICS (${date}) ===")
+        Log.d(TAG, "Elapsed time: ${elapsedMinutes} min")
+        Log.d(TAG, "ActiveCaloriesBurned AGGREGATE: $activeAgg kcal")
+        Log.d(TAG, "ActiveCaloriesBurned RECORDS: ${activeRecords.size} records, sum=$activeRecordSum kcal")
+        activeRecords.forEachIndexed { i, r ->
+            Log.d(TAG, "  ActiveRecord[$i]: ${r.energy.inKilocalories} kcal, ${r.startTime} -> ${r.endTime}, dataOrigin=${r.metadata.dataOrigin.packageName}")
+        }
+        Log.d(TAG, "TotalCaloriesBurned AGGREGATE: $totalAgg kcal")
+        Log.d(TAG, "  -> TotalCal - BMR estimate (${elapsedMinutes} min * 1 kcal/min = ${elapsedMinutes} kcal) = ${(totalAgg - elapsedMinutes).coerceAtLeast(0.0)} kcal")
+        Log.d(TAG, "ExerciseSessions: ${exerciseSessions.size} sessions")
+        exerciseSessions.forEachIndexed { i, s ->
+            Log.d(TAG, "  Session[$i]: type=${s.exerciseType}, ${s.startTime} -> ${s.endTime}, dataOrigin=${s.metadata.dataOrigin.packageName}")
+        }
+        Log.d(TAG, "=== END DIAGNOSTICS ===")
+
+        return CalorieDiagnostics(
+            activeCaloriesAggregate = activeAgg,
+            activeCaloriesRecordCount = activeRecords.size,
+            activeCaloriesRecordSum = activeRecordSum,
+            totalCaloriesAggregate = totalAgg,
+            exerciseSessionCount = exerciseSessions.size,
+            exerciseSessionCaloriesSum = exerciseCalSum,
+            elapsedMinutes = elapsedMinutes
+        )
+    }
+
+    /**
      * Activity calories for a specific day.
      *
+     * Samsung Health writes its "Cal" (Aktivitätskalorien) into TotalCaloriesBurnedRecord.
+     * ActiveCaloriesBurnedRecord is NOT written by Samsung Health on most devices.
+     *
      * Strategy:
-     * 1. Try ActiveCaloriesBurnedRecord aggregate first (most accurate).
-     * 2. Fall back to reading individual ActiveCaloriesBurnedRecords (Samsung Health quirk).
-     * 3. Samsung Health fallback: use TotalCaloriesBurnedRecord minus estimated BMR.
-     *    Samsung Health writes activity calories into TotalCaloriesBurnedRecord, not
-     *    ActiveCaloriesBurnedRecord. BMR estimate: ~1 kcal/min (1440 kcal/day).
+     * 1. Try ActiveCaloriesBurnedRecord aggregate (works on non-Samsung devices).
+     * 2. Fall back to individual ActiveCaloriesBurnedRecords.
+     * 3. Samsung fallback: TotalCaloriesBurnedRecord — no BMR subtraction,
+     *    because Samsung Health's "Cal" IS already just the activity calories
+     *    (not total energy expenditure). Samsung writes activity-only cal into
+     *    TotalCaloriesBurnedRecord directly.
      */
     suspend fun getActiveCaloriesForDay(date: LocalDate): Double {
         val start = date.atStartOfDay(ZoneId.systemDefault()).toInstant()
@@ -105,7 +201,7 @@ class HealthConnectManager(context: Context) {
 
             if (aggregated > 0.0) return@runCatching aggregated
 
-            // 2. Fallback: sum individual ActiveCaloriesBurnedRecords (Samsung Health quirk)
+            // 2. Fallback: sum individual ActiveCaloriesBurnedRecords
             val records = client.readRecords(
                 ReadRecordsRequest(
                     ActiveCaloriesBurnedRecord::class,
@@ -114,7 +210,6 @@ class HealthConnectManager(context: Context) {
             ).records
 
             if (records.isNotEmpty()) {
-                // Deduplicate overlapping Samsung Health records
                 val sorted = records.sortedWith(compareBy({ it.startTime }, { -it.energy.inKilocalories }))
                 var lastEnd = Instant.MIN
                 var total = 0.0
@@ -127,9 +222,10 @@ class HealthConnectManager(context: Context) {
                 if (total > 0.0) return@runCatching total
             }
 
-            // 3. Samsung Health fallback: TotalCaloriesBurnedRecord minus estimated BMR.
-            // Samsung Health writes its "Cal" (activity calories) into TotalCaloriesBurned.
-            // We subtract ~1 kcal/min BMR for the elapsed time window to get active calories.
+            // 3. Samsung Health fallback: TotalCaloriesBurnedRecord
+            // Samsung Health writes its activity-only "Cal" value into TotalCaloriesBurnedRecord.
+            // This is NOT total energy expenditure — Samsung strips BMR before writing to HC.
+            // So we take it directly without subtracting BMR.
             val totalCalories = client.aggregate(
                 AggregateRequest(
                     metrics = setOf(TotalCaloriesBurnedRecord.ENERGY_TOTAL),
@@ -137,14 +233,8 @@ class HealthConnectManager(context: Context) {
                 )
             )[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.inKilocalories ?: 0.0
 
-            if (totalCalories > 0.0) {
-                val elapsedMinutes = java.time.Duration.between(start, end).toMinutes()
-                val bmrEstimate = elapsedMinutes * 1.0  // ~1 kcal/min = 1440 kcal/day
-                val activeCalories = (totalCalories - bmrEstimate).coerceAtLeast(0.0)
-                return@runCatching activeCalories
-            }
+            totalCalories
 
-            0.0
         }.getOrDefault(0.0)
     }
 
