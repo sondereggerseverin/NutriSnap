@@ -4,16 +4,7 @@ import android.content.Context
 import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-import ch.nutrisnap.app.data.model.DiaryEntry
-import ch.nutrisnap.app.data.model.FavoriteFoodEntity
-import ch.nutrisnap.app.data.model.FastingSession
-import ch.nutrisnap.app.data.model.FoodItem
-import ch.nutrisnap.app.data.model.HealthConnectCache
-import ch.nutrisnap.app.data.model.IngredientMatch
-import ch.nutrisnap.app.data.model.Recipe
-import ch.nutrisnap.app.data.model.RecipeCollection
-import ch.nutrisnap.app.data.model.WaterEntry
-import ch.nutrisnap.app.data.model.WeightEntry
+import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.data.repository.UserProfile
 
 @Entity(tableName = "user_profile")
@@ -59,9 +50,14 @@ interface UserProfileDao {
         FastingSession::class,
         RecipeCollection::class,
         HealthConnectCache::class,
-        IngredientMatch::class
+        IngredientMatch::class,
+        // Phase 1 new entities:
+        CustomFoodItem::class,
+        MealTemplate::class,
+        MealTemplateItem::class,
+        GeneratedRecipeEntity::class
     ],
-    version = 6,
+    version = 8,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -76,6 +72,9 @@ abstract class NutriDatabase : RoomDatabase() {
     abstract fun recipeCollectionDao(): RecipeCollectionDao
     abstract fun healthConnectDao(): HealthConnectDao
     abstract fun ingredientMatchDao(): IngredientMatchDao
+    abstract fun customFoodDao(): CustomFoodDao
+    abstract fun mealTemplateDao(): MealTemplateDao
+    abstract fun generatedRecipeDao(): GeneratedRecipeDao
 
     companion object {
         @Volatile private var INSTANCE: NutriDatabase? = null
@@ -89,115 +88,85 @@ abstract class NutriDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE user_profile ADD COLUMN carbsGoalG REAL NOT NULL DEFAULT 220")
                 db.execSQL("ALTER TABLE user_profile ADD COLUMN fatGoalG REAL NOT NULL DEFAULT 65")
-                db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS weight_entries (
-                        dateStr TEXT NOT NULL PRIMARY KEY,
-                        weightKg REAL NOT NULL
-                    )
-                """.trimIndent())
-                db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS favorite_foods (
-                        foodKey TEXT NOT NULL PRIMARY KEY,
-                        name TEXT NOT NULL,
-                        brand TEXT,
-                        caloriesPer100g REAL NOT NULL,
-                        proteinPer100g REAL NOT NULL,
-                        carbsPer100g REAL NOT NULL,
-                        fatPer100g REAL NOT NULL,
-                        fiberPer100g REAL NOT NULL DEFAULT 0,
-                        addedAt INTEGER NOT NULL
-                    )
-                """.trimIndent())
+                db.execSQL("""CREATE TABLE IF NOT EXISTS weight_entries (dateStr TEXT NOT NULL PRIMARY KEY, weightKg REAL NOT NULL)""")
+                db.execSQL("""CREATE TABLE IF NOT EXISTS favorite_foods (foodKey TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL, brand TEXT, caloriesPer100g REAL NOT NULL, proteinPer100g REAL NOT NULL, carbsPer100g REAL NOT NULL, fatPer100g REAL NOT NULL, fiberPer100g REAL NOT NULL DEFAULT 0, addedAt INTEGER NOT NULL)""")
             }
         }
         private val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS food_items (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        name TEXT NOT NULL,
-                        brand TEXT,
-                        barcode TEXT,
-                        calories REAL NOT NULL,
-                        protein REAL NOT NULL,
-                        carbs REAL NOT NULL,
-                        fat REAL NOT NULL,
-                        servingSize REAL NOT NULL DEFAULT 100,
-                        servingUnit TEXT NOT NULL DEFAULT 'g',
-                        fiber REAL,
-                        sugar REAL,
-                        saturatedFat REAL,
-                        sodium REAL,
-                        potassium REAL,
-                        calcium REAL,
-                        iron REAL,
-                        vitaminC REAL,
-                        vitaminD REAL,
-                        vitaminB12 REAL,
-                        source TEXT NOT NULL DEFAULT 'MANUAL',
-                        completenessScore INTEGER NOT NULL DEFAULT 0,
-                        timesUsed INTEGER NOT NULL DEFAULT 0
-                    )
-                """.trimIndent())
-                db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS water_entries (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        date TEXT NOT NULL,
-                        amountMl INTEGER NOT NULL,
-                        timestamp TEXT NOT NULL
-                    )
-                """.trimIndent())
-                db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS fasting_sessions (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        startTime TEXT NOT NULL,
-                        endTime TEXT,
-                        goalHours INTEGER NOT NULL DEFAULT 16,
-                        isCompleted INTEGER NOT NULL DEFAULT 0
-                    )
-                """.trimIndent())
+                db.execSQL("""CREATE TABLE IF NOT EXISTS food_items (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, brand TEXT, barcode TEXT, calories REAL NOT NULL, protein REAL NOT NULL, carbs REAL NOT NULL, fat REAL NOT NULL, servingSize REAL NOT NULL DEFAULT 100, servingUnit TEXT NOT NULL DEFAULT 'g', fiber REAL, sugar REAL, saturatedFat REAL, sodium REAL, potassium REAL, calcium REAL, iron REAL, vitaminC REAL, vitaminD REAL, vitaminB12 REAL, source TEXT NOT NULL DEFAULT 'MANUAL', completenessScore INTEGER NOT NULL DEFAULT 0, timesUsed INTEGER NOT NULL DEFAULT 0)""")
+                db.execSQL("""CREATE TABLE IF NOT EXISTS water_entries (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, date TEXT NOT NULL, amountMl INTEGER NOT NULL, timestamp TEXT NOT NULL)""")
+                db.execSQL("""CREATE TABLE IF NOT EXISTS fasting_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, startTime TEXT NOT NULL, endTime TEXT, goalHours INTEGER NOT NULL DEFAULT 16, isCompleted INTEGER NOT NULL DEFAULT 0)""")
             }
         }
         private val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""CREATE TABLE IF NOT EXISTS recipe_collections (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, emoji TEXT NOT NULL DEFAULT '📁', createdAt INTEGER NOT NULL DEFAULT 0)""")
+                db.execSQL("""CREATE TABLE IF NOT EXISTS health_connect_cache (date TEXT NOT NULL PRIMARY KEY, steps INTEGER NOT NULL DEFAULT 0, activeCaloriesKcal REAL NOT NULL DEFAULT 0.0, weightKg REAL, sleepMinutes INTEGER NOT NULL DEFAULT 0, avgHeartRateBpm INTEGER, lastUpdated INTEGER NOT NULL DEFAULT 0)""")
+            }
+        }
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""CREATE TABLE IF NOT EXISTS ingredient_matches (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, recipeId INTEGER NOT NULL, ingredientRaw TEXT NOT NULL, ingredientName TEXT NOT NULL, amountGrams REAL NOT NULL DEFAULT 0.0, matchedFoodItemId INTEGER, matchedFoodName TEXT, matchedCalories REAL, matchedProtein REAL, matchedCarbs REAL, matchedFat REAL, matchSource TEXT NOT NULL DEFAULT 'UNMATCHED')""")
+            }
+        }
+        // Phase 1: Custom Foods + Meal Templates
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS recipe_collections (
+                    CREATE TABLE IF NOT EXISTS custom_foods (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         name TEXT NOT NULL,
-                        emoji TEXT NOT NULL DEFAULT '📁',
-                        createdAt INTEGER NOT NULL DEFAULT 0
+                        calories REAL NOT NULL,
+                        protein REAL NOT NULL,
+                        carbs REAL NOT NULL,
+                        fat REAL NOT NULL,
+                        fiber REAL NOT NULL DEFAULT 0,
+                        createdAt INTEGER NOT NULL DEFAULT 0,
+                        userId TEXT NOT NULL DEFAULT ''
                     )
                 """.trimIndent())
                 db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS health_connect_cache (
-                        date TEXT NOT NULL PRIMARY KEY,
-                        steps INTEGER NOT NULL DEFAULT 0,
-                        activeCaloriesKcal REAL NOT NULL DEFAULT 0.0,
-                        weightKg REAL,
-                        sleepMinutes INTEGER NOT NULL DEFAULT 0,
-                        avgHeartRateBpm INTEGER,
-                        lastUpdated INTEGER NOT NULL DEFAULT 0
+                    CREATE TABLE IF NOT EXISTS meal_templates (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        mealType TEXT NOT NULL DEFAULT 'LUNCH',
+                        createdAt INTEGER NOT NULL DEFAULT 0,
+                        userId TEXT NOT NULL DEFAULT ''
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS meal_template_items (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        templateId INTEGER NOT NULL,
+                        foodName TEXT NOT NULL,
+                        calories REAL NOT NULL,
+                        protein REAL NOT NULL,
+                        carbs REAL NOT NULL,
+                        fat REAL NOT NULL,
+                        quantityGrams REAL NOT NULL,
+                        FOREIGN KEY(templateId) REFERENCES meal_templates(id) ON DELETE CASCADE
                     )
                 """.trimIndent())
             }
         }
-
-        private val MIGRATION_5_6 = object : Migration(5, 6) {
+        // Phase 2: KI-Rezeptgenerator history
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS ingredient_matches (
+                    CREATE TABLE IF NOT EXISTS generated_recipes (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        recipeId INTEGER NOT NULL,
-                        ingredientRaw TEXT NOT NULL,
-                        ingredientName TEXT NOT NULL,
-                        amountGrams REAL NOT NULL DEFAULT 0.0,
-                        matchedFoodItemId INTEGER,
-                        matchedFoodName TEXT,
-                        matchedCalories REAL,
-                        matchedProtein REAL,
-                        matchedCarbs REAL,
-                        matchedFat REAL,
-                        matchSource TEXT NOT NULL DEFAULT 'UNMATCHED'
+                        title TEXT NOT NULL,
+                        description TEXT NOT NULL DEFAULT '',
+                        ingredients TEXT NOT NULL DEFAULT '',
+                        steps TEXT NOT NULL DEFAULT '',
+                        servings INTEGER NOT NULL DEFAULT 2,
+                        prepTimeMinutes INTEGER NOT NULL DEFAULT 30,
+                        calories INTEGER NOT NULL DEFAULT 0,
+                        protein REAL NOT NULL DEFAULT 0,
+                        carbs REAL NOT NULL DEFAULT 0,
+                        fat REAL NOT NULL DEFAULT 0,
+                        generatedAt INTEGER NOT NULL DEFAULT 0
                     )
                 """.trimIndent())
             }
@@ -210,7 +179,10 @@ abstract class NutriDatabase : RoomDatabase() {
                     NutriDatabase::class.java,
                     "nutrisnap.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(
+                        MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
+                        MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8
+                    )
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { INSTANCE = it }
