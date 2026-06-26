@@ -1,6 +1,5 @@
 package ch.nutrisnap.app.domain
 
-import ch.nutrisnap.app.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -27,13 +26,8 @@ data class GeneratedRecipe(
 )
 
 /**
- * AI recipe generator with multi-provider support:
- *  1. GLM-5.2 via Zenmux (free tier, 1M context) — primary
- *  2. Groq llama3-8b (free tier) — fallback
- *
- * Configure in local.properties:
- *   ZENMUX_API_KEY=your_key   (get free key at zenmux.ai)
- *   GROQ_API_KEY=your_key     (get free key at console.groq.com)
+ * AI recipe generator using GLM-5.2 via Zenmux (free tier).
+ * API key is hardcoded for convenience — rotate if needed.
  */
 class GroqRecipeGeneratorService {
     private val client = OkHttpClient.Builder()
@@ -43,38 +37,13 @@ class GroqRecipeGeneratorService {
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
 
+    // Zenmux free-tier key (GLM-5.2)
+    private val apiKey = "sk-mg-v1-afd268b859d2221113fb31c6a79268efeca82c872a4635650ef7c564ccca6e4c"
+    private val apiUrl = "https://zenmux.ai/api/v1/chat/completions"
+    private val model  = "z-ai/glm-5.2-free"
+
     suspend fun generateRecipe(userInput: String): Result<GeneratedRecipe> = withContext(Dispatchers.IO) {
-        val zenmuxKey = BuildConfig.ZENMUX_API_KEY
-        val groqKey = BuildConfig.GROQ_API_KEY
-
-        return@withContext when {
-            zenmuxKey.isNotBlank() -> tryProvider(
-                url = "https://zenmux.ai/api/v1/chat/completions",
-                apiKey = zenmuxKey,
-                model = "z-ai/glm-5.2-free",
-                userInput = userInput
-            )
-            groqKey.isNotBlank() -> tryProvider(
-                url = "https://api.groq.com/openai/v1/chat/completions",
-                apiKey = groqKey,
-                model = "llama3-8b-8192",
-                userInput = userInput
-            )
-            else -> Result.failure(Exception(
-                "Kein API-Key konfiguriert. Hol dir einen kostenlosen Key:\n" +
-                "• GLM-5.2: zenmux.ai → ZENMUX_API_KEY\n" +
-                "• Groq: console.groq.com → GROQ_API_KEY"
-            ))
-        }
-    }
-
-    private fun tryProvider(
-        url: String,
-        apiKey: String,
-        model: String,
-        userInput: String
-    ): Result<GeneratedRecipe> {
-        return try {
+        try {
             val prompt = "Du bist ein Koch. Erstelle ein Rezept fuer: $userInput. " +
                 "Antworte NUR mit JSON (kein Markdown): " +
                 "{\"title\":\"Name\",\"description\":\"Beschreibung\"," +
@@ -96,14 +65,14 @@ class GroqRecipeGeneratorService {
 
             val requestBody = requestJson.toRequestBody("application/json".toMediaType())
             val request = Request.Builder()
-                .url(url)
+                .url(apiUrl)
                 .addHeader("Authorization", "Bearer $apiKey")
                 .post(requestBody)
                 .build()
 
             val response = client.newCall(request).execute()
-            val bodyStr = response.body?.string() ?: return Result.failure(Exception("Leere Antwort"))
-            if (!response.isSuccessful) return Result.failure(Exception("API Fehler ${response.code}: $bodyStr"))
+            val bodyStr = response.body?.string() ?: return@withContext Result.failure(Exception("Leere Antwort"))
+            if (!response.isSuccessful) return@withContext Result.failure(Exception("API Fehler ${response.code}: $bodyStr"))
 
             val root = JSONObject(bodyStr)
             val content = root
