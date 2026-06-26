@@ -195,9 +195,7 @@ fun MainScaffold(
             composable(Screen.Analysis.route)  { AnalysisScreen() }
             composable(Screen.Settings.route) {
                 SettingsScreen(
-                    onNavigateToNotifSettings = { navController.navigate("notif_settings") },
-                    onNavigateToCustomFoods   = { navController.navigate("custom_foods") },
-                    onNavigateToMealTemplates = { navController.navigate("meal_templates") }
+                    onNavigateToNotifSettings = { navController.navigate("notif_settings") }
                 )
             }
             composable("notif_settings") {
