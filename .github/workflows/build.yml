@@ -33,7 +33,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: ./gradlew assembleDebug --stacktrace 2>&1 | tee build_output.log; exit ${PIPESTATUS[0]}
-        - name: Sign APK with stable keystore
+      - name: Sign APK with stable keystore
         if: success()
         run: |
           UNSIGNED=app/build/outputs/apk/debug/app-debug.apk
@@ -80,7 +80,6 @@ jobs:
 
           encoded = base64.b64encode(content.encode()).decode()
 
-          # Check if file exists
           api_url = f"https://api.github.com/repos/{repo}/contents/build_errors.txt"
           req = urllib.request.Request(api_url, headers={"Authorization": f"token {token}"})
           try:
