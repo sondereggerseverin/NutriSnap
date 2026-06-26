@@ -1,4 +1,4 @@
-# Build errors - run 243
+# Build errors - run 256
 
 ## Error lines
 ```
@@ -63,25 +63,25 @@ WARNING: D8: An error occurred when parsing kotlin metadata. This normally happe
 WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
 WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
 WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
-WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
 Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libbarhopper_v3.so, libdatastore_shared_counter.so, libimage_processing_util_jni.so. Run with --info option to learn more.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/customfood/CustomFoodViewModel.kt:13:76 Unresolved reference 'customFoodDao'.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/mealtemplate/MealTemplateScreen.kt:62:29 Type checking has run into a recursive problem. Easiest workaround: specify the types of your declarations explicitly.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/mealtemplate/MealTemplateScreen.kt:62:47 Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/mealtemplate/MealTemplateScreen.kt:62:47 Cannot infer type for type parameter 'R'. Specify it explicitly.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/mealtemplate/MealTemplateScreen.kt:62:47 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/mealtemplate/MealTemplateScreen.kt:62:51 Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/mealtemplate/MealTemplateScreen.kt:140:17 This material API is experimental and is likely to change or to be removed in the future.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/mealtemplate/MealTemplateScreen.kt:146:42 This material API is experimental and is likely to change or to be removed in the future.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/mealtemplate/MealTemplateScreen.kt:146:70 This material API is experimental and is likely to change or to be removed in the future.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/mealtemplate/MealTemplateScreen.kt:147:45 This material API is experimental and is likely to change or to be removed in the future.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/mealtemplate/MealTemplateScreen.kt:149:21 This material API is experimental and is likely to change or to be removed in the future.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/mealtemplate/MealTemplateScreen.kt:177:58 Type checking has run into a recursive problem. Easiest workaround: specify the types of your declarations explicitly.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/mealtemplate/MealTemplateViewModel.kt:17:78 Unresolved reference 'mealTemplateDao'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/MainActivity.kt:199:21 No parameter with name 'onNavigateToCustomFoods' found.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/MainActivity.kt:200:21 No parameter with name 'onNavigateToMealTemplates' found.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/mealtemplate/MealTemplateScreen.kt:69:100 Unresolved reference 'launch'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/mealtemplate/MealTemplateScreen.kt:70:72 Suspend function 'suspend fun getItems(templateId: Int): List<MealTemplateItem>' can only be called from a coroutine or another suspend function.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipegen/RecipeGeneratorScreen.kt:41:41 Unresolved reference 'Schnelles'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipegen/RecipeGeneratorScreen.kt:41:41 Literals must be surrounded by whitespace.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipegen/RecipeGeneratorScreen.kt:41:51 Unresolved reference 'Hähnchen'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipegen/RecipeGeneratorScreen.kt:41:64 Unresolved reference 'Reis'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipegen/RecipeGeneratorScreen.kt:41:68 Syntax error: Expecting ','.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipegen/RecipeGeneratorScreen.kt:41:76 Unresolved reference 'Vegetarisches'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipegen/RecipeGeneratorScreen.kt:41:76 Literals must be surrounded by whitespace.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipegen/RecipeGeneratorScreen.kt:41:90 Unresolved reference 'Abendessen'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipegen/RecipeGeneratorScreen.kt:41:105 Unresolved reference 'Zucchini'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipegen/RecipeGeneratorScreen.kt:41:113 Syntax error: Expecting ','.
 > Task :app:compileDebugKotlin FAILED
    > Compilation error. See log for more details
 Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilation error. See log for more details
-BUILD FAILED in 4m 57s
+BUILD FAILED in 4m 19s
 ```
 
 ## Last 150 lines
@@ -234,6 +234,6 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilat
 	... 2 more
 
 
-BUILD FAILED in 4m 57s
+BUILD FAILED in 4m 19s
 31 actionable tasks: 31 executed
 ```
