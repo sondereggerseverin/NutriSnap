@@ -11,10 +11,15 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import ch.nutrisnap.app.data.db.NutriDatabase
+import ch.nutrisnap.app.data.repository.DiaryRepository
+import ch.nutrisnap.app.data.repository.UserProfileRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.TextStyle
@@ -41,8 +46,11 @@ data class DailyStats(
     val fat: Float
 )
 
-class WeeklyStatsViewModel : ViewModel() {
-    // TODO: Aus DiaryRepository befüllen (DiaryEntries der letzten 7 Tage aggregieren)
+class WeeklyStatsViewModel(app: Application) : AndroidViewModel(app) {
+    private val db          = NutriDatabase.getInstance(app)
+    private val diaryRepo   = DiaryRepository(db)
+    private val profileRepo = UserProfileRepository(db)
+
     private val _weeklyData = MutableStateFlow<List<DailyStats>>(emptyList())
     val weeklyData: StateFlow<List<DailyStats>> = _weeklyData
 
@@ -55,16 +63,22 @@ class WeeklyStatsViewModel : ViewModel() {
 
     private fun loadWeeklyStats() {
         viewModelScope.launch {
-            // Platzhalter – ersetzen mit echten Daten aus DiaryRepository:
-            // val stats = diaryRepository.getWeeklyStats(LocalDate.now().minusDays(6), LocalDate.now())
+            val profile = profileRepo.get().first()
+            _calorieGoal.value = profile.computedTdee()?.toFloat() ?: profile.dailyCalorieGoal.toFloat()
+
             val today = LocalDate.now()
+            val from  = today.minusDays(6)
+            val byDate = diaryRepo.getWeeklySummary(from).first().associateBy { it.dateStr }
+
             _weeklyData.value = (6 downTo 0).map { daysAgo ->
+                val date = today.minusDays(daysAgo.toLong())
+                val s = byDate[date.toString()]
                 DailyStats(
-                    date = today.minusDays(daysAgo.toLong()),
-                    calories = 0f,
-                    protein = 0f,
-                    carbs = 0f,
-                    fat = 0f
+                    date     = date,
+                    calories = s?.calories ?: 0f,
+                    protein  = s?.protein  ?: 0f,
+                    carbs    = s?.carbs    ?: 0f,
+                    fat      = s?.fat      ?: 0f
                 )
             }
         }

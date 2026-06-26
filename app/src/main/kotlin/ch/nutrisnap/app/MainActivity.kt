@@ -32,6 +32,9 @@ import ch.nutrisnap.app.ui.screens.auth.AuthViewModel
 import ch.nutrisnap.app.ui.screens.auth.LoginScreen
 import ch.nutrisnap.app.ui.screens.customfood.CreateCustomFoodScreen
 import ch.nutrisnap.app.ui.screens.diary.DiaryScreen
+import ch.nutrisnap.app.ui.screens.export.ExportScreen
+import ch.nutrisnap.app.ui.screens.fasting.FastingScreen
+import ch.nutrisnap.app.ui.screens.fasting.FastingViewModel
 import ch.nutrisnap.app.ui.screens.home.HomeScreen
 import ch.nutrisnap.app.ui.screens.mealtemplate.MealTemplateScreen
 import ch.nutrisnap.app.ui.screens.recipegen.RecipeGeneratorScreen
@@ -41,6 +44,9 @@ import ch.nutrisnap.app.ui.screens.settings.KEY_BIOMETRIC_LOCK
 import ch.nutrisnap.app.ui.screens.settings.NotificationSettingsScreen
 import ch.nutrisnap.app.ui.screens.settings.SettingsScreen
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
+import ch.nutrisnap.app.ui.screens.stats.WeeklyStatsScreen
+import ch.nutrisnap.app.ui.screens.stats.WeeklyStatsViewModel
+import ch.nutrisnap.app.ui.screens.water.WaterTrackingScreen
 import ch.nutrisnap.app.ui.theme.NutriSnapTheme
 import ch.nutrisnap.app.ui.viewmodel.HealthConnectViewModel
 import ch.nutrisnap.app.utils.NetworkMonitor
@@ -201,8 +207,26 @@ fun MainScaffold(
             composable(Screen.Analysis.route)  { AnalysisScreen() }
             composable(Screen.Settings.route) {
                 SettingsScreen(
-                    onNavigateToNotifSettings = { navController.navigate("notif_settings") }
+                    onNavigateToNotifSettings = { navController.navigate("notif_settings") },
+                    onNavigateToWater         = { navController.navigate("water") },
+                    onNavigateToFasting       = { navController.navigate("fasting") },
+                    onNavigateToStats         = { navController.navigate("stats") },
+                    onNavigateToExport        = { navController.navigate("export") },
+                    onNavigateToCustomFoods   = { navController.navigate("custom_foods") },
+                    onNavigateToMealTemplates = { navController.navigate("meal_templates") }
                 )
+            }
+            composable("water")   { WaterTrackingScreen() }
+            composable("fasting") {
+                val vm: FastingViewModel = viewModel()
+                FastingScreen(viewModel = vm)
+            }
+            composable("stats") {
+                val vm: WeeklyStatsViewModel = viewModel()
+                WeeklyStatsScreen(viewModel = vm)
+            }
+            composable("export") {
+                ExportScreen(onBack = { navController.popBackStack() })
             }
             composable("health") {
                 HealthConnectScreen(

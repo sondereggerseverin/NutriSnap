@@ -64,7 +64,10 @@ fun SettingsScreen(
     onNavigateToNotifSettings: () -> Unit = {},
     onNavigateToWater: () -> Unit = {},
     onNavigateToFasting: () -> Unit = {},
-    onNavigateToStats: () -> Unit = {}
+    onNavigateToStats: () -> Unit = {},
+    onNavigateToExport: () -> Unit = {},
+    onNavigateToCustomFoods: () -> Unit = {},
+    onNavigateToMealTemplates: () -> Unit = {}
 ) {
     val state   by vm.uiState.collectAsState()
     val profile  = state.profile
@@ -123,6 +126,24 @@ fun SettingsScreen(
                     Icon(Icons.Default.Notifications, null, Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp)); Text("Reminder", fontSize = 12.sp)
                 }
+            }
+        }
+
+        // ── Daten & mehr ──────────────────────────────────────────────────────
+        SettingsCard(title = "Daten & mehr", icon = Icons.Default.Storage) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onNavigateToCustomFoods, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Default.Restaurant, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp)); Text("Eigene", fontSize = 12.sp)
+                }
+                OutlinedButton(onClick = onNavigateToMealTemplates, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Default.Bookmark, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp)); Text("Vorlagen", fontSize = 12.sp)
+                }
+            }
+            Button(onClick = onNavigateToExport, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Download, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp)); Text("Daten exportieren (CSV)")
             }
         }
 

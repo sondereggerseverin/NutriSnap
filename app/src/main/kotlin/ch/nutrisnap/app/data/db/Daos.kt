@@ -38,6 +38,9 @@ interface DiaryDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM diary_entries WHERE dateStr = :dateStr)")
     suspend fun hasEntriesForDate(dateStr: String): Boolean
+
+    @Query("SELECT * FROM diary_entries ORDER BY dateStr, mealType")
+    suspend fun getAllOnce(): List<DiaryEntry>
 }
 
 data class DailySummary(
@@ -79,6 +82,9 @@ interface WeightDao {
 
     @Query("SELECT * FROM weight_entries ORDER BY dateStr DESC LIMIT 1")
     suspend fun getLatest(): WeightEntry?
+
+    @Query("SELECT * FROM weight_entries ORDER BY dateStr ASC")
+    suspend fun getAllOnce(): List<WeightEntry>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entry: WeightEntry)
