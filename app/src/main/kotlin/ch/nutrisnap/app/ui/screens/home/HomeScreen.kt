@@ -19,17 +19,29 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.nutrisnap.app.data.model.HealthConnectCache
 import ch.nutrisnap.app.ui.components.MacroRing
+import ch.nutrisnap.app.ui.viewmodel.HealthConnectViewModel
 
 @Composable
 fun HomeScreen(
     vm: HomeViewModel = viewModel(),
-    onNavigateToDiary: () -> Unit = {}
+    hcVm: HealthConnectViewModel = viewModel(),
+    onNavigateToDiary: () -> Unit = {},
+    onNavigateToHealth: () -> Unit = {}
 ) {
     val state by vm.uiState.collectAsState()
+    val hcState by hcVm.uiState.collectAsState()
     var showWeightDialog by remember { mutableStateOf(false) }
 
-    LazyColumnHome(state = state, onMealClick = { onNavigateToDiary() }, onLogWeight = { showWeightDialog = true })
+    LazyColumnHome(
+        state = state,
+        todayHc = hcState.todayData,
+        hasHcPermission = hcState.hasPermission,
+        onMealClick = { onNavigateToDiary() },
+        onLogWeight = { showWeightDialog = true },
+        onOpenHealth = onNavigateToHealth
+    )
 
     if (showWeightDialog) {
         WeightEntryDialog(
@@ -43,8 +55,11 @@ fun HomeScreen(
 @Composable
 private fun LazyColumnHome(
     state: HomeUiState,
+    todayHc: HealthConnectCache?,
+    hasHcPermission: Boolean,
     onMealClick: () -> Unit,
-    onLogWeight: () -> Unit
+    onLogWeight: () -> Unit,
+    onOpenHealth: () -> Unit
 ) {
     androidx.compose.foundation.lazy.LazyColumn(
         Modifier.fillMaxSize(),
@@ -52,8 +67,101 @@ private fun LazyColumnHome(
     ) {
         item { HomeHeader(state) }
         item { MealOverviewGrid(state.meals, onClick = onMealClick) }
+        // Health Connect card always visible
+        item { HealthCard(todayHc, hasHcPermission, onOpenHealth) }
         item { StreakCard(state.streak) }
         item { WeightQuickCard(state.lastWeightKg, onLogWeight) }
+    }
+}
+
+// ── Health Connect summary card ───────────────────────────────────────────────
+
+@Composable
+private fun HealthCard(
+    data: HealthConnectCache?,
+    hasPermission: Boolean,
+    onOpenHealth: () -> Unit
+) {
+    Card(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .clickable(onClick = onOpenHealth),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(1.dp)
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Favorite, null,
+                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Health Connect", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                }
+                Icon(Icons.Default.ChevronRight, null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            if (!hasPermission || data == null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Info, null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Tippe um Health Connect zu verbinden",
+                        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
+                    HealthStatItem(
+                        icon = "👟",
+                        value = "%,d".format(data.steps),
+                        label = "Schritte"
+                    )
+                    HealthStatItem(
+                        icon = "🔥",
+                        value = "${data.activeCaloriesKcal.toInt()} kcal",
+                        label = "Verbrannt"
+                    )
+                    if (data.sleepMinutes > 0) {
+                        val h = data.sleepMinutes / 60
+                        val m = data.sleepMinutes % 60
+                        HealthStatItem(
+                            icon = "😴",
+                            value = "${h}h ${m}m",
+                            label = "Schlaf"
+                        )
+                    }
+                    if (data.weightKg != null) {
+                        HealthStatItem(
+                            icon = "⚖️",
+                            value = "%.1f kg".format(data.weightKg),
+                            label = "Gewicht"
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HealthStatItem(icon: String, value: String, label: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(icon, fontSize = 22.sp)
+        Spacer(Modifier.height(2.dp))
+        Text(value, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.primary)
+        Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -74,7 +182,7 @@ private fun HomeHeader(state: HomeUiState) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
             Column {
                 Text("${state.greeting} 👋", fontSize = 13.sp, color = Color.White.copy(alpha = 0.85f))
-                Text("Dein Tag im Überblick", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Dein Tag im Ueberblick", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
             }
             StreakBadge(state.streak)
         }
@@ -94,7 +202,7 @@ private fun HomeHeader(state: HomeUiState) {
                         "${(state.calorieGoal - state.totalCalories).coerceAtLeast(0f).toInt()}",
                         fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White
                     )
-                    Text("kcal übrig", fontSize = 10.sp, color = Color.White.copy(alpha = 0.8f))
+                    Text("kcal uebrig", fontSize = 10.sp, color = Color.White.copy(alpha = 0.8f))
                 }
             }
 
@@ -185,7 +293,7 @@ private fun MealOverviewGrid(meals: List<MealOverview>, onClick: () -> Unit) {
                                         else MaterialTheme.colorScheme.outline
                             )
                             Text(
-                                "${meal.count} Einträge",
+                                "${meal.count} Eintraege",
                                 fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -198,7 +306,7 @@ private fun MealOverviewGrid(meals: List<MealOverview>, onClick: () -> Unit) {
     }
 }
 
-// ── Streak card ──────────────────────────────────────────────────────────────
+// ── Streak card ───────────────────────────────────────────────────────────────
 
 @Composable
 private fun StreakCard(streak: Int) {
@@ -221,7 +329,7 @@ private fun StreakCard(streak: Int) {
     }
 }
 
-// ── Weight quick-entry card ──────────────────────────────────────────────────
+// ── Weight quick-entry card ───────────────────────────────────────────────────
 
 @Composable
 private fun WeightQuickCard(lastWeight: Float?, onLogWeight: () -> Unit) {
@@ -237,9 +345,9 @@ private fun WeightQuickCard(lastWeight: Float?, onLogWeight: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("⚖️ Aktuelles Gewicht", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                Text("Aktuelles Gewicht", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 Text(
-                    lastWeight?.let { "%.1f kg".format(it) } ?: "—",
+                    lastWeight?.let { "%.1f kg".format(it) } ?: "-",
                     fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary
                 )
             }
@@ -248,7 +356,7 @@ private fun WeightQuickCard(lastWeight: Float?, onLogWeight: () -> Unit) {
     }
 }
 
-// ── Weight entry dialog ──────────────────────────────────────────────────────
+// ── Weight entry dialog ───────────────────────────────────────────────────────
 
 @Composable
 private fun WeightEntryDialog(currentWeight: Float?, onConfirm: (Float) -> Unit, onDismiss: () -> Unit) {
