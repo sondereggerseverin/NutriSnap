@@ -30,8 +30,11 @@ import ch.nutrisnap.app.ui.screens.HealthConnectScreen
 import ch.nutrisnap.app.ui.screens.analysis.AnalysisScreen
 import ch.nutrisnap.app.ui.screens.auth.AuthViewModel
 import ch.nutrisnap.app.ui.screens.auth.LoginScreen
+import ch.nutrisnap.app.ui.screens.customfood.CreateCustomFoodScreen
 import ch.nutrisnap.app.ui.screens.diary.DiaryScreen
 import ch.nutrisnap.app.ui.screens.home.HomeScreen
+import ch.nutrisnap.app.ui.screens.mealtemplate.MealTemplateScreen
+import ch.nutrisnap.app.ui.screens.recipegen.RecipeGeneratorScreen
 import ch.nutrisnap.app.ui.screens.recipes.RecipesScreen
 import ch.nutrisnap.app.ui.screens.security.BiometricLockScreen
 import ch.nutrisnap.app.ui.screens.settings.KEY_BIOMETRIC_LOCK
@@ -44,17 +47,17 @@ import ch.nutrisnap.app.utils.NetworkMonitor
 import kotlinx.coroutines.flow.map
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
-    object Home     : Screen("home",     "Start",   Icons.Default.Home)
-    object Diary    : Screen("diary",    "Buch",    Icons.Default.MenuBook)
-    object Recipes  : Screen("recipes",  "Rezepte", Icons.Default.RestaurantMenu)
-    object Analysis : Screen("analysis", "Analyse", Icons.Default.BarChart)
-    object Health   : Screen("health",   "Health",  Icons.Default.FavoriteBorder)
-    object Settings : Screen("settings", "Mehr",    Icons.Default.Settings)
+    object Home      : Screen("home",      "Start",    Icons.Default.Home)
+    object Diary     : Screen("diary",     "Tagebuch", Icons.Default.MenuBook)
+    object Recipes   : Screen("recipes",   "Rezepte",  Icons.Default.RestaurantMenu)
+    object AiRecipes : Screen("ai_recipes","KI-Koch",  Icons.Default.AutoAwesome)
+    object Analysis  : Screen("analysis",  "Analyse",  Icons.Default.BarChart)
+    object Settings  : Screen("settings",  "Mehr",     Icons.Default.Settings)
 }
 
 val bottomNavItems = listOf(
     Screen.Home, Screen.Diary, Screen.Recipes,
-    Screen.Analysis, Screen.Health, Screen.Settings
+    Screen.AiRecipes, Screen.Analysis, Screen.Settings
 )
 
 class MainActivity : ComponentActivity() {
@@ -92,13 +95,8 @@ class MainActivity : ComponentActivity() {
                 val isLoggedIn by authVm.isLoggedIn.collectAsState()
 
                 when (isLoggedIn) {
-                    null -> {
-                        // Session wird geladen – leerer Screen damit kein Login-Flash
-                        Box(modifier = Modifier.fillMaxSize())
-                    }
-                    false -> {
-                        LoginScreen(onLoggedIn = { authVm.onLoggedIn() })
-                    }
+                    null -> Box(modifier = Modifier.fillMaxSize())
+                    false -> LoginScreen(onLoggedIn = { authVm.onLoggedIn() })
                     true -> {
                         val networkMonitor = remember { NetworkMonitor(this) }
                         val isOnline by networkMonitor.isOnline.collectAsState(initial = true)
@@ -191,20 +189,34 @@ fun MainScaffold(
                     }
                 })
             }
-            composable(Screen.Diary.route)    { DiaryScreen() }
-            composable(Screen.Recipes.route)  { RecipesScreen(sharedUrl = sharedUrl) }
-            composable(Screen.Analysis.route) { AnalysisScreen() }
-            composable(Screen.Health.route) {
+            composable(Screen.Diary.route)     { DiaryScreen() }
+            composable(Screen.Recipes.route)   { RecipesScreen(sharedUrl = sharedUrl) }
+            composable(Screen.AiRecipes.route) { RecipeGeneratorScreen() }
+            composable(Screen.Analysis.route)  { AnalysisScreen() }
+            composable(Screen.Settings.route) {
+                SettingsScreen(
+                    onNavigateToNotifSettings = { navController.navigate("notif_settings") },
+                    onNavigateToCustomFoods   = { navController.navigate("custom_foods") },
+                    onNavigateToMealTemplates = { navController.navigate("meal_templates") }
+                )
+            }
+            composable("notif_settings") {
+                NotificationSettingsScreen(onBack = { navController.popBackStack() })
+            }
+            composable("custom_foods") {
+                CreateCustomFoodScreen(onBack = { navController.popBackStack() })
+            }
+            composable("meal_templates") {
+                MealTemplateScreen(
+                    onBack = { navController.popBackStack() },
+                    onTemplateSelected = { navController.popBackStack() }
+                )
+            }
+            composable(Screen.Settings.route + "/health") {
                 HealthConnectScreen(
                     viewModel = hcVm,
                     onRequestPermission = onRequestHealthPermission
                 )
-            }
-            composable(Screen.Settings.route) {
-                SettingsScreen(onNavigateToNotifSettings = { navController.navigate("notif_settings") })
-            }
-            composable("notif_settings") {
-                NotificationSettingsScreen(onBack = { navController.popBackStack() })
             }
         }
     }
