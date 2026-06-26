@@ -26,12 +26,15 @@ fun MealTemplateScreen(
     val templates by vm.templates.collectAsState()
     var showCreate by remember { mutableStateOf(false) }
     var toDelete by remember { mutableStateOf<MealTemplate?>(null) }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Mahlzeit-Vorlagen") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Zurück") } }
+                navigationIcon = {
+                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Zurück") }
+                }
             )
         },
         floatingActionButton = {
@@ -47,20 +50,25 @@ fun MealTemplateScreen(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(12.dp))
                     Text("Noch keine Vorlagen", style = MaterialTheme.typography.titleMedium)
-                    Text("Tippe auf + um eine Vorlage zu erstellen",
+                    Text(
+                        "Tippe auf + um eine Vorlage zu erstellen",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         } else {
-            LazyColumn(Modifier.padding(padding).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(
+                Modifier.padding(padding).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 items(templates, key = { it.id }) { template ->
                     TemplateCard(
                         template = template,
                         onUse = {
-                            vm.viewModelScope.let {
-                                // launch coroutine to load items then callback
+                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                                val items: List<MealTemplateItem> = vm.getItems(template.id)
+                                onTemplateSelected(items)
                             }
                         },
                         onDelete = { toDelete = template }
@@ -73,8 +81,8 @@ fun MealTemplateScreen(
     if (showCreate) {
         CreateTemplateDialog(
             onDismiss = { showCreate = false },
-            onSave = { name, mealType, items ->
-                vm.saveTemplate(name, mealType, items)
+            onSave = { name: String, mealType: MealType ->
+                vm.saveTemplate(name, mealType, emptyList())
                 showCreate = false
             }
         )
@@ -90,7 +98,9 @@ fun MealTemplateScreen(
                     Text("Löschen", color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = { toDelete = null }) { Text("Abbrechen") } }
+            dismissButton = {
+                TextButton(onClick = { toDelete = null }) { Text("Abbrechen") }
+            }
         )
     }
 }
@@ -105,9 +115,11 @@ private fun TemplateCard(
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(template.name, fontWeight = FontWeight.SemiBold)
-                Text(template.mealType.label(),
+                Text(
+                    template.mealType.label(),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             TextButton(onClick = onUse) { Text("Verwenden") }
             IconButton(onClick = onDelete) {
@@ -118,13 +130,15 @@ private fun TemplateCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CreateTemplateDialog(
     onDismiss: () -> Unit,
-    onSave: (String, MealType, List<MealTemplateItem>) -> Unit
+    onSave: (String, MealType) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var mealType by remember { mutableStateOf(MealType.LUNCH) }
+    var expanded by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -132,12 +146,16 @@ private fun CreateTemplateDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
-                    value = name, onValueChange = { name = it },
+                    value = name,
+                    onValueChange = { name = it },
                     label = { Text("Name der Vorlage") },
-                    singleLine = true, modifier = Modifier.fillMaxWidth()
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
-                var expanded by remember { mutableStateOf(false) }
-                ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = it }
+                ) {
                     OutlinedTextField(
                         value = mealType.label(),
                         onValueChange = {},
@@ -146,7 +164,10 @@ private fun CreateTemplateDialog(
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
                         modifier = Modifier.menuAnchor().fillMaxWidth()
                     )
-                    ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
                         MealType.values().forEach { mt ->
                             DropdownMenuItem(
                                 text = { Text(mt.label()) },
@@ -158,20 +179,19 @@ private fun CreateTemplateDialog(
             }
         },
         confirmButton = {
-            Button(onClick = {
-                if (name.isNotBlank()) onSave(name, mealType, emptyList())
-            }) { Text("Erstellen") }
+            Button(onClick = { if (name.isNotBlank()) onSave(name, mealType) }) {
+                Text("Erstellen")
+            }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } }
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Abbrechen") }
+        }
     )
 }
 
-private fun MealType.label() = when (this) {
+private fun MealType.label(): String = when (this) {
     MealType.BREAKFAST -> "Frühstück"
     MealType.LUNCH     -> "Mittagessen"
     MealType.DINNER    -> "Abendessen"
     MealType.SNACK     -> "Snack"
 }
-
-// Workaround: expose viewModelScope from composable context
-private val MealTemplateViewModel.viewModelScope get() = this.viewModelScope
