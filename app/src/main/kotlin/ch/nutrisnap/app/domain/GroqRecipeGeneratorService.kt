@@ -8,6 +8,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import ch.nutrisnap.app.BuildConfig
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
@@ -25,10 +26,6 @@ data class GeneratedRecipe(
     val fat: Float = 0f
 )
 
-/**
- * AI recipe generator using GLM-5.2 via Zenmux (free tier).
- * API key is hardcoded for convenience — rotate if needed.
- */
 class GroqRecipeGeneratorService {
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -37,13 +34,26 @@ class GroqRecipeGeneratorService {
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
 
-    // Zenmux free-tier key (GLM-5.2)
-    private val apiKey = "sk-mg-v1-afd268b859d2221113fb31c6a79268efeca82c872a4635650ef7c564ccca6e4c"
-    private val apiUrl = "https://zenmux.ai/api/v1/chat/completions"
-    private val model  = "z-ai/glm-5.2-free"
-
     suspend fun generateRecipe(userInput: String): Result<GeneratedRecipe> = withContext(Dispatchers.IO) {
-        try {
+        tryProvider(
+            url = "https://api.groq.com/openai/v1/chat/completions",
+            apiKey = BuildConfig.GROQ_API_KEY,
+            model = "llama-3.3-70b-versatile",
+            userInput = userInput
+        )
+    }
+
+    private fun tryProvider(
+        url: String,
+        apiKey: String,
+        model: String,
+        userInput: String
+    ): Result<GeneratedRecipe> {
+        return try {
+            if (apiKey.isBlank()) return Result.failure(Exception(
+                "Kein GROQ_API_KEY in local.properties konfiguriert"
+            ))
+
             val prompt = "Du bist ein Koch. Erstelle ein Rezept fuer: $userInput. " +
                 "Antworte NUR mit JSON (kein Markdown): " +
                 "{\"title\":\"Name\",\"description\":\"Beschreibung\"," +
@@ -65,14 +75,14 @@ class GroqRecipeGeneratorService {
 
             val requestBody = requestJson.toRequestBody("application/json".toMediaType())
             val request = Request.Builder()
-                .url(apiUrl)
+                .url(url)
                 .addHeader("Authorization", "Bearer $apiKey")
                 .post(requestBody)
                 .build()
 
             val response = client.newCall(request).execute()
-            val bodyStr = response.body?.string() ?: return@withContext Result.failure(Exception("Leere Antwort"))
-            if (!response.isSuccessful) return@withContext Result.failure(Exception("API Fehler ${response.code}: $bodyStr"))
+            val bodyStr = response.body?.string() ?: return Result.failure(Exception("Leere Antwort"))
+            if (!response.isSuccessful) return Result.failure(Exception("API Fehler ${response.code}: $bodyStr"))
 
             val root = JSONObject(bodyStr)
             val content = root
