@@ -17,18 +17,20 @@ android {
         versionCode = 2
         versionName = "1.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField("String", "GROQ_API_KEY",
-            "\"${System.getenv("GROQ_API_KEY") ?: ""}\"")
-        buildConfigField("String", "USDA_API_KEY",
-            "\"${System.getenv("USDA_API_KEY") ?: ""}\"")
-        buildConfigField("String", "NUTRITIONIX_APP_ID",
-            "\"${System.getenv("NUTRITIONIX_APP_ID") ?: ""}\"")
-        buildConfigField("String", "NUTRITIONIX_API_KEY",
-            "\"${System.getenv("NUTRITIONIX_API_KEY") ?: ""}\"")
-        buildConfigField("String", "SUPABASE_URL",
-            "\"${System.getenv("SUPABASE_URL") ?: ""}\"")
-        buildConfigField("String", "SUPABASE_ANON_KEY",
-            "\"${System.getenv("SUPABASE_ANON_KEY") ?: ""}\"")
+
+        val localProps = java.util.Properties().apply {
+            val f = rootProject.file("local.properties")
+            if (f.exists()) load(f.inputStream())
+        }
+        fun localOrEnv(key: String) = localProps.getProperty(key) ?: System.getenv(key) ?: ""
+
+        buildConfigField("String", "ZENMUX_API_KEY", "\"${localOrEnv("ZENMUX_API_KEY")}\"")
+        buildConfigField("String", "GROQ_API_KEY",   "\"${localOrEnv("GROQ_API_KEY")}\"")
+        buildConfigField("String", "USDA_API_KEY",   "\"${localOrEnv("USDA_API_KEY")}\"")
+        buildConfigField("String", "NUTRITIONIX_APP_ID",  "\"${localOrEnv("NUTRITIONIX_APP_ID")}\"")
+        buildConfigField("String", "NUTRITIONIX_API_KEY", "\"${localOrEnv("NUTRITIONIX_API_KEY")}\"")
+        buildConfigField("String", "SUPABASE_URL",      "\"${localOrEnv("SUPABASE_URL")}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${localOrEnv("SUPABASE_ANON_KEY")}\"")
     }
 
     compileOptions {
