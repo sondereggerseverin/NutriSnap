@@ -1,9 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipegen
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -24,12 +21,8 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
     val state by vm.state.collectAsState()
     var input by remember { mutableStateOf("") }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        Text("🤖 KI-Rezeptgenerator",
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+        Text("KI-Rezeptgenerator",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 8.dp))
@@ -37,8 +30,8 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
         OutlinedTextField(
             value = input,
             onValueChange = { input = it },
-            label = { Text("Was möchtest du essen?") },
-            placeholder = { Text("z.B. "Schnelles Hähnchen mit Reis" oder "Vegetarisches Abendessen mit Zucchini"") },
+            label = { Text("Was moechtest du essen?") },
+            placeholder = { Text("z.B. Schnelles Haehnchen mit Reis") },
             modifier = Modifier.fillMaxWidth(),
             minLines = 2, maxLines = 4
         )
@@ -54,7 +47,7 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
                 CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp,
                     color = MaterialTheme.colorScheme.onPrimary)
                 Spacer(Modifier.width(8.dp))
-                Text("Generiere Rezept…")
+                Text("Generiere Rezept...")
             } else {
                 Icon(Icons.Default.AutoAwesome, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
@@ -64,7 +57,8 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
 
         state.error?.let { error ->
             Spacer(Modifier.height(8.dp))
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+            Card(colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer)) {
                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Error, null, tint = MaterialTheme.colorScheme.error)
                     Spacer(Modifier.width(8.dp))
@@ -88,7 +82,7 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
                 Card(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
                     ListItem(
                         headlineContent = { Text(entity.title, fontWeight = FontWeight.Medium) },
-                        supportingContent = { Text("${entity.calories} kcal · ${entity.protein.toInt()}g P") },
+                        supportingContent = { Text("${entity.calories} kcal") },
                         leadingContent = { Icon(Icons.Default.History, null) }
                     )
                 }
@@ -112,24 +106,19 @@ private fun RecipeResultCard(recipe: GeneratedRecipe) {
             }
 
             Spacer(Modifier.height(8.dp))
-            // Macro chips
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 MacroChip("${recipe.calories} kcal", MaterialTheme.colorScheme.primaryContainer)
                 MacroChip("P ${recipe.protein.toInt()}g", MaterialTheme.colorScheme.secondaryContainer)
                 MacroChip("K ${recipe.carbs.toInt()}g", MaterialTheme.colorScheme.tertiaryContainer)
-                MacroChip("F ${recipe.fat.toInt()}g", MaterialTheme.colorScheme.surfaceVariant)
             }
-            Text("${recipe.servings} Port. · ${recipe.prepTimeMinutes} Min.",
+            Text("${recipe.servings} Port. - ${recipe.prepTimeMinutes} Min.",
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp))
 
             Spacer(Modifier.height(12.dp))
             Text("Zutaten", fontWeight = FontWeight.SemiBold)
             recipe.ingredients.forEachIndexed { i, ingredient ->
-                Row(
-                    Modifier.padding(vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(Modifier.padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(
                         checked = i in checkedIngredients,
                         onCheckedChange = { c ->
@@ -159,7 +148,7 @@ private fun RecipeResultCard(recipe: GeneratedRecipe) {
 @Composable
 private fun MacroChip(text: String, color: androidx.compose.ui.graphics.Color) {
     Surface(color = color, shape = MaterialTheme.shapes.small) {
-        Text(text, Modifier.padding(horizontal = 8.dp, vertical = 4.dp), fontSize = 12.sp,
-            fontWeight = FontWeight.Medium)
+        Text(text, Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
 }
