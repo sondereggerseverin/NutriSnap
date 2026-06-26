@@ -5,13 +5,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 @Serializable
@@ -41,12 +39,21 @@ class GroqRecipeGeneratorService {
             val apiKey = BuildConfig.GROQ_API_KEY
             if (apiKey.isBlank()) return@withContext Result.failure(Exception("Kein GROQ API-Key konfiguriert"))
 
-            val escapedInput = userInput.replace("\\", "\\\\").replace("\"", "\\\"")
-            val prompt = """Du bist ein Ernährungsberater und Koch. Erstelle ein Rezept basierend auf dieser Anfrage: "$escapedInput". Antworte NUR mit einem JSON-Objekt ohne Markdown-Backticks: {"title":"Rezeptname","description":"Kurze Beschreibung","ingredients":["200g Hähnchenbrust"],"steps":["Schritt 1..."],"servings":2,"prepTimeMinutes":25,"calories":450,"protein":38.5,"carbs":42.0,"fat":12.0}"""
+            val prompt = "Du bist ein Koch. Erstelle ein Rezept fuer: $userInput. Antworte NUR mit JSON (kein Markdown): {\"title\":\"Name\",\"description\":\"Beschreibung\",\"ingredients\":[\"200g Beispiel\"],\"steps\":[\"Schritt 1\"],\"servings\":2,\"prepTimeMinutes\":25,\"calories\":400,\"protein\":30.0,\"carbs\":40.0,\"fat\":10.0}"
 
-            val bodyJson = """{"model":"llama3-8b-8192","messages":[{"role":"user","content":${Json.encodeToString(kotlinx.serialization.serializer<String>(), prompt)}}],"temperature":0.7,"max_tokens":1500}"""
+            val requestJson = JSONObject().apply {
+                put("model", "llama3-8b-8192")
+                put("temperature", 0.7)
+                put("max_tokens", 1500)
+                put("messages", org.json.JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("role", "user")
+                        put("content", prompt)
+                    })
+                })
+            }.toString()
 
-            val requestBody = bodyJson.toRequestBody("application/json".toMediaType())
+            val requestBody = requestJson.toRequestBody("application/json".toMediaType())
             val request = Request.Builder()
                 .url("https://api.groq.com/openai/v1/chat/completions")
                 .addHeader("Authorization", "Bearer $apiKey")
@@ -57,16 +64,17 @@ class GroqRecipeGeneratorService {
             val bodyStr = response.body?.string() ?: return@withContext Result.failure(Exception("Leere Antwort"))
             if (!response.isSuccessful) return@withContext Result.failure(Exception("API Fehler ${response.code}"))
 
-            // Parse Groq response
-            val root = json.parseToJsonElement(bodyStr).jsonObject
-            val content = root["choices"]?.jsonArray?.get(0)
-                ?.jsonObject?.get("message")
-                ?.jsonObject?.get("content")
-                ?.jsonPrimitive?.content
-                ?: return@withContext Result.failure(Exception("Konnte Antwort nicht parsen"))
+            // Parse with Android's built-in JSONObject (no extension functions needed)
+            val root = JSONObject(bodyStr)
+            val content = root
+                .getJSONArray("choices")
+                .getJSONObject(0)
+                .getJSONObject("message")
+                .getString("content")
 
             val cleaned = content.trim()
                 .removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+
             val recipe = json.decodeFromString<GeneratedRecipe>(cleaned)
             Result.success(recipe)
         } catch (e: Exception) {
