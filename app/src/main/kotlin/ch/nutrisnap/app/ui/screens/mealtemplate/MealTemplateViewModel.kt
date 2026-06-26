@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 
 class MealTemplateViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = MealTemplateRepository(NutriDatabase.getInstance(app).mealTemplateDao())
@@ -25,5 +27,6 @@ class MealTemplateViewModel(app: Application) : AndroidViewModel(app) {
     fun delete(template: MealTemplate) =
         viewModelScope.launch { repo.delete(template) }
 
-    suspend fun getItems(templateId: Int): List<MealTemplateItem> = repo.getItems(templateId)
+    suspend fun getItems(templateId: Int): List<MealTemplateItem> =
+        withContext(Dispatchers.IO) { repo.getItems(templateId) }
 }
