@@ -83,10 +83,11 @@ class HealthConnectManager(context: Context) {
      * Activity calories for a specific day.
      *
      * Strategy:
-     * 1. Try ActiveCaloriesBurnedRecord aggregate first (most accurate, Samsung Health writes this).
-     * 2. If that returns 0, fall back to reading individual ExerciseSessionRecords and summing
-     *    their active calories — Samsung Health sometimes only writes session records.
-     * 3. No BMR subtraction — we only want active/exercise calories, not total energy.
+     * 1. Try ActiveCaloriesBurnedRecord aggregate first (most accurate).
+     * 2. Fall back to reading individual ActiveCaloriesBurnedRecords (Samsung Health quirk).
+     * 3. Samsung Health fallback: use TotalCaloriesBurnedRecord minus estimated BMR.
+     *    Samsung Health writes activity calories into TotalCaloriesBurnedRecord, not
+     *    ActiveCaloriesBurnedRecord. BMR estimate: ~1 kcal/min (1440 kcal/day).
      */
     suspend fun getActiveCaloriesForDay(date: LocalDate): Double {
         val start = date.atStartOfDay(ZoneId.systemDefault()).toInstant()
@@ -112,20 +113,38 @@ class HealthConnectManager(context: Context) {
                 )
             ).records
 
-            if (records.isEmpty()) return@runCatching 0.0
-
-            // Deduplicate overlapping Samsung Health records:
-            // Sort by startTime, skip records fully contained within a previous record's range.
-            val sorted = records.sortedWith(compareBy({ it.startTime }, { -it.energy.inKilocalories }))
-            var lastEnd = Instant.MIN
-            var total = 0.0
-            for (record in sorted) {
-                if (record.startTime >= lastEnd) {
-                    total += record.energy.inKilocalories
-                    if (record.endTime > lastEnd) lastEnd = record.endTime
+            if (records.isNotEmpty()) {
+                // Deduplicate overlapping Samsung Health records
+                val sorted = records.sortedWith(compareBy({ it.startTime }, { -it.energy.inKilocalories }))
+                var lastEnd = Instant.MIN
+                var total = 0.0
+                for (record in sorted) {
+                    if (record.startTime >= lastEnd) {
+                        total += record.energy.inKilocalories
+                        if (record.endTime > lastEnd) lastEnd = record.endTime
+                    }
                 }
+                if (total > 0.0) return@runCatching total
             }
-            total
+
+            // 3. Samsung Health fallback: TotalCaloriesBurnedRecord minus estimated BMR.
+            // Samsung Health writes its "Cal" (activity calories) into TotalCaloriesBurned.
+            // We subtract ~1 kcal/min BMR for the elapsed time window to get active calories.
+            val totalCalories = client.aggregate(
+                AggregateRequest(
+                    metrics = setOf(TotalCaloriesBurnedRecord.ENERGY_TOTAL),
+                    timeRangeFilter = TimeRangeFilter.between(start, end)
+                )
+            )[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.inKilocalories ?: 0.0
+
+            if (totalCalories > 0.0) {
+                val elapsedMinutes = java.time.Duration.between(start, end).toMinutes()
+                val bmrEstimate = elapsedMinutes * 1.0  // ~1 kcal/min = 1440 kcal/day
+                val activeCalories = (totalCalories - bmrEstimate).coerceAtLeast(0.0)
+                return@runCatching activeCalories
+            }
+
+            0.0
         }.getOrDefault(0.0)
     }
 
