@@ -5,6 +5,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -31,42 +34,19 @@ class GroqRecipeGeneratorService {
         .readTimeout(60, TimeUnit.SECONDS)
         .build()
 
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+    private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
 
     suspend fun generateRecipe(userInput: String): Result<GeneratedRecipe> = withContext(Dispatchers.IO) {
         try {
             val apiKey = BuildConfig.GROQ_API_KEY
             if (apiKey.isBlank()) return@withContext Result.failure(Exception("Kein GROQ API-Key konfiguriert"))
 
-            val prompt = """
-Du bist ein Ernährungsberater und Koch. Erstelle ein Rezept basierend auf dieser Anfrage: "$userInput"
+            val escapedInput = userInput.replace("\\", "\\\\").replace("\"", "\\\"")
+            val prompt = """Du bist ein Ernährungsberater und Koch. Erstelle ein Rezept basierend auf dieser Anfrage: "$escapedInput". Antworte NUR mit einem JSON-Objekt ohne Markdown-Backticks: {"title":"Rezeptname","description":"Kurze Beschreibung","ingredients":["200g Hähnchenbrust"],"steps":["Schritt 1..."],"servings":2,"prepTimeMinutes":25,"calories":450,"protein":38.5,"carbs":42.0,"fat":12.0}"""
 
-Antworte NUR mit einem JSON-Objekt (kein weiterer Text, keine Markdown-Backticks):
-{
-  "title": "Rezeptname",
-  "description": "Kurze Beschreibung",
-  "ingredients": ["200g Hähnchenbrust", "100g Reis", ...],
-  "steps": ["Schritt 1...", "Schritt 2...", ...],
-  "servings": 2,
-  "prepTimeMinutes": 25,
-  "calories": 450,
-  "protein": 38.5,
-  "carbs": 42.0,
-  "fat": 12.0
-}
+            val bodyJson = """{"model":"llama3-8b-8192","messages":[{"role":"user","content":${Json.encodeToString(kotlinx.serialization.serializer<String>(), prompt)}}],"temperature":0.7,"max_tokens":1500}"""
 
-Kalorien und Makros pro Portion angeben.
-""".trimIndent()
-
-            val requestBody = """
-{
-  "model": "llama3-8b-8192",
-  "messages": [{"role": "user", "content": ${json.encodeToString(kotlinx.serialization.serializer<String>(), prompt)}}],
-  "temperature": 0.7,
-  "max_tokens": 1500
-}
-""".trimIndent().toRequestBody("application/json".toMediaType())
-
+            val requestBody = bodyJson.toRequestBody("application/json".toMediaType())
             val request = Request.Builder()
                 .url("https://api.groq.com/openai/v1/chat/completions")
                 .addHeader("Authorization", "Bearer $apiKey")
@@ -74,22 +54,19 @@ Kalorien und Makros pro Portion angeben.
                 .build()
 
             val response = client.newCall(request).execute()
-            val body = response.body?.string() ?: return@withContext Result.failure(Exception("Leere Antwort"))
-
+            val bodyStr = response.body?.string() ?: return@withContext Result.failure(Exception("Leere Antwort"))
             if (!response.isSuccessful) return@withContext Result.failure(Exception("API Fehler ${response.code}"))
 
-            // Extract content from Groq response
-            val contentJson = Json { ignoreUnknownKeys = true; isLenient = true }
-            val root = contentJson.parseToJsonElement(body)
-            val content = root.jsonObject["choices"]
-                ?.jsonArray?.get(0)
+            // Parse Groq response
+            val root = json.parseToJsonElement(bodyStr).jsonObject
+            val content = root["choices"]?.jsonArray?.get(0)
                 ?.jsonObject?.get("message")
                 ?.jsonObject?.get("content")
-                ?.let { kotlinx.serialization.json.Json.decodeFromJsonElement(kotlinx.serialization.serializer<String>(), it) }
+                ?.jsonPrimitive?.content
                 ?: return@withContext Result.failure(Exception("Konnte Antwort nicht parsen"))
 
-            // Clean and parse JSON
-            val cleaned = content.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+            val cleaned = content.trim()
+                .removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
             val recipe = json.decodeFromString<GeneratedRecipe>(cleaned)
             Result.success(recipe)
         } catch (e: Exception) {
