@@ -79,35 +79,53 @@ class HealthConnectManager(context: Context) {
         }.getOrDefault(0L)
     }
 
-    /** Activity calories for a specific day */
+    /**
+     * Activity calories for a specific day.
+     *
+     * Strategy:
+     * 1. Try ActiveCaloriesBurnedRecord aggregate first (most accurate, Samsung Health writes this).
+     * 2. If that returns 0, fall back to reading individual ExerciseSessionRecords and summing
+     *    their active calories — Samsung Health sometimes only writes session records.
+     * 3. No BMR subtraction — we only want active/exercise calories, not total energy.
+     */
     suspend fun getActiveCaloriesForDay(date: LocalDate): Double {
         val start = date.atStartOfDay(ZoneId.systemDefault()).toInstant()
-        val end   = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val end   = if (date == LocalDate.now()) Instant.now()
+                    else date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
+
         return runCatching {
-            val response = client.aggregate(
+            // 1. Aggregate active calories
+            val aggregated = client.aggregate(
                 AggregateRequest(
-                    metrics = setOf(
-                        ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL,
-                        TotalCaloriesBurnedRecord.ENERGY_TOTAL
-                    ),
+                    metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
                     timeRangeFilter = TimeRangeFilter.between(start, end)
                 )
-            )
-            val activeKcal = response[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]
-                ?.inKilocalories ?: 0.0
-            val totalKcal  = response[TotalCaloriesBurnedRecord.ENERGY_TOTAL]
-                ?.inKilocalories ?: 0.0
+            )[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories ?: 0.0
 
-            when {
-                activeKcal > 10.0 -> activeKcal
-                totalKcal > 50.0 -> {
-                    val minutesElapsed = java.time.Duration.between(start, end).toMinutes()
-                        .coerceAtLeast(1L)
-                    val bmrSoFar = minutesElapsed * (2000.0 / 1440.0)
-                    (totalKcal - bmrSoFar).coerceAtLeast(0.0)
+            if (aggregated > 0.0) return@runCatching aggregated
+
+            // 2. Fallback: sum individual ActiveCaloriesBurnedRecords (Samsung Health quirk)
+            val records = client.readRecords(
+                ReadRecordsRequest(
+                    ActiveCaloriesBurnedRecord::class,
+                    TimeRangeFilter.between(start, end)
+                )
+            ).records
+
+            if (records.isEmpty()) return@runCatching 0.0
+
+            // Deduplicate overlapping Samsung Health records:
+            // Sort by startTime, skip records fully contained within a previous record's range.
+            val sorted = records.sortedWith(compareBy({ it.startTime }, { -it.energy.inKilocalories }))
+            var lastEnd = Instant.MIN
+            var total = 0.0
+            for (record in sorted) {
+                if (record.startTime >= lastEnd) {
+                    total += record.energy.inKilocalories
+                    if (record.endTime > lastEnd) lastEnd = record.endTime
                 }
-                else -> 0.0
             }
+            total
         }.getOrDefault(0.0)
     }
 
@@ -133,29 +151,20 @@ class HealthConnectManager(context: Context) {
             val resp = client.readRecords(
                 ReadRecordsRequest(WeightRecord::class, TimeRangeFilter.between(from, to))
             )
-            // Group by date, take last reading per day
             resp.records
                 .groupBy { it.time.atZone(ZoneId.systemDefault()).toLocalDate() }
                 .mapValues { (_, records) -> records.last().weight.inKilograms }
         }.getOrDefault(emptyMap())
     }
 
-    /**
-     * Steps today.
-     * AggregateRequest deduplicates Samsung Health overlapping records internally.
-     */
     fun getTodaysSteps(): Flow<Long> = flow {
         emit(getStepsForDay(LocalDate.now()))
     }
 
-    /**
-     * Activity calories heute.
-     */
     fun getTodaysActiveCalories(): Flow<Double> = flow {
         emit(getActiveCaloriesForDay(LocalDate.now()))
     }
 
-    /** Latest weight reading from last 30 days */
     fun getLatestWeight(): Flow<Double?> = flow {
         val result = runCatching {
             val resp = client.readRecords(
@@ -172,14 +181,13 @@ class HealthConnectManager(context: Context) {
         emit(result)
     }
 
-    /** Last night sleep: 18:00 yesterday → 12:00 today */
     fun getLastNightSleep(): Flow<Long> = flow {
         emit(getSleepForNight(LocalDate.now()))
     }
 
-    /** Average heart rate today */
     fun getTodaysAvgHeartRate(): Flow<Long?> = flow {
-        val (start, end) = todayRange()
+        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val end   = Instant.now()
         val result = runCatching {
             val resp = client.readRecords(
                 ReadRecordsRequest(HeartRateRecord::class, TimeRangeFilter.between(start, end))
@@ -190,9 +198,6 @@ class HealthConnectManager(context: Context) {
         emit(result)
     }
 
-    /**
-     * Steps per day for the last 7 days.
-     */
     fun getWeeklySteps(): Flow<Map<LocalDate, Long>> = flow {
         val today = LocalDate.now()
         val map = mutableMapOf<LocalDate, Long>()
@@ -203,8 +208,14 @@ class HealthConnectManager(context: Context) {
         emit(map)
     }
 
-    private fun todayRange(): Pair<Instant, Instant> {
-        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
-        return Pair(start, Instant.now())
+    /** Weekly active calories (last 7 days) */
+    fun getWeeklyActiveCalories(): Flow<Map<LocalDate, Double>> = flow {
+        val today = LocalDate.now()
+        val map = mutableMapOf<LocalDate, Double>()
+        for (i in 6 downTo 0) {
+            val day = today.minusDays(i.toLong())
+            map[day] = getActiveCaloriesForDay(day)
+        }
+        emit(map)
     }
 }
