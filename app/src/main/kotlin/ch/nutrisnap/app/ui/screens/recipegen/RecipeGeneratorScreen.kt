@@ -9,10 +9,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.domain.GeneratedRecipe
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -20,6 +22,15 @@ import ch.nutrisnap.app.domain.GeneratedRecipe
 fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
     val state by vm.state.collectAsState()
     var input by remember { mutableStateOf("") }
+    var showDiaryDialog by remember { mutableStateOf(false) }
+
+    // Reset snackbar after showing
+    LaunchedEffect(state.addedToDiary) {
+        if (state.addedToDiary) {
+            kotlinx.coroutines.delay(2000)
+            vm.clearAddedToDiary()
+        }
+    }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text("KI-Rezeptgenerator",
@@ -55,6 +66,20 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
             }
         }
 
+        // Success banner
+        if (state.addedToDiary) {
+            Spacer(Modifier.height(8.dp))
+            Card(colors = CardDefaults.cardColors(
+                containerColor = Color(0xFF4CAF50).copy(alpha = 0.15f))) {
+                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF4CAF50))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Ins Tagebuch hinzugefügt ✓",
+                        color = Color(0xFF4CAF50), fontWeight = FontWeight.Medium)
+                }
+            }
+        }
+
         state.error?.let { error ->
             Spacer(Modifier.height(8.dp))
             Card(colors = CardDefaults.cardColors(
@@ -70,7 +95,10 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
 
         state.recipe?.let { recipe ->
             Spacer(Modifier.height(16.dp))
-            RecipeResultCard(recipe = recipe)
+            RecipeResultCard(
+                recipe = recipe,
+                onAddToDiary = { showDiaryDialog = true }
+            )
         }
 
         if (state.recipe == null && !state.isLoading && state.history.isNotEmpty()) {
@@ -82,17 +110,108 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
                 Card(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
                     ListItem(
                         headlineContent = { Text(entity.title, fontWeight = FontWeight.Medium) },
-                        supportingContent = { Text("${entity.calories} kcal") },
+                        supportingContent = { Text("${entity.calories} kcal · ${entity.servings} Port.") },
                         leadingContent = { Icon(Icons.Default.History, null) }
                     )
                 }
             }
         }
     }
+
+    // "Ins Tagebuch" dialog
+    if (showDiaryDialog) {
+        state.recipe?.let { recipe ->
+            AddRecipeToDiaryDialog(
+                recipe = recipe,
+                onConfirm = { servings, meal ->
+                    vm.addGeneratedRecipeToDiary(recipe, servings, meal)
+                    showDiaryDialog = false
+                },
+                onDismiss = { showDiaryDialog = false }
+            )
+        }
+    }
 }
 
 @Composable
-private fun RecipeResultCard(recipe: GeneratedRecipe) {
+private fun AddRecipeToDiaryDialog(
+    recipe: GeneratedRecipe,
+    onConfirm: (Float, MealType) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var servingsText by remember { mutableStateOf("1") }
+    var selectedMeal by remember { mutableStateOf(MealType.LUNCH) }
+    var expanded by remember { mutableStateOf(false) }
+
+    val servings = servingsText.toFloatOrNull() ?: 1f
+    val factor = servings / recipe.servings.coerceAtLeast(1).toFloat()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Ins Tagebuch", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(recipe.title, fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                OutlinedTextField(
+                    value = servingsText,
+                    onValueChange = { servingsText = it },
+                    label = { Text("Portionen") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+                    )
+                )
+
+                // Mahlzeit-Auswahl
+                Box {
+                    OutlinedButton(
+                        onClick = { expanded = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(selectedMeal.label())
+                        Spacer(Modifier.weight(1f))
+                        Icon(Icons.Default.ArrowDropDown, null)
+                    }
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        MealType.values().forEach { meal ->
+                            DropdownMenuItem(
+                                text = { Text(meal.label()) },
+                                onClick = { selectedMeal = meal; expanded = false }
+                            )
+                        }
+                    }
+                }
+
+                // Macro preview
+                if (servings > 0) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("${(recipe.calories * factor).toInt()} kcal",
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary)
+                        Text("P ${(recipe.protein * factor).toInt()}g", fontSize = 12.sp)
+                        Text("K ${(recipe.carbs * factor).toInt()}g", fontSize = 12.sp)
+                        Text("F ${(recipe.fat * factor).toInt()}g", fontSize = 12.sp)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { if (servings > 0) onConfirm(servings, selectedMeal) },
+                enabled = servings > 0
+            ) { Text("Hinzufügen") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Abbrechen") }
+        }
+    )
+}
+
+@Composable
+private fun RecipeResultCard(recipe: GeneratedRecipe, onAddToDiary: () -> Unit) {
     var checkedIngredients by remember { mutableStateOf(setOf<Int>()) }
 
     Card(Modifier.fillMaxWidth()) {
@@ -114,6 +233,22 @@ private fun RecipeResultCard(recipe: GeneratedRecipe) {
             Text("${recipe.servings} Port. - ${recipe.prepTimeMinutes} Min.",
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp))
+
+            Spacer(Modifier.height(12.dp))
+
+            // ── Ins Tagebuch Button ────────────────────────────────────────────
+            Button(
+                onClick = onAddToDiary,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            ) {
+                Icon(Icons.Default.PlaylistAdd, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Ins Tagebuch", fontWeight = FontWeight.SemiBold)
+            }
 
             Spacer(Modifier.height(12.dp))
             Text("Zutaten", fontWeight = FontWeight.SemiBold)
@@ -151,4 +286,11 @@ private fun MacroChip(text: String, color: androidx.compose.ui.graphics.Color) {
         Text(text, Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
+}
+
+private fun MealType.label() = when (this) {
+    MealType.BREAKFAST -> "Frühstück"
+    MealType.LUNCH     -> "Mittagessen"
+    MealType.DINNER    -> "Abendessen"
+    MealType.SNACK     -> "Snack"
 }
