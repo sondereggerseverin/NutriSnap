@@ -55,20 +55,20 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DiaryUiState())
 
     // Food search state
-    private val _searchResults = MutableStateFlow<List<FoodItem>>(emptyList())
-    private val _isSearching   = MutableStateFlow(false)
-    val searchResults: StateFlow<List<FoodItem>> = _searchResults
-    val isSearching:   StateFlow<Boolean>        = _isSearching
+    private val _searchResults  = MutableStateFlow<List<FoodItem>>(emptyList())
+    private val _isSearching    = MutableStateFlow(false)
+    private val _barcodeResult  = MutableStateFlow<FoodItem?>(null)
+
+    val searchResults:  StateFlow<List<FoodItem>> = _searchResults
+    val isSearching:    StateFlow<Boolean>        = _isSearching
+    val barcodeResult:  StateFlow<FoodItem?>      = _barcodeResult
 
     // Favorites
     val favorites: StateFlow<List<FoodItem>> = favRepo.getAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun isFavorite(food: FoodItem): Flow<Boolean> = favRepo.isFavorite(food)
-
-    fun toggleFavorite(food: FoodItem) {
-        viewModelScope.launch { favRepo.toggle(food) }
-    }
+    fun toggleFavorite(food: FoodItem) = viewModelScope.launch { favRepo.toggle(food) }
 
     fun setDate(date: LocalDate) { _date.value = date }
     fun prevDay()                { _date.value = _date.value.minusDays(1) }
@@ -92,23 +92,37 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun setBarcodeResult(food: FoodItem) { _barcodeResult.value = food }
+    fun clearBarcodeResult()             { _barcodeResult.value = null }
+
     fun addEntry(food: FoodItem, grams: Float, meal: MealType) {
+        viewModelScope.launch { repo.addEntry(food, grams, meal, _date.value) }
+    }
+
+    /**
+     * Manueller Eintrag: Name + kcal + optionale Makros, keine FoodItem-Referenz.
+     * foodItemId = -999 markiert manuelle Einträge.
+     */
+    fun addManualEntry(
+        name: String,
+        kcal: Float,
+        protein: Float,
+        carbs: Float,
+        fat: Float,
+        meal: MealType
+    ) {
         viewModelScope.launch {
-            repo.addEntry(food, grams, meal, _date.value)
+            repo.addManualEntry(name, kcal, protein, carbs, fat, meal, _date.value)
         }
     }
 
     fun addRecipeAsMeal(recipe: Recipe, servingsFactor: Float, meal: MealType) {
-        viewModelScope.launch {
-            repo.addRecipeAsMeal(recipe, servingsFactor, meal, _date.value)
-        }
+        viewModelScope.launch { repo.addRecipeAsMeal(recipe, servingsFactor, meal, _date.value) }
     }
 
-    /** Update the amount of an existing entry, recalculating macros */
     fun updateEntryAmount(entry: DiaryEntry, newValue: Float) {
         viewModelScope.launch {
             if (entry.amountGrams <= 0f) {
-                // Rezept-Eintrag: newValue = eingegebene Kalorien
                 val ratio = if (entry.calories > 0f) newValue / entry.calories else 1f
                 repo.updateEntry(entry.copy(
                     calories = newValue,
@@ -117,7 +131,6 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
                     fat      = entry.fat     * ratio
                 ))
             } else {
-                // FoodItem-Eintrag: newValue = neue Gramm-Menge
                 val factor = newValue / entry.amountGrams
                 repo.updateEntry(entry.copy(
                     amountGrams = newValue,
@@ -130,11 +143,7 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun deleteEntry(entry: DiaryEntry) {
-        viewModelScope.launch { repo.deleteEntry(entry) }
-    }
+    fun deleteEntry(entry: DiaryEntry) = viewModelScope.launch { repo.deleteEntry(entry) }
 
-    fun saveCustomFood(item: FoodItem) {
-        viewModelScope.launch { foodRepo.saveCustomFood(item) }
-    }
+    fun saveCustomFood(item: FoodItem) = viewModelScope.launch { foodRepo.saveCustomFood(item) }
 }
