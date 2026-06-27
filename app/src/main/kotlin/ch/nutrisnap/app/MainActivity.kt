@@ -160,7 +160,7 @@ fun MainScaffold(
 
     LaunchedEffect(sharedUrl) {
         if (!sharedUrl.isNullOrBlank()) {
-            navController.navigate(Screen.AiRecipes.route) {
+            navController.navigate(Screen.Recipes.route) {
                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                 launchSingleTop = true; restoreState = true
             }
