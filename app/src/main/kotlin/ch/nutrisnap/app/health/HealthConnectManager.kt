@@ -182,13 +182,22 @@ class HealthConnectManager(context: Context) {
      * sometimes writes its full activity cal into TotalCaloriesBurnedRecord and only a
      * subset into ActiveCaloriesBurnedRecord.
      */
+    /**
+     * Returns the activity/burned calories for a day — matching what Samsung Health shows.
+     *
+     * Samsung Galaxy devices write into Health Connect:
+     *   - ActiveCaloriesBurnedRecord  = exercise/movement calories only (often underreported)
+     *   - TotalCaloriesBurnedRecord   = on Samsung = TOTAL including BMR
+     *
+     * Samsung Health "Verbrannt" value = TotalCaloriesBurnedRecord on Galaxy devices.
+     * We return TotalCaloriesBurnedRecord when available, falling back to ActiveCalories.
+     */
     suspend fun getActiveCaloriesForDay(date: LocalDate): Double {
         val start = date.atStartOfDay(ZoneId.systemDefault()).toInstant()
         val end   = if (date == LocalDate.now()) Instant.now()
                     else date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
 
         return runCatching {
-            // 1. Aggregate active calories
             val activeAgg = client.aggregate(
                 AggregateRequest(
                     metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
@@ -196,7 +205,6 @@ class HealthConnectManager(context: Context) {
                 )
             )[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories ?: 0.0
 
-            // 2. Aggregate total calories (Samsung Health writes its "Cal" here)
             val totalAgg = client.aggregate(
                 AggregateRequest(
                     metrics = setOf(TotalCaloriesBurnedRecord.ENERGY_TOTAL),
@@ -204,12 +212,17 @@ class HealthConnectManager(context: Context) {
                 )
             )[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.inKilocalories ?: 0.0
 
-            Log.d(TAG, "getActiveCaloriesForDay($date): activeAgg=$activeAgg, totalAgg=$totalAgg -> using max=${maxOf(activeAgg, totalAgg)}")
+            Log.d(TAG, "getActiveCaloriesForDay($date): activeAgg=$activeAgg totalAgg=$totalAgg")
 
-            // Take the maximum — Samsung Health's "Cal" (totalAgg) is typically higher
-            // and matches what Samsung Health displays on its dashboard.
-            maxOf(activeAgg, totalAgg)
-
+            // Samsung Health on Galaxy writes its full "Verbrannt" value into TotalCaloriesBurnedRecord.
+            // If total > active significantly, use total (it IS the Samsung Health dashboard value).
+            // If total is 0 or suspiciously low, fall back to active.
+            when {
+                totalAgg > activeAgg * 1.5 && totalAgg > 200.0 -> totalAgg   // Samsung Health total = "Verbrannt"
+                activeAgg > 0.0 -> activeAgg
+                totalAgg > 0.0  -> totalAgg
+                else -> 0.0
+            }
         }.getOrDefault(0.0)
     }
 
