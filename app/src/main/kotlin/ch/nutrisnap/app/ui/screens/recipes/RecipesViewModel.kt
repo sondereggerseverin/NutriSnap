@@ -144,6 +144,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 description       = newDesc
             )
             repo.updateRecipe(updated)
+            // Clear so IngredientVerifySheet re-initialises fresh if reopened
+            _nutritionState.value = NutritionState()
         }
     }
 
