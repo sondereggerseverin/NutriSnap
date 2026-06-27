@@ -262,12 +262,15 @@ private fun RecipeThumbnail(
 ) {
     val box = if (size != null) modifier.then(Modifier.size(size)) else modifier
     val url = recipe.imageUrl
+    // Track load failure so CDN-expired/auth-gated TikTok URLs fall back to gradient
+    var imageLoadFailed by remember(url) { mutableStateOf(false) }
 
-    if (!url.isNullOrBlank()) {
+    if (!url.isNullOrBlank() && !imageLoadFailed) {
         AsyncImage(
             model = url, contentDescription = recipe.title,
             modifier = box.clip(shape),
-            contentScale = ContentScale.Crop
+            contentScale = ContentScale.Crop,
+            onError = { imageLoadFailed = true }
         )
     } else {
         val (gradientColors, icon) = platformVisuals(recipe.platform)
