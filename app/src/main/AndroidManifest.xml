@@ -48,8 +48,14 @@
         </activity>
         <activity
             android:name=".MainActivity"
-            android:exported="false"
-            android:theme="@style/Theme.NutriSnap"/>
+            android:exported="true"
+            android:theme="@style/Theme.NutriSnap">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
 
         <!-- Required by Health Connect: rationale + VIEW_PERMISSION_USAGE alias -->
         <activity
