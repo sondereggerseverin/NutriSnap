@@ -205,8 +205,19 @@ class RecipeScraper(private val context: Context) {
                 if (code == 0 && j != null) {
                     val t = j.optString("title", "").ifBlank { j.optString("desc", "") }.trim()
                     // Always extract thumbnail + author BEFORE break so they're not skipped
-                    if (thumbnail == null) thumbnail = j.optString("cover", "").ifBlank { null }
-                    if (author == null)    author    = j.optJSONObject("author")?.optString("nickname")
+                    // Prefer origin_cover (stable) over cover (signed CDN URL that expires quickly)
+                    if (thumbnail == null) {
+                        val originCover = j.optString("origin_cover", "").ifBlank { null }
+                        val cover       = j.optString("cover", "").ifBlank { null }
+                        // tiktokcdn.com URLs are auth-signed and often fail in AsyncImage → skip them
+                        thumbnail = when {
+                            originCover != null && "tiktokcdn.com" !in originCover -> originCover
+                            cover != null && "tiktokcdn.com" !in cover             -> cover
+                            originCover != null -> originCover  // fallback: use even if CDN (better than nothing)
+                            else -> cover
+                        }
+                    }
+                    if (author == null) author = j.optJSONObject("author")?.optString("nickname")
                     if (t.isNotBlank()) { caption = t; break }
                 }
             }
