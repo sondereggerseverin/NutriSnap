@@ -116,13 +116,16 @@ fun IngredientVerifySheet(
             }
 
             // Ingredient rows
-            items(verifyStates.indices.toList()) { index ->
-                val state = verifyStates[index]
+            items(verifyStates, key = { it.result.line }) { state ->
+                val index = verifyStates.indexOf(state)
                 IngredientVerifyRow(
                     state = state,
-                    onScan = { scanTarget = index },
+                    onScan = { if (index >= 0) scanTarget = index },
                     onDelete = {
-                        verifyStates = verifyStates.toMutableList().also { it.removeAt(index) }
+                        verifyStates = verifyStates.toMutableList().also { list ->
+                            val i = list.indexOf(state)
+                            if (i >= 0) list.removeAt(i)
+                        }
                     }
                 )
                 HorizontalDivider(
@@ -156,16 +159,22 @@ fun IngredientVerifySheet(
 
     // Show scan/search/manual sheet for the target ingredient
     scanTarget?.let { idx ->
-        IngredientIdentifySheet(
-            ingredientName = verifyStates[idx].result.parsed?.name ?: verifyStates[idx].result.line,
-            onDismiss = { scanTarget = null },
-            onFoodSelected = { food ->
-                verifyStates = verifyStates.toMutableList().also {
-                    it[idx] = it[idx].copy(override = food)
+        val targetState = verifyStates.getOrNull(idx)
+        if (targetState != null) {
+            IngredientIdentifySheet(
+                ingredientName = targetState.result.parsed?.name ?: targetState.result.line,
+                onDismiss = { scanTarget = null },
+                onFoodSelected = { food ->
+                    verifyStates = verifyStates.toMutableList().also { list ->
+                        val i = list.indexOf(targetState)
+                        if (i >= 0) list[i] = list[i].copy(override = food)
+                    }
+                    scanTarget = null
                 }
-                scanTarget = null
-            }
-        )
+            )
+        } else {
+            scanTarget = null
+        }
     }
 }
 
