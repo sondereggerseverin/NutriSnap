@@ -19,10 +19,21 @@ import ch.nutrisnap.app.domain.GeneratedRecipe
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
+fun RecipeGeneratorScreen(
+    vm: RecipeGeneratorViewModel = viewModel(),
+    sharedUrl: String? = null
+) {
     val state by vm.state.collectAsState()
-    var input by remember { mutableStateOf("") }
+    var input by remember { mutableStateOf(sharedUrl ?: "") }
     var showDiaryDialog by remember { mutableStateOf(false) }
+
+    // Auto-generate when a URL is shared from Instagram/TikTok/etc.
+    LaunchedEffect(sharedUrl) {
+        if (!sharedUrl.isNullOrBlank()) {
+            input = sharedUrl
+            vm.generate(sharedUrl)
+        }
+    }
 
     // Reset snackbar after showing
     LaunchedEffect(state.addedToDiary) {
