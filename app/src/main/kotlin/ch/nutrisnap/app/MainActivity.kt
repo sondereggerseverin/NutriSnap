@@ -160,7 +160,7 @@ fun MainScaffold(
 
     LaunchedEffect(sharedUrl) {
         if (!sharedUrl.isNullOrBlank()) {
-            navController.navigate(Screen.Recipes.route) {
+            navController.navigate(Screen.AiRecipes.route) {
                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                 launchSingleTop = true; restoreState = true
             }
@@ -203,7 +203,7 @@ fun MainScaffold(
             }
             composable(Screen.Diary.route)     { DiaryScreen() }
             composable(Screen.Recipes.route)   { RecipesScreen(sharedUrl = sharedUrl) }
-            composable(Screen.AiRecipes.route) { RecipeGeneratorScreen() }
+            composable(Screen.AiRecipes.route) { RecipeGeneratorScreen(sharedUrl = sharedUrl) }
             composable(Screen.Analysis.route)  { AnalysisScreen() }
             composable(Screen.Settings.route) {
                 SettingsScreen(
