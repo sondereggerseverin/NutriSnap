@@ -90,6 +90,13 @@ fun SettingsScreen(
     var selectedGoal by remember { mutableStateOf(FitnessGoal.MAINTAIN) }
     var showSaved   by remember { mutableStateOf(false) }
 
+    // Theme selection
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val currentThemeName = prefs?.get(ch.nutrisnap.app.ui.theme.KEY_APP_THEME) ?: AppTheme.FOREST_GREEN.name
+    val currentTheme = runCatching { AppTheme.valueOf(currentThemeName) }.getOrDefault(AppTheme.FOREST_GREEN)
+
     // Auto-recalculate when body data or goal changes
     fun applyGoal() {
         val w = weightText.toFloatOrNull() ?: return
@@ -111,6 +118,22 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("Einstellungen", fontWeight = FontWeight.Bold, fontSize = 22.sp)
+
+        // Theme Picker
+        SettingsCard(title = "App-Design", icon = Icons.Default.Palette) {
+            Spacer(Modifier.height(4.dp))
+            ThemePickerSection(
+                currentTheme = currentTheme,
+                onThemeSelected = { theme ->
+                    scope.launch {
+                        context.notifDataStore.edit { prefs ->
+                            prefs[ch.nutrisnap.app.ui.theme.KEY_APP_THEME] = theme.name
+                        }
+                    }
+                }
+            )
+            Spacer(Modifier.height(4.dp))
+        }
 
         // Feature-Shortcuts
         SettingsCard(title = "Features", icon = Icons.Default.Apps) {
