@@ -87,6 +87,15 @@ enum class AppTheme(
     )
 }
 
+// Legacy color aliases (used by Components.kt)
+val Green900 = Color(0xFF1B4332)
+val Green700 = Color(0xFF2D6A4F)
+val Green400 = Color(0xFF52B788)
+val Green100 = Color(0xFFD8F3DC)
+val Cream    = Color(0xFFF8F4EF)
+val Coral    = Color(0xFFE07A5F)
+val CoralLight = Color(0xFFF2C4BB)
+
 val KEY_APP_THEME = stringPreferencesKey("app_theme")
 
 @Composable
