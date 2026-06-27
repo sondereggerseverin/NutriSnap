@@ -54,12 +54,17 @@ class GroqRecipeGeneratorService {
                 "Kein GROQ_API_KEY in local.properties konfiguriert"
             ))
 
-            val prompt = "Du bist ein Koch. Erstelle ein Rezept fuer: $userInput. " +
-                "Antworte NUR mit JSON (kein Markdown): " +
+            val prompt = "Du bist ein erfahrener Ernaehrungsberater und Koch. " +
+                "Erstelle ein realistisches Rezept fuer: $userInput. " +
+                "WICHTIG: Berechne die Naehrwerte EXAKT und realistisch basierend auf den echten Zutatenmengen pro Portion. " +
+                "Beispiel-Referenzwerte pro 100g: Huehnerbrust=165kcal/31gP, Parmesan=431kcal/38gP, " +
+                "Ricotta=174kcal/11gP, Hackfleisch=250kcal/17gP, Pasta=350kcal/13gP, Reis=130kcal/3gP, Ei=155kcal/13gP. " +
+                "Addiere die Kalorien aller Zutaten und teile durch die Portionszahl. " +
+                "Antworte NUR mit JSON (kein Markdown, keine Erklaerungen): " +
                 "{\"title\":\"Name\",\"description\":\"Beschreibung\"," +
                 "\"ingredients\":[\"200g Beispiel\"],\"steps\":[\"Schritt 1\"]," +
-                "\"servings\":2,\"prepTimeMinutes\":25,\"calories\":400," +
-                "\"protein\":30.0,\"carbs\":40.0,\"fat\":10.0}"
+                "\"servings\":4,\"prepTimeMinutes\":30,\"calories\":650," +
+                "\"protein\":55.0,\"carbs\":45.0,\"fat\":25.0}"
 
             val requestJson = JSONObject().apply {
                 put("model", model)
