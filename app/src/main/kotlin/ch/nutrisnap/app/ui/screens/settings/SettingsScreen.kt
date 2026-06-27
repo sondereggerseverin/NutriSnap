@@ -4,12 +4,16 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -22,6 +26,9 @@ import ch.nutrisnap.app.data.repository.UserProfile
 import ch.nutrisnap.app.health.HealthConnectManager
 import ch.nutrisnap.app.health.HealthConnectStatus
 import kotlinx.coroutines.launch
+import androidx.datastore.preferences.core.edit
+import ch.nutrisnap.app.ui.theme.AppTheme
+import ch.nutrisnap.app.ui.theme.KEY_APP_THEME
 
 enum class FitnessGoal(val label: String, val emoji: String, val desc: String) {
     LOSE_WEIGHT("Abnehmen",        "🔥", "–500 kcal vom TDEE · mehr Protein"),
@@ -428,6 +435,58 @@ fun HealthConnectCard() {
                             }
                         }) {
                             Text("Erneut prüfen", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ThemePickerSection(
+    currentTheme: AppTheme,
+    onThemeSelected: (AppTheme) -> Unit
+) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Text("App-Design", fontWeight = FontWeight.Bold, fontSize = 15.sp,
+            modifier = Modifier.padding(bottom = 10.dp))
+        androidx.compose.foundation.lazy.LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            items(AppTheme.entries.size) { idx ->
+                val theme = AppTheme.entries[idx]
+                val isSelected = theme == currentTheme
+                Card(
+                    modifier = Modifier
+                        .width(90.dp)
+                        .clickable { onThemeSelected(theme) },
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSelected) theme.primaryLight else MaterialTheme.colorScheme.surface
+                    ),
+                    border = if (isSelected) BorderStroke(2.dp, theme.primary) else null,
+                    elevation = CardDefaults.cardElevation(if (isSelected) 4.dp else 1.dp)
+                ) {
+                    Column(
+                        Modifier.padding(10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            Modifier.size(40.dp).clip(CircleShape).background(theme.primary),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(theme.emoji, fontSize = 18.sp)
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(theme.label.split(" ").first(), fontSize = 10.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) theme.primaryDark else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                        if (isSelected) {
+                            Icon(Icons.Default.CheckCircle, null,
+                                tint = theme.primary, modifier = Modifier.size(14.dp))
                         }
                     }
                 }
