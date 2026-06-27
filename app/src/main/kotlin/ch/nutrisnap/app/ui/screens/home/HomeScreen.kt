@@ -38,6 +38,7 @@ fun HomeScreen(
         state = state,
         todayHc = hcState.todayData,
         hasHcPermission = hcState.hasPermission,
+        burnedKcal = hcState.todayData?.activeCaloriesKcal?.toInt() ?: 0,
         onMealClick = { onNavigateToDiary() },
         onLogWeight = { showWeightDialog = true },
         onOpenHealth = onNavigateToHealth
@@ -57,6 +58,7 @@ private fun LazyColumnHome(
     state: HomeUiState,
     todayHc: HealthConnectCache?,
     hasHcPermission: Boolean,
+    burnedKcal: Int,
     onMealClick: () -> Unit,
     onLogWeight: () -> Unit,
     onOpenHealth: () -> Unit
@@ -65,7 +67,7 @@ private fun LazyColumnHome(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        item { HomeHeader(state) }
+        item { HomeHeader(state, burnedKcal) }
         item { MealOverviewGrid(state.meals, onClick = onMealClick) }
         // Health Connect card always visible
         item { HealthCard(todayHc, hasHcPermission, onOpenHealth) }
@@ -168,7 +170,7 @@ private fun HealthStatItem(icon: String, value: String, label: String) {
 // ── Header with calorie ring + macro bars ─────────────────────────────────────
 
 @Composable
-private fun HomeHeader(state: HomeUiState) {
+private fun HomeHeader(state: HomeUiState, burnedKcal: Int = 0) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -189,10 +191,10 @@ private fun HomeHeader(state: HomeUiState) {
 
         Spacer(Modifier.height(20.dp))
 
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             MacroRing(
                 eaten = state.totalCalories, goal = state.calorieGoal,
-                size = 110.dp, strokeWidth = 9.dp,
+                size = 100.dp, strokeWidth = 8.dp,
                 trackColor = Color.White.copy(alpha = 0.25f),
                 progressColor = Color.White,
                 overflowColor = Color(0xFFFFD67A)
@@ -200,22 +202,26 @@ private fun HomeHeader(state: HomeUiState) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         "${(state.calorieGoal - state.totalCalories).coerceAtLeast(0f).toInt()}",
-                        fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White
+                        fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Color.White
                     )
-                    Text("kcal uebrig", fontSize = 10.sp, color = Color.White.copy(alpha = 0.8f))
+                    Text("uebrig", fontSize = 9.sp, color = Color.White.copy(alpha = 0.8f))
                 }
             }
 
             Column(Modifier.weight(1f)) {
+                // Calorie summary row: eaten / burned / goal
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    LabeledValue("${state.totalCalories.toInt()}", "gegessen")
-                    LabeledValue("${state.calorieGoal.toInt()}", "Ziel")
+                    LabeledValue("${state.totalCalories.toInt()}", "gegessen", "🍽️")
+                    if (burnedKcal > 0) {
+                        LabeledValue("$burnedKcal", "verbrannt", "🔥")
+                    }
+                    LabeledValue("${state.calorieGoal.toInt()}", "Ziel", "🎯")
                 }
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(8.dp))
                 WhiteMacroBar("Protein",  state.totalProtein, state.proteinGoal)
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(5.dp))
                 WhiteMacroBar("Kohlenh.", state.totalCarbs,   state.carbsGoal)
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(5.dp))
                 WhiteMacroBar("Fett",     state.totalFat,     state.fatGoal)
             }
         }
@@ -223,10 +229,13 @@ private fun HomeHeader(state: HomeUiState) {
 }
 
 @Composable
-private fun LabeledValue(value: String, label: String) {
+private fun LabeledValue(value: String, label: String, emoji: String = "") {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-        Text(label, fontSize = 10.sp, color = Color.White.copy(alpha = 0.7f))
+        if (emoji.isNotEmpty()) {
+            Text(emoji, fontSize = 11.sp)
+        }
+        Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text(label, fontSize = 9.sp, color = Color.White.copy(alpha = 0.7f))
     }
 }
 
