@@ -97,4 +97,20 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
     fun clearAddedToDiary() = _state.update { it.copy(addedToDiary = false) }
     fun clearError() = _state.update { it.copy(error = null) }
     fun clearRecipe() = _state.update { it.copy(recipe = null, addedToDiary = false) }
+
+    fun loadFromHistory(entity: GeneratedRecipeEntity) {
+        val recipe = GeneratedRecipe(
+            title           = entity.title,
+            description     = entity.description,
+            ingredients     = runCatching { json.decodeFromString<List<String>>(entity.ingredients) }.getOrDefault(emptyList()),
+            steps           = runCatching { json.decodeFromString<List<String>>(entity.steps) }.getOrDefault(emptyList()),
+            servings        = entity.servings,
+            prepTimeMinutes = entity.prepTimeMinutes,
+            calories        = entity.calories,
+            protein         = entity.protein,
+            carbs           = entity.carbs,
+            fat             = entity.fat
+        )
+        _state.update { it.copy(recipe = recipe, error = null, addedToDiary = false) }
+    }
 }
