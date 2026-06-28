@@ -214,13 +214,13 @@ class HealthConnectManager(context: Context) {
 
             Log.d(TAG, "getActiveCaloriesForDay($date): activeAgg=$activeAgg totalAgg=$totalAgg")
 
-            // Samsung Health on Galaxy writes its full "Verbrannt" value into TotalCaloriesBurnedRecord.
-            // If total > active significantly, use total (it IS the Samsung Health dashboard value).
-            // If total is 0 or suspiciously low, fall back to active.
+            // Samsung Health writes TDEE (BMR + activity) into TotalCaloriesBurnedRecord,
+            // NOT just workout/activity calories. Using totalAgg would show ~2000+ kcal as "Verbrannt".
+            // ActiveCaloriesBurnedRecord correctly contains only actual activity/exercise calories.
+            // Use total only as absolute last resort when active is completely missing.
             when {
-                totalAgg > activeAgg * 1.5 && totalAgg > 200.0 -> totalAgg   // Samsung Health total = "Verbrannt"
                 activeAgg > 0.0 -> activeAgg
-                totalAgg > 0.0  -> totalAgg
+                totalAgg > 0.0  -> totalAgg  // last resort fallback only
                 else -> 0.0
             }
         }.getOrDefault(0.0)
