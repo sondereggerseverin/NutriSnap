@@ -14,9 +14,10 @@ class AuthViewModel : ViewModel() {
 
     init {
         viewModelScope.launch {
-            // Supabase stellt Session asynchron wieder her – kurz warten
-            AuthRepository.awaitSession()
-            _isLoggedIn.value = AuthRepository.isLoggedIn
+            // LOGIN TEMPORARILY DISABLED — set to true to re-enable Supabase auth:
+            // AuthRepository.awaitSession()
+            // _isLoggedIn.value = AuthRepository.isLoggedIn
+            _isLoggedIn.value = true
         }
     }
 
