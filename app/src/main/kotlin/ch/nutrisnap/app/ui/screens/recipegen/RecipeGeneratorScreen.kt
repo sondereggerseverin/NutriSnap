@@ -118,11 +118,16 @@ fun RecipeGeneratorScreen(
                 fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
             state.history.take(5).forEach { entity ->
-                Card(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                    onClick = { vm.loadFromHistory(entity) }
+                ) {
                     ListItem(
                         headlineContent = { Text(entity.title, fontWeight = FontWeight.Medium) },
                         supportingContent = { Text("${entity.calories} kcal · ${entity.servings} Port.") },
-                        leadingContent = { Icon(Icons.Default.History, null) }
+                        leadingContent = { Icon(Icons.Default.History, null) },
+                        trailingContent = { Icon(Icons.Default.ArrowForward, null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                     )
                 }
             }
