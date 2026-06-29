@@ -38,7 +38,6 @@ fun HomeScreen(
         state = state,
         todayHc = hcState.todayData,
         hasHcPermission = hcState.hasPermission,
-        burnedKcal = hcState.todayData?.activeCaloriesKcal?.toInt() ?: 0,
         onMealClick = { onNavigateToDiary() },
         onLogWeight = { showWeightDialog = true },
         onOpenHealth = onNavigateToHealth
@@ -58,7 +57,6 @@ private fun LazyColumnHome(
     state: HomeUiState,
     todayHc: HealthConnectCache?,
     hasHcPermission: Boolean,
-    burnedKcal: Int,
     onMealClick: () -> Unit,
     onLogWeight: () -> Unit,
     onOpenHealth: () -> Unit
@@ -67,9 +65,8 @@ private fun LazyColumnHome(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        item { HomeHeader(state, burnedKcal) }
+        item { HomeHeader(state) }
         item { MealOverviewGrid(state.meals, onClick = onMealClick) }
-        // Health Connect card always visible
         item { HealthCard(todayHc, hasHcPermission, onOpenHealth) }
         item { StreakCard(state.streak) }
         item { WeightQuickCard(state.lastWeightKg, onLogWeight) }
@@ -170,7 +167,7 @@ private fun HealthStatItem(icon: String, value: String, label: String) {
 // ── Header with calorie ring + macro bars ─────────────────────────────────────
 
 @Composable
-private fun HomeHeader(state: HomeUiState, burnedKcal: Int = 0) {
+private fun HomeHeader(state: HomeUiState) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -191,37 +188,36 @@ private fun HomeHeader(state: HomeUiState, burnedKcal: Int = 0) {
 
         Spacer(Modifier.height(20.dp))
 
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             MacroRing(
-                eaten = state.totalCalories, goal = state.calorieGoal,
-                size = 100.dp, strokeWidth = 8.dp,
+                eaten = state.totalCalories, goal = state.adjustedGoal,
+                size = 110.dp, strokeWidth = 9.dp,
                 trackColor = Color.White.copy(alpha = 0.25f),
                 progressColor = Color.White,
                 overflowColor = Color(0xFFFFD67A)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        "${(state.calorieGoal - state.totalCalories).coerceAtLeast(0f).toInt()}",
-                        fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Color.White
+                        "${state.remaining.toInt()}",
+                        fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White
                     )
-                    Text("uebrig", fontSize = 9.sp, color = Color.White.copy(alpha = 0.8f))
+                    Text("kcal uebrig", fontSize = 10.sp, color = Color.White.copy(alpha = 0.8f))
                 }
             }
 
             Column(Modifier.weight(1f)) {
-                // Calorie summary row: eaten / burned / goal
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    LabeledValue("${state.totalCalories.toInt()}", "gegessen", "🍽️")
-                    if (burnedKcal > 0) {
-                        LabeledValue("$burnedKcal", "verbrannt", "🔥")
+                    LabeledValue("${state.totalCalories.toInt()}", "gegessen")
+                    if (state.burnedKcal > 0f) {
+                        LabeledValue("+${state.burnedKcal.toInt()}", "aktiv")
                     }
-                    LabeledValue("${state.calorieGoal.toInt()}", "Ziel", "🎯")
+                    LabeledValue("${state.adjustedGoal.toInt()}", "Ziel")
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
                 WhiteMacroBar("Protein",  state.totalProtein, state.proteinGoal)
-                Spacer(Modifier.height(5.dp))
+                Spacer(Modifier.height(6.dp))
                 WhiteMacroBar("Kohlenh.", state.totalCarbs,   state.carbsGoal)
-                Spacer(Modifier.height(5.dp))
+                Spacer(Modifier.height(6.dp))
                 WhiteMacroBar("Fett",     state.totalFat,     state.fatGoal)
             }
         }
@@ -229,13 +225,10 @@ private fun HomeHeader(state: HomeUiState, burnedKcal: Int = 0) {
 }
 
 @Composable
-private fun LabeledValue(value: String, label: String, emoji: String = "") {
+private fun LabeledValue(value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        if (emoji.isNotEmpty()) {
-            Text(emoji, fontSize = 11.sp)
-        }
-        Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-        Text(label, fontSize = 9.sp, color = Color.White.copy(alpha = 0.7f))
+        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text(label, fontSize = 10.sp, color = Color.White.copy(alpha = 0.7f))
     }
 }
 

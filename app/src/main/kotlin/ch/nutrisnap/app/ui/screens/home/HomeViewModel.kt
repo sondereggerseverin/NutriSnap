@@ -8,7 +8,6 @@ import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.repository.DiaryRepository
 import ch.nutrisnap.app.data.repository.StatsRepository
-import ch.nutrisnap.app.data.repository.UserProfile
 import ch.nutrisnap.app.data.repository.UserProfileRepository
 import ch.nutrisnap.app.data.repository.WeightRepository
 import kotlinx.coroutines.flow.*
@@ -31,13 +30,19 @@ data class HomeUiState(
     val totalCarbs:    Float   = 0f,
     val totalFat:      Float   = 0f,
     val calorieGoal:   Float   = 2000f,
+    val burnedKcal:    Float   = 0f,
     val proteinGoal:   Float   = 120f,
     val carbsGoal:     Float   = 220f,
     val fatGoal:       Float   = 65f,
     val streak:        Int     = 0,
     val lastWeightKg:  Float?  = null,
     val meals:         List<MealOverview> = emptyList()
-)
+) {
+    /** Budget = Basis-Ziel + verbrannte Aktivitätskalorien */
+    val adjustedGoal: Float get() = calorieGoal + burnedKcal
+    /** Übrig = Budget - gegessen (nie negativ) */
+    val remaining:    Float get() = (adjustedGoal - totalCalories).coerceAtLeast(0f)
+}
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val db          = NutriDatabase.getInstance(app)
@@ -45,9 +50,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val profileRepo = UserProfileRepository(db)
     private val weightRepo  = WeightRepository(db)
     private val statsRepo   = StatsRepository(db)
+    private val hcDao       = db.healthConnectDao()
 
-    private val _streak     = MutableStateFlow(0)
-    private val _refreshKey = MutableStateFlow(0)
+    private val _streak = MutableStateFlow(0)
 
     init { refreshStreak() }
 
@@ -55,8 +60,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         diaryRepo.getEntriesForDate(LocalDate.now()),
         profileRepo.get(),
         weightRepo.getRecent(1),
-        _streak
-    ) { entries, profile, weights, streak ->
+        _streak,
+        hcDao.getCacheForDate(LocalDate.now())
+    ) { entries, profile, weights, streak, hcCache ->
         val byMeal = entries.groupBy { it.mealType }
 
         HomeUiState(
@@ -66,6 +72,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             totalCarbs    = entries.sumOf { it.carbs.toDouble() }.toFloat(),
             totalFat      = entries.sumOf { it.fat.toDouble() }.toFloat(),
             calorieGoal   = profile.computedTdee()?.toFloat() ?: profile.dailyCalorieGoal.toFloat(),
+            burnedKcal    = hcCache?.activeCaloriesKcal?.toFloat() ?: 0f,
             proteinGoal   = profile.proteinGoalG,
             carbsGoal     = profile.carbsGoalG,
             fatGoal       = profile.fatGoalG,

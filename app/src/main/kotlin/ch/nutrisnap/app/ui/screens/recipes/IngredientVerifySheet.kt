@@ -115,17 +115,14 @@ fun IngredientVerifySheet(
                 }
             }
 
-            // Ingredient rows
+            // Ingredient rows — stable keys so Compose recomposes correctly after delete
             items(verifyStates, key = { it.result.line }) { state ->
                 val index = verifyStates.indexOf(state)
                 IngredientVerifyRow(
                     state = state,
-                    onScan = { if (index >= 0) scanTarget = index },
+                    onScan = { scanTarget = index },
                     onDelete = {
-                        verifyStates = verifyStates.toMutableList().also { list ->
-                            val i = list.indexOf(state)
-                            if (i >= 0) list.removeAt(i)
-                        }
+                        verifyStates = verifyStates.toMutableList().also { it.remove(state) }
                     }
                 )
                 HorizontalDivider(
@@ -159,22 +156,16 @@ fun IngredientVerifySheet(
 
     // Show scan/search/manual sheet for the target ingredient
     scanTarget?.let { idx ->
-        val targetState = verifyStates.getOrNull(idx)
-        if (targetState != null) {
-            IngredientIdentifySheet(
-                ingredientName = targetState.result.parsed?.name ?: targetState.result.line,
-                onDismiss = { scanTarget = null },
-                onFoodSelected = { food ->
-                    verifyStates = verifyStates.toMutableList().also { list ->
-                        val i = list.indexOf(targetState)
-                        if (i >= 0) list[i] = list[i].copy(override = food)
-                    }
-                    scanTarget = null
+        IngredientIdentifySheet(
+            ingredientName = verifyStates[idx].result.parsed?.name ?: verifyStates[idx].result.line,
+            onDismiss = { scanTarget = null },
+            onFoodSelected = { food ->
+                verifyStates = verifyStates.toMutableList().also {
+                    it[idx] = it[idx].copy(override = food)
                 }
-            )
-        } else {
-            scanTarget = null
-        }
+                scanTarget = null
+            }
+        )
     }
 }
 
