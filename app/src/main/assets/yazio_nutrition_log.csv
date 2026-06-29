@@ -1,0 +1,426 @@
+﻿Datum,Mahlzeit,Produkt,Menge (g),Kalorien total,Protein total (g),Fett total (g),Kohlenhydrate total (g)
+2026-01-10,breakfast,Energy Sport Bar,40.0,1.6,0.0,0.0,0.3
+2026-01-16,breakfast,Champion,150.0,6.4,0.3,0.2,0.8
+2026-01-16,breakfast,Berry Granola Crunchy Müesli,50.0,2.2,0.0,0.1,0.3
+2026-01-16,breakfast,Milch,300.0,1.4,0.1,0.0,0.1
+2026-01-16,breakfast,"Hühnerei, Eier, gekocht",210.0,2.9,0.2,0.2,0.0
+2026-01-16,breakfast,Brotscheibe,112.0,1.4,0.0,0.0,0.3
+2026-01-16,breakfast,Nutella,15.0,0.8,0.0,0.0,0.1
+2026-01-16,breakfast,Multivitamin Saft,250.0,0.9,0.0,0.0,0.3
+2026-01-16,breakfast,Ananasjoghurt,150.0,1.0,0.1,0.0,0.2
+2026-02-14,breakfast,Quix mixed nuts paprika,200.0,11.3,0.4,1.0,0.3
+2026-02-15,breakfast,Chilli con carne,800.0,9.6,0.4,0.6,0.7
+2026-03-02,breakfast,Quix mixed nuts paprika,50.0,2.8,0.1,0.2,0.1
+2026-03-02,breakfast,Dar Vida Gruyère,46.0,2.0,0.1,0.1,0.3
+2026-03-02,snack,Protein Drink Macchiato,500.0,2.6,0.4,0.0,0.3
+2026-03-02,dinner,Champion,100.0,4.3,0.2,0.1,0.6
+2026-03-02,lunch,Tonno  rosa naturale,155.0,1.7,0.4,0.0,0.0
+2026-03-03,breakfast,Quix mixed nuts paprika,100.0,5.7,0.2,0.5,0.1
+2026-03-03,breakfast,Pouletbrust mit Curry,150.0,1.6,0.3,0.0,0.0
+2026-03-03,breakfast,Protein Drink Macchiato,1000.0,5.2,0.7,0.1,0.5
+2026-03-14,breakfast,Milch,250.0,1.2,0.1,0.0,0.1
+2026-03-14,breakfast,High Protein Crunchy Muesli,130.0,5.6,0.4,0.2,0.6
+2026-03-22,breakfast,Emmi Protein Coffee,462.0,2.5,0.4,0.0,0.2
+2026-03-22,breakfast,Sushi box tokio-style,280.0,4.4,0.1,0.1,0.7
+2026-03-22,breakfast,Kägi Chiefs Protein Waffer,50.0,2.4,0.1,0.1,0.2
+2026-03-22,lunch,Knuspi Vollkorn,22.0,1.1,0.0,0.1,0.1
+2026-03-22,lunch,"Chicken Wing, roasted",255.0,6.5,0.6,0.4,0.0
+2026-03-22,dinner,Magerquark,320.0,2.0,0.3,0.0,0.1
+2026-03-24,dinner,Protein Drink Macchiato,500.0,2.6,0.4,0.0,0.3
+2026-03-24,dinner,Mozzarella,250.0,6.2,0.4,0.5,0.0
+2026-03-24,lunch,"Bratwurst, grob",200.0,5.8,0.3,0.5,0.0
+2026-03-24,lunch,Country Cuts,300.0,5.3,0.1,0.2,0.8
+2026-03-24,breakfast,Milch,200.0,0.9,0.1,0.0,0.1
+2026-03-24,breakfast,Mokka Joghurt,100.0,1.0,0.0,0.0,0.1
+2026-03-24,breakfast,Berry Granola Crunchy Müesli,50.0,2.2,0.0,0.1,0.3
+2026-03-26,breakfast,Berry Granola Crunchy Müesli,50.0,2.2,0.0,0.1,0.3
+2026-03-26,breakfast,Milch,300.0,1.4,0.1,0.0,0.1
+2026-03-26,breakfast,Pouletbrust mit Curry,150.0,1.6,0.3,0.0,0.0
+2026-03-26,breakfast,Bauernbrot,110.0,2.4,0.1,0.0,0.4
+2026-03-26,breakfast,Protein Drink Macchiato,500.0,2.6,0.4,0.0,0.3
+2026-03-28,breakfast,HighProtein choco Drink,500.0,2.9,0.4,0.1,0.1
+2026-03-29,breakfast,Protein Drink Macchiato,500.0,2.6,0.4,0.0,0.3
+2026-03-29,breakfast,Emmi Protein Coffee,330.0,1.8,0.3,0.0,0.1
+2026-03-31,lunch,Emmi Protein Coffee,660.0,3.6,0.5,0.1,0.3
+2026-04-04,breakfast,Appenzellerin,238.0,9.4,0.6,0.8,0.0
+2026-04-04,breakfast,Focaccia,220.0,5.5,0.2,0.2,0.8
+2026-04-04,snack,Mini Mozzarella,160.0,3.9,0.3,0.3,0.0
+2026-04-04,snack,Protein Drink Macchiato,500.0,2.6,0.4,0.0,0.3
+2026-04-04,snack,Focus water,500.0,0.9,0.0,0.0,0.2
+2026-04-04,lunch,Chicken Dürüm,350.0,5.8,0.4,0.3,0.5
+2026-04-04,dinner,Lasagne Bolognese,400.0,6.8,0.3,0.3,0.6
+2026-04-04,dinner,Parmesan,80.0,3.1,0.3,0.2,0.0
+2026-04-04,snack,"Heidelbeeren (Blaubeeren), frisch",400.0,1.8,0.0,0.0,0.2
+2026-04-06,lunch,Knoppers NussRiegel,40.0,2.1,0.0,0.1,0.2
+2026-04-06,breakfast,Tortilla Wraps (Vollkorn),124.0,3.6,0.1,0.1,0.6
+2026-04-06,breakfast,Poulet Geschnetzeltes ,460.0,5.4,1.1,0.1,0.0
+2026-04-06,breakfast,Saurer Halbrahm,100.0,1.6,0.0,0.1,0.0
+2026-04-06,dinner,Rindsgulasch mit kartoffelstock,400.0,4.6,0.2,0.2,0.4
+2026-04-06,lunch,Eistee Pfirsich,400.0,0.8,0.0,0.0,0.2
+2026-04-10,dinner,Poulet Schenkel gewürzt,500.0,8.0,0.9,0.5,0.0
+2026-04-10,lunch,Sandwich Poulet Tartar,235.0,6.2,0.2,0.3,0.6
+2026-04-10,breakfast,HighProtein choco Drink,500.0,2.9,0.4,0.1,0.1
+2026-04-10,snack,Whey Protein Coconut,80.0,3.1,0.6,0.0,0.1
+2026-04-10,snack,Milch,500.0,2.3,0.2,0.1,0.2
+2026-04-11,dinner,Cordon bleu poulet,900.0,21.2,1.3,1.2,1.3
+2026-04-11,snack,Hurricane Eis,252.0,2.7,0.0,0.0,0.5
+2026-04-14,breakfast,Bauernbrot,120.0,2.6,0.1,0.0,0.5
+2026-04-14,breakfast,Nutella,20.0,1.1,0.0,0.1,0.1
+2026-04-14,lunch,Stocki Kartoffelstock,450.0,3.2,0.1,0.0,0.5
+2026-04-14,dinner,Dürüm Döner,800.0,14.0,0.9,0.6,1.4
+2026-04-14,lunch,Falafel,80.0,2.6,0.1,0.1,0.3
+2026-04-14,lunch,Fischfilet paniert ,250.0,4.3,0.4,0.2,0.4
+2026-04-14,lunch,Emmi Protein Coffee,330.0,1.8,0.3,0.0,0.1
+2026-04-14,snack,Berry Granola Crunchy Müesli,100.0,4.5,0.1,0.1,0.7
+2026-04-15,breakfast,Müsli,50.0,2.1,0.0,0.1,0.3
+2026-04-15,breakfast,Bauernbrot,60.0,1.3,0.0,0.0,0.2
+2026-04-15,breakfast,Youghourt Himbeer,270.0,2.5,0.1,0.1,0.4
+2026-04-15,breakfast,"Hühnerei, Eier, gekocht",70.0,1.0,0.1,0.1,0.0
+2026-04-15,breakfast,whey vanille ,80.0,3.1,0.6,0.0,0.1
+2026-04-15,breakfast,Milch,500.0,2.3,0.2,0.1,0.2
+2026-04-15,lunch,Schnitzelbrötchen,250.0,6.1,0.3,0.3,0.6
+2026-04-15,lunch,Schnitzelbrötchen,250.0,6.1,0.3,0.3,0.6
+2026-04-15,dinner,Älpler Magronen,520.0,7.2,0.2,0.3,0.8
+2026-04-16,breakfast,"Hühnerei, Eier, gekocht",140.0,1.9,0.2,0.1,0.0
+2026-04-16,breakfast,Berry Granola Crunchy Müesli,50.0,2.2,0.0,0.1,0.3
+2026-04-16,breakfast,Joghurt Pur Himbeere,90.0,0.9,0.0,0.0,0.1
+2026-04-16,lunch,Putenfleisch,350.0,5.4,0.7,0.3,0.0
+2026-04-16,lunch,Gnocchi (Nocken),400.0,6.2,0.1,0.0,1.3
+2026-04-16,lunch,"Grüne Bohnen (Brechbohnen), gekocht",210.0,0.8,0.0,0.0,0.1
+2026-04-16,snack,Quix mixed nuts paprika,50.0,2.8,0.1,0.2,0.1
+2026-04-16,dinner,Paprika Chips,155.0,8.2,0.1,0.5,0.8
+2026-04-16,dinner,Rösti,300.0,4.9,0.1,0.2,0.6
+2026-04-19,breakfast,Skandinavischer Räucherlachs,200.0,3.5,0.4,0.2,0.0
+2026-04-19,breakfast,Bauernbrot,130.0,2.8,0.1,0.0,0.5
+2026-04-20,lunch,Ghackets und Hörnli (mit Zwiebeln & Käse),331.5,4.6,0.2,0.1,0.7
+2026-04-20,breakfast,Skandinavischer Räucherlachs,200.0,3.5,0.4,0.2,0.0
+2026-04-20,breakfast,ParaPan,150.0,3.9,0.2,0.1,0.4
+2026-04-25,breakfast,Caffè Latte 26g Protein Coffee,660.0,3.7,0.5,0.1,0.3
+2026-04-25,breakfast,Ovomaltine crunchy cream,21.0,1.1,0.0,0.1,0.1
+2026-04-25,breakfast,Vollkorntoast ,76.0,1.9,0.1,0.0,0.3
+2026-04-25,breakfast,Youghourt Himbeer,270.0,2.5,0.1,0.1,0.4
+2026-04-25,breakfast,Quix mixed nuts paprika,100.0,5.7,0.2,0.5,0.1
+2026-04-25,lunch,Döner Kebab,500.0,8.7,0.5,0.2,1.0
+2026-04-29,breakfast,Biscoff stick,66.0,2.3,0.0,0.1,0.3
+2026-04-29,breakfast,Müsli,50.0,2.1,0.0,0.1,0.3
+2026-04-29,breakfast,Youghourt Himbeer,90.0,0.8,0.0,0.0,0.1
+2026-04-29,dinner,Sandwichtoast Saatenharmonie,150.0,4.5,0.2,0.1,0.6
+2026-04-29,dinner,Hamburger,200.0,4.8,0.3,0.4,0.0
+2026-04-29,dinner,Stremellachs,250.0,5.8,0.5,0.4,0.0
+2026-04-29,lunch,Hackbällchen mit Kartoffelstock,400.0,6.0,0.2,0.6,0.5
+2026-04-29,lunch,vaya protein chips,80.0,3.4,0.2,0.1,0.4
+2026-05-02,breakfast,Farmer Müsli Kerne und Nüsse,100.0,4.7,0.1,0.2,0.5
+2026-05-02,breakfast,Milch,400.0,1.8,0.1,0.1,0.2
+2026-05-02,breakfast,Quix mixed nuts paprika,50.0,2.8,0.1,0.2,0.1
+2026-05-04,breakfast,Protein Drink Macchiato,1000.0,5.2,0.7,0.1,0.5
+2026-05-04,breakfast,Haferbrei mit Apfelstücken,200.0,8.0,0.3,0.2,1.2
+2026-05-04,breakfast,Appenzellerin,150.0,5.9,0.4,0.5,0.0
+2026-05-04,lunch,Vollkorntoast,100.0,2.5,0.1,0.0,0.4
+2026-05-04,snack,Vitamin Focus Water Reload ,500.0,0.9,0.0,0.0,0.2
+2026-05-05,breakfast,Haferbrei mit Apfelstücken,100.0,4.0,0.1,0.1,0.6
+2026-05-05,breakfast,whey vanille ,30.0,1.2,0.2,0.0,0.1
+2026-05-05,breakfast,Protein Drink Macchiato,500.0,2.6,0.4,0.0,0.3
+2026-05-05,breakfast,Appenzellerin,45.0,1.8,0.1,0.1,0.0
+2026-05-05,lunch,Ravioli in Tomatensauce,600.0,5.3,0.2,0.1,0.8
+2026-05-05,lunch,Quix mixed nuts paprika,50.0,2.8,0.1,0.2,0.1
+2026-05-05,snack,Trek Biscoff Protein Oat Bar,50.0,2.3,0.1,0.1,0.2
+2026-05-07,lunch,Trek Biscoff Protein Oat Bar,100.0,4.6,0.2,0.2,0.5
+2026-05-07,lunch,Gulasch (Rindergulasch),450.0,5.4,0.4,0.4,0.1
+2026-05-07,lunch,Protein Drink Macchiato,500.0,2.6,0.4,0.0,0.3
+2026-05-07,lunch,Schweinssteak Nierstuck,500.0,7.2,1.1,0.3,0.1
+2026-05-09,breakfast,Chicken Strips Herbs,130.0,1.4,0.3,0.0,0.0
+2026-05-09,breakfast,Truten sandwich,215.0,4.9,0.2,0.2,0.6
+2026-05-09,breakfast,Biscoff stick,66.0,2.3,0.0,0.1,0.3
+2026-05-09,snack,Vanille Skyr,500.0,3.9,0.5,0.0,0.5
+2026-05-12,breakfast,Haferbrei mit Apfelstücken,100.0,4.0,0.1,0.1,0.6
+2026-05-12,breakfast,Banana,150.0,1.3,0.0,0.0,0.3
+2026-05-12,breakfast,Bio Whey Protein Natural Vanilla,65.0,2.4,0.3,0.1,0.1
+2026-05-12,breakfast,HighProtein choco Drink,350.0,2.0,0.3,0.1,0.1
+2026-05-12,lunch,Ciabatta poulet curry,250.0,5.2,0.2,0.1,0.7
+2026-05-12,snack,Mild - würzig,50.0,2.0,0.1,0.2,0.0
+2026-05-12,dinner,FuzeTea Eistee Zitrone Zitronengras,500.0,0.9,0.0,0.0,0.2
+2026-05-13,breakfast,Poulet Sauce Cocktail,235.0,5.8,0.2,0.3,0.7
+2026-05-13,breakfast,Mild - würzig,100.0,3.9,0.2,0.3,0.0
+2026-05-14,breakfast,Laugen Butterbrezel,62.0,2.3,0.0,0.1,0.2
+2026-05-14,breakfast,Ice Tea Lemon,500.0,1.4,0.0,0.0,0.4
+2026-05-14,breakfast,Poulet Sauce Cocktail,235.0,5.8,0.2,0.3,0.7
+2026-05-14,breakfast,Energy milk high protein,330.0,1.9,0.3,0.0,0.2
+2026-05-14,breakfast,Haferbrei mit Apfelstücken,100.0,4.0,0.1,0.1,0.6
+2026-05-14,breakfast,Bio Whey Protein Natural Vanilla,65.0,2.4,0.3,0.1,0.1
+2026-05-15,lunch,Poulet Sauce Cocktail,235.0,5.8,0.2,0.3,0.7
+2026-05-16,breakfast,Energy milk high protein,330.0,1.9,0.3,0.0,0.2
+2026-05-16,lunch,Chicken Crispy Pouletschnitzel,200.0,4.2,0.3,0.2,0.2
+2026-05-16,snack,Chef Select Salatbox Caesar,280.0,3.3,0.1,0.3,0.1
+2026-05-16,dinner,Norwegische Lachsfiletportionen,125.0,2.7,0.2,0.2,0.0
+2026-05-16,dinner,Butterzopf,50.0,1.5,0.0,0.0,0.3
+2026-05-16,lunch,Cordon bleu (aus Schweinefleisch),165.0,3.6,0.4,0.2,0.2
+2026-05-17,dinner,High Protein Milk Drink,400.0,1.6,0.3,0.0,0.1
+2026-05-17,dinner,Farmer Müsli Kerne und Nüsse,150.0,7.1,0.2,0.3,0.7
+2026-05-17,dinner,Norwegische Lachsfiletportionen,375.0,8.0,0.7,0.6,0.0
+2026-05-17,breakfast,Bauernbrot,150.0,3.2,0.1,0.0,0.6
+2026-05-18,snack,V by valais RECHARGE lemon-lime,750.0,0.8,0.0,0.0,0.2
+2026-05-18,dinner,Vanilla Protein Milk Felfel,230.0,2.1,0.2,0.1,0.2
+2026-05-18,dinner,"Karotten (Möhren), frisch",300.0,1.2,0.0,0.0,0.2
+2026-05-18,dinner,Poke Bowl: Smoked Salmon Rainbow,380.0,6.6,0.2,0.2,0.9
+2026-05-18,dinner,Fromage,46.0,2.0,0.1,0.1,0.3
+2026-05-18,dinner,Formaggio grattugiato,100.0,3.4,0.3,0.2,0.0
+2026-05-19,lunch,"Apfel (mit Schale), frisch",130.0,0.8,0.0,0.0,0.2
+2026-05-19,breakfast,Spagetti Bolognese,700.0,9.8,0.5,0.2,1.4
+2026-05-20,breakfast,Raffaelo,40.0,2.5,0.0,0.2,0.2
+2026-05-20,lunch,"Kartoffeln, ohne Schale gebacken",400.0,3.7,0.1,0.0,0.9
+2026-05-20,lunch,Hackbraten,360.0,5.4,0.6,0.2,0.2
+2026-05-20,dinner,Vanilla Protein Milk Felfel,230.0,2.1,0.2,0.1,0.2
+2026-05-20,dinner,Trail mix - salty Protein mix,40.0,2.1,0.1,0.1,0.1
+2026-05-20,dinner,Croquant Muesli - Framboise,250.0,3.2,0.1,0.1,0.4
+2026-05-21,lunch,Ricola,12.5,0.5,0.0,0.0,0.1
+2026-05-21,lunch,"Kopfsalat, frisch",300.0,0.4,0.0,0.0,0.0
+2026-05-21,lunch,Magerquark,150.0,0.9,0.2,0.0,0.1
+2026-05-21,lunch,Parmesan Käse,20.0,0.8,0.1,0.1,0.0
+2026-05-21,lunch,Ricotta Käse,40.0,0.6,0.0,0.0,0.0
+2026-05-21,lunch,"Hühnerei, Eier, roh",60.0,0.8,0.1,0.1,0.0
+2026-05-21,lunch,Pouletbrust,250.0,2.8,0.6,0.0,0.0
+2026-05-21,dinner,Trockenfleisch M-Budget,80.0,1.5,0.3,0.0,0.0
+2026-05-21,dinner,Dinkelroggenbrot ,350.0,6.6,0.2,0.0,1.3
+2026-05-21,dinner,Butter,60.0,4.4,0.0,0.5,0.0
+2026-05-22,breakfast,Magerquark,500.0,3.1,0.5,0.0,0.2
+2026-05-22,breakfast,Focus water,1500.0,2.6,0.0,0.0,0.6
+2026-05-22,lunch,Gyros,250.0,4.9,0.6,0.3,0.0
+2026-05-22,lunch,Süßkartoffelpommes frittiert,250.0,4.9,0.1,0.3,0.8
+2026-05-22,lunch,Tzatziki selbstgemacht,200.0,0.8,0.1,0.0,0.0
+2026-05-23,dinner,Chickenburger,300.0,6.9,0.3,0.2,0.8
+2026-05-23,dinner,Chicken Mc Nuggets,216.0,5.3,0.3,0.3,0.4
+2026-05-23,lunch,Pouletbrust,130.0,1.5,0.3,0.0,0.0
+2026-05-23,lunch,Kartoffelsalat,600.0,6.2,0.1,0.3,0.8
+2026-05-23,dinner,The Ceasar Salad Crispy Chicken ,329.0,3.6,0.2,0.2,0.3
+2026-05-25,breakfast,Hefezopf ,120.0,3.7,0.1,0.1,0.5
+2026-05-25,breakfast,"Hühnerei, Eier, gekocht",70.0,1.0,0.1,0.1,0.0
+2026-05-25,breakfast,Ovomaltine crunchy cream,28.0,1.5,0.0,0.1,0.2
+2026-05-26,snack,Vitamin Focus Water Reload ,500.0,0.9,0.0,0.0,0.2
+2026-05-26,lunch,Hüttenkäse,200.0,1.9,0.2,0.1,0.1
+2026-05-26,lunch,Salmone Poke Bowl - FELFEL,300.0,4.9,0.2,0.1,0.7
+2026-05-26,dinner,Trail mix - salty Protein mix,40.0,2.1,0.1,0.1,0.1
+2026-05-26,dinner,Sternenberger (Käse),120.0,4.8,0.3,0.4,0.0
+2026-05-27,breakfast,Butterlaugebrezel,70.0,2.4,0.1,0.1,0.4
+2026-05-27,breakfast,Kinder Bueno White,39.0,2.2,0.0,0.1,0.2
+2026-05-27,snack,Water Active Pineapple,500.0,0.9,0.0,0.0,0.2
+2026-05-28,breakfast,Crunchy roll,90.0,3.8,0.1,0.2,0.4
+2026-05-28,breakfast,HiGHPROTEIN nature DRINK,500.0,3.1,0.4,0.1,0.2
+2026-05-28,lunch,Poulet Filetspitzen Indonesia,288.0,3.9,0.6,0.2,0.0
+2026-05-28,lunch,Mischsalat mit Falafel und Couscous,300.0,3.7,0.1,0.2,0.3
+2026-05-28,breakfast,Trockenfleisch,50.0,1.2,0.2,0.0,0.0
+2026-05-28,dinner,Felfel Overnight Oats Framboise,210.0,3.2,0.1,0.1,0.5
+2026-05-29,snack,La fionrenzana,350.0,1.4,0.0,0.0,0.3
+2026-05-29,snack,Activia Pfirsich & Maracuja,115.0,1.0,0.0,0.0,0.1
+2026-05-29,snack,Salat Natur,300.0,2.1,0.0,0.2,0.1
+2026-05-29,breakfast,Kinder Bueno White,39.0,2.2,0.0,0.1,0.2
+2026-05-29,breakfast,Vanilla Protein Milk Felfel,230.0,2.1,0.2,0.1,0.2
+2026-05-29,dinner,BBQ,256.0,3.8,0.5,0.2,0.0
+2026-05-30,breakfast,Sternenberger (Käse),56.0,2.3,0.2,0.2,0.0
+2026-05-30,dinner,Rauchmöckli,45.0,0.8,0.2,0.0,0.0
+2026-05-30,breakfast,Power Gel,41.0,1.0,0.0,0.0,0.3
+2026-05-30,lunch,"Dinkelnudeln, gekocht",300.0,3.8,0.1,0.0,0.7
+2026-05-30,lunch,Rindsgeschnetzeltes,200.0,2.6,0.4,0.1,0.0
+2026-05-30,lunch,Bratensauce,200.0,1.5,0.0,0.1,0.1
+2026-05-30,breakfast,Urdinkelbrot,130.0,3.2,0.1,0.1,0.6
+2026-05-30,breakfast,Butter,30.0,2.2,0.0,0.2,0.0
+2026-05-30,breakfast,Haferkleie,50.0,1.9,0.1,0.0,0.3
+2026-05-30,breakfast,Milch 3.5% fett,150.0,1.0,0.0,0.1,0.1
+2026-05-30,breakfast,Kakaopulver,20.0,0.7,0.0,0.0,0.0
+2026-05-30,breakfast,Bodylab Whey Protein Latte Macchiato,30.0,1.1,0.2,0.0,0.0
+2026-05-30,breakfast,Saure Glühwürmchen,63.0,2.1,0.0,0.0,0.5
+2026-05-30,breakfast,"Joghurt 1,5% Fett",50.0,0.2,0.0,0.0,0.0
+2026-05-30,breakfast,Frischkäse light,25.0,0.2,0.0,0.0,0.0
+2026-05-30,snack,protein spread almond,25.0,1.6,0.1,0.1,0.1
+2026-05-30,snack,Urdinkelbrot,90.0,2.2,0.1,0.0,0.4
+2026-05-30,dinner,Protein clear drink ,500.0,0.9,0.2,0.0,0.0
+2026-05-30,dinner,Hamburger ,80.0,1.8,0.1,0.1,0.0
+2026-05-30,dinner,Butterzopf,70.0,2.1,0.1,0.0,0.4
+2026-06-01,snack,Focus water,500.0,0.9,0.0,0.0,0.2
+2026-06-01,dinner,Sour cream & onion Nüsse,60.0,3.0,0.1,0.2,0.2
+2026-06-02,snack,Focus water,500.0,0.9,0.0,0.0,0.2
+2026-06-02,breakfast,"Apfel (mit Schale), frisch",260.0,1.7,0.0,0.0,0.4
+2026-06-02,lunch,Texan Pecan,66.0,2.5,0.0,0.2,0.2
+2026-06-02,snack,Croquant Muesli - Framboise,250.0,3.2,0.1,0.1,0.4
+2026-06-02,snack,BEEF JERKY ORIGINAL,40.0,1.0,0.2,0.0,0.0
+2026-06-02,snack,Vanilla Protein Milk,230.0,2.1,0.2,0.1,0.2
+2026-06-03,snack,Focus water,500.0,0.9,0.0,0.0,0.2
+2026-06-03,breakfast,"Apfel (mit Schale), frisch",260.0,1.7,0.0,0.0,0.4
+2026-06-03,lunch,Pouletbrust,350.0,4.0,0.9,0.1,0.0
+2026-06-04,dinner,maispoulez,300.0,3.1,0.7,0.0,0.0
+2026-06-05,dinner,Trockenfleisch,400.0,7.5,1.5,0.1,0.0
+2026-06-05,lunch,Dürüm Döner,600.0,10.5,0.7,0.4,1.1
+2026-06-05,dinner,Parmesan Käse,120.0,4.8,0.4,0.4,0.0
+2026-06-05,lunch,Power Layer,50.0,1.9,0.1,0.1,0.2
+2026-06-05,snack,Focus water,500.0,0.9,0.0,0.0,0.2
+2026-06-06,breakfast,Bio Senner Extra,55.0,2.1,0.2,0.2,0.0
+2026-06-06,lunch,Nudelgratin mit Schinken,200.0,3.2,0.0,0.1,0.3
+2026-06-06,lunch,"Joghurt 1,5% Fett",130.0,0.6,0.0,0.0,0.1
+2026-06-06,lunch,Mayonnaise light,30.0,0.9,0.0,0.1,0.0
+2026-06-06,snack,Milsani High Protein Joghurt Pfirsich Orange ,200.0,1.4,0.2,0.0,0.1
+2026-06-07,lunch,Mischsalat mit Poulet,600.0,5.2,0.2,0.4,0.2
+2026-06-07,lunch,Urdinkel Holzofenbrot,150.0,4.7,0.2,0.1,0.7
+2026-06-07,lunch,protein spread almond,30.0,1.9,0.1,0.1,0.1
+2026-06-07,lunch,Pouletaufschnitt,70.0,0.7,0.1,0.0,0.0
+2026-06-07,snack,"Nektarine, frisch",100.0,0.6,0.0,0.0,0.1
+2026-06-08,lunch,Mozzarella light,125.0,2.1,0.3,0.1,0.0
+2026-06-08,lunch,High protein wrap,120.0,3.5,0.2,0.1,0.4
+2026-06-08,snack,Focus water,500.0,0.9,0.0,0.0,0.2
+2026-06-08,dinner,apero gruyère AOP,52.0,2.2,0.2,0.2,0.0
+2026-06-08,dinner,Croquant Muesli - Framboise,250.0,3.2,0.1,0.1,0.4
+2026-06-09,breakfast,Hefezopf ,40.0,1.2,0.0,0.0,0.2
+2026-06-09,breakfast,Pouletbrust mit Curry,40.0,0.4,0.1,0.0,0.0
+2026-06-09,breakfast,Bio wachteleier,45.0,0.7,0.1,0.1,0.0
+2026-06-09,snack,Salted peanuts,50.0,3.2,0.1,0.3,0.1
+2026-06-09,dinner,Penne alle  cinque P,380.0,6.3,0.1,0.2,1.0
+2026-06-09,dinner,cube le maréchal ,80.0,3.1,0.2,0.3,0.0
+2026-06-09,snack,Focus water,500.0,0.9,0.0,0.0,0.2
+2026-06-09,snack,Isoclear,45.0,1.6,0.4,0.0,0.0
+2026-06-09,lunch,köttbullar mit stock,460.0,5.1,0.2,0.2,0.5
+2026-06-10,lunch,Mozzarella light,125.0,2.1,0.3,0.1,0.0
+2026-06-10,lunch,High protein wrap,120.0,3.5,0.2,0.1,0.4
+2026-06-10,dinner,protein bite ,40.0,1.9,0.1,0.1,0.1
+2026-06-10,dinner,Focus water,500.0,0.9,0.0,0.0,0.2
+2026-06-10,dinner,Croquant Muesli - Framboise,250.0,3.2,0.1,0.1,0.4
+2026-06-10,snack,Poulet Curry,70.0,2.2,0.2,0.1,0.0
+2026-06-10,snack,Urdinkel Holzofenbrot,60.0,1.9,0.1,0.1,0.3
+2026-06-10,snack,Fuzetea Eistee Zitrone,500.0,1.5,0.0,0.0,0.4
+2026-06-11,dinner,Butterlaugebrezel,70.0,2.4,0.1,0.1,0.4
+2026-06-11,snack,Focus water,500.0,0.9,0.0,0.0,0.2
+2026-06-11,snack,High Protein Drink Chocolate Flavour,330.0,2.3,0.4,0.0,0.2
+2026-06-11,dinner,Smoked salmon bowl,210.0,4.3,0.1,0.2,0.5
+2026-06-11,dinner,High protein wrap,40.0,1.2,0.1,0.0,0.1
+2026-06-11,lunch,Hackbraten mit Soße,500.0,7.5,0.4,0.5,0.3
+2026-06-11,lunch,Kartoffelstock ,400.0,4.1,0.1,0.2,0.5
+2026-06-12,snack,"Karotten (Möhren), frisch",750.0,2.9,0.1,0.0,0.5
+2026-06-12,dinner,Snack Carrots,750.0,2.0,0.1,0.0,0.4
+2026-06-12,snack,15% Kaffeerahm Emmi,24.0,0.4,0.0,0.0,0.0
+2026-06-12,snack,Schwarzer Kaffee,200.0,0.0,0.0,0.0,0.0
+2026-06-12,dinner,Omlett,66.0,0.7,0.1,0.0,0.0
+2026-06-12,dinner,protein spread almond,10.0,0.6,0.0,0.0,0.0
+2026-06-12,dinner,Milch   Teilentrahmt Drink,400.0,1.9,0.1,0.1,0.2
+2026-06-12,dinner,Brownie z wisniami ,100.0,4.1,0.2,0.1,0.5
+2026-06-12,lunch,Pouletbrust,350.0,4.0,0.9,0.1,0.0
+2026-06-12,lunch,Kokosnussmilch fettreduziert,130.0,1.6,0.0,0.2,0.0
+2026-06-12,lunch,"Grüne Peperoni, frisch",160.0,0.3,0.0,0.0,0.0
+2026-06-12,lunch,Polenta (zubereitet),250.0,2.4,0.1,0.0,0.4
+2026-06-13,breakfast,Milch,410.0,1.9,0.1,0.1,0.2
+2026-06-13,breakfast,Farmer Müsli Kerne und Nüsse,130.0,6.1,0.2,0.3,0.6
+2026-06-13,snack,Hefezopf ,100.0,3.1,0.1,0.1,0.4
+2026-06-13,snack,protein spread almond,30.0,1.9,0.1,0.1,0.1
+2026-06-13,lunch,"Karotten (Möhren), frisch",650.0,2.5,0.1,0.0,0.4
+2026-06-13,dinner,Mozzarella light,125.0,2.1,0.3,0.1,0.0
+2026-06-13,dinner,alter fritz,30.0,1.2,0.1,0.1,0.0
+2026-06-14,lunch,Pulled Beef,220.0,3.5,0.4,0.1,0.2
+2026-06-14,lunch,Roasted Sweet Potatoes,200.0,2.4,0.0,0.0,0.5
+2026-06-14,lunch,"Kohlrabi, gekocht",100.0,0.3,0.0,0.0,0.0
+2026-06-14,dinner,Brownie z wisniami ,100.0,4.1,0.2,0.1,0.5
+2026-06-14,dinner,Joghurt Nature 1.5%,300.0,1.6,0.1,0.0,0.1
+2026-06-14,snack,"Kirschen, frisch",250.0,1.6,0.0,0.0,0.3
+2026-06-14,snack,Farmer Cinnamon Roll,26.0,1.2,0.0,0.1,0.2
+2026-06-14,snack,Im your meal,500.0,5.4,0.4,0.2,0.4
+2026-06-14,snack,Joghurt Nature 1.5%,150.0,0.8,0.1,0.0,0.1
+2026-06-14,snack,Bio Vollmilch,150.0,1.0,0.0,0.1,0.1
+2026-06-15,lunch,Pulled Beef,220.0,3.5,0.4,0.1,0.2
+2026-06-15,lunch,Roasted Sweet Potatoes,200.0,2.4,0.0,0.0,0.5
+2026-06-15,lunch,"Kohlrabi, gekocht",100.0,0.3,0.0,0.0,0.0
+2026-06-15,snack,Water Active Pineapple,500.0,0.9,0.0,0.0,0.2
+2026-06-15,dinner,Ghackets mit Hörmli und Chäs,430.0,6.1,0.4,0.1,0.8
+2026-06-15,snack,Proteinshake Vanille,300.0,1.8,0.3,0.0,0.1
+2026-06-16,lunch,Pulled Beef,220.0,3.5,0.4,0.1,0.2
+2026-06-16,lunch,Roasted Sweet Potatoes,200.0,2.4,0.0,0.0,0.5
+2026-06-16,lunch,"Kohlrabi, gekocht",100.0,0.3,0.0,0.0,0.0
+2026-06-16,snack,Carazza,40.0,1.5,0.0,0.1,0.1
+2026-06-16,dinner,"Hühnerei, Eier, gekocht",120.0,1.6,0.1,0.1,0.0
+2026-06-16,dinner,Mayonnaise light,20.0,0.6,0.0,0.1,0.0
+2026-06-16,dinner,Toastbrot Weizen (Weizentoastbrot),50.0,1.3,0.0,0.0,0.2
+2026-06-16,dinner,Raclette Käse in Scheiben,48.0,1.7,0.1,0.1,0.0
+2026-06-16,dinner,"Putenschnitzel, paniert",125.0,3.3,0.2,0.1,0.3
+2026-06-17,snack,Coconut with Lemongrass & Tofu,450.0,6.4,0.2,0.3,0.7
+2026-06-17,snack,Vanilla Protein Milk,230.0,2.1,0.2,0.1,0.2
+2026-06-17,dinner,Raffaello,10.0,0.6,0.0,0.0,0.0
+2026-06-17,dinner,Schokoeier,6.0,0.3,0.0,0.0,0.0
+2026-06-17,lunch,Norwegische Lachsfilet,250.0,5.1,0.6,0.3,0.0
+2026-06-17,lunch,Kartoffeln roh,400.0,3.1,0.1,0.0,0.6
+2026-06-17,lunch,"Brokkoli (Broccoli), frisch",250.0,0.9,0.1,0.0,0.1
+2026-06-17,dinner,"Brokkoli (Broccoli), gekocht",408.0,1.1,0.1,0.0,0.1
+2026-06-17,dinner,"Blumenkohl, gekocht",400.0,1.0,0.1,0.0,0.1
+2026-06-18,lunch,Ghackets mit Hörnli,400.0,4.9,0.3,0.1,0.6
+2026-06-18,snack,Salted Caramel & Australian Macadamia,68.0,2.4,0.0,0.1,0.3
+2026-06-18,dinner,Premium Muesli Honey & Nuts,75.0,3.6,0.1,0.2,0.4
+2026-06-18,dinner,Milch,250.0,1.2,0.1,0.0,0.1
+2026-06-18,dinner,BBQ Pouletbrust Spiessli,300.0,3.3,0.7,0.1,0.0
+2026-06-18,dinner,Chef Select Salatbox Caesar,280.0,3.3,0.1,0.3,0.1
+2026-06-19,snack,Magnum White Chocolate & Cookies,74.0,2.3,0.0,0.1,0.2
+2026-06-19,snack,Milch Laktosefrei,400.0,1.6,0.1,0.1,0.1
+2026-06-19,dinner,Focus water,500.0,0.9,0.0,0.0,0.2
+2026-06-19,dinner,Classic Cornflakes,24.0,0.9,0.0,0.0,0.2
+2026-06-19,dinner,Himbeermilch,350.0,1.6,0.1,0.0,0.2
+2026-06-20,snack,Saft von Fass,1000.0,1.8,0.0,0.0,0.4
+2026-06-20,snack,Protein Quarkcreme,235.0,1.6,0.2,0.0,0.1
+2026-06-20,snack,Pouletbrust,200.0,2.3,0.5,0.0,0.0
+2026-06-20,dinner,Mischsalat mit Joghurtdressing,300.0,3.4,0.1,0.3,0.2
+2026-06-20,snack,high protein shake,330.0,2.2,0.3,0.0,0.2
+2026-06-21,breakfast,Premium Muesli Honey & Nuts,150.0,7.2,0.2,0.3,0.9
+2026-06-21,breakfast,Milch,500.0,2.3,0.2,0.1,0.2
+2026-06-21,snack,Saure Glühwürmchen,110.0,3.7,0.0,0.0,0.8
+2026-06-21,snack,Dar Vida Gruyère,73.6,3.3,0.1,0.1,0.4
+2026-06-21,snack,Coca Cola Cherry,250.0,1.1,0.0,0.0,0.3
+2026-06-21,snack,shorley ,500.0,1.3,0.0,0.0,0.3
+2026-06-21,snack,Mischsalat mit Poulet,300.0,2.6,0.1,0.2,0.1
+2026-06-21,snack,Salznuesse,150.0,9.3,0.4,0.8,0.2
+2026-06-21,snack,Focus water,2000.0,3.4,0.0,0.0,0.8
+2026-06-21,snack,"Banane (ohne Schale), frisch",450.0,4.2,0.1,0.0,0.9
+2026-06-22,dinner,Dürüm mit Poulet,300.0,10.7,0.5,0.8,0.4
+2026-06-22,breakfast,Magerquark,500.0,3.1,0.5,0.0,0.2
+2026-06-22,breakfast,Kekse,33.0,1.6,0.0,0.1,0.2
+2026-06-22,lunch,Schokoladeneis,75.0,2.1,0.0,0.1,0.2
+2026-06-22,snack,Vanilla Protein Milk,230.0,2.1,0.2,0.1,0.2
+2026-06-23,lunch,Chicken Fried Rice,480.0,6.5,0.3,0.3,0.7
+2026-06-23,breakfast,"Apfel (mit Schale), frisch",130.0,0.8,0.0,0.0,0.2
+2026-06-23,dinner,Focus water,500.0,0.9,0.0,0.0,0.2
+2026-06-24,breakfast,Riche en protéines crème dessert chocolat caramel ,150.0,1.2,0.2,0.0,0.1
+2026-06-24,breakfast,Protein Quarkcreme,235.0,1.6,0.2,0.0,0.1
+2026-06-24,lunch,"Nudeln, gekocht (aus Hartweizengrieß)",250.0,3.6,0.1,0.0,0.7
+2026-06-24,lunch,Soße Bolognese,450.0,3.4,0.2,0.2,0.2
+2026-06-24,snack,Pralinato Mini,21.0,0.9,0.0,0.1,0.1
+2026-06-24,dinner,Urdinkel Holzofenbrot,85.0,2.6,0.1,0.1,0.4
+2026-06-24,dinner,protein spread almond,20.0,1.2,0.0,0.1,0.1
+2026-06-25,snack,Super smoothie uplift,250.0,1.6,0.0,0.0,0.3
+2026-06-25,breakfast,Extreme Chocolate,145.0,3.6,0.1,0.2,0.5
+2026-06-26,lunch,"Langkornreis, gekocht",300.0,3.7,0.1,0.0,0.8
+2026-06-26,breakfast,BEEF JERKY ORIGINAL,40.0,1.0,0.2,0.0,0.0
+2026-06-26,breakfast,apero gruyère AOP,52.0,2.2,0.2,0.2,0.0
+2026-06-26,dinner,Salmon Mango Poke Bowl,390.0,6.5,0.2,0.1,0.7
+2026-06-26,snack,Ovomaltine Crunchy Biscuit,31.0,1.6,0.0,0.1,0.2
+2026-06-26,snack,Premium Musli Triple Choc,80.0,3.5,0.1,0.1,0.5
+2026-06-26,snack,Joghurt Nature 1.5%,300.0,1.6,0.1,0.0,0.1
+2026-06-26,dinner,Focus water,500.0,0.9,0.0,0.0,0.2
+2026-06-26,dinner,Magerquark,500.0,3.1,0.5,0.0,0.2
+2026-06-26,dinner,Extrême mini vanille,39.0,1.3,0.0,0.1,0.2
+2026-06-27,breakfast,Premium Musli Triple Choc,120.0,5.3,0.1,0.2,0.7
+2026-06-27,breakfast,Milch,420.0,1.9,0.1,0.1,0.2
+2026-06-27,snack,Dar Vida Gruyère,46.0,2.0,0.1,0.1,0.3
+2026-06-27,snack,Power Layer Cookies and Cream,50.0,2.0,0.2,0.1,0.2
+2026-06-27,snack,Ovomaltine Crunchy Biscuit,31.0,1.6,0.0,0.1,0.2
+2026-06-27,lunch,Urdinkel Holzofenbrot,215.0,6.7,0.2,0.2,1.0
+2026-06-27,lunch,protein spread almond,30.0,1.9,0.1,0.1,0.1
+2026-06-27,lunch,Vita Reform,15.0,0.8,0.0,0.1,0.0
+2026-06-27,lunch,Bienenhonig cremig,20.0,0.6,0.0,0.0,0.2
+2026-06-27,dinner,Planted Kebab,170.0,3.3,0.4,0.2,0.0
+2026-06-27,dinner,High Protein Drink Chocolate Flavour,330.0,2.3,0.4,0.0,0.2
+2026-06-28,breakfast,Clear whey blackberry geschmack,30.0,1.0,0.2,0.0,0.0
+2026-06-28,breakfast,Flohsamen,5.0,0.1,0.0,0.0,0.0
+2026-06-28,lunch,High protein wraps,120.0,3.5,0.2,0.1,0.4
+2026-06-28,lunch,Sour Cream,50.0,1.1,0.0,0.1,0.0
+2026-06-28,lunch,Planted Kebab,297.5,5.9,0.7,0.3,0.1
+2026-06-28,snack,Focus water,500.0,0.9,0.0,0.0,0.2
+2026-06-28,snack,Ice Tea Lemon,900.0,1.2,0.0,0.0,0.3
+2026-06-28,snack,Cornet mit Vanilleglace,68.5,1.9,0.0,0.1,0.3
+2026-06-28,snack,Glace twister,72.0,0.6,0.0,0.0,0.1
+2026-06-28,dinner,"Karotten (Möhren), frisch",550.0,2.1,0.0,0.0,0.4
+2026-06-28,dinner,"Nektarine, frisch",250.0,1.4,0.0,0.0,0.3
+2026-06-28,dinner,"Erdbeeren, frisch",150.0,0.5,0.0,0.0,0.1
+2026-06-28,dinner,gemischter salat,300.0,4.0,0.1,0.2,0.3
+2026-06-29,dinner,Flachpfirsich,230.0,1.0,0.0,0.0,0.3
+2026-06-29,snack,Dar Vida Gruyère,46.0,2.0,0.1,0.1,0.3
+2026-06-29,lunch,poke Bowl Chicken Asia4You,250.0,3.2,0.1,0.1,0.5
