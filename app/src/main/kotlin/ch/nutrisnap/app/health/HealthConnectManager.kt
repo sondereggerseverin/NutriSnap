@@ -81,7 +81,8 @@ class HealthConnectManager(context: Context) {
     /** Activity calories for a specific day (active only, no BMR) */
     suspend fun getActiveCaloriesForDay(date: LocalDate): Double {
         val start = date.atStartOfDay(ZoneId.systemDefault()).toInstant()
-        val end   = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val end   = if (date == LocalDate.now()) Instant.now()
+                    else date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
         return runCatching {
             val response = client.aggregate(
                 AggregateRequest(
