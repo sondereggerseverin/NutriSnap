@@ -8,16 +8,22 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 class AuthViewModel : ViewModel() {
-    // null = noch am Laden (Session-Restore), false = nicht eingeloggt, true = eingeloggt
-    private val _isLoggedIn = MutableStateFlow<Boolean?>(null)
+    // ─── DEV FLAG ───────────────────────────────────────────────────────────────
+    // AUTH_ENABLED = true  → Supabase Login aktiv
+    // AUTH_ENABLED = false → Login übersprungen (dev/debug)
+    private val AUTH_ENABLED = false
+
+    // null = noch am Laden, false = nicht eingeloggt, true = eingeloggt
+    // Wenn AUTH_ENABLED = false: direkt true setzen, nie null oder false
+    private val _isLoggedIn = MutableStateFlow<Boolean?>(if (AUTH_ENABLED) null else true)
     val isLoggedIn: StateFlow<Boolean?> = _isLoggedIn
 
     init {
-        viewModelScope.launch {
-            // LOGIN TEMPORARILY DISABLED — set to true to re-enable Supabase auth:
-            // AuthRepository.awaitSession()
-            // _isLoggedIn.value = AuthRepository.isLoggedIn
-            _isLoggedIn.value = true
+        if (AUTH_ENABLED) {
+            viewModelScope.launch {
+                AuthRepository.awaitSession()
+                _isLoggedIn.value = AuthRepository.isLoggedIn
+            }
         }
     }
 
