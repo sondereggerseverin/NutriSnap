@@ -258,6 +258,12 @@ class HealthConnectManager(context: Context) {
         emit(getStepsForDay(LocalDate.now()))
     }
 
+    private fun todayRange(): Pair<Instant, Instant> {
+        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val end = Instant.now()
+        return Pair(start, end)
+    }
+
     fun getTodaysActiveCalories(dailyBmr: Double = 1800.0): Flow<Double> = flow {
         val (start, end) = todayRange()
         val activeResp = client.readRecords(ReadRecordsRequest(ActiveCaloriesBurnedRecord::class, TimeRangeFilter.between(start, end)))
