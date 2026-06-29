@@ -1,4 +1,4 @@
-﻿package ch.nutrisnap.app.data.model
+package ch.nutrisnap.app.data.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
@@ -11,7 +11,7 @@ data class FoodItem(
     val brand: String? = null,
     val barcode: String? = null,
 
-    // MakronÃ¤hrstoffe (pro 100g)
+    // Makronaehrstoffe (pro 100g)
     val calories: Float,
     val protein: Float,
     val carbs: Float,
@@ -19,7 +19,7 @@ data class FoodItem(
     val servingSize: Float = 100f,
     val servingUnit: String = "g",
 
-    // MikronÃ¤hrstoffe (pro 100g, nullable wenn nicht bekannt)
+    // Mikronaehrstoffe (pro 100g, nullable wenn nicht bekannt)
     val fiber: Float? = null,
     val sugar: Float? = null,
     val saturatedFat: Float? = null,
@@ -41,6 +41,6 @@ enum class FoodSource {
     OPEN_FOOD_FACTS,
     USDA,
     NUTRITIONIX,
-    MANUAL
-    SWISS_FSVO`n}
-
+    MANUAL,
+    SWISS_FSVO
+}
