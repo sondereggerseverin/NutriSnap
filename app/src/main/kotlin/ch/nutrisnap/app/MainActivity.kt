@@ -99,7 +99,14 @@ class MainActivity : ComponentActivity() {
                 val authVm: AuthViewModel = viewModel()
                 val isLoggedIn by authVm.isLoggedIn.collectAsState()
 
-                when (isLoggedIn) {
+                // ─── DEV: Anmeldung deaktivieren ──────────────────────────────────────────
+                // true  = Anmeldung aktiv (normal)
+                // false = Anmeldung übersprungen (dev/debug)
+                val AUTH_ENABLED = false
+
+                if (AUTH_ENABLED) authVm.onLoggedIn()
+
+                when (if (AUTH_ENABLED) isLoggedIn else true) {
                     null  -> Box(modifier = Modifier.fillMaxSize())
                     false -> LoginScreen(onLoggedIn = { authVm.onLoggedIn() })
                     true  -> {
