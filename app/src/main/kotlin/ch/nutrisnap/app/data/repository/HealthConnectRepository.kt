@@ -28,7 +28,12 @@ class HealthConnectRepository(
                 runCatching { manager.getTodaysActiveCalories().firstOrNull() ?: 0.0 }.getOrDefault(0.0)
             }
             val weight = async {
-                runCatching { manager.getLatestWeight().firstOrNull() }.getOrDefault(null)
+                runCatching {
+                    val today = LocalDate.now()
+                    val start = today.atStartOfDay(ZoneId.systemDefault()).toInstant()
+                    val end = java.time.Instant.now()
+                    manager.getWeightForRange(start, end)[today]
+                }.getOrDefault(null)
             }
             val sleep = async {
                 runCatching { manager.getLastNightSleep().firstOrNull() ?: 0L }.getOrDefault(0L)
