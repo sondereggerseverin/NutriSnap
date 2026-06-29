@@ -60,10 +60,10 @@ fun RecipeGeneratorScreen(
         OutlinedTextField(
             value = input,
             onValueChange = { input = it },
-            label = { Text("Was möchtest du essen?") },
-            placeholder = { Text("z.B. Schnelles Hähnchen mit Reis") },
+            label = { Text("Rezept, Caption oder Link") },
+            placeholder = { Text("Rezeptidee, kopierten Caption-Text oder Instagram/TikTok-Link einfügen") },
             modifier = Modifier.fillMaxWidth(),
-            minLines = 2, maxLines = 4
+            minLines = 3, maxLines = 8
         )
 
         Spacer(Modifier.height(12.dp))
