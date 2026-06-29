@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
 @Serializable
 data class RecipeIngredient(
     val name: String = "",
-    val amount: String = "",   // z.B. "200g", "2 Stück"
+    val amount: String = "",
     val calories: Int = 0,
     val protein: Float = 0f,
     val carbs: Float = 0f,
@@ -26,7 +26,7 @@ data class RecipeIngredient(
 data class GeneratedRecipe(
     val title: String = "",
     val description: String = "",
-    val ingredients: List<String> = emptyList(),          // legacy, kept for history compat
+    val ingredients: List<String> = emptyList(),
     val structuredIngredients: List<RecipeIngredient> = emptyList(),
     val steps: List<String> = emptyList(),
     val servings: Int = 2,
@@ -36,10 +36,14 @@ data class GeneratedRecipe(
     val carbs: Float = 0f,
     val fat: Float = 0f
 ) {
-    /** Returns structured ingredients if available, otherwise wraps legacy strings */
     fun effectiveIngredients(): List<RecipeIngredient> =
         if (structuredIngredients.isNotEmpty()) structuredIngredients
         else ingredients.map { RecipeIngredient(name = it, amount = "") }
+}
+
+private fun isUrl(input: String): Boolean {
+    val trimmed = input.trim()
+    return trimmed.startsWith("http://") || trimmed.startsWith("https://")
 }
 
 class GroqRecipeGeneratorService {
@@ -59,6 +63,55 @@ class GroqRecipeGeneratorService {
         )
     }
 
+    private fun buildPrompt(userInput: String): String {
+        val isCaption = !isUrl(userInput) && userInput.length > 80
+
+        val taskDescription = if (isCaption) {
+            """
+Der Benutzer hat folgenden Text eingefügt (z.B. einen kopierten Instagram/TikTok-Caption oder ein Rezept aus dem Internet):
+
+\"\"\"
+$userInput
+\"\"\"
+
+Extrahiere daraus alle Zutaten und Zubereitungsschritte. Falls Mengenangaben fehlen, schätze realistische Werte.
+Falls kein Rezepttitel erkennbar ist, erfinde einen passenden deutschen Namen.
+""".trimIndent()
+        } else {
+            "Erstelle ein realistisches Rezept für: $userInput"
+        }
+
+        return """
+Du bist ein erfahrener Ernährungsberater und Koch.
+$taskDescription
+
+Berechne die Nährwerte EXAKT basierend auf echten Zutatenmengen.
+Referenzwerte pro 100g: Hühnerbrust=165kcal/31gP, Parmesan=431kcal/38gP,
+Ricotta=174kcal/11gP, Hackfleisch=250kcal/17gP, Pasta=350kcal/13gP,
+Reis=130kcal/3gP, Ei=155kcal/13gP, Butter=717kcal/1gP.
+
+Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
+{
+  "title": "Rezeptname",
+  "description": "Kurze Beschreibung",
+  "structuredIngredients": [
+    {"name": "Hühnerbrust", "amount": "200g", "calories": 330, "protein": 62.0, "carbs": 0.0, "fat": 7.0}
+  ],
+  "ingredients": ["200g Hühnerbrust"],
+  "steps": ["Schritt 1", "Schritt 2"],
+  "servings": 4,
+  "prepTimeMinutes": 30,
+  "calories": 650,
+  "protein": 55.0,
+  "carbs": 45.0,
+  "fat": 25.0
+}
+
+calories/protein/carbs/fat auf Toplevel = Werte PRO PORTION.
+Werte in structuredIngredients = GESAMT für die gesamte Zutatenmenge.
+""".trimIndent()
+    }
+
     private fun tryProvider(
         url: String,
         apiKey: String,
@@ -70,37 +123,6 @@ class GroqRecipeGeneratorService {
                 "Kein GROQ_API_KEY in local.properties konfiguriert"
             ))
 
-            val prompt = """
-Du bist ein erfahrener Ernaehrungsberater und Koch.
-Erstelle ein realistisches Rezept fuer: $userInput
-
-Berechne die Naehrwerte EXAKT basierend auf echten Zutatenmengen pro Portion.
-Referenzwerte pro 100g: Huehnerbrust=165kcal/31gP, Parmesan=431kcal/38gP,
-Ricotta=174kcal/11gP, Hackfleisch=250kcal/17gP, Pasta=350kcal/13gP,
-Reis=130kcal/3gP, Ei=155kcal/13gP, Butter=717kcal/1gP.
-
-Antworte NUR mit folgendem JSON (kein Markdown, keine Erklaerungen):
-{
-  "title": "Rezeptname",
-  "description": "Kurze Beschreibung",
-  "structuredIngredients": [
-    {"name": "Huehnerbrust", "amount": "200g", "calories": 330, "protein": 62.0, "carbs": 0.0, "fat": 7.0},
-    {"name": "Pasta", "amount": "250g", "calories": 875, "protein": 32.5, "carbs": 175.0, "fat": 5.0}
-  ],
-  "ingredients": ["200g Huehnerbrust", "250g Pasta"],
-  "steps": ["Schritt 1", "Schritt 2"],
-  "servings": 4,
-  "prepTimeMinutes": 30,
-  "calories": 650,
-  "protein": 55.0,
-  "carbs": 45.0,
-  "fat": 25.0
-}
-
-Wichtig: calories/protein/carbs/fat auf Toplevel sind die Werte PRO PORTION.
-Die Werte in structuredIngredients sind GESAMT fuer die gesamte Zutatenmenge.
-""".trimIndent()
-
             val requestJson = JSONObject().apply {
                 put("model", model)
                 put("temperature", 0.7)
@@ -108,7 +130,7 @@ Die Werte in structuredIngredients sind GESAMT fuer die gesamte Zutatenmenge.
                 put("messages", org.json.JSONArray().apply {
                     put(JSONObject().apply {
                         put("role", "user")
-                        put("content", prompt)
+                        put("content", buildPrompt(userInput))
                     })
                 })
             }.toString()
