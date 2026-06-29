@@ -25,7 +25,7 @@ class HealthConnectRepository(
                 runCatching { manager.getTodaysSteps().firstOrNull() ?: 0L }.getOrDefault(0L)
             }
             val calories = async {
-                runCatching { manager.getTodaysActiveCalories().firstOrNull() ?: 0.0 }.getOrDefault(0.0)
+                runCatching { manager.getActiveCaloriesForDay(LocalDate.now()) }.getOrDefault(0.0)
             }
             val weight = async {
                 runCatching {
