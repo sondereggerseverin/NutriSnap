@@ -97,16 +97,33 @@ class MainActivity : ComponentActivity() {
         setContent {
             NutriSnapTheme {
                 val authVm: AuthViewModel = viewModel()
-                val isLoggedIn by authVm.isLoggedIn.collectAsState()
-
                 // ─── DEV: Anmeldung deaktivieren ──────────────────────────────────────────
                 // true  = Anmeldung aktiv (normal)
                 // false = Anmeldung übersprungen (dev/debug)
                 val AUTH_ENABLED = false
 
-                if (AUTH_ENABLED) authVm.onLoggedIn()
+                if (!AUTH_ENABLED) {
+                    // Skip auth entirely — go straight to main content
+                    val networkMonitor2 = remember { NetworkMonitor(this) }
+                    val isOnline2 by networkMonitor2.isOnline.collectAsState(initial = true)
+                    val hcVm2: HealthConnectViewModel = viewModel()
+                    LaunchedEffect(Unit) { healthConnectViewModel = hcVm2 }
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        OfflineBanner(isOnline = isOnline2)
+                        MainScaffold(
+                            sharedUrl = sharedUrl,
+                            hcVm = hcVm2,
+                            onRequestHealthPermission = {
+                                healthConnectPermLauncher.launch(HealthConnectManager.REQUIRED_PERMISSIONS)
+                            }
+                        )
+                    }
+                    return@NutriSnapTheme
+                }
 
-                when (if (AUTH_ENABLED) isLoggedIn else true) {
+                val isLoggedIn by authVm.isLoggedIn.collectAsState()
+
+                when (isLoggedIn) {
                     null  -> Box(modifier = Modifier.fillMaxSize())
                     false -> LoginScreen(onLoggedIn = { authVm.onLoggedIn() })
                     true  -> {
