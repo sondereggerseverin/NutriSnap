@@ -258,24 +258,15 @@ class HealthConnectManager(context: Context) {
         emit(getStepsForDay(LocalDate.now()))
     }
 
-    fun getTodaysActiveCalories(): Flow<Double> = flow {
-        emit(getActiveCaloriesForDay(LocalDate.now()))
-    }
-
-    fun getLatestWeight(): Flow<Double?> = flow {
-        val result = runCatching {
-            val resp = client.readRecords(
-                ReadRecordsRequest(
-                    WeightRecord::class,
-                    TimeRangeFilter.between(
-                        Instant.now().minusSeconds(30L * 24 * 3600),
-                        Instant.now()
-                    )
-                )
-            )
-            resp.records.lastOrNull()?.weight?.inKilograms
-        }.getOrDefault(null)
-        emit(result)
+    fun getTodaysActiveCalories(dailyBmr: Double = 1800.0): Flow<Double> = flow {
+        val (start, end) = todayRange()
+        val activeResp = client.readRecords(ReadRecordsRequest(ActiveCaloriesBurnedRecord::class, TimeRangeFilter.between(start, end)))
+        val activeCals = activeResp.records.sumOf { it.energy.inKilocalories }
+        if (activeCals > 0) { emit(activeCals); return@flow }
+        val totalResp = client.readRecords(ReadRecordsRequest(TotalCaloriesBurnedRecord::class, TimeRangeFilter.between(start, end)))
+        val totalCals = totalResp.records.sumOf { it.energy.inKilocalories }
+        if (totalCals > 0) { val bmrPortion = (java.time.Duration.between(start, Instant.now()).toMinutes() / 60.0) * (dailyBmr / 24.0); emit((totalCals - bmrPortion).coerceAtLeast(0.0)); return@flow }
+        emit(0.0)
     }
 
     fun getLastNightSleep(): Flow<Long> = flow {
@@ -316,3 +307,4 @@ class HealthConnectManager(context: Context) {
         emit(map)
     }
 }
+
