@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit
 data class RecipeIngredient(
     val name: String = "",
     val amount: String = "",
-    val calories: Int = 0,
+    val calories: Float = 0f,
     val protein: Float = 0f,
     val carbs: Float = 0f,
     val fat: Float = 0f
@@ -31,7 +31,7 @@ data class GeneratedRecipe(
     val steps: List<String> = emptyList(),
     val servings: Int = 2,
     val prepTimeMinutes: Int = 30,
-    val calories: Int = 0,
+    val calories: Float = 0f,
     val protein: Float = 0f,
     val carbs: Float = 0f,
     val fat: Float = 0f

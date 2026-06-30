@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlin.math.roundToInt
 import java.time.LocalDate
 
 data class RecipeGenUiState(
@@ -55,7 +56,7 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
                         steps           = json.encodeToString(recipe.steps),
                         servings        = recipe.servings,
                         prepTimeMinutes = recipe.prepTimeMinutes,
-                        calories        = recipe.calories,
+                        calories        = recipe.calories.roundToInt(),
                         protein         = recipe.protein,
                         carbs           = recipe.carbs,
                         fat             = recipe.fat

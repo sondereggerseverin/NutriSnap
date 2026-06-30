@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.domain.GeneratedRecipe
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -151,7 +152,7 @@ private fun RecipeResultCard(recipe: GeneratedRecipe, onAddToDiary: () -> Unit) 
 
             // Makro-Chips
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                MacroChip("${recipe.calories} kcal", MaterialTheme.colorScheme.primaryContainer)
+                MacroChip("${recipe.calories.roundToInt()} kcal", MaterialTheme.colorScheme.primaryContainer)
                 MacroChip("P ${recipe.protein.toInt()}g", MaterialTheme.colorScheme.secondaryContainer)
                 MacroChip("K ${recipe.carbs.toInt()}g", MaterialTheme.colorScheme.tertiaryContainer)
                 MacroChip("F ${recipe.fat.toInt()}g", MaterialTheme.colorScheme.surfaceVariant)

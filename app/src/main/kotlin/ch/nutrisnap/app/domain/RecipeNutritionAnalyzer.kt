@@ -76,11 +76,25 @@ object RecipeNutritionAnalyzer {
 
     private val UNIT_TO_G = mapOf(
         "kg" to 1000f, "g" to 1f,
+        "kilogram" to 1000f, "kilogramm" to 1000f,
+        "gram" to 1f, "gramm" to 1f, "grams" to 1f,
         "lb" to 453.6f, "lbs" to 453.6f, "oz" to 28.35f,
         "l" to 1000f, "ml" to 1f, "dl" to 100f,
+        "liter" to 1000f, "litre" to 1000f,
+        "milliliter" to 1f, "millilitre" to 1f,
         "cups" to 240f, "cup" to 240f,
         "tbsp" to 15f, "tbs" to 15f, "el" to 15f,
-        "tsp" to 5f, "tl" to 5f
+        "tablespoon" to 15f, "tablespoons" to 15f, "esslöffel" to 15f,
+        "tsp" to 5f, "tl" to 5f,
+        "teaspoon" to 5f, "teaspoons" to 5f, "teelöffel" to 5f
+    )
+
+    // Units that describe a *count* of items rather than a weight/volume.
+    // Used as a fallback when the exact item isn't in COUNT_WEIGHTS below —
+    // intentionally a much smaller guess than the old blanket "* 100" fallback,
+    // since "10 portion Raffaello" should land around 200g, not 1000g.
+    private val GENERIC_PIECE_UNITS = setOf(
+        "portion", "portionen", "stück", "stueck", "piece", "pieces", "scoop", "scoops"
     )
 
     private val COUNT_WEIGHTS = mapOf(
@@ -159,7 +173,14 @@ object RecipeNutritionAnalyzer {
             val lc = rest.lowercase()
             val countKey = COUNT_WEIGHTS.keys.sortedByDescending { it.length }
                 .firstOrNull { lc.contains(it) }
-            val gramWeight = if (countKey != null) amount * (COUNT_WEIGHTS[countKey] ?: 100f) else amount * 100f
+            val gramWeight = when {
+                countKey != null -> amount * (COUNT_WEIGHTS[countKey] ?: 100f)
+                // "10 portion Raffaello", "3 Stück ..." — count-style unit but the
+                // specific food isn't in COUNT_WEIGHTS. Guess a modest per-piece
+                // weight instead of treating amount as if it were in 100g steps.
+                GENERIC_PIECE_UNITS.any { lc.startsWith(it) } -> amount * 25f
+                else -> amount * 100f
+            }
             val foodName = rest.replace(Regex("""\s*(,|;).*"""), "").take(50)
             ParsedIngredient(gramWeight.coerceAtLeast(1f), foodName)
         }
