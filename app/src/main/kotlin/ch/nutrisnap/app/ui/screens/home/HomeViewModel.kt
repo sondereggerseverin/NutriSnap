@@ -71,7 +71,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             totalProtein  = entries.sumOf { it.protein.toDouble() }.toFloat(),
             totalCarbs    = entries.sumOf { it.carbs.toDouble() }.toFloat(),
             totalFat      = entries.sumOf { it.fat.toDouble() }.toFloat(),
-            calorieGoal   = profile.computedTdee()?.toFloat() ?: profile.dailyCalorieGoal.toFloat(),
+            calorieGoal   = profile.dailyCalorieGoal.toFloat(),
             burnedKcal    = hcCache?.activeCaloriesKcal?.toFloat() ?: 0f,
             proteinGoal   = profile.proteinGoalG,
             carbsGoal     = profile.carbsGoalG,

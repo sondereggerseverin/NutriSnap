@@ -49,7 +49,7 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
             totalProtein  = entries.sumOf { it.protein.toDouble() }.toFloat(),
             totalCarbs    = entries.sumOf { it.carbs.toDouble() }.toFloat(),
             totalFat      = entries.sumOf { it.fat.toDouble() }.toFloat(),
-            calorieGoal   = (profile.computedTdee()?.toFloat()) ?: profile.dailyCalorieGoal.toFloat(),
+            calorieGoal   = profile.dailyCalorieGoal.toFloat(),
             proteinGoal   = profile.proteinGoalG
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DiaryUiState())

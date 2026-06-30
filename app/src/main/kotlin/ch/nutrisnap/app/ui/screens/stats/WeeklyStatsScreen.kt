@@ -64,7 +64,7 @@ class WeeklyStatsViewModel(app: Application) : AndroidViewModel(app) {
     private fun loadWeeklyStats() {
         viewModelScope.launch {
             val profile = profileRepo.get().first()
-            _calorieGoal.value = profile.computedTdee()?.toFloat() ?: profile.dailyCalorieGoal.toFloat()
+            _calorieGoal.value = profile.dailyCalorieGoal.toFloat()
 
             val today = LocalDate.now()
             val from  = today.minusDays(6)

@@ -95,6 +95,56 @@ fun RecipesScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 singleLine = true, shape = RoundedCornerShape(12.dp)
             )
+
+            // ── Filter & Sortierung ──────────────────────────────────────────
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    listOf(
+                        null       to "Alle",
+                        "instagram" to "📷 IG",
+                        "tiktok"    to "🎵 TikTok",
+                        "web"       to "🌐 Web",
+                        "ki"        to "✨ KI"
+                    ).forEach { (value, label) ->
+                        FilterChip(
+                            selected = state.platformFilter == value,
+                            onClick  = { vm.setPlatformFilter(value) },
+                            label    = { Text(label, fontSize = 12.sp) }
+                        )
+                    }
+                }
+                IconButton(onClick = {
+                    val next = when (state.sort) {
+                        RecipeSort.NEWEST   -> RecipeSort.NAME
+                        RecipeSort.NAME     -> RecipeSort.CALORIES
+                        RecipeSort.CALORIES -> RecipeSort.NEWEST
+                    }
+                    vm.setSort(next)
+                }) {
+                    Icon(Icons.Default.Sort, "Sortierung: ${state.sort}",
+                        tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+            if (state.recipes.isNotEmpty()) {
+                Text(
+                    "${state.recipes.size} Rezept${if (state.recipes.size == 1) "" else "e"} · " +
+                        when (state.sort) {
+                            RecipeSort.NEWEST   -> "neueste zuerst"
+                            RecipeSort.NAME     -> "A–Z"
+                            RecipeSort.CALORIES -> "meiste kcal zuerst"
+                        },
+                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+            }
+
             if (state.recipes.isEmpty()) {
                 EmptyState(
                     icon = { Icon(Icons.Default.MenuBook, null, Modifier.size(56.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) },
@@ -239,6 +289,7 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
     val (icon, label) = when (platform.lowercase()) {
         "instagram" -> Icons.Default.CameraAlt to "Instagram"
         "tiktok"    -> Icons.Default.VideoLibrary to "TikTok"
+        "ki"        -> Icons.Default.AutoAwesome to "KI"
         else        -> Icons.Default.Language to "Web"
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -288,6 +339,7 @@ private fun platformVisuals(platform: String?): Pair<List<Color>, androidx.compo
     when (platform?.lowercase()) {
         "instagram" -> listOf(Color(0xFFFEDA77), Color(0xFFDC2743), Color(0xFF962FBF)) to Icons.Default.CameraAlt
         "tiktok"    -> listOf(Color(0xFF25F4EE), Color(0xFF000000), Color(0xFFFE2C55)) to Icons.Default.VideoLibrary
+        "ki"        -> listOf(Color(0xFFFF9B45), Color(0xFFD9633B)) to Icons.Default.AutoAwesome
         else        -> listOf(Color(0xFF2D6A4F), Color(0xFF40916C)) to Icons.Default.RestaurantMenu
     }
 
@@ -304,6 +356,11 @@ fun ImportSheet(prefillUrl: String, isLoading: Boolean, error: String?,
     var showManual by remember(openAtManualCaption) { mutableStateOf(openAtManualCaption) }
     var manualTitle by remember { mutableStateOf("") }; var manualCaption by remember { mutableStateOf("") }
     val isInstagram = "instagram.com" in url || "instagr.am" in url
+    // Jeder Fehler bei einem Instagram-Link -> sofort Caption-Fallback anbieten,
+    // nicht nur wenn der ViewModel-State exakt "instagramBlocked" meldet.
+    LaunchedEffect(error) {
+        if (error != null && isInstagram) showManual = true
+    }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal=16.dp).navigationBarsPadding().padding(bottom=8.dp)) {
             if (!showManual) {

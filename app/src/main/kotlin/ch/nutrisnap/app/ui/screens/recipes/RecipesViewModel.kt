@@ -28,9 +28,13 @@ data class NutritionState(
     val recipeId: Long = -1L
 )
 
+enum class RecipeSort { NEWEST, NAME, CALORIES }
+
 data class RecipesUiState(
     val recipes:          List<Recipe> = emptyList(),
     val query:            String       = "",
+    val platformFilter:   String?      = null,   // null = alle
+    val sort:             RecipeSort   = RecipeSort.NEWEST,
     val isImporting:      Boolean      = false,
     val importError:      String?      = null,
     val lastImport:       Recipe?      = null,
@@ -42,8 +46,10 @@ data class RecipesUiState(
 class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = RecipeRepository(NutriDatabase.getInstance(app), app)
 
-    private val _query         = MutableStateFlow("")
-    private val _importState   = MutableStateFlow(ImportState())
+    private val _query          = MutableStateFlow("")
+    private val _platformFilter = MutableStateFlow<String?>(null)
+    private val _sort           = MutableStateFlow(RecipeSort.NEWEST)
+    private val _importState    = MutableStateFlow(ImportState())
     private val _nutritionState = MutableStateFlow(NutritionState())
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -52,12 +58,32 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             if (q.isBlank()) repo.getAll() else repo.search(q)
         },
         _query,
+        _platformFilter,
+        _sort,
         _importState,
         _nutritionState
-    ) { recipes, q, imp, nut ->
+    ) { values ->
+        @Suppress("UNCHECKED_CAST")
+        val recipes        = values[0] as List<Recipe>
+        val q              = values[1] as String
+        val platformFilter = values[2] as String?
+        val sort           = values[3] as RecipeSort
+        val imp            = values[4] as ImportState
+        val nut            = values[5] as NutritionState
+
+        val filtered = if (platformFilter == null) recipes
+            else recipes.filter { (it.platform ?: "web").lowercase() == platformFilter }
+        val sorted = when (sort) {
+            RecipeSort.NEWEST   -> filtered.sortedByDescending { it.savedAt }
+            RecipeSort.NAME     -> filtered.sortedBy { it.title.lowercase() }
+            RecipeSort.CALORIES -> filtered.sortedByDescending { it.totalCalories ?: -1f }
+        }
+
         RecipesUiState(
-            recipes          = recipes,
+            recipes          = sorted,
             query            = q,
+            platformFilter   = platformFilter,
+            sort             = sort,
             isImporting      = imp.isImporting,
             importError      = imp.importError,
             lastImport       = imp.lastImport,
@@ -68,6 +94,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RecipesUiState())
 
     fun setQuery(q: String) { _query.value = q }
+    fun setPlatformFilter(p: String?) { _platformFilter.value = p }
+    fun setSort(s: RecipeSort) { _sort.value = s }
     fun clearError()        { _importState.update { it.copy(importError = null) } }
     fun clearLastImport()   { _importState.update { it.copy(lastImport = null) } }
     fun clearInstagramBlocked() { _importState.update { it.copy(instagramBlocked = false, blockedUrl = "") } }

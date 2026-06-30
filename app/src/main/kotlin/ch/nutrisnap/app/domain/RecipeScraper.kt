@@ -332,7 +332,7 @@ class RecipeScraper(private val context: Context) {
             .joinToString("\n") { "• ${it.text().trim()}" }
 
         return Recipe(
-            title        = cleanTitle(title),
+            title        = cleanTitle(title, url),
             description  = desc.take(400),
             imageUrl     = image,
             sourceUrl    = url,
@@ -388,7 +388,7 @@ class RecipeScraper(private val context: Context) {
         val instructions = listField("recipeInstructions").ifEmpty { listField("text") }
 
         return Recipe(
-            title           = cleanTitle(field("name") ?: doc.title()),
+            title           = cleanTitle(field("name") ?: doc.title(), url),
             description     = (field("description") ?: "").take(400),
             imageUrl        = field("image") ?: doc.select("meta[property=og:image]").attr("content").ifBlank { null },
             sourceUrl       = url,
@@ -412,8 +412,12 @@ class RecipeScraper(private val context: Context) {
         }
     }
 
-    private fun cleanTitle(raw: String) =
-        raw.replace(Regex("""\s*[-|].*$"""), "").trim().ifBlank { "Rezept" }
+    private fun cleanTitle(raw: String, sourceUrl: String? = null): String {
+        val cleaned = raw.replace(Regex("""\s*[-|].*$"""), "").trim()
+        if (cleaned.isNotBlank()) return cleaned
+        val host = sourceUrl?.let { runCatching { java.net.URI(it).host?.removePrefix("www.") }.getOrNull() }
+        return if (!host.isNullOrBlank()) "Rezept von $host" else "Rezept"
+    }
 
     private fun encode(url: String) = java.net.URLEncoder.encode(url, "UTF-8")
 
