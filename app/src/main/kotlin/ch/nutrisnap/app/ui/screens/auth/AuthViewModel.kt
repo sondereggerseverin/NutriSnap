@@ -11,7 +11,7 @@ class AuthViewModel : ViewModel() {
     // ─── DEV FLAG ───────────────────────────────────────────────────────────────
     // AUTH_ENABLED = true  → Supabase Login aktiv
     // AUTH_ENABLED = false → Login übersprungen (dev/debug)
-    private val AUTH_ENABLED = false
+    private val AUTH_ENABLED = true
 
     // null = noch am Laden, false = nicht eingeloggt, true = eingeloggt
     // Wenn AUTH_ENABLED = false: direkt true setzen, nie null oder false
