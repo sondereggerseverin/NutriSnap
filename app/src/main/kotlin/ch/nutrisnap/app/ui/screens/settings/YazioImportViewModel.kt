@@ -141,4 +141,12 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
     fun reset() {
         _state.value = YazioImportState.Idle
     }
+
+    /** Loescht ALLE Tagebuch-Eintraege (manuell, importiert, Rezepte). Unwiderruflich. */
+    fun clearAllDiaryEntries(onDone: () -> Unit) {
+        viewModelScope.launch {
+            diaryRepo.deleteAllEntries()
+            onDone()
+        }
+    }
 }
