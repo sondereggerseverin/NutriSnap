@@ -56,7 +56,7 @@ fun YazioImportScreen(
 
             when (val s = state) {
                 is YazioImportState.Idle -> {
-                    Button(onClick = { filePicker.launch("text/csv") }) {
+                    Button(onClick = { filePicker.launch("*/*") }) {
                         Icon(Icons.Filled.UploadFile, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
                         Text("nutrition_log.csv auswaehlen")
