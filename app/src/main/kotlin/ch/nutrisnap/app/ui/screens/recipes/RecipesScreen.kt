@@ -4,6 +4,8 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -63,6 +65,9 @@ private fun scaleNumbers(line: String, ratio: Float): String {
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
+private fun Recipe.isIncomplete(): Boolean =
+    (title == "Rezept" || title.startsWith("Rezept von")) && imageUrl.isNullOrBlank() && totalCalories == null
+
 @Composable
 fun RecipesScreen(
     vm: RecipesViewModel = viewModel(),
@@ -75,6 +80,7 @@ fun RecipesScreen(
     var showVerifySheet    by remember { mutableStateOf(false) }
     var addToDiaryRecipe  by remember { mutableStateOf<Recipe?>(null) }
     var editRecipe        by remember { mutableStateOf<Recipe?>(null) }
+    var hideIncomplete    by remember { mutableStateOf(false) }
 
     LaunchedEffect(sharedUrl) { if (!sharedUrl.isNullOrBlank()) showImportSheet = true }
     LaunchedEffect(state.instagramBlocked) { if (state.instagramBlocked) showImportSheet = true }
@@ -104,7 +110,7 @@ fun RecipesScreen(
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState())
                 ) {
                     listOf(
                         null       to "Alle",
@@ -117,6 +123,14 @@ fun RecipesScreen(
                             selected = state.platformFilter == value,
                             onClick  = { vm.setPlatformFilter(value) },
                             label    = { Text(label, fontSize = 12.sp) }
+                        )
+                    }
+                    val incompleteCount = state.recipes.count { it.isIncomplete() }
+                    if (incompleteCount > 0) {
+                        FilterChip(
+                            selected = hideIncomplete,
+                            onClick  = { hideIncomplete = !hideIncomplete },
+                            label    = { Text("🧹 Ohne leere ($incompleteCount)", fontSize = 12.sp) }
                         )
                     }
                 }
@@ -132,9 +146,10 @@ fun RecipesScreen(
                         tint = MaterialTheme.colorScheme.primary)
                 }
             }
+            val displayedRecipes = if (hideIncomplete) state.recipes.filterNot { it.isIncomplete() } else state.recipes
             if (state.recipes.isNotEmpty()) {
                 Text(
-                    "${state.recipes.size} Rezept${if (state.recipes.size == 1) "" else "e"} · " +
+                    "${displayedRecipes.size} Rezept${if (displayedRecipes.size == 1) "" else "e"} · " +
                         when (state.sort) {
                             RecipeSort.NEWEST   -> "neueste zuerst"
                             RecipeSort.NAME     -> "A–Z"
@@ -145,15 +160,15 @@ fun RecipesScreen(
                 )
             }
 
-            if (state.recipes.isEmpty()) {
+            if (displayedRecipes.isEmpty()) {
                 EmptyState(
                     icon = { Icon(Icons.Default.MenuBook, null, Modifier.size(56.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                    message = "Noch keine Rezepte gespeichert",
-                    sub = "Tippe auf + und füge einen Link ein"
+                    message = if (hideIncomplete) "Keine vollständigen Rezepte" else "Noch keine Rezepte gespeichert",
+                    sub = if (hideIncomplete) "Schalte den Filter aus, um alle zu sehen" else "Tippe auf + und füge einen Link ein"
                 )
             } else {
                 LazyColumn(contentPadding = PaddingValues(bottom = 80.dp)) {
-                    items(state.recipes, key = { it.id }) { recipe ->
+                    items(displayedRecipes, key = { it.id }) { recipe ->
                         RecipeCard(recipe,
                             onClick      = { selectedRecipe = recipe },
                             onDelete     = { vm.deleteRecipe(recipe) },
@@ -242,12 +257,32 @@ fun RecipesScreen(
 private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit,
     onAddToDiary: () -> Unit, onEdit: () -> Unit) {
     var showConfirm by remember { mutableStateOf(false) }
+    val incomplete = recipe.isIncomplete()
     Card(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(2.dp)
+        colors = CardDefaults.cardColors(
+            containerColor = if (incomplete) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                              else MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(if (incomplete) 0.dp else 2.dp)
     ) {
+        if (incomplete) {
+            // Kompakte Darstellung für leere Web-Importe ohne Caption/Bild/Kalorien
+            Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.WarningAmber, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.outline)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(recipe.title, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("Unvollständig – Caption fehlt, tippe zum Ergänzen", fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.outline)
+                }
+                IconButton(onClick = { showConfirm = true }, Modifier.size(32.dp)) {
+                    Icon(Icons.Default.DeleteOutline, "Löschen", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                }
+            }
+        } else {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             RecipeThumbnail(recipe = recipe, size = 72.dp)
             Spacer(Modifier.width(12.dp))
@@ -275,6 +310,7 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
                     Icon(Icons.Default.DeleteOutline, "Löschen", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
                 }
             }
+        }
         }
     }
     if (showConfirm) {
