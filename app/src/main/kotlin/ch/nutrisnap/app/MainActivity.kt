@@ -39,6 +39,8 @@ import ch.nutrisnap.app.ui.screens.home.HomeScreen
 import ch.nutrisnap.app.ui.screens.mealtemplate.MealTemplateScreen
 import ch.nutrisnap.app.ui.screens.recipegen.RecipeGeneratorScreen
 import ch.nutrisnap.app.ui.screens.recipes.RecipesScreen
+import ch.nutrisnap.app.ui.screens.scan.FoodScanScreen
+import ch.nutrisnap.app.ui.screens.scan.NutritionLabelScanScreen
 import ch.nutrisnap.app.ui.screens.security.BiometricLockScreen
 import ch.nutrisnap.app.ui.screens.settings.KEY_BIOMETRIC_LOCK
 import ch.nutrisnap.app.ui.screens.settings.NotificationSettingsScreen
@@ -239,7 +241,9 @@ fun MainScaffold(
                     onNavigateToExport        = { navController.navigate("export") },
                     onNavigateToCustomFoods   = { navController.navigate("custom_foods") },
                     onNavigateToMealTemplates = { navController.navigate("meal_templates") },
-                    onNavigateToYazioImport   = { navController.navigate("yazio_import") }
+                    onNavigateToYazioImport   = { navController.navigate("yazio_import") },
+                    onNavigateToFoodScan      = { navController.navigate("food_scan") },
+                    onNavigateToLabelScan     = { navController.navigate("nutrition_label_scan") }
                 )
             }
             composable("water")   { WaterTrackingScreen() }
@@ -274,6 +278,12 @@ fun MainScaffold(
             }
             composable("yazio_import") {
                 YazioImportScreen(onBack = { navController.popBackStack() })
+            }
+            composable("food_scan") {
+                FoodScanScreen(onNavigateBack = { navController.popBackStack() })
+            }
+            composable("nutrition_label_scan") {
+                NutritionLabelScanScreen(onNavigateBack = { navController.popBackStack() })
             }
         }
     }
