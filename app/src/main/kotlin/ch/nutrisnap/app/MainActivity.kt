@@ -101,7 +101,7 @@ class MainActivity : ComponentActivity() {
                 // ─── DEV: Anmeldung deaktivieren ──────────────────────────────────────────
                 // true  = Anmeldung aktiv (normal)
                 // false = Anmeldung übersprungen (dev/debug)
-                val AUTH_ENABLED = false
+                val AUTH_ENABLED = true
 
                 if (!AUTH_ENABLED) {
                     // Skip auth entirely — go straight to main content
