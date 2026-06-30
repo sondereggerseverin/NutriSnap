@@ -99,6 +99,7 @@ class DiaryRepository(db: NutriDatabase) {
 
     suspend fun updateEntry(entry: DiaryEntry) = dao.update(entry)
     suspend fun deleteEntry(entry: DiaryEntry) = dao.delete(entry)
+    suspend fun deleteAllEntries() = dao.deleteAll()
 }
 
 class RecipeRepository(db: NutriDatabase, context: Context) {
