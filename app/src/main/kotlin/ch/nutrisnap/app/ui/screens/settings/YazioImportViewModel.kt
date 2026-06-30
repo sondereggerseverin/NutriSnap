@@ -64,11 +64,14 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                 var skipped = 0
                 val days = mutableSetOf<LocalDate>()
 
-                reader.forEachLine { rawLine ->
+                val allLines = reader.readLines()
+                reader.close()
+
+                for (rawLine in allLines) {
                     val line = rawLine.trim()
-                    if (line.isBlank()) return@forEachLine
+                    if (line.isBlank()) continue
                     val cols = splitCsvLine(line)
-                    if (cols.size < 8) { skipped++; return@forEachLine }
+                    if (cols.size < 8) { skipped++; continue }
 
                     try {
                         val dateStr = cols[0].trim()
@@ -80,7 +83,6 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                         val carbs   = cols[7].trim().toFloatOrNull() ?: 0f
 
                         val date = LocalDate.parse(dateStr)
-                        days.add(date)
 
                         val mealType = when (mealStr) {
                             "breakfast", "fruehstueck", "fruehstuck" -> MealType.BREAKFAST
@@ -89,24 +91,24 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                             else -> MealType.SNACK
                         }
 
-                        viewModelScope.launch {
-                            diaryRepo.addManualEntry(
-                                name = product,
-                                kcal = kcal,
-                                protein = protein,
-                                carbs = carbs,
-                                fat = fat,
-                                mealType = mealType,
-                                date = date
-                            )
-                        }
+                        // Sequenziell und mit await: garantiert, dass jeder Eintrag
+                        // wirklich in der DB landet, bevor der naechste verarbeitet wird
+                        // und bevor der Erfolgs-State gesetzt wird.
+                        diaryRepo.addManualEntry(
+                            name = product,
+                            kcal = kcal,
+                            protein = protein,
+                            carbs = carbs,
+                            fat = fat,
+                            mealType = mealType,
+                            date = date
+                        )
+                        days.add(date)
                         imported++
                     } catch (e: Exception) {
                         skipped++
                     }
                 }
-
-                reader.close()
                 _state.value = YazioImportState.Success(
                     YazioImportResult(
                         importedDays = days.size,
