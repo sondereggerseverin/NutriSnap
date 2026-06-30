@@ -1,10 +1,12 @@
 package ch.nutrisnap.app.data.repository
 
+import ch.nutrisnap.app.data.db.DiaryDao
 import ch.nutrisnap.app.data.db.NutriDatabase
 import java.time.LocalDate
 
-class StatsRepository(db: NutriDatabase) {
-    private val diaryDao = db.diaryDao()
+class StatsRepository(private val diaryDao: DiaryDao) {
+
+    constructor(db: NutriDatabase) : this(db.diaryDao())
 
     /**
      * Number of consecutive days (ending today) with at least one diary entry.

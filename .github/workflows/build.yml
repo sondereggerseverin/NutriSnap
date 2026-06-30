@@ -35,12 +35,14 @@ jobs:
         run: ./gradlew assembleDebug --stacktrace 2>&1 | tee build_output.log; exit ${PIPESTATUS[0]}
       - name: Sign APK with stable keystore
         if: success()
+        env:
+          KEYSTORE_PASS: ${{ secrets.KEYSTORE_PASSWORD || 'nutrisnap123' }}
         run: |
           UNSIGNED=app/build/outputs/apk/debug/app-debug.apk
           ${ANDROID_HOME}/build-tools/$(ls ${ANDROID_HOME}/build-tools/ | sort -V | tail -1)/apksigner sign \
             --ks app/nutrisnap-debug.keystore \
-            --ks-pass pass:nutrisnap123 \
-            --key-pass pass:nutrisnap123 \
+            --ks-pass "pass:${KEYSTORE_PASS}" \
+            --key-pass "pass:${KEYSTORE_PASS}" \
             --ks-key-alias nutrisnap-debug \
             $UNSIGNED
           echo "APK signed with stable keystore"

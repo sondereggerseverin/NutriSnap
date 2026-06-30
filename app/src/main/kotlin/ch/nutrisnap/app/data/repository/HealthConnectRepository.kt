@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.data.repository
 
+import android.util.Log
 import ch.nutrisnap.app.data.db.HealthConnectDao
 import ch.nutrisnap.app.data.model.HealthConnectCache
 import ch.nutrisnap.app.health.HealthConnectManager
@@ -10,6 +11,8 @@ import kotlinx.coroutines.flow.firstOrNull
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+
+private const val TAG = "HealthConnectRepo"
 
 class HealthConnectRepository(
     private val manager: HealthConnectManager,
@@ -25,7 +28,9 @@ class HealthConnectRepository(
                 runCatching { manager.getTodaysSteps().firstOrNull() ?: 0L }.getOrDefault(0L)
             }
             val calories = async {
-                runCatching { manager.getActiveCaloriesForDay(LocalDate.now()) }.getOrDefault(0.0)
+                runCatching { manager.getActiveCaloriesForDay(LocalDate.now()) }
+                    .onFailure { Log.e(TAG, "syncToday: calories fetch failed", it) }
+                    .getOrDefault(0.0)
             }
             val weight = async {
                 runCatching {

@@ -3,6 +3,7 @@ package ch.nutrisnap.app.health
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.aggregate.AggregationResultGroupedByDuration
 import androidx.health.connect.client.permission.HealthPermission
@@ -32,6 +33,8 @@ class HealthConnectManager(context: Context) {
     }
 
     companion object {
+        private const val TAG = "HealthConnectManager"
+
         // Samsung Health's package id - used to filter out other contributing apps
         // (e.g. Google Fit, other trackers) that may inflate or duplicate values.
         private const val SAMSUNG_HEALTH_PACKAGE = "com.sec.android.app.shealth"
@@ -86,6 +89,8 @@ class HealthConnectManager(context: Context) {
                     timeRangeFilter = TimeRangeFilter.between(start, end)
                 )
             )[StepsRecord.COUNT_TOTAL] ?: 0L
+        }.onFailure {
+            Log.e(TAG, "getStepsForDay failed for $date", it)
         }.getOrDefault(0L)
     }
 
@@ -118,6 +123,8 @@ class HealthConnectManager(context: Context) {
             }
             if (samsungRecords.isEmpty()) null
             else samsungRecords.sumOf { it.energy.inKilocalories }
+        }.onFailure {
+            Log.e(TAG, "getActiveCaloriesForDay: Tier 1 (Samsung records) failed for $date", it)
         }.getOrNull()
 
         if (samsungRecordsSum != null && samsungRecordsSum > 0.0) {
@@ -133,6 +140,8 @@ class HealthConnectManager(context: Context) {
                     dataOriginFilter = setOf(DataOrigin(SAMSUNG_HEALTH_PACKAGE))
                 )
             )[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories
+        }.onFailure {
+            Log.e(TAG, "getActiveCaloriesForDay: Tier 2 (Samsung aggregate) failed for $date", it)
         }.getOrNull()
 
         if (samsungAggregate != null && samsungAggregate > 0.0) {
@@ -147,7 +156,14 @@ class HealthConnectManager(context: Context) {
                     timeRangeFilter = range
                 )
             )[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories ?: 0.0
+        }.onFailure {
+            Log.e(TAG, "getActiveCaloriesForDay: Tier 3 (unfiltered aggregate) failed for $date", it)
         }.getOrDefault(0.0)
+
+        if (unfilteredAggregate == 0.0) {
+            Log.w(TAG, "getActiveCaloriesForDay: all 3 tiers returned no data for $date " +
+                "(check Health Connect permissions / Samsung Health sync)")
+        }
 
         return unfilteredAggregate.coerceAtMost(ACTIVE_CALORIES_SANITY_CAP_KCAL)
     }
