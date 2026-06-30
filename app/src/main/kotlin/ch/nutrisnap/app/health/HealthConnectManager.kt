@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.aggregate.AggregationResultGroupedByDuration
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
@@ -12,6 +13,7 @@ import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.WeightRecord
+import androidx.health.connect.client.records.metadata.DataOrigin
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
@@ -30,6 +32,14 @@ class HealthConnectManager(context: Context) {
     }
 
     companion object {
+        // Samsung Health's package id - used to filter out other contributing apps
+        // (e.g. Google Fit, other trackers) that may inflate or duplicate values.
+        private const val SAMSUNG_HEALTH_PACKAGE = "com.sec.android.app.shealth"
+
+        // Sanity cap: nobody legitimately burns more "active" kcal than this in a day.
+        // Used only as a last-resort guard on the unfiltered aggregate fallback.
+        private const val ACTIVE_CALORIES_SANITY_CAP_KCAL = 3000.0
+
         val REQUIRED_PERMISSIONS = setOf(
             HealthPermission.getReadPermission(StepsRecord::class),
             HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
@@ -79,20 +89,67 @@ class HealthConnectManager(context: Context) {
         }.getOrDefault(0L)
     }
 
-    /** Activity calories for a specific day (active only, no BMR) */
+    /**
+     * Activity calories for a specific day (active/movement only, no BMR).
+     *
+     * Three-tier fallback, in order of trustworthiness:
+     *  1. Sum individual ActiveCaloriesBurnedRecord entries written by Samsung Health
+     *     (filtered by dataOrigin). Most granular and reliable when present.
+     *  2. Aggregate ActiveCaloriesBurnedRecord but restricted to Samsung Health's
+     *     dataOrigin via AggregateRequest's dataOriginFilter. Cheaper, same source.
+     *  3. Unfiltered aggregate across all sources, capped at a sanity ceiling, so a
+     *     misbehaving/duplicate source can't blow up the displayed number. This is
+     *     the old behaviour and is only used if Samsung Health has no data at all
+     *     (e.g. permission not granted yet, or sync hasn't happened).
+     */
     suspend fun getActiveCaloriesForDay(date: LocalDate): Double {
         val start = date.atStartOfDay(ZoneId.systemDefault()).toInstant()
         val end   = if (date == LocalDate.now()) Instant.now()
                     else date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
-        return runCatching {
-            val response = client.aggregate(
+        val range = TimeRangeFilter.between(start, end)
+
+        // Tier 1: sum raw Samsung-origin records.
+        val samsungRecordsSum = runCatching {
+            val resp = client.readRecords(
+                ReadRecordsRequest(ActiveCaloriesBurnedRecord::class, range)
+            )
+            val samsungRecords = resp.records.filter {
+                it.metadata.dataOrigin.packageName == SAMSUNG_HEALTH_PACKAGE
+            }
+            if (samsungRecords.isEmpty()) null
+            else samsungRecords.sumOf { it.energy.inKilocalories }
+        }.getOrNull()
+
+        if (samsungRecordsSum != null && samsungRecordsSum > 0.0) {
+            return samsungRecordsSum
+        }
+
+        // Tier 2: Samsung-filtered aggregate.
+        val samsungAggregate = runCatching {
+            client.aggregate(
                 AggregateRequest(
                     metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
-                    timeRangeFilter = TimeRangeFilter.between(start, end)
+                    timeRangeFilter = range,
+                    dataOriginFilter = setOf(DataOrigin(SAMSUNG_HEALTH_PACKAGE))
                 )
-            )
-            response[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories ?: 0.0
+            )[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories
+        }.getOrNull()
+
+        if (samsungAggregate != null && samsungAggregate > 0.0) {
+            return samsungAggregate
+        }
+
+        // Tier 3: unfiltered aggregate, capped as a last resort.
+        val unfilteredAggregate = runCatching {
+            client.aggregate(
+                AggregateRequest(
+                    metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
+                    timeRangeFilter = range
+                )
+            )[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories ?: 0.0
         }.getOrDefault(0.0)
+
+        return unfilteredAggregate.coerceAtMost(ACTIVE_CALORIES_SANITY_CAP_KCAL)
     }
 
     /** Sleep for a specific night (18:00 day-1 → 12:00 day) */
