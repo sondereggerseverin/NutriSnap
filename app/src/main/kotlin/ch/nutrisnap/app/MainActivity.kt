@@ -43,6 +43,7 @@ import ch.nutrisnap.app.ui.screens.security.BiometricLockScreen
 import ch.nutrisnap.app.ui.screens.settings.KEY_BIOMETRIC_LOCK
 import ch.nutrisnap.app.ui.screens.settings.NotificationSettingsScreen
 import ch.nutrisnap.app.ui.screens.settings.SettingsScreen
+import ch.nutrisnap.app.ui.screens.settings.YazioImportScreen
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.screens.stats.WeeklyStatsScreen
 import ch.nutrisnap.app.ui.screens.stats.WeeklyStatsViewModel
@@ -237,7 +238,8 @@ fun MainScaffold(
                     onNavigateToStats         = { navController.navigate("stats") },
                     onNavigateToExport        = { navController.navigate("export") },
                     onNavigateToCustomFoods   = { navController.navigate("custom_foods") },
-                    onNavigateToMealTemplates = { navController.navigate("meal_templates") }
+                    onNavigateToMealTemplates = { navController.navigate("meal_templates") },
+                    onNavigateToYazioImport   = { navController.navigate("yazio_import") }
                 )
             }
             composable("water")   { WaterTrackingScreen() }
@@ -269,6 +271,9 @@ fun MainScaffold(
                     onBack = { navController.popBackStack() },
                     onTemplateSelected = { navController.popBackStack() }
                 )
+            }
+            composable("yazio_import") {
+                YazioImportScreen(onBack = { navController.popBackStack() })
             }
         }
     }
