@@ -86,7 +86,7 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
                         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Error, null, tint = MaterialTheme.colorScheme.error)
                             Spacer(Modifier.width(8.dp))
-                            Text(error, color = MaterialTheme.colorScheme.error, Modifier.weight(1f))
+                            Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
                             IconButton(onClick = vm::clearError) { Icon(Icons.Default.Close, null) }
                         }
                     }
