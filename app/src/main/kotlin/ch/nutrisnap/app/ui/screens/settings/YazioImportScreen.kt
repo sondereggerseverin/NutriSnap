@@ -54,12 +54,23 @@ fun YazioImportScreen(
 
             Spacer(Modifier.height(24.dp))
 
+            var showClearConfirm by remember { mutableStateOf(false) }
+
             when (val s = state) {
                 is YazioImportState.Idle -> {
                     Button(onClick = { filePicker.launch("*/*") }) {
                         Icon(Icons.Filled.UploadFile, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
                         Text("nutrition_log.csv auswaehlen")
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = { showClearConfirm = true },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text("Tagebuch zuerst leeren")
                     }
                 }
                 is YazioImportState.Loading -> {
@@ -94,6 +105,27 @@ fun YazioImportScreen(
                         Text("Erneut versuchen")
                     }
                 }
+            }
+
+            if (showClearConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showClearConfirm = false },
+                    title = { Text("Tagebuch wirklich leeren?") },
+                    text = { Text("Alle Tagebuch-Eintraege (manuell, importiert, Rezepte) werden unwiderruflich geloescht. Das ist sinnvoll vor einem sauberen Yazio-Reimport.") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showClearConfirm = false
+                            viewModel.clearAllDiaryEntries {}
+                        }) {
+                            Text("Loeschen", color = MaterialTheme.colorScheme.error)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showClearConfirm = false }) {
+                            Text("Abbrechen")
+                        }
+                    }
+                )
             }
         }
     }
