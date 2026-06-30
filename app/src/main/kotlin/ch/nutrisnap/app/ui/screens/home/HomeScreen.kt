@@ -128,7 +128,7 @@ private fun HealthCard(
                     )
                     HealthStatItem(
                         icon = "🔥",
-                        value = "${data.activeCaloriesKcal.toInt()} kcal",
+                        value = data.activeCaloriesKcal?.let { "${it.toInt()} kcal" } ?: "–",
                         label = "Verbrannt"
                     )
                     if (data.sleepMinutes > 0) {

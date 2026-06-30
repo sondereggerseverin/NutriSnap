@@ -30,7 +30,7 @@ class HealthConnectRepository(
             val calories = async {
                 runCatching { manager.getActiveCaloriesForDay(LocalDate.now()) }
                     .onFailure { Log.e(TAG, "syncToday: calories fetch failed", it) }
-                    .getOrDefault(0.0)
+                    .getOrDefault(null)
             }
             val weight = async {
                 runCatching {
@@ -83,7 +83,7 @@ class HealthConnectRepository(
             if (existing != null && existing.steps > 0) continue
 
             val steps = runCatching { manager.getStepsForDay(date) }.getOrDefault(0L)
-            val calories = runCatching { manager.getActiveCaloriesForDay(date) }.getOrDefault(0.0)
+            val calories = runCatching { manager.getActiveCaloriesForDay(date) }.getOrDefault(null)
             val sleep = runCatching { manager.getSleepForNight(date) }.getOrDefault(0L)
             val weight = weightMap[date] ?: existing?.weightKg
 

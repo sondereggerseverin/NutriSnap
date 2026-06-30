@@ -59,9 +59,9 @@ class HealthConnectViewModel(app: Application) : AndroidViewModel(app) {
             val weightTrend = if (thisWeekWeights.isNotEmpty() && prevWeekWeights.isNotEmpty())
                 thisWeekWeights.average() - prevWeekWeights.average() else null
 
-            // Calorie averages (only days with actual activity > 0)
-            val thisWeekKcal = thisWeek.filter { it.activeCaloriesKcal > 10.0 }.map { it.activeCaloriesKcal }
-            val prevWeekKcal = prevWeek.filter { it.activeCaloriesKcal > 10.0 }.map { it.activeCaloriesKcal }
+            // Calorie averages (only days with actual activity > 0 and real data)
+            val thisWeekKcal = thisWeek.mapNotNull { it.activeCaloriesKcal }.filter { it > 10.0 }
+            val prevWeekKcal = prevWeek.mapNotNull { it.activeCaloriesKcal }.filter { it > 10.0 }
             val avgKcal = if (thisWeekKcal.isNotEmpty()) thisWeekKcal.average() else 0.0
             val kcalTrend = if (thisWeekKcal.isNotEmpty() && prevWeekKcal.isNotEmpty())
                 thisWeekKcal.average() - prevWeekKcal.average() else null

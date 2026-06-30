@@ -156,10 +156,11 @@ private fun TodayOverviewCard(
                     Button(onClick = onConnectClick) { Text("Jetzt verbinden") }
                 }
             } else {
+                val activeKcal = data?.totalActivityCalories
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
                     BigStatItem(value = if (data != null) formatSteps(data.steps) else "–",
                         label = "Schritte", icon = "👟", color = Color(0xFF2196F3))
-                    BigStatItem(value = if (data != null) "${data.totalActivityCalories}" else "–",
+                    BigStatItem(value = activeKcal?.let { "$it" } ?: "–",
                         label = "Akt. kcal", icon = "🔥", color = Color(0xFFFF5722))
                     BigStatItem(
                         value = if (data?.weightKg != null) String.format("%.1f", data.weightKg) else "–",
@@ -170,7 +171,7 @@ private fun TodayOverviewCard(
                         color = Color(0xFF3F51B5))
                 }
 
-                if (data != null && data.totalActivityCalories > 0) {
+                if (activeKcal != null && activeKcal > 0) {
                     Spacer(Modifier.height(12.dp))
                     HorizontalDivider()
                     Spacer(Modifier.height(8.dp))
@@ -181,7 +182,7 @@ private fun TodayOverviewCard(
                         Column {
                             Text("Kalorienziel angepasst: $adjustedGoal kcal",
                                 fontWeight = FontWeight.Medium, color = Color(0xFF4CAF50))
-                            Text("Basis 2000 + ${data.totalActivityCalories} aus Aktivität",
+                            Text("Basis 2000 + $activeKcal aus Aktivität",
                                 fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }

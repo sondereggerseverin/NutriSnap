@@ -8,13 +8,15 @@ import java.time.LocalDate
 data class HealthConnectCache(
     @PrimaryKey val date: LocalDate,
     val steps: Long = 0L,
-    val activeCaloriesKcal: Double = 0.0,
+    // null = Health Connect hat noch keine Daten dafür (z.B. Samsung Health hat
+    // den Tag noch nicht synct) — bewusst unterschieden von 0.0 = "wirklich 0 kcal".
+    val activeCaloriesKcal: Double? = null,
     val weightKg: Double? = null,
     val sleepMinutes: Long = 0L,
     val avgHeartRateBpm: Long? = null,
     val lastUpdated: Long = System.currentTimeMillis()
 ) {
-    val totalActivityCalories: Int get() = activeCaloriesKcal.toInt()
+    val totalActivityCalories: Int? get() = activeCaloriesKcal?.toInt()
     val sleepFormatted: String get() {
         val h = sleepMinutes / 60
         val m = sleepMinutes % 60

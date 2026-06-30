@@ -107,7 +107,7 @@ class HealthConnectManager(context: Context) {
      *     the old behaviour and is only used if Samsung Health has no data at all
      *     (e.g. permission not granted yet, or sync hasn't happened).
      */
-    suspend fun getActiveCaloriesForDay(date: LocalDate): Double {
+    suspend fun getActiveCaloriesForDay(date: LocalDate): Double? {
         val start = date.atStartOfDay(ZoneId.systemDefault()).toInstant()
         val end   = if (date == LocalDate.now()) Instant.now()
                     else date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
@@ -149,20 +149,24 @@ class HealthConnectManager(context: Context) {
         }
 
         // Tier 3: unfiltered aggregate, capped as a last resort.
+        // Kept nullable here on purpose: a missing key means Health Connect has
+        // no record at all for this day (e.g. Samsung Health hasn't synced yet),
+        // which is different from a genuine "burned 0 kcal" reading.
         val unfilteredAggregate = runCatching {
             client.aggregate(
                 AggregateRequest(
                     metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
                     timeRangeFilter = range
                 )
-            )[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories ?: 0.0
+            )[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories
         }.onFailure {
             Log.e(TAG, "getActiveCaloriesForDay: Tier 3 (unfiltered aggregate) failed for $date", it)
-        }.getOrDefault(0.0)
+        }.getOrNull()
 
-        if (unfilteredAggregate == 0.0) {
+        if (unfilteredAggregate == null) {
             Log.w(TAG, "getActiveCaloriesForDay: all 3 tiers returned no data for $date " +
                 "(check Health Connect permissions / Samsung Health sync)")
+            return null
         }
 
         return unfilteredAggregate.coerceAtMost(ACTIVE_CALORIES_SANITY_CAP_KCAL)
@@ -208,7 +212,7 @@ class HealthConnectManager(context: Context) {
     /**
      * Activity calories heute.
      */
-    fun getTodaysActiveCalories(): Flow<Double> = flow {
+    fun getTodaysActiveCalories(): Flow<Double?> = flow {
         emit(getActiveCaloriesForDay(LocalDate.now()))
     }
 

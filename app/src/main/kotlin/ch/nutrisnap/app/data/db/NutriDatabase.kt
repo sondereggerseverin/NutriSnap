@@ -57,7 +57,7 @@ interface UserProfileDao {
         MealTemplateItem::class,
         GeneratedRecipeEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -172,6 +172,32 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // Phase 3: activeCaloriesKcal nullable machen (null = "Health Connect hat
+        // noch keine Daten", statt es mit 0.0 = "wirklich 0 kcal" zu verwechseln).
+        // SQLite kennt kein ALTER COLUMN -> Tabelle neu anlegen + Daten kopieren.
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS health_connect_cache_new (
+                        date TEXT NOT NULL PRIMARY KEY,
+                        steps INTEGER NOT NULL DEFAULT 0,
+                        activeCaloriesKcal REAL,
+                        weightKg REAL,
+                        sleepMinutes INTEGER NOT NULL DEFAULT 0,
+                        avgHeartRateBpm INTEGER,
+                        lastUpdated INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    INSERT INTO health_connect_cache_new
+                    SELECT date, steps, activeCaloriesKcal, weightKg, sleepMinutes, avgHeartRateBpm, lastUpdated
+                    FROM health_connect_cache
+                """.trimIndent())
+                db.execSQL("DROP TABLE health_connect_cache")
+                db.execSQL("ALTER TABLE health_connect_cache_new RENAME TO health_connect_cache")
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -181,7 +207,8 @@ abstract class NutriDatabase : RoomDatabase() {
                 )
                     .addMigrations(
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
-                        MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8
+                        MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
+                        MIGRATION_8_9
                     )
                     .fallbackToDestructiveMigration()
                     .build()
