@@ -41,6 +41,9 @@ interface DiaryDao {
 
     @Query("SELECT * FROM diary_entries ORDER BY dateStr, mealType")
     suspend fun getAllOnce(): List<DiaryEntry>
+
+    @Query("DELETE FROM diary_entries")
+    suspend fun deleteAll()
 }
 
 data class DailySummary(
