@@ -228,7 +228,7 @@ fun MainScaffold(
             }
             composable(Screen.Diary.route)     { DiaryScreen() }
             composable(Screen.Recipes.route)   { RecipesScreen(sharedUrl = sharedUrl) }
-            composable(Screen.AiRecipes.route) { RecipeGeneratorScreen(sharedUrl = sharedUrl) }
+            composable(Screen.AiRecipes.route) { RecipeGeneratorScreen() }
             composable(Screen.Analysis.route)  { AnalysisScreen() }
             composable(Screen.Settings.route) {
                 SettingsScreen(
