@@ -77,7 +77,9 @@ fun SettingsScreen(
     onNavigateToExport: () -> Unit = {},
     onNavigateToCustomFoods: () -> Unit = {},
     onNavigateToMealTemplates: () -> Unit = {},
-    onNavigateToYazioImport: () -> Unit = {}
+    onNavigateToYazioImport: () -> Unit = {},
+    onNavigateToFoodScan: () -> Unit = {},
+    onNavigateToLabelScan: () -> Unit = {}
 ) {
     val state   by vm.uiState.collectAsState()
     val profile  = state.profile
@@ -181,6 +183,14 @@ fun SettingsScreen(
             OutlinedButton(onClick = onNavigateToYazioImport, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.UploadFile, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp)); Text("Yazio-Daten importieren")
+            }
+            Button(onClick = onNavigateToFoodScan, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.PhotoCamera, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp)); Text("Essen scannen (KI-Kalorienschätzung)")
+            }
+            OutlinedButton(onClick = onNavigateToLabelScan, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.CameraAlt, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp)); Text("Nährwerttabelle fotografieren")
             }
         }
 
