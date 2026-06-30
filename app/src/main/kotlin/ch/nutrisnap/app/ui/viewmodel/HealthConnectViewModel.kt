@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.HealthConnectCache
 import ch.nutrisnap.app.data.repository.HealthConnectRepository
+import ch.nutrisnap.app.data.repository.UserProfileRepository
 import ch.nutrisnap.app.health.HealthConnectManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -35,13 +36,21 @@ class HealthConnectViewModel(app: Application) : AndroidViewModel(app) {
     private val db = NutriDatabase.getInstance(app)
     private val manager = HealthConnectManager(app)
     private val repository = HealthConnectRepository(manager, db.healthConnectDao())
+    private val profileRepo = UserProfileRepository(db)
 
     private val _uiState = MutableStateFlow(HealthConnectUiState())
     val uiState: StateFlow<HealthConnectUiState> = _uiState.asStateFlow()
 
-    /** Dynamisches Kalorienziel: Basis-TDEE + Aktivitätskalorien aus HC */
-    val adjustedCalorieGoal: StateFlow<Int> = _uiState.map { state ->
-        2000 + (state.todayData?.totalActivityCalories ?: 0)
+    /**
+     * Kalorienziel = TDEE aus dem Nutzerprofil (BMR * activityFactor).
+     * Der activityFactor (z.B. 1.55 = "moderat aktiv") bildet die durchschnittliche
+     * Aktivität bereits ab. Health-Connect-Aktivkalorien NICHT zusätzlich addieren,
+     * sonst wird Aktivität doppelt gezählt (Bug: vorher 2000 + 100% HC-Aktivkalorien).
+     * Fallback auf das manuell gesetzte dailyCalorieGoal, falls TDEE nicht berechenbar ist
+     * (fehlende Gewicht/Größe/Alter-Angaben).
+     */
+    val adjustedCalorieGoal: StateFlow<Int> = profileRepo.get().map { profile ->
+        (profile.computedTdee() ?: profile.dailyCalorieGoal.toDouble()).toInt()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 2000)
 
     /** Weekly stats computed from the last 30 days of data */

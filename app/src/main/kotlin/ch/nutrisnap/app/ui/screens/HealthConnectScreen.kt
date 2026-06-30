@@ -180,9 +180,9 @@ private fun TodayOverviewCard(
                             tint = Color(0xFF4CAF50), modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Column {
-                            Text("Kalorienziel angepasst: $adjustedGoal kcal",
+                            Text("Kalorienziel: $adjustedGoal kcal",
                                 fontWeight = FontWeight.Medium, color = Color(0xFF4CAF50))
-                            Text("Basis 2000 + $activeKcal aus Aktivität",
+                        Text("Basierend auf deinem TDEE (Grundumsatz × Aktivitätsfaktor)",
                                 fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
