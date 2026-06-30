@@ -76,7 +76,8 @@ fun SettingsScreen(
     onNavigateToStats: () -> Unit = {},
     onNavigateToExport: () -> Unit = {},
     onNavigateToCustomFoods: () -> Unit = {},
-    onNavigateToMealTemplates: () -> Unit = {}
+    onNavigateToMealTemplates: () -> Unit = {},
+    onNavigateToYazioImport: () -> Unit = {}
 ) {
     val state   by vm.uiState.collectAsState()
     val profile  = state.profile
@@ -176,6 +177,10 @@ fun SettingsScreen(
             Button(onClick = onNavigateToExport, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.Download, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp)); Text("Daten exportieren (CSV)")
+            }
+            OutlinedButton(onClick = onNavigateToYazioImport, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.UploadFile, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp)); Text("Yazio-Daten importieren")
             }
         }
 
