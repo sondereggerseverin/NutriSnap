@@ -16,6 +16,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.domain.FoodScanResult
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FoodScanScreen(
     onNavigateBack: () -> Unit,
@@ -56,6 +57,7 @@ fun FoodScanScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FoodScanResultView(
     result: FoodScanResult,
