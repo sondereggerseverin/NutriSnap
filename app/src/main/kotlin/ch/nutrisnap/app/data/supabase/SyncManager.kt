@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.data.supabase
 
+import android.util.Log
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.DiaryEntry
 import ch.nutrisnap.app.data.model.MealType
@@ -16,9 +17,9 @@ import ch.nutrisnap.app.data.model.WeightEntry
 object SyncManager {
 
     suspend fun pullAll(db: NutriDatabase) {
-        runCatching { pullDiary(db) }
-        runCatching { pullRecipes(db) }
-        runCatching { pullWeight(db) }
+        runCatching { pullDiary(db) }.onFailure { Log.e("NutriSync", "Pull diary_entries fehlgeschlagen: ${it.message}", it) }
+        runCatching { pullRecipes(db) }.onFailure { Log.e("NutriSync", "Pull recipes fehlgeschlagen: ${it.message}", it) }
+        runCatching { pullWeight(db) }.onFailure { Log.e("NutriSync", "Pull weight_entries fehlgeschlagen: ${it.message}", it) }
     }
 
     private suspend fun pullDiary(db: NutriDatabase) {

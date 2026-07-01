@@ -1,6 +1,7 @@
 package ch.nutrisnap.app.data.repository
 
 import android.content.Context
+import android.util.Log
 import ch.nutrisnap.app.BuildConfig
 import ch.nutrisnap.app.data.api.NutritionixApi
 import ch.nutrisnap.app.data.api.OpenFoodFactsApi
@@ -20,7 +21,13 @@ import java.time.LocalDate
  *  (e.g. offline) never breaks the local save — it's caught and swallowed. */
 private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 private fun pushSafely(block: suspend () -> Unit) {
-    syncScope.launch { runCatching { block() } }
+    syncScope.launch {
+        runCatching { block() }.onFailure {
+            // Vorher komplett stumm geschluckt -> jetzt sichtbar in Logcat, damit
+            // Sync-Fehler (fehlende UNIQUE-Constraint, RLS-Policy, offline, ...) auffindbar sind.
+            Log.e("NutriSync", "Push zu Supabase fehlgeschlagen: ${it.message}", it)
+        }
+    }
 }
 
 class DiaryRepository(db: NutriDatabase) {
