@@ -1,6 +1,8 @@
 package ch.nutrisnap.app.ui.screens.scan
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -85,10 +87,25 @@ private fun FoodScanResultView(
                 title = { Text("Ergebnis") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") } }
             )
+        },
+        bottomBar = {
+            Surface(shadowElevation = 8.dp) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(onClick = onRetake, modifier = Modifier.weight(1f)) { Text("Neu fotografieren") }
+                    Button(onClick = { onSave(scaled, mealType) }, modifier = Modifier.weight(1f)) { Text("Speichern") }
+                }
+            }
         }
     ) { padding ->
         Column(
-            Modifier.padding(padding).padding(16.dp).fillMaxSize(),
+            Modifier
+                .padding(padding)
+                .padding(16.dp)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(result.foodName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -125,13 +142,7 @@ private fun FoodScanResultView(
                     }
                 }
             }
-
-            Spacer(Modifier.weight(1f))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onRetake, modifier = Modifier.weight(1f)) { Text("Neu fotografieren") }
-                Button(onClick = { onSave(scaled, mealType) }, modifier = Modifier.weight(1f)) { Text("Speichern") }
-            }
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
