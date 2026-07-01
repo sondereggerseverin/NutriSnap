@@ -130,6 +130,13 @@ class MainActivity : ComponentActivity() {
                     null  -> Box(modifier = Modifier.fillMaxSize())
                     false -> LoginScreen(onLoggedIn = { authVm.onLoggedIn() })
                     true  -> {
+                        LaunchedEffect(Unit) {
+                            runCatching {
+                                ch.nutrisnap.app.data.supabase.SyncManager.pullAll(
+                                    ch.nutrisnap.app.data.db.NutriDatabase.getInstance(this@MainActivity)
+                                )
+                            }
+                        }
                         val networkMonitor = remember { NetworkMonitor(this) }
                         val isOnline by networkMonitor.isOnline.collectAsState(initial = true)
                         val biometricEnabled by notifDataStore.data
