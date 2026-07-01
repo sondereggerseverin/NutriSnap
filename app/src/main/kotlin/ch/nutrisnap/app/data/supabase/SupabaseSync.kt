@@ -83,9 +83,10 @@ object SupabaseSync {
                 carbs = entry.carbs,
                 fat = entry.fat,
                 localId = entry.id
-            ),
+            )
+        ) {
             onConflict = "user_id,local_id"
-        )
+        }
     }
 
     suspend fun deleteDiaryEntry(localId: Long) {
@@ -129,9 +130,10 @@ object SupabaseSync {
                 isFavorite = recipe.isFavorite,
                 savedAt = recipe.savedAt,
                 localId = recipe.id
-            ),
+            )
+        ) {
             onConflict = "user_id,local_id"
-        )
+        }
     }
 
     suspend fun deleteRecipe(localId: Long) {
@@ -156,9 +158,10 @@ object SupabaseSync {
     suspend fun upsertWeight(entry: WeightEntry) {
         val uid = userId() ?: return
         sb.postgrest["weight_entries"].upsert(
-            WeightEntryDto(userId = uid, dateStr = entry.dateStr, weightKg = entry.weightKg),
+            WeightEntryDto(userId = uid, dateStr = entry.dateStr, weightKg = entry.weightKg)
+        ) {
             onConflict = "user_id,date_str"
-        )
+        }
     }
 
     suspend fun deleteWeight(dateStr: String) {
