@@ -116,6 +116,7 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
                 item {
                     RecipeResultCard(
                         recipe = recipe,
+                        isSavingImage = state.isGeneratingImage,
                         onAddToDiary = { showDiarySheet = true },
                         onSaveAsRecipe = { vm.saveAsRecipe() },
                         onUpdate = { vm.updateRecipe(it) },
@@ -182,6 +183,7 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
 @Composable
 private fun RecipeResultCard(
     recipe: GeneratedRecipe,
+    isSavingImage: Boolean = false,
     onAddToDiary: () -> Unit,
     onSaveAsRecipe: () -> Unit,
     onUpdate: (GeneratedRecipe) -> Unit,
@@ -335,10 +337,20 @@ private fun RecipeResultCard(
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onSaveAsRecipe, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.MenuBook, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Als Rezept")
+                OutlinedButton(
+                    onClick = onSaveAsRecipe,
+                    enabled = !isSavingImage,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    if (isSavingImage) {
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Bild wird erstellt…")
+                    } else {
+                        Icon(Icons.Default.MenuBook, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Als Rezept")
+                    }
                 }
                 Button(onClick = onAddToDiary, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.BookmarkAdd, null, Modifier.size(18.dp))

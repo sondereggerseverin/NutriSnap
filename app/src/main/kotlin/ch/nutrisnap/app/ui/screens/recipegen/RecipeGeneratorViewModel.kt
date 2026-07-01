@@ -12,6 +12,7 @@ import ch.nutrisnap.app.data.repository.RecipeRepository
 import ch.nutrisnap.app.domain.GeneratedRecipe
 import ch.nutrisnap.app.domain.GroqRecipeGeneratorService
 import ch.nutrisnap.app.domain.RecipeIngredient
+import ch.nutrisnap.app.domain.ZenMuxImageService
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
@@ -28,12 +29,14 @@ data class RecipeGenUiState(
     val error: String? = null,
     val savedToDiary: Boolean = false,
     val savedAsRecipe: Boolean = false,
+    val isGeneratingImage: Boolean = false,
     val history: List<GeneratedRecipeEntity> = emptyList()
 )
 
 class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
-    private val service     = GroqRecipeGeneratorService()
-    private val db          = NutriDatabase.getInstance(app)
+    private val service      = GroqRecipeGeneratorService()
+    private val imageService = ZenMuxImageService(app)
+    private val db           = NutriDatabase.getInstance(app)
     private val dao         = db.generatedRecipeDao()
     private val diaryDao    = db.diaryDao()
     private val recipeRepo  = RecipeRepository(db, app)
@@ -116,14 +119,23 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
         updateRecipe(current.copy(structuredIngredients = newIngredients))
     }
 
-    /** Speichert das KI-Rezept dauerhaft im Rezepte-Tab (Kochbuch). */
+    /** Speichert das KI-Rezept dauerhaft im Rezepte-Tab (Kochbuch).
+     *  Erzeugt vorher per ZenMux ein KI-Bild fürs Rezept (statt des orangen
+     *  Platzhalters). Schlägt die Bildgenerierung fehl (kein API-Key, offline,
+     *  API-Fehler), wird das Rezept trotzdem ganz normal ohne Bild gespeichert. */
     fun saveAsRecipe() {
         val r = _state.value.recipe ?: return
         viewModelScope.launch {
+            _state.update { it.copy(isGeneratingImage = true) }
+            val generatedImageUri = imageService
+                .generateRecipeImage(r.title, r.description)
+                .getOrNull()
+
             recipeRepo.saveRecipe(
                 Recipe(
                     title             = r.title,
                     description       = r.description,
+                    imageUrl          = generatedImageUri,
                     ingredients       = r.effectiveIngredients().joinToString("\n") { ing ->
                         if (ing.amount.isNotBlank()) "${ing.amount} ${ing.name}" else ing.name
                     },
@@ -137,7 +149,7 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
                     platform          = "ki"
                 )
             )
-            _state.update { it.copy(savedAsRecipe = true) }
+            _state.update { it.copy(savedAsRecipe = true, isGeneratingImage = false) }
         }
     }
 
