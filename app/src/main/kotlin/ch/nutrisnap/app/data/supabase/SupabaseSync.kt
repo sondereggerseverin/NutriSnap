@@ -58,13 +58,17 @@ data class WeightEntryDto(
 )
 
 // ─── Sync functions ───────────────────────────────────────────────────────────
+// NOTE: upsert onConflict requires matching UNIQUE constraints in Supabase:
+//   diary_entries: UNIQUE (user_id, local_id)
+//   recipes:       UNIQUE (user_id, local_id)
+//   weight_entries: UNIQUE (user_id, date_str)   [already used by the web app]
 
 object SupabaseSync {
 
     private val sb get() = SupabaseClient.client
     private fun userId() = sb.auth.currentUserOrNull()?.id
 
-    // Diary
+    // ── Diary ──────────────────────────────────────────────────────────────
     suspend fun upsertDiaryEntry(entry: DiaryEntry) {
         val uid = userId() ?: return
         sb.postgrest["diary_entries"].upsert(
@@ -79,7 +83,8 @@ object SupabaseSync {
                 carbs = entry.carbs,
                 fat = entry.fat,
                 localId = entry.id
-            )
+            ),
+            onConflict = "user_id,local_id"
         )
     }
 
@@ -93,7 +98,15 @@ object SupabaseSync {
         }
     }
 
-    // Recipes
+    /** Fetch all remote diary entries for the current user. */
+    suspend fun fetchDiaryEntries(): List<DiaryEntryDto> {
+        val uid = userId() ?: return emptyList()
+        return sb.postgrest["diary_entries"].select {
+            filter { eq("user_id", uid) }
+        }.decodeList()
+    }
+
+    // ── Recipes ────────────────────────────────────────────────────────────
     suspend fun upsertRecipe(recipe: Recipe) {
         val uid = userId() ?: return
         sb.postgrest["recipes"].upsert(
@@ -116,7 +129,8 @@ object SupabaseSync {
                 isFavorite = recipe.isFavorite,
                 savedAt = recipe.savedAt,
                 localId = recipe.id
-            )
+            ),
+            onConflict = "user_id,local_id"
         )
     }
 
@@ -130,11 +144,20 @@ object SupabaseSync {
         }
     }
 
-    // Weight
+    /** Fetch all remote recipes for the current user. */
+    suspend fun fetchRecipes(): List<RecipeDto> {
+        val uid = userId() ?: return emptyList()
+        return sb.postgrest["recipes"].select {
+            filter { eq("user_id", uid) }
+        }.decodeList()
+    }
+
+    // ── Weight ─────────────────────────────────────────────────────────────
     suspend fun upsertWeight(entry: WeightEntry) {
         val uid = userId() ?: return
         sb.postgrest["weight_entries"].upsert(
-            WeightEntryDto(userId = uid, dateStr = entry.dateStr, weightKg = entry.weightKg)
+            WeightEntryDto(userId = uid, dateStr = entry.dateStr, weightKg = entry.weightKg),
+            onConflict = "user_id,date_str"
         )
     }
 
@@ -146,5 +169,13 @@ object SupabaseSync {
                 eq("date_str", dateStr)
             }
         }
+    }
+
+    /** Fetch all remote weight entries for the current user. */
+    suspend fun fetchWeightEntries(): List<WeightEntryDto> {
+        val uid = userId() ?: return emptyList()
+        return sb.postgrest["weight_entries"].select {
+            filter { eq("user_id", uid) }
+        }.decodeList()
     }
 }
