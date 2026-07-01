@@ -1,6 +1,8 @@
 package ch.nutrisnap.app.ui.screens.scan
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -79,10 +81,42 @@ private fun LabelResultView(
                 title = { Text("Nährwerte erkannt") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") } }
             )
+        },
+        bottomBar = {
+            Surface(shadowElevation = 8.dp) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(onClick = onRetake, modifier = Modifier.weight(1f)) { Text("Neu fotografieren") }
+                    Button(
+                        onClick = {
+                            saved = true
+                            if (name.isNotBlank()) {
+                                onSave(
+                                    name,
+                                    NutritionLabelResult(
+                                        caloriesPer100g = calories.toFloatOrNull() ?: 0f,
+                                        proteinPer100g  = protein.toFloatOrNull()  ?: 0f,
+                                        carbsPer100g    = carbs.toFloatOrNull()    ?: 0f,
+                                        fatPer100g      = fat.toFloatOrNull()      ?: 0f,
+                                        fiberPer100g    = fiber.toFloatOrNull()    ?: 0f
+                                    )
+                                )
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Speichern") }
+                }
+            }
         }
     ) { padding ->
         Column(
-            Modifier.padding(padding).padding(16.dp).fillMaxSize(),
+            Modifier
+                .padding(padding)
+                .padding(16.dp)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
@@ -104,30 +138,7 @@ private fun LabelResultView(
             LabelField("Kohlenhydrate (g)", carbs) { carbs = it }
             LabelField("Fett (g)", fat) { fat = it }
             LabelField("Ballaststoffe (g)", fiber) { fiber = it }
-
-            Spacer(Modifier.weight(1f))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onRetake, modifier = Modifier.weight(1f)) { Text("Neu fotografieren") }
-                Button(
-                    onClick = {
-                        saved = true
-                        if (name.isNotBlank()) {
-                            onSave(
-                                name,
-                                NutritionLabelResult(
-                                    caloriesPer100g = calories.toFloatOrNull() ?: 0f,
-                                    proteinPer100g  = protein.toFloatOrNull()  ?: 0f,
-                                    carbsPer100g    = carbs.toFloatOrNull()    ?: 0f,
-                                    fatPer100g      = fat.toFloatOrNull()      ?: 0f,
-                                    fiberPer100g    = fiber.toFloatOrNull()    ?: 0f
-                                )
-                            )
-                        }
-                    },
-                    modifier = Modifier.weight(1f)
-                ) { Text("Speichern") }
-            }
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
