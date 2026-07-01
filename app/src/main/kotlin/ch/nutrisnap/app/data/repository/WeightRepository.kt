@@ -2,11 +2,20 @@ package ch.nutrisnap.app.data.repository
 
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.WeightEntry
+import ch.nutrisnap.app.data.supabase.SupabaseSync
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 class WeightRepository(db: NutriDatabase) {
     private val dao = db.weightDao()
+    private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private fun pushSafely(block: suspend () -> Unit) {
+        syncScope.launch { runCatching { block() } }
+    }
 
     fun getAll(): Flow<List<WeightEntry>> = dao.getAll()
 
@@ -17,8 +26,13 @@ class WeightRepository(db: NutriDatabase) {
     suspend fun getLatest(): WeightEntry? = dao.getLatest()
 
     suspend fun logWeight(date: LocalDate, kg: Float) {
-        dao.upsert(WeightEntry(dateStr = date.toString(), weightKg = kg))
+        val entry = WeightEntry(dateStr = date.toString(), weightKg = kg)
+        dao.upsert(entry)
+        pushSafely { SupabaseSync.upsertWeight(entry) }
     }
 
-    suspend fun delete(entry: WeightEntry) = dao.delete(entry)
+    suspend fun delete(entry: WeightEntry) {
+        dao.delete(entry)
+        pushSafely { SupabaseSync.deleteWeight(entry.dateStr) }
+    }
 }
