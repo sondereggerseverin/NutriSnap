@@ -19,18 +19,33 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.FlowRow
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.GeneratedRecipeEntity
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.domain.GeneratedRecipe
 import ch.nutrisnap.app.domain.RecipeIngredient
+import ch.nutrisnap.app.ui.screens.scan.PhotoCaptureScreen
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
     val state by vm.state.collectAsState()
+
+    if (state.showFridgeCamera) {
+        PhotoCaptureScreen(
+            title = "Kuehlschrank fotografieren",
+            instructions = "Foto vom Kuehlschrank oder Vorrat machen, die KI erkennt die Zutaten",
+            onPhotoCaptured = { bitmap -> vm.analyzeFridgePhoto(bitmap) },
+            onNavigateBack = { vm.closeFridgeCamera() }
+        )
+        return
+    }
+
     var input by remember { mutableStateOf("") }
+    var ingredientInput by remember { mutableStateOf("") }
+    var fillUpMealLabel by remember { mutableStateOf("Abendessen") }
     var showDiarySheet by remember { mutableStateOf(false) }
     var entityToDelete by remember { mutableStateOf<GeneratedRecipeEntity?>(null) }
 
@@ -69,31 +84,59 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
 
             if (state.recipe == null) {
                 item {
-                    OutlinedTextField(
-                        value = input,
-                        onValueChange = { input = it },
-                        label = { Text("Was möchtest du essen?") },
-                        placeholder = { Text("z.B. Schnelles Hähnchen mit Reis") },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 2, maxLines = 4,
-                        shape = RoundedCornerShape(12.dp)
+                    val tabs = listOf(
+                        Triple(RecipeGenMode.FREITEXT, "Freitext", Icons.Default.Edit),
+                        Triple(RecipeGenMode.ZUTATEN, "Zutaten", Icons.Default.Kitchen),
+                        Triple(RecipeGenMode.FILL_UP, "Fill Up", Icons.Default.LocalFireDepartment),
+                        Triple(RecipeGenMode.ZUFALL, "Zufall", Icons.Default.Casino)
                     )
-                    Spacer(Modifier.height(8.dp))
-                    Button(
-                        onClick = { vm.generate(input) },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !state.isLoading && input.isNotBlank()
+                    ScrollableTabRow(
+                        selectedTabIndex = tabs.indexOfFirst { it.first == state.mode }.coerceAtLeast(0),
+                        edgePadding = 0.dp
                     ) {
-                        if (state.isLoading) {
-                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Generiere Rezept…")
-                        } else {
-                            Icon(Icons.Default.AutoAwesome, null, Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Rezept generieren")
+                        tabs.forEach { (mode, label, icon) ->
+                            Tab(
+                                selected = state.mode == mode,
+                                onClick = { vm.setMode(mode) },
+                                text = { Text(label, fontSize = 12.sp) },
+                                icon = { Icon(icon, null, Modifier.size(18.dp)) }
+                            )
                         }
+                    }
+                    Spacer(Modifier.height(12.dp))
+
+                    when (state.mode) {
+                        RecipeGenMode.FREITEXT -> FreitextInput(
+                            input = input,
+                            onInputChange = { input = it },
+                            isLoading = state.isLoading,
+                            onGenerate = { vm.generate(input) }
+                        )
+                        RecipeGenMode.ZUTATEN -> ZutatenInput(
+                            chips = state.ingredientChips,
+                            ingredientInput = ingredientInput,
+                            onIngredientInputChange = { ingredientInput = it },
+                            onAddChip = {
+                                vm.addIngredientChip(ingredientInput)
+                                ingredientInput = ""
+                            },
+                            onRemoveChip = { vm.removeIngredientChip(it) },
+                            onOpenCamera = { vm.openFridgeCamera() },
+                            isScanningFridge = state.isScanningFridge,
+                            isLoading = state.isLoading,
+                            onGenerate = { vm.generateFromIngredients() }
+                        )
+                        RecipeGenMode.FILL_UP -> FillUpInput(
+                            budget = state.fillUpBudget,
+                            mealLabel = fillUpMealLabel,
+                            onMealLabelChange = { fillUpMealLabel = it },
+                            isLoading = state.isLoading,
+                            onGenerate = { vm.generateFillUp(fillUpMealLabel) }
+                        )
+                        RecipeGenMode.ZUFALL -> ZufallInput(
+                            isLoading = state.isLoading,
+                            onGenerate = { vm.generateRandomRecipe() }
+                        )
                     }
                 }
             }
@@ -175,6 +218,200 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
             },
             dismissButton = { TextButton(onClick = { entityToDelete = null }) { Text("Abbrechen") } }
         )
+    }
+}
+
+// ── Modus-Eingaben ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun FreitextInput(
+    input: String,
+    onInputChange: (String) -> Unit,
+    isLoading: Boolean,
+    onGenerate: () -> Unit
+) {
+    Column {
+        OutlinedTextField(
+            value = input,
+            onValueChange = onInputChange,
+            label = { Text("Was möchtest du essen?") },
+            placeholder = { Text("z.B. Schnelles Hähnchen mit Reis") },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 2, maxLines = 4,
+            shape = RoundedCornerShape(12.dp)
+        )
+        Spacer(Modifier.height(8.dp))
+        Button(
+            onClick = onGenerate,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading && input.isNotBlank()
+        ) {
+            GenerateButtonContent(isLoading, "Generiere Rezept…", "Rezept generieren", Icons.Default.AutoAwesome)
+        }
+    }
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun ZutatenInput(
+    chips: List<String>,
+    ingredientInput: String,
+    onIngredientInputChange: (String) -> Unit,
+    onAddChip: () -> Unit,
+    onRemoveChip: (String) -> Unit,
+    onOpenCamera: () -> Unit,
+    isScanningFridge: Boolean,
+    isLoading: Boolean,
+    onGenerate: () -> Unit
+) {
+    Column {
+        Text("Was hast du zuhause?", fontWeight = FontWeight.Medium, fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = ingredientInput,
+                onValueChange = onIngredientInputChange,
+                placeholder = { Text("z.B. Eier") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done)
+            )
+            Spacer(Modifier.width(8.dp))
+            FilledTonalIconButton(onClick = onAddChip, enabled = ingredientInput.isNotBlank()) {
+                Icon(Icons.Default.Add, "Zutat hinzufügen")
+            }
+            Spacer(Modifier.width(4.dp))
+            FilledTonalIconButton(onClick = onOpenCamera, enabled = !isScanningFridge) {
+                if (isScanningFridge) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                else Icon(Icons.Default.PhotoCamera, "Kühlschrank fotografieren")
+            }
+        }
+        if (isScanningFridge) {
+            Spacer(Modifier.height(6.dp))
+            Text("Analysiere Foto…", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+        }
+        if (chips.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                chips.forEach { chip ->
+                    InputChip(
+                        selected = false,
+                        onClick = { onRemoveChip(chip) },
+                        label = { Text(chip, fontSize = 13.sp) },
+                        trailingIcon = { Icon(Icons.Default.Close, "Entfernen", Modifier.size(14.dp)) }
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Button(
+            onClick = onGenerate,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading && chips.isNotEmpty()
+        ) {
+            GenerateButtonContent(isLoading, "Zaubere Rezept…", "Rezept aus Zutaten zaubern", Icons.Default.AutoAwesome)
+        }
+        if (chips.isEmpty() && !isScanningFridge) {
+            Spacer(Modifier.height(4.dp))
+            Text("Zutaten eintippen oder Kühlschrank fotografieren", fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FillUpInput(
+    budget: FillUpBudget,
+    mealLabel: String,
+    onMealLabelChange: (String) -> Unit,
+    isLoading: Boolean,
+    onGenerate: () -> Unit
+) {
+    Column {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+            Column(Modifier.padding(14.dp)) {
+                Text("Heute noch übrig", fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Spacer(Modifier.height(6.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    BudgetStat("${budget.calories.roundToInt()}", "kcal")
+                    BudgetStat("${budget.protein.roundToInt()}g", "Protein")
+                    BudgetStat("${budget.carbs.roundToInt()}g", "Carbs")
+                    BudgetStat("${budget.fat.roundToInt()}g", "Fett")
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Text("Für welche Mahlzeit?", fontWeight = FontWeight.Medium, fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("Mittagessen", "Abendessen", "Snack").forEach { label ->
+                FilterChip(
+                    selected = mealLabel == label,
+                    onClick = { onMealLabelChange(label) },
+                    label = { Text(label, fontSize = 12.sp) }
+                )
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Button(
+            onClick = onGenerate,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading && budget.calories > 0f
+        ) {
+            GenerateButtonContent(isLoading, "Fülle auf…", "Mit Restbudget auffüllen", Icons.Default.LocalFireDepartment)
+        }
+        if (budget.calories <= 0f) {
+            Spacer(Modifier.height(4.dp))
+            Text("Kein Kalorienbudget mehr übrig für heute", fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
+@Composable
+private fun BudgetStat(value: String, label: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, fontWeight = FontWeight.Bold, fontSize = 16.sp,
+            color = MaterialTheme.colorScheme.onPrimaryContainer)
+        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+    }
+}
+
+@Composable
+private fun ZufallInput(
+    isLoading: Boolean,
+    onGenerate: () -> Unit
+) {
+    Column {
+        Text("Lass dich überraschen – ein zufälliges, alltagstaugliches Rezept.",
+            fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(10.dp))
+        Button(
+            onClick = onGenerate,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading
+        ) {
+            GenerateButtonContent(isLoading, "Würfle Rezept…", "Zufallsrezept", Icons.Default.Casino)
+        }
+    }
+}
+
+@Composable
+private fun RowScope.GenerateButtonContent(isLoading: Boolean, loadingText: String, idleText: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    if (isLoading) {
+        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp,
+            color = MaterialTheme.colorScheme.onPrimary)
+        Spacer(Modifier.width(8.dp))
+        Text(loadingText)
+    } else {
+        Icon(icon, null, Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(idleText)
     }
 }
 

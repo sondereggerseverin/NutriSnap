@@ -28,6 +28,11 @@ data class FoodScanResult(
 )
 
 @Serializable
+data class FridgeScanResult(
+    val ingredients: List<String> = emptyList()
+)
+
+@Serializable
 data class NutritionLabelResult(
     val caloriesPer100g: Float = 0f,
     val proteinPer100g: Float = 0f,
@@ -93,6 +98,22 @@ confidence ist "hoch", "mittel" oder "niedrig" je nachdem wie sicher die Schätz
 Alle Werte (calories/protein/carbs/fat) beziehen sich auf die GESAMTE geschätzte Portion, nicht auf 100g.
 """.trimIndent()
         callVisionRaw(prompt, base64Jpeg).mapCatching { json.decodeFromString<FoodScanResult>(it) }
+    }
+
+    /** Erkennt vorhandene Zutaten auf einem Foto (z.B. offener Kühlschrank/Vorratsschrank). */
+    suspend fun analyzeFridgePhoto(base64Jpeg: String): Result<FridgeScanResult> = withContext(Dispatchers.IO) {
+        val prompt = """
+Du siehst ein Foto von einem Kühlschrank, Vorratsschrank oder einer Ansammlung von Lebensmitteln.
+Identifiziere ALLE klar erkennbaren Lebensmittel/Zutaten auf dem Foto. Sei konkret (z.B. "Rüebli" statt "Gemüse",
+"Naturejoghurt" statt "Milchprodukt"), aber erfinde nichts, was nicht wirklich zu sehen ist.
+Ignoriere nicht-essbare Dinge.
+
+Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
+{
+  "ingredients": ["Rüebli", "Naturejoghurt", "Eier", "Zwiebeln"]
+}
+""".trimIndent()
+        callVisionRaw(prompt, base64Jpeg).mapCatching { json.decodeFromString<FridgeScanResult>(it) }
     }
 
     /** Liest eine fotografierte Nährwerttabelle aus und gibt die Werte pro 100g zurück. */

@@ -55,12 +55,34 @@ class GroqRecipeGeneratorService {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
 
     suspend fun generateRecipe(userInput: String): Result<GeneratedRecipe> = withContext(Dispatchers.IO) {
-        tryProvider(
-            url = "https://api.groq.com/openai/v1/chat/completions",
-            apiKey = BuildConfig.GROQ_API_KEY,
-            model = "llama-3.3-70b-versatile",
-            userInput = userInput
-        )
+        tryProvider(prompt = buildPrompt(userInput))
+    }
+
+    /** Generiert ein Rezept aus einer Liste vorhandener Zutaten (z.B. "was ist im Kühlschrank"). */
+    suspend fun generateFromIngredients(
+        ingredients: List<String>,
+        note: String = ""
+    ): Result<GeneratedRecipe> = withContext(Dispatchers.IO) {
+        tryProvider(prompt = buildIngredientsPrompt(ingredients, note))
+    }
+
+    /**
+     * Generiert ein Gericht, das möglichst genau in die noch übrigen Tages-Makros passt
+     * ("Fill Up"). mealLabel z.B. "Abendessen" oder "Snack".
+     */
+    suspend fun generateFillUp(
+        remainingCalories: Float,
+        remainingProtein: Float,
+        remainingCarbs: Float,
+        remainingFat: Float,
+        mealLabel: String
+    ): Result<GeneratedRecipe> = withContext(Dispatchers.IO) {
+        tryProvider(prompt = buildFillUpPrompt(remainingCalories, remainingProtein, remainingCarbs, remainingFat, mealLabel))
+    }
+
+    /** Überrascht mit einem komplett zufälligen, alltagstauglichen Rezept. */
+    suspend fun generateRandom(): Result<GeneratedRecipe> = withContext(Dispatchers.IO) {
+        tryProvider(prompt = buildRandomPrompt())
     }
 
     private fun buildPrompt(userInput: String): String {
@@ -112,32 +134,131 @@ Werte in structuredIngredients = GESAMT für die gesamte Zutatenmenge.
 """.trimIndent()
     }
 
-    private fun tryProvider(
-        url: String,
-        apiKey: String,
-        model: String,
-        userInput: String
-    ): Result<GeneratedRecipe> {
+    private val JSON_SCHEMA_HINT = """
+Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
+{
+  "title": "Rezeptname",
+  "description": "Kurze Beschreibung",
+  "structuredIngredients": [
+    {"name": "Hühnerbrust", "amount": "200g", "calories": 330, "protein": 62.0, "carbs": 0.0, "fat": 7.0}
+  ],
+  "ingredients": ["200g Hühnerbrust"],
+  "steps": ["Schritt 1", "Schritt 2"],
+  "servings": 2,
+  "prepTimeMinutes": 30,
+  "calories": 650,
+  "protein": 55.0,
+  "carbs": 45.0,
+  "fat": 25.0
+}
+
+calories/protein/carbs/fat auf Toplevel = Werte PRO PORTION.
+Werte in structuredIngredients = GESAMT für die gesamte Zutatenmenge.
+""".trimIndent()
+
+    private fun buildIngredientsPrompt(ingredients: List<String>, note: String): String {
+        val list = ingredients.filter { it.isNotBlank() }.joinToString("\n") { "- $it" }
+        val noteBlock = if (note.isNotBlank()) "\nZusätzlicher Wunsch: $note" else ""
+        return """
+Du bist ein erfahrener Koch, spezialisiert auf Resteverwertung ("was kann ich mit dem kochen, das ich gerade zuhause habe").
+
+Diese Zutaten sind vorhanden:
+$list
+$noteBlock
+
+Erstelle ein realistisches, alltagstaugliches Rezept, das MÖGLICHST VIELE dieser Zutaten verwendet.
+Du darfst übliche Grundzutaten annehmen, die in fast jedem Haushalt vorhanden sind (Salz, Pfeffer, Öl, Wasser, Gewürze),
+auch wenn sie nicht in der Liste stehen. Falls für ein rundes Gericht 1-2 zusätzliche Zutaten fehlen, die typischerweise
+im Haushalt vorhanden sind, kannst du sie ergänzen — aber baue das Rezept primär um die vorhandenen Zutaten herum.
+Erfinde KEINE exotischen Zutaten, die die Person offensichtlich nicht hat.
+
+Berechne die Nährwerte EXAKT basierend auf echten Zutatenmengen.
+Referenzwerte pro 100g: Hühnerbrust=165kcal/31gP, Parmesan=431kcal/38gP,
+Ricotta=174kcal/11gP, Hackfleisch=250kcal/17gP, Pasta=350kcal/13gP,
+Reis=130kcal/3gP, Ei=155kcal/13gP, Butter=717kcal/1gP.
+
+$JSON_SCHEMA_HINT
+""".trimIndent()
+    }
+
+    private fun buildFillUpPrompt(
+        remainingCalories: Float,
+        remainingProtein: Float,
+        remainingCarbs: Float,
+        remainingFat: Float,
+        mealLabel: String
+    ): String {
+        return """
+Du bist ein erfahrener Ernährungsberater und Koch. Die Person hat heute noch folgendes Kalorien-/Makro-Budget übrig
+und möchte damit ihr(e) $mealLabel bestreiten:
+
+- Kalorien: ca. ${remainingCalories.roundToIntSafe()} kcal
+- Protein: ca. ${remainingProtein.roundToIntSafe()} g
+- Kohlenhydrate: ca. ${remainingCarbs.roundToIntSafe()} g
+- Fett: ca. ${remainingFat.roundToIntSafe()} g
+
+Erfinde ein leckeres, alltagstaugliches Gericht, dessen Nährwerte PRO PORTION so nah wie möglich an diesem Budget liegen
+(Toleranz ca. ±10%). Bevorzuge eine ausgewogene, proteinreiche Mahlzeit. Wenn das Budget sehr klein ist (< 300 kcal),
+schlage einen Snack statt einer ganzen Mahlzeit vor. Setze "servings" auf 1, damit die Toplevel-Werte direkt einer Portion entsprechen.
+
+Berechne die Nährwerte EXAKT basierend auf echten Zutatenmengen.
+Referenzwerte pro 100g: Hühnerbrust=165kcal/31gP, Parmesan=431kcal/38gP,
+Ricotta=174kcal/11gP, Hackfleisch=250kcal/17gP, Pasta=350kcal/13gP,
+Reis=130kcal/3gP, Ei=155kcal/13gP, Butter=717kcal/1gP.
+
+$JSON_SCHEMA_HINT
+""".trimIndent()
+    }
+
+    private fun buildRandomPrompt(): String {
+        val cuisines = listOf(
+            "italienisch", "asiatisch (wok)", "mexikanisch", "mediterran", "indisch (mild)",
+            "skandinavisch", "amerikanisch (BBQ-Style)", "griechisch", "orientalisch",
+            "schweizerisch/alpin", "japanisch", "thailändisch", "spanisch"
+        )
+        val styles = listOf(
+            "schnell (unter 20 Min.)", "proteinreich & fitnessfreundlich", "gemütliches Comfort Food",
+            "vegetarisch", "One-Pot", "für Meal Prep geeignet", "leicht & sommerlich", "herzhaft & deftig"
+        )
+        val cuisine = cuisines.random()
+        val style = styles.random()
+        return """
+Überrasche mich mit einem kreativen, aber alltagstauglichen Rezept. Stil: $cuisine, $style.
+Es soll mit haushaltsüblichen, in der Schweiz/Europa gut erhältlichen Zutaten machbar sein.
+
+Berechne die Nährwerte EXAKT basierend auf echten Zutatenmengen.
+Referenzwerte pro 100g: Hühnerbrust=165kcal/31gP, Parmesan=431kcal/38gP,
+Ricotta=174kcal/11gP, Hackfleisch=250kcal/17gP, Pasta=350kcal/13gP,
+Reis=130kcal/3gP, Ei=155kcal/13gP, Butter=717kcal/1gP.
+
+$JSON_SCHEMA_HINT
+""".trimIndent()
+    }
+
+    private fun Float.roundToIntSafe(): Int = this.coerceAtLeast(0f).let { Math.round(it) }
+
+    private fun tryProvider(prompt: String): Result<GeneratedRecipe> {
         return try {
+            val apiKey = BuildConfig.GROQ_API_KEY
             if (apiKey.isBlank()) return Result.failure(Exception(
                 "Kein GROQ_API_KEY in local.properties konfiguriert"
             ))
 
             val requestJson = JSONObject().apply {
-                put("model", model)
+                put("model", "llama-3.3-70b-versatile")
                 put("temperature", 0.7)
                 put("max_tokens", 2000)
                 put("messages", org.json.JSONArray().apply {
                     put(JSONObject().apply {
                         put("role", "user")
-                        put("content", buildPrompt(userInput))
+                        put("content", prompt)
                     })
                 })
             }.toString()
 
             val requestBody = requestJson.toRequestBody("application/json".toMediaType())
             val request = Request.Builder()
-                .url(url)
+                .url("https://api.groq.com/openai/v1/chat/completions")
                 .addHeader("Authorization", "Bearer $apiKey")
                 .post(requestBody)
                 .build()

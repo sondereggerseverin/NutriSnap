@@ -1,6 +1,7 @@
 package ch.nutrisnap.app.ui.screens.recipegen
 
 import android.app.Application
+import android.graphics.Bitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import ch.nutrisnap.app.data.db.NutriDatabase
@@ -8,9 +9,12 @@ import ch.nutrisnap.app.data.model.DiaryEntry
 import ch.nutrisnap.app.data.model.GeneratedRecipeEntity
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.model.Recipe
+import ch.nutrisnap.app.data.repository.DiaryRepository
 import ch.nutrisnap.app.data.repository.RecipeRepository
+import ch.nutrisnap.app.data.repository.UserProfileRepository
 import ch.nutrisnap.app.domain.GeneratedRecipe
 import ch.nutrisnap.app.domain.GroqRecipeGeneratorService
+import ch.nutrisnap.app.domain.GroqVisionService
 import ch.nutrisnap.app.domain.RecipeIngredient
 import ch.nutrisnap.app.domain.ZenMuxImageService
 import kotlinx.coroutines.flow.*
@@ -21,7 +25,18 @@ import kotlinx.serialization.json.Json
 import kotlin.math.roundToInt
 import java.time.LocalDate
 
+/** Wie das aktuell angezeigte Rezept erzeugt wurde – steuert Tab-Auswahl in der UI. */
+enum class RecipeGenMode { FREITEXT, ZUTATEN, FILL_UP, ZUFALL }
+
+data class FillUpBudget(
+    val calories: Float = 0f,
+    val protein: Float = 0f,
+    val carbs: Float = 0f,
+    val fat: Float = 0f
+)
+
 data class RecipeGenUiState(
+    val mode: RecipeGenMode = RecipeGenMode.FREITEXT,
     val isLoading: Boolean = false,
     val recipe: GeneratedRecipe? = null,
     /** id of the generated_recipes row currently shown, if opened from/saved to history */
@@ -30,16 +45,25 @@ data class RecipeGenUiState(
     val savedToDiary: Boolean = false,
     val savedAsRecipe: Boolean = false,
     val isGeneratingImage: Boolean = false,
-    val history: List<GeneratedRecipeEntity> = emptyList()
+    val history: List<GeneratedRecipeEntity> = emptyList(),
+    // Zutaten-Modus
+    val ingredientChips: List<String> = emptyList(),
+    val isScanningFridge: Boolean = false,
+    val showFridgeCamera: Boolean = false,
+    // Fill-Up-Modus
+    val fillUpBudget: FillUpBudget = FillUpBudget()
 )
 
 class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
     private val service      = GroqRecipeGeneratorService()
+    private val visionService = GroqVisionService()
     private val imageService = ZenMuxImageService(app)
     private val db           = NutriDatabase.getInstance(app)
     private val dao         = db.generatedRecipeDao()
     private val diaryDao    = db.diaryDao()
     private val recipeRepo  = RecipeRepository(db, app)
+    private val diaryRepo   = DiaryRepository(db)
+    private val profileRepo = UserProfileRepository(db)
     private val json        = Json { ignoreUnknownKeys = true }
 
     private val _state = MutableStateFlow(RecipeGenUiState())
@@ -51,13 +75,130 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(history = history) }
             }
         }
+        // Hält das Fill-Up-Budget (übrige Tages-Makros) live aktuell.
+        viewModelScope.launch {
+            combine(
+                diaryRepo.getEntriesForDate(LocalDate.now()),
+                profileRepo.get()
+            ) { entries, profile ->
+                val eaten = FillUpBudget(
+                    calories = entries.sumOf { it.calories.toDouble() }.toFloat(),
+                    protein  = entries.sumOf { it.protein.toDouble() }.toFloat(),
+                    carbs    = entries.sumOf { it.carbs.toDouble() }.toFloat(),
+                    fat      = entries.sumOf { it.fat.toDouble() }.toFloat()
+                )
+                FillUpBudget(
+                    calories = (profile.dailyCalorieGoal - eaten.calories).coerceAtLeast(0f),
+                    protein  = (profile.proteinGoalG - eaten.protein).coerceAtLeast(0f),
+                    carbs    = (profile.carbsGoalG - eaten.carbs).coerceAtLeast(0f),
+                    fat      = (profile.fatGoalG - eaten.fat).coerceAtLeast(0f)
+                )
+            }.collect { budget ->
+                _state.update { it.copy(fillUpBudget = budget) }
+            }
+        }
     }
+
+    fun setMode(mode: RecipeGenMode) = _state.update { it.copy(mode = mode) }
 
     fun generate(userInput: String) {
         if (userInput.isBlank()) return
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null, recipe = null, openHistoryId = null, savedToDiary = false, savedAsRecipe = false) }
             service.generateRecipe(userInput).fold(
+                onSuccess = { recipe ->
+                    val newId = dao.insert(recipe.toEntity())
+                    _state.update { it.copy(isLoading = false, recipe = recipe, openHistoryId = newId.toInt()) }
+                    dao.trimHistory()
+                },
+                onFailure = { e ->
+                    _state.update { it.copy(isLoading = false, error = e.message ?: "Unbekannter Fehler") }
+                }
+            )
+        }
+    }
+
+    // ── Zutaten-Modus ────────────────────────────────────────────────────────
+
+    fun addIngredientChip(name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isBlank()) return
+        _state.update {
+            if (it.ingredientChips.any { c -> c.equals(trimmed, ignoreCase = true) }) it
+            else it.copy(ingredientChips = it.ingredientChips + trimmed)
+        }
+    }
+
+    fun removeIngredientChip(name: String) {
+        _state.update { it.copy(ingredientChips = it.ingredientChips.filterNot { c -> c == name }) }
+    }
+
+    fun openFridgeCamera()  = _state.update { it.copy(showFridgeCamera = true) }
+    fun closeFridgeCamera() = _state.update { it.copy(showFridgeCamera = false) }
+
+    /** Analysiert ein Kühlschrank-/Vorratsfoto und fügt erkannte Zutaten als Chips hinzu. */
+    fun analyzeFridgePhoto(bitmap: Bitmap) {
+        viewModelScope.launch {
+            _state.update { it.copy(isScanningFridge = true, showFridgeCamera = false, error = null) }
+            val base64 = visionService.bitmapToBase64Jpeg(bitmap)
+            visionService.analyzeFridgePhoto(base64).fold(
+                onSuccess = { result ->
+                    _state.update { s ->
+                        val merged = (s.ingredientChips + result.ingredients)
+                            .distinctBy { it.lowercase() }
+                        s.copy(isScanningFridge = false, ingredientChips = merged)
+                    }
+                },
+                onFailure = { e ->
+                    _state.update { it.copy(isScanningFridge = false, error = e.message ?: "Foto konnte nicht analysiert werden") }
+                }
+            )
+        }
+    }
+
+    fun generateFromIngredients(note: String = "") {
+        val ingredients = _state.value.ingredientChips
+        if (ingredients.isEmpty()) return
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null, recipe = null, openHistoryId = null, savedToDiary = false, savedAsRecipe = false) }
+            service.generateFromIngredients(ingredients, note).fold(
+                onSuccess = { recipe ->
+                    val newId = dao.insert(recipe.toEntity())
+                    _state.update { it.copy(isLoading = false, recipe = recipe, openHistoryId = newId.toInt()) }
+                    dao.trimHistory()
+                },
+                onFailure = { e ->
+                    _state.update { it.copy(isLoading = false, error = e.message ?: "Unbekannter Fehler") }
+                }
+            )
+        }
+    }
+
+    // ── Fill-Up-Modus ────────────────────────────────────────────────────────
+
+    fun generateFillUp(mealLabel: String) {
+        val budget = _state.value.fillUpBudget
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null, recipe = null, openHistoryId = null, savedToDiary = false, savedAsRecipe = false) }
+            service.generateFillUp(budget.calories, budget.protein, budget.carbs, budget.fat, mealLabel).fold(
+                onSuccess = { recipe ->
+                    val newId = dao.insert(recipe.toEntity())
+                    _state.update { it.copy(isLoading = false, recipe = recipe, openHistoryId = newId.toInt()) }
+                    dao.trimHistory()
+                },
+                onFailure = { e ->
+                    _state.update { it.copy(isLoading = false, error = e.message ?: "Unbekannter Fehler") }
+                }
+            )
+        }
+    }
+
+    // ── Zufalls-Modus ────────────────────────────────────────────────────────
+
+    fun generateRandomRecipe() {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, error = null, recipe = null, openHistoryId = null, savedToDiary = false, savedAsRecipe = false) }
+            service.generateRandom().fold(
                 onSuccess = { recipe ->
                     val newId = dao.insert(recipe.toEntity())
                     _state.update { it.copy(isLoading = false, recipe = recipe, openHistoryId = newId.toInt()) }
