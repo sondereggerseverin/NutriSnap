@@ -4,7 +4,8 @@ import android.Manifest
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
-import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -31,10 +32,11 @@ import androidx.core.content.ContextCompat
 import java.util.concurrent.Executors
 
 /**
- * Wiederverwendbarer Kamera-Capture-Screen fuer EIN Foto (im Gegensatz zum
+ * Wiederverwendbarer Capture-Screen fuer EIN Foto (im Gegensatz zum
  * BarcodeScannerScreen, der laufend live analysiert). Wird sowohl fuer den
  * Essens-Scan (Kalorienschaetzung) als auch fuer das Fotografieren von
- * Naehrwerttabellen verwendet.
+ * Naehrwerttabellen verwendet. Bietet sowohl Kamera-Aufnahme als auch
+ * Auswahl eines bestehenden Bilds aus der Galerie.
  */
 @Composable
 fun PhotoCaptureScreen(
@@ -52,11 +54,24 @@ fun PhotoCaptureScreen(
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
-        uri?.let {
-            val stream = context.contentResolver.openInputStream(it)
-            val bitmap = stream?.use { s -> BitmapFactory.decodeStream(s) }
-            bitmap?.let { bmp -> onPhotoCaptured(bmp) }
+    ) { uri ->
+        if (uri != null) {
+            isCapturing = true
+            val bitmap = try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val source = android.graphics.ImageDecoder.createSource(context.contentResolver, uri)
+                    android.graphics.ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                        decoder.isMutableRequired = true
+                    }
+                } else {
+                    @Suppress("DEPRECATION")
+                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                }
+            } catch (e: Exception) {
+                null
+            }
+            isCapturing = false
+            bitmap?.let { onPhotoCaptured(it) }
         }
     }
 
@@ -72,9 +87,18 @@ fun PhotoCaptureScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text("Kamera-Zugriff wird benötigt.")
+            Text("Kamera-Zugriff wird benötigt, um Fotos aufzunehmen.")
             Spacer(Modifier.height(16.dp))
-            Button(onClick = onNavigateBack) { Text("Zurück") }
+            Text("Du kannst aber auch ein Foto aus der Galerie wählen:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(8.dp))
+            Button(onClick = {
+                galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            }) {
+                Icon(Icons.Default.PhotoLibrary, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp)); Text("Aus Galerie wählen")
+            }
+            Spacer(Modifier.height(16.dp))
+            OutlinedButton(onClick = onNavigateBack) { Text("Zurück") }
         }
         return
     }
@@ -133,6 +157,19 @@ fun PhotoCaptureScreen(
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         }
 
+        // Galerie-Button (unten links)
+        FloatingActionButton(
+            onClick = {
+                if (isCapturing) return@FloatingActionButton
+                galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            },
+            modifier = Modifier.align(Alignment.BottomStart).padding(start = 32.dp, bottom = 40.dp),
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        ) {
+            Icon(Icons.Default.PhotoLibrary, contentDescription = "Aus Galerie wählen")
+        }
+
+        // Kamera-Auslöser (unten mittig)
         FloatingActionButton(
             onClick = {
                 val capture = imageCapture ?: return@FloatingActionButton
@@ -161,18 +198,6 @@ fun PhotoCaptureScreen(
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp)
         ) {
             Icon(Icons.Default.Camera, contentDescription = "Foto aufnehmen")
-        }
-
-        SmallFloatingActionButton(
-            onClick = {
-                galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            },
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(bottom = 40.dp, end = 24.dp)
-        ) {
-            Icon(Icons.Default.PhotoLibrary, contentDescription = "Aus Galerie wählen")
         }
     }
 }
