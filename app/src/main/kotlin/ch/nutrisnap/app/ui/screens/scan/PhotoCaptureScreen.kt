@@ -4,6 +4,10 @@ import android.Manifest
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -12,6 +16,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Camera
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,6 +49,16 @@ fun PhotoCaptureScreen(
     var isCapturing by remember { mutableStateOf(false) }
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     val executor = remember { Executors.newSingleThreadExecutor() }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        uri?.let {
+            val stream = context.contentResolver.openInputStream(it)
+            val bitmap = stream?.use { s -> BitmapFactory.decodeStream(s) }
+            bitmap?.let { bmp -> onPhotoCaptured(bmp) }
+        }
+    }
 
     LaunchedEffect(Unit) {
         hasPermission = ContextCompat.checkSelfPermission(
@@ -146,6 +161,18 @@ fun PhotoCaptureScreen(
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp)
         ) {
             Icon(Icons.Default.Camera, contentDescription = "Foto aufnehmen")
+        }
+
+        SmallFloatingActionButton(
+            onClick = {
+                galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            },
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 40.dp, end = 24.dp)
+        ) {
+            Icon(Icons.Default.PhotoLibrary, contentDescription = "Aus Galerie wählen")
         }
     }
 }
