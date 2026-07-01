@@ -1,5 +1,6 @@
 ﻿package ch.nutrisnap.app.domain
 
+import android.util.Log
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.DiaryEntry
 import ch.nutrisnap.app.data.model.FoodItem
@@ -16,8 +17,9 @@ class YazioImporter(private val db: NutriDatabase) {
             val lines = csvContent.split("\n").drop(1)
             var foodsCreated = 0
             var entriesCreated = 0
+            var skipped = 0
             val createdFoods = mutableMapOf<String, FoodItem>()
-            lines.filter { it.isNotBlank() }.forEach { line ->
+            lines.filter { it.isNotBlank() }.forEachIndexed { index, line ->
                 val parts = line.split("|").map { it.trim() }
                 if (parts.size >= 8) {
                     try {
@@ -64,10 +66,16 @@ class YazioImporter(private val db: NutriDatabase) {
                         )
                         db.diaryDao().insert(entry)
                         entriesCreated++
-                    } catch (e: Exception) {}
+                    } catch (e: Exception) {
+                        skipped++
+                        Log.w("YazioImport", "Zeile ${index + 2} übersprungen: ${e.message}")
+                    }
+                } else {
+                    skipped++
+                    Log.w("YazioImport", "Zeile ${index + 2} übersprungen: erwarte 8 Spalten, hat ${parts.size}")
                 }
             }
-            ImportResult(success = true, foodsImported = foodsCreated, entriesImported = entriesCreated)
+            ImportResult(success = true, foodsImported = foodsCreated, entriesImported = entriesCreated, rowsSkipped = skipped)
         } catch (e: Exception) {
             ImportResult(success = false, error = e.message ?: "Unknown error")
         }
@@ -78,5 +86,6 @@ data class ImportResult(
     val success: Boolean,
     val foodsImported: Int = 0,
     val entriesImported: Int = 0,
+    val rowsSkipped: Int = 0,
     val error: String? = null
 )

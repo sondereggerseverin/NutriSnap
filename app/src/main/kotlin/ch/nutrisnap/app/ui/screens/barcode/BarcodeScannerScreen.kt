@@ -1,6 +1,8 @@
 package ch.nutrisnap.app.ui.screens.barcode
 
 import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -192,7 +194,23 @@ private fun ScanOverlay(modifier: Modifier = Modifier) {
 
 @Composable
 private fun CameraPermissionRequest(onPermissionGranted: () -> Unit) {
-    // TODO: Implement permission request using rememberLauncherForActivityResult
+    val context = LocalContext.current
+    // true = System-Dialog wurde schon mal gezeigt und abgelehnt (shouldShowRequestPermissionRationale
+    // wird dann false, weil "nicht mehr fragen" aktiv ist) -> direkt zu den Einstellungen leiten.
+    var permanentlyDenied by remember { mutableStateOf(false) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            onPermissionGranted()
+        } else {
+            val activity = context as? android.app.Activity
+            val canAskAgain = activity?.shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) ?: true
+            permanentlyDenied = !canAskAgain
+        }
+    }
+
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -200,8 +218,26 @@ private fun CameraPermissionRequest(onPermissionGranted: () -> Unit) {
     ) {
         Text("Kamera-Zugriff wird benötigt, um Barcodes zu scannen.")
         Spacer(Modifier.height(16.dp))
-        Button(onClick = { /* Launch permission request */ }) {
-            Text("Zugriff erlauben")
+        if (permanentlyDenied) {
+            Text(
+                "Der Zugriff wurde dauerhaft abgelehnt. Bitte in den App-Einstellungen aktivieren.",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 32.dp)
+            )
+            Spacer(Modifier.height(12.dp))
+            Button(onClick = {
+                val intent = android.content.Intent(
+                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    android.net.Uri.fromParts("package", context.packageName, null)
+                )
+                context.startActivity(intent)
+            }) {
+                Text("Zu den Einstellungen")
+            }
+        } else {
+            Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
+                Text("Zugriff erlauben")
+            }
         }
     }
 }
