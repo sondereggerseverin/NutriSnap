@@ -42,6 +42,9 @@ interface DiaryDao {
     @Query("SELECT * FROM diary_entries ORDER BY dateStr, mealType")
     suspend fun getAllOnce(): List<DiaryEntry>
 
+    @Query("SELECT * FROM diary_entries WHERE id = :id")
+    suspend fun getById(id: Long): DiaryEntry?
+
     @Query("DELETE FROM diary_entries")
     suspend fun deleteAll()
 }
@@ -85,6 +88,9 @@ interface WeightDao {
 
     @Query("SELECT * FROM weight_entries ORDER BY dateStr DESC LIMIT 1")
     suspend fun getLatest(): WeightEntry?
+
+    @Query("SELECT * FROM weight_entries WHERE dateStr = :dateStr LIMIT 1")
+    suspend fun getByDate(dateStr: String): WeightEntry?
 
     @Query("SELECT * FROM weight_entries ORDER BY dateStr ASC")
     suspend fun getAllOnce(): List<WeightEntry>
