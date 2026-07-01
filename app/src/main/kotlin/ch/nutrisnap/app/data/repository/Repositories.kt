@@ -7,9 +7,21 @@ import ch.nutrisnap.app.data.api.OpenFoodFactsApi
 import ch.nutrisnap.app.data.api.UsdaFoodApi
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.*
+import ch.nutrisnap.app.data.supabase.SupabaseSync
 import ch.nutrisnap.app.domain.RecipeScraper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 import java.time.LocalDate
+
+/** Fire-and-forget scope for pushing local changes to Supabase. A failed push
+ *  (e.g. offline) never breaks the local save — it's caught and swallowed. */
+private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+private fun pushSafely(block: suspend () -> Unit) {
+    syncScope.launch { runCatching { block() } }
+}
 
 class DiaryRepository(db: NutriDatabase) {
     private val dao = db.diaryDao()
@@ -22,7 +34,7 @@ class DiaryRepository(db: NutriDatabase) {
 
     suspend fun addEntry(food: FoodItem, amountGrams: Float, mealType: MealType, date: LocalDate): Long {
         val f = amountGrams / 100f
-        return dao.insert(
+        val id = dao.insert(
             DiaryEntry(
                 foodItemId  = food.id,
                 foodName    = food.name + (food.brand?.let { " ($it)" } ?: ""),
@@ -35,6 +47,8 @@ class DiaryRepository(db: NutriDatabase) {
                 fat         = food.fat      * f
             )
         )
+        dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }
+        return id
     }
 
     /**
@@ -56,7 +70,7 @@ class DiaryRepository(db: NutriDatabase) {
         val carbs       = (recipe.carbsPerServing   ?: 0f) * servingsFactor
         val fat         = (recipe.fatPerServing     ?: 0f) * servingsFactor
 
-        return dao.insert(
+        val id = dao.insert(
             DiaryEntry(
                 foodItemId  = -(recipe.id.toInt()).coerceAtMost(-1), // negative = recipe entry
                 foodName    = recipe.title,
@@ -69,6 +83,8 @@ class DiaryRepository(db: NutriDatabase) {
                 fat         = fat
             )
         )
+        dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }
+        return id
     }
 
     /**
@@ -83,22 +99,34 @@ class DiaryRepository(db: NutriDatabase) {
         fat: Float,
         mealType: MealType,
         date: LocalDate
-    ): Long = dao.insert(
-        DiaryEntry(
-            foodItemId  = -999,
-            foodName    = name,
-            amountGrams = 0f,
-            mealType    = mealType,
-            dateStr     = date.toString(),
-            calories    = kcal,
-            protein     = protein,
-            carbs       = carbs,
-            fat         = fat
+    ): Long {
+        val id = dao.insert(
+            DiaryEntry(
+                foodItemId  = -999,
+                foodName    = name,
+                amountGrams = 0f,
+                mealType    = mealType,
+                dateStr     = date.toString(),
+                calories    = kcal,
+                protein     = protein,
+                carbs       = carbs,
+                fat         = fat
+            )
         )
-    )
+        dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }
+        return id
+    }
 
-    suspend fun updateEntry(entry: DiaryEntry) = dao.update(entry)
-    suspend fun deleteEntry(entry: DiaryEntry) = dao.delete(entry)
+    suspend fun updateEntry(entry: DiaryEntry) {
+        dao.update(entry)
+        pushSafely { SupabaseSync.upsertDiaryEntry(entry) }
+    }
+
+    suspend fun deleteEntry(entry: DiaryEntry) {
+        dao.delete(entry)
+        pushSafely { SupabaseSync.deleteDiaryEntry(entry.id) }
+    }
+
     suspend fun deleteAllEntries() = dao.deleteAll()
 }
 
@@ -109,15 +137,30 @@ class RecipeRepository(db: NutriDatabase, context: Context) {
     fun getAll():          Flow<List<Recipe>> = dao.getAll()
     fun search(q: String): Flow<List<Recipe>> = dao.search(q)
 
-    suspend fun saveRecipe(r: Recipe): Long  = dao.insert(r)
-    suspend fun updateRecipe(r: Recipe)      = dao.update(r)
-    suspend fun deleteRecipe(r: Recipe)      = dao.delete(r)
-    suspend fun getById(id: Long)            = dao.getById(id)
+    suspend fun saveRecipe(r: Recipe): Long {
+        val id = dao.insert(r)
+        dao.getById(id)?.let { saved -> pushSafely { SupabaseSync.upsertRecipe(saved) } }
+        return id
+    }
+
+    suspend fun updateRecipe(r: Recipe) {
+        dao.update(r)
+        pushSafely { SupabaseSync.upsertRecipe(r) }
+    }
+
+    suspend fun deleteRecipe(r: Recipe) {
+        dao.delete(r)
+        pushSafely { SupabaseSync.deleteRecipe(r.id) }
+    }
+
+    suspend fun getById(id: Long) = dao.getById(id)
 
     suspend fun importFromUrl(url: String): RecipeScrapeResult {
         val result = scraper.scrape(url)
         if (result.success && result.recipe != null) {
-            val saved = result.recipe.copy(id = dao.insert(result.recipe))
+            val newId = dao.insert(result.recipe)
+            val saved = result.recipe.copy(id = newId)
+            pushSafely { SupabaseSync.upsertRecipe(saved) }
             return result.copy(recipe = saved)
         }
         return result
