@@ -55,6 +55,7 @@ fun NutritionLabelScanScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LabelResultView(
     result: NutritionLabelResult,
