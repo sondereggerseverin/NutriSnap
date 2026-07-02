@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Samsung Health Data SDK AAR requires minSdk 29; app minSdk is 26.
+         The SDK is only invoked behind a Build.VERSION.SDK_INT >= 29 runtime check
+         (see SamsungHealthDataManager), so it's safe to override the manifest merge. -->
+    <uses-sdk tools:overrideLibrary="com.samsung.android.sdk.health.data"/>
 
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>

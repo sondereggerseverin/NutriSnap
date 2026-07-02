@@ -19,7 +19,9 @@ data class HealthConnectUiState(
     val isHistoricalSyncing: Boolean = false,
     val hasPermission: Boolean = false,
     val isAvailable: Boolean = false,
-    val syncError: String? = null
+    val syncError: String? = null,
+    val samsungHealthSupported: Boolean = false,
+    val samsungHealthPermission: Boolean? = null
 )
 
 data class WeeklyStats(
@@ -36,7 +38,7 @@ class HealthConnectViewModel(app: Application) : AndroidViewModel(app) {
     private val db = NutriDatabase.getInstance(app)
     private val manager = HealthConnectManager(app)
     private val profileRepo = UserProfileRepository(db)
-    private val repository = HealthConnectRepository(manager, db.healthConnectDao(), profileRepo)
+    private val repository = HealthConnectRepository(manager, db.healthConnectDao(), profileRepo, app)
 
     private val _uiState = MutableStateFlow(HealthConnectUiState())
     val uiState: StateFlow<HealthConnectUiState> = _uiState.asStateFlow()
@@ -88,10 +90,31 @@ class HealthConnectViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         val available = HealthConnectManager.isAvailable(app)
-        _uiState.update { it.copy(isAvailable = available) }
+        _uiState.update { it.copy(isAvailable = available, samsungHealthSupported = repository.isSamsungHealthSupported()) }
         if (available) {
             observeData()
             checkPermissionsAndSync()
+        }
+        checkSamsungHealthPermission()
+    }
+
+    private fun checkSamsungHealthPermission() {
+        if (!repository.isSamsungHealthSupported()) return
+        viewModelScope.launch {
+            val granted = runCatching { repository.hasSamsungHealthPermissions() }.getOrDefault(false)
+            _uiState.update { it.copy(samsungHealthPermission = granted) }
+        }
+    }
+
+    /** Must be called with a foreground Activity; Samsung Health shows its own consent dialog. */
+    fun requestSamsungHealthPermissions(activity: android.app.Activity) {
+        viewModelScope.launch {
+            val granted = runCatching { repository.requestSamsungHealthPermissions(activity) }.getOrDefault(false)
+            _uiState.update { it.copy(samsungHealthPermission = granted) }
+            if (granted) {
+                syncNow()
+                syncHistorical()
+            }
         }
     }
 

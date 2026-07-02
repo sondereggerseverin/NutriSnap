@@ -234,6 +234,9 @@ fun SettingsScreen(
         // Health Connect
         HealthConnectCard()
 
+        // Samsung Health Data SDK (Tier 0 — direct read, bypasses Health Connect)
+        SamsungHealthCard()
+
         // ── Körperdaten ───────────────────────────────────────────────────────
         SettingsCard(title = "Körperdaten", icon = Icons.Default.Person) {
             GoalField("Gewicht (kg)",  weightText, KeyboardType.Number) {
@@ -483,8 +486,93 @@ fun HealthConnectCard() {
     }
 }
 
+// ── Samsung Health Data SDK Card ───────────────────────────────────────────────
+
 @Composable
-fun ThemePickerSection(
+fun SamsungHealthCard() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope   = rememberCoroutineScope()
+
+    val supported = remember { ch.nutrisnap.app.health.SamsungHealthDataManager.isSupported() }
+    var permissionsGranted by remember { mutableStateOf<Boolean?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+
+    val manager = remember { ch.nutrisnap.app.health.SamsungHealthDataManager(context) }
+
+    LaunchedEffect(supported) {
+        if (supported) {
+            permissionsGranted = runCatching { manager.hasPermissions() }.getOrDefault(false)
+        }
+    }
+
+    if (!supported) return // Android < 10: silently hide, Health Connect card covers this device.
+
+    SettingsCard(title = "Samsung Health Data SDK", icon = Icons.Default.Favorite) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = when (permissionsGranted) {
+                        true  -> "✓ Verbunden (direkte Aktivkalorien)"
+                        false -> "Nicht verbunden"
+                        null  -> "Wird geprüft…"
+                    },
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = when (permissionsGranted) {
+                        true  -> Color(0xFF2E7D32)
+                        else  -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+                Text(
+                    "Umgeht Health Connect für Aktivkalorien",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            val activity = context as? android.app.Activity
+
+            if (permissionsGranted != true) {
+                Button(
+                    onClick = {
+                        val act = activity ?: return@Button
+                        isLoading = true
+                        scope.launch {
+                            val granted = runCatching { manager.requestPermissions(act) }
+                                .getOrDefault(false)
+                            permissionsGranted = granted
+                            isLoading = false
+                        }
+                    },
+                    enabled = !isLoading && activity != null
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            Modifier.size(16.dp), strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    } else {
+                        Text("Verbinden")
+                    }
+                }
+            } else {
+                OutlinedButton(onClick = {
+                    scope.launch {
+                        runCatching { permissionsGranted = manager.hasPermissions() }
+                    }
+                }) {
+                    Text("Erneut prüfen", fontSize = 12.sp)
+                }
+            }
+        }
+    }
+}
+
+
     currentTheme: AppTheme,
     onThemeSelected: (AppTheme) -> Unit
 ) {
