@@ -19,11 +19,12 @@ data class UserProfile(
     val ageYears:         Int   = 0,
     val activityFactor:   Float = 1.55f
 ) {
-    fun computedTdee(): Double? {
+    fun computedBmr(): Double? {
         if (weightKg <= 0f || heightCm <= 0 || ageYears <= 0) return null
-        val bmr = 10.0 * weightKg + 6.25 * heightCm - 5.0 * ageYears
-        return bmr * activityFactor
+        return 10.0 * weightKg + 6.25 * heightCm - 5.0 * ageYears
     }
+
+    fun computedTdee(): Double? = computedBmr()?.let { it * activityFactor }
 }
 
 class UserProfileRepository(private val db: NutriDatabase) {

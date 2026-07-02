@@ -97,17 +97,23 @@ class HealthConnectManager(context: Context) {
     /**
      * Activity calories for a specific day (active/movement only, no BMR).
      *
-     * Three-tier fallback, in order of trustworthiness:
+     * Four-tier fallback, in order of trustworthiness:
      *  1. Sum individual ActiveCaloriesBurnedRecord entries written by Samsung Health
      *     (filtered by dataOrigin). Most granular and reliable when present.
      *  2. Aggregate ActiveCaloriesBurnedRecord but restricted to Samsung Health's
      *     dataOrigin via AggregateRequest's dataOriginFilter. Cheaper, same source.
-     *  3. Unfiltered aggregate across all sources, capped at a sanity ceiling, so a
-     *     misbehaving/duplicate source can't blow up the displayed number. This is
-     *     the old behaviour and is only used if Samsung Health has no data at all
-     *     (e.g. permission not granted yet, or sync hasn't happened).
+     *  3. Samsung's TotalCaloriesBurnedRecord minus a prorated resting-metabolism
+     *     estimate (bmrKcalPerDay). Samsung Health frequently writes total calories
+     *     to Health Connect while never writing the "active" record type at all —
+     *     this is a well-known Samsung Health / Health Connect gap, not something
+     *     fixable purely by reading differently on tiers 1/2. Only used when the
+     *     caller supplies a BMR estimate (from the user's profile).
+     *  4. Unfiltered ActiveCaloriesBurnedRecord aggregate across all sources, capped
+     *     at a sanity ceiling, so a misbehaving/duplicate source can't blow up the
+     *     displayed number. Last resort, used only if nothing above has any data
+     *     (e.g. permission not granted yet, or Samsung Health hasn't synced).
      */
-    suspend fun getActiveCaloriesForDay(date: LocalDate): Double? {
+    suspend fun getActiveCaloriesForDay(date: LocalDate, bmrKcalPerDay: Double? = null): Double? {
         val start = date.atStartOfDay(ZoneId.systemDefault()).toInstant()
         val end   = if (date == LocalDate.now()) Instant.now()
                     else date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
@@ -148,7 +154,34 @@ class HealthConnectManager(context: Context) {
             return samsungAggregate
         }
 
-        // Tier 3: unfiltered aggregate, capped as a last resort.
+        // Tier 3: Samsung's TotalCaloriesBurnedRecord minus prorated BMR.
+        // Only attempted if the caller gave us a BMR estimate.
+        if (bmrKcalPerDay != null && bmrKcalPerDay > 0.0) {
+            val totalResult = runCatching {
+                val resp = client.readRecords(
+                    ReadRecordsRequest(TotalCaloriesBurnedRecord::class, range)
+                )
+                val samsungTotalRecords = resp.records.filter {
+                    it.metadata.dataOrigin.packageName == SAMSUNG_HEALTH_PACKAGE
+                }
+                if (samsungTotalRecords.isEmpty()) null
+                else samsungTotalRecords.sumOf { it.energy.inKilocalories }
+            }.onFailure {
+                Log.e(TAG, "getActiveCaloriesForDay: Tier 3 (Samsung total calories) failed for $date", it)
+            }.getOrNull()
+
+            if (totalResult != null && totalResult > 0.0) {
+                // Prorate the daily BMR by the elapsed fraction of the day so a
+                // partial "today" query doesn't subtract a full day's resting burn.
+                val elapsedFraction = (java.time.Duration.between(start, end).toMinutes()
+                    .coerceAtLeast(0)).toDouble() / (24 * 60)
+                val restingEstimate = bmrKcalPerDay * elapsedFraction
+                val active = (totalResult - restingEstimate).coerceAtLeast(0.0)
+                if (active > 0.0) return active
+            }
+        }
+
+        // Tier 4: unfiltered aggregate, capped as a last resort.
         // Kept nullable here on purpose: a missing key means Health Connect has
         // no record at all for this day (e.g. Samsung Health hasn't synced yet),
         // which is different from a genuine "burned 0 kcal" reading.
@@ -160,11 +193,11 @@ class HealthConnectManager(context: Context) {
                 )
             )[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories
         }.onFailure {
-            Log.e(TAG, "getActiveCaloriesForDay: Tier 3 (unfiltered aggregate) failed for $date", it)
+            Log.e(TAG, "getActiveCaloriesForDay: Tier 4 (unfiltered aggregate) failed for $date", it)
         }.getOrNull()
 
         if (unfilteredAggregate == null) {
-            Log.w(TAG, "getActiveCaloriesForDay: all 3 tiers returned no data for $date " +
+            Log.w(TAG, "getActiveCaloriesForDay: all tiers returned no data for $date " +
                 "(check Health Connect permissions / Samsung Health sync)")
             return null
         }
@@ -212,8 +245,8 @@ class HealthConnectManager(context: Context) {
     /**
      * Activity calories heute.
      */
-    fun getTodaysActiveCalories(): Flow<Double?> = flow {
-        emit(getActiveCaloriesForDay(LocalDate.now()))
+    fun getTodaysActiveCalories(bmrKcalPerDay: Double? = null): Flow<Double?> = flow {
+        emit(getActiveCaloriesForDay(LocalDate.now(), bmrKcalPerDay))
     }
 
     /** Latest weight reading from last 30 days */

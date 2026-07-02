@@ -53,7 +53,9 @@ import ch.nutrisnap.app.ui.screens.water.WaterTrackingScreen
 import ch.nutrisnap.app.ui.theme.NutriSnapTheme
 import ch.nutrisnap.app.ui.viewmodel.HealthConnectViewModel
 import ch.nutrisnap.app.utils.NetworkMonitor
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Home      : Screen("home",       "Start",    Icons.Default.Home)
@@ -130,12 +132,22 @@ class MainActivity : ComponentActivity() {
                     null  -> Box(modifier = Modifier.fillMaxSize())
                     false -> LoginScreen(onLoggedIn = { authVm.onLoggedIn() })
                     true  -> {
-                        LaunchedEffect(Unit) {
-                            runCatching {
-                                ch.nutrisnap.app.data.supabase.SyncManager.pullAll(
-                                    ch.nutrisnap.app.data.db.NutriDatabase.getInstance(this@MainActivity)
-                                )
+                        // Pull remote (web-created) rows on first composition AND every time
+                        // the app comes back to the foreground. Previously this only ran once
+                        // per login (LaunchedEffect(Unit)), so entries added on the web app
+                        // never showed up on the phone unless you logged out/in again.
+                        val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+                        DisposableEffect(lifecycleOwner) {
+                            val db = ch.nutrisnap.app.data.db.NutriDatabase.getInstance(this@MainActivity)
+                            val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                                if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                                    (lifecycleOwner.lifecycleScope).launch {
+                                        runCatching { ch.nutrisnap.app.data.supabase.SyncManager.pullAll(db) }
+                                    }
+                                }
                             }
+                            lifecycleOwner.lifecycle.addObserver(observer)
+                            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
                         }
                         val networkMonitor = remember { NetworkMonitor(this) }
                         val isOnline by networkMonitor.isOnline.collectAsState(initial = true)

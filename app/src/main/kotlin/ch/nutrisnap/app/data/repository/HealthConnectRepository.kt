@@ -16,19 +16,27 @@ private const val TAG = "HealthConnectRepo"
 
 class HealthConnectRepository(
     private val manager: HealthConnectManager,
-    private val dao: HealthConnectDao
+    private val dao: HealthConnectDao,
+    private val profileRepo: UserProfileRepository? = null
 ) {
     fun getTodayData(): Flow<HealthConnectCache?> = dao.getCacheForDate(LocalDate.now())
     fun getLast7Days(): Flow<List<HealthConnectCache>> = dao.getLast7Days()
     fun getLast30Days(): Flow<List<HealthConnectCache>> = dao.getLast30Days()
 
+    // Used as a fallback: Samsung Health often writes TotalCaloriesBurnedRecord to
+    // Health Connect but never writes ActiveCaloriesBurnedRecord. Subtracting a
+    // prorated BMR from the total gives a usable "active calories" estimate.
+    private suspend fun currentBmr(): Double? =
+        runCatching { profileRepo?.get()?.firstOrNull()?.computedBmr() }.getOrNull()
+
     suspend fun syncToday(): Result<HealthConnectCache> = runCatching {
         coroutineScope {
+            val bmr = currentBmr()
             val steps = async {
                 runCatching { manager.getTodaysSteps().firstOrNull() ?: 0L }.getOrDefault(0L)
             }
             val calories = async {
-                runCatching { manager.getActiveCaloriesForDay(LocalDate.now()) }
+                runCatching { manager.getActiveCaloriesForDay(LocalDate.now(), bmr) }
                     .onFailure { Log.e(TAG, "syncToday: calories fetch failed", it) }
                     .getOrDefault(null)
             }
@@ -68,6 +76,7 @@ class HealthConnectRepository(
      */
     suspend fun syncHistorical(days: Int = 30): Result<Int> = runCatching {
         val today = LocalDate.now()
+        val bmr = currentBmr()
         // Fetch all weight data in one API call for efficiency
         val weightFrom = today.minusDays(days.toLong())
             .atStartOfDay(ZoneId.systemDefault()).toInstant()
@@ -83,7 +92,7 @@ class HealthConnectRepository(
             if (existing != null && existing.steps > 0) continue
 
             val steps = runCatching { manager.getStepsForDay(date) }.getOrDefault(0L)
-            val calories = runCatching { manager.getActiveCaloriesForDay(date) }.getOrDefault(null)
+            val calories = runCatching { manager.getActiveCaloriesForDay(date, bmr) }.getOrDefault(null)
             val sleep = runCatching { manager.getSleepForNight(date) }.getOrDefault(0L)
             val weight = weightMap[date] ?: existing?.weightKg
 
