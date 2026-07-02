@@ -47,8 +47,8 @@ class SamsungHealthDataManager(private val context: Context) {
 
     companion object {
         val REQUIRED_PERMISSIONS: Set<Permission> = setOf(
-            Permission.of(DataType.ActivitySummaryType, AccessType.READ),
-            Permission.of(DataType.StepsType, AccessType.READ)
+            Permission.of(DataType.ActivitySummaryType(), AccessType.READ),
+            Permission.of(DataType.StepsType(), AccessType.READ)
         )
 
         fun isSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q

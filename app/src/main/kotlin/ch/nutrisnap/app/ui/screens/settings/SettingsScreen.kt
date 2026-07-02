@@ -572,7 +572,8 @@ fun SamsungHealthCard() {
     }
 }
 
-
+@Composable
+fun ThemePickerSection(
     currentTheme: AppTheme,
     onThemeSelected: (AppTheme) -> Unit
 ) {
