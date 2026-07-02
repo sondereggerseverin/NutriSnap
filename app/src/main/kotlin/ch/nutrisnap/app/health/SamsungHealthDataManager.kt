@@ -12,6 +12,7 @@ import com.samsung.android.sdk.health.data.permission.AccessType
 import com.samsung.android.sdk.health.data.permission.Permission
 import com.samsung.android.sdk.health.data.request.AggregateRequest
 import com.samsung.android.sdk.health.data.request.DataType
+import com.samsung.android.sdk.health.data.request.DataTypes
 import com.samsung.android.sdk.health.data.request.LocalTimeFilter
 import java.time.LocalDate
 
@@ -47,8 +48,8 @@ class SamsungHealthDataManager(private val context: Context) {
 
     companion object {
         val REQUIRED_PERMISSIONS: Set<Permission> = setOf(
-            Permission.of(DataType.ActivitySummaryType(), AccessType.READ),
-            Permission.of(DataType.StepsType(), AccessType.READ)
+            Permission.of(DataTypes.ACTIVITY_SUMMARY, AccessType.READ),
+            Permission.of(DataTypes.STEPS, AccessType.READ)
         )
 
         fun isSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
