@@ -28,7 +28,11 @@ class HealthConnectRepository(
     // optional so existing call sites that don't pass one keep working (Tier 0 simply
     // stays disabled for them, same as before this SDK was integrated).
     private val samsungHealthManager: SamsungHealthDataManager? =
-        context?.let { SamsungHealthDataManager(it.applicationContext) }
+        context?.let {
+            runCatching { SamsungHealthDataManager(it.applicationContext) }
+                .onFailure { e -> Log.w(TAG, "Samsung Health SDK init failed, disabling Tier 0", e) }
+                .getOrNull()
+        }
 
     private suspend fun samsungActiveCalories(date: LocalDate): Double? =
         runCatching { samsungHealthManager?.readActiveCalories(date) }
