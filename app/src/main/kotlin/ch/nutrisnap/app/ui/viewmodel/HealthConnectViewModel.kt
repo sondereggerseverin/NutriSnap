@@ -7,6 +7,7 @@ import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.HealthConnectCache
 import ch.nutrisnap.app.data.repository.HealthConnectRepository
 import ch.nutrisnap.app.data.repository.UserProfileRepository
+import ch.nutrisnap.app.data.supabase.SupabaseSync
 import ch.nutrisnap.app.domain.AdaptiveCalorieTarget
 import ch.nutrisnap.app.domain.AdaptiveTdeeCalculator
 import ch.nutrisnap.app.health.HealthConnectManager
@@ -190,6 +191,7 @@ class HealthConnectViewModel(app: Application) : AndroidViewModel(app) {
             repository.syncToday()
                 .onSuccess { cache ->
                     _uiState.update { it.copy(isLoading = false, todayData = cache, syncError = null) }
+                    pushHealthDaily(cache)
                 }
                 .onFailure { err ->
                     _uiState.update {
@@ -202,10 +204,46 @@ class HealthConnectViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Pusht Aktivkalorien/Schritte eines Tages nach Supabase (health_daily), damit die
+     * Web-App den Sport-Bonus im adaptiven Kalorienziel mitberechnen kann. Android bleibt
+     * die alleinige Quelle (Health Connect / Samsung Health SDK); Fehler sind nicht
+     * kritisch fuer die App-Funktion und werden nur geloggt.
+     */
+    private fun pushHealthDaily(cache: HealthConnectCache) {
+        viewModelScope.launch {
+            runCatching {
+                SupabaseSync.upsertHealthDaily(
+                    dateStr = cache.date.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                    activeCaloriesKcal = cache.activeCaloriesKcal,
+                    steps = cache.steps
+                )
+            }.onFailure { android.util.Log.w("HealthConnect", "Push health_daily fehlgeschlagen: ${it.message}") }
+        }
+    }
+
+    private fun pushHistoricalHealthDaily() {
+        viewModelScope.launch {
+            runCatching {
+                val days = repository.getLast30Days().firstOrNull().orEmpty()
+                for (d in days) {
+                    if (d.activeCaloriesKcal != null || d.steps > 0) {
+                        SupabaseSync.upsertHealthDaily(
+                            dateStr = d.date.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                            activeCaloriesKcal = d.activeCaloriesKcal,
+                            steps = d.steps
+                        )
+                    }
+                }
+            }.onFailure { android.util.Log.w("HealthConnect", "Push historical health_daily fehlgeschlagen: ${it.message}") }
+        }
+    }
+
     fun syncHistorical() {
         viewModelScope.launch {
             _uiState.update { it.copy(isHistoricalSyncing = true) }
             repository.syncHistorical(30)
+                .onSuccess { pushHistoricalHealthDaily() }
                 .onFailure { err ->
                     // Historical sync errors are silent (non-blocking)
                     android.util.Log.w("HealthConnect", "Historical sync failed: ${err.message}")
