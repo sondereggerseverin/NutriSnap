@@ -132,7 +132,8 @@ class HealthConnectViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         val available = HealthConnectManager.isAvailable(app)
-        _uiState.update { it.copy(isAvailable = available, samsungHealthSupported = repository.isSamsungHealthSupported()) }
+        val samsungSupported = runCatching { repository.isSamsungHealthSupported() }.getOrDefault(false)
+        _uiState.update { it.copy(isAvailable = available, samsungHealthSupported = samsungSupported) }
         if (available) {
             observeData()
             checkPermissionsAndSync()
@@ -141,7 +142,7 @@ class HealthConnectViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun checkSamsungHealthPermission() {
-        if (!repository.isSamsungHealthSupported()) return
+        if (!runCatching { repository.isSamsungHealthSupported() }.getOrDefault(false)) return
         viewModelScope.launch {
             val granted = runCatching { repository.hasSamsungHealthPermissions() }.getOrDefault(false)
             _uiState.update { it.copy(samsungHealthPermission = granted) }
