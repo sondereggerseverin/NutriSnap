@@ -108,7 +108,10 @@ class SamsungHealthDataManager(private val context: Context) {
                 .setLocalTimeFilter(LocalTimeFilter.of(start, end))
                 .build()
             val response = s.aggregateData(request)
-            response.dataList.firstOrNull()?.value?.toDouble()
+            // Same sanity guard as the Health Connect fallback path (see
+            // HealthConnectManager.ACTIVE_CALORIES_SANITY_CAP_KCAL) against sensor/aggregation
+            // glitches, raised to accommodate legitimate multi-hour endurance activity days.
+            response.dataList.firstOrNull()?.value?.toDouble()?.coerceAtMost(6000.0)
         }.onFailure {
             Log.e(TAG, "readActiveCalories failed for $date", it)
         }.getOrNull()

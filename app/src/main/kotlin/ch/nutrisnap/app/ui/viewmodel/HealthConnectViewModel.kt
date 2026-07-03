@@ -7,10 +7,14 @@ import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.HealthConnectCache
 import ch.nutrisnap.app.data.repository.HealthConnectRepository
 import ch.nutrisnap.app.data.repository.UserProfileRepository
+import ch.nutrisnap.app.domain.AdaptiveCalorieTarget
+import ch.nutrisnap.app.domain.AdaptiveTdeeCalculator
 import ch.nutrisnap.app.health.HealthConnectManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 data class HealthConnectUiState(
     val todayData: HealthConnectCache? = null,
@@ -87,6 +91,43 @@ class HealthConnectViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    /**
+     * Adaptive daily calorie target: uses the real weight+intake trend over the last
+     * ~14 days when there's enough data (see AdaptiveTdeeCalculator.MIN_TREND_DAYS),
+     * falling back to the BMR*activityFactor formula otherwise. Adds a damped
+     * adjustment for how today's Health Connect / Samsung Health active calories
+     * compare to the recent average, so a big training day (like a long ride or hike)
+     * unlocks extra food without blowing the week's average deficit.
+     */
+    val adaptiveDailyTarget: StateFlow<AdaptiveCalorieTarget?> = combine(
+        profileRepo.get(),
+        repository.getLast30Days(),
+        weeklyStats
+    ) { profile, last30Days, weekly ->
+        val fromDate = LocalDate.now().minusDays(13).format(DateTimeFormatter.ISO_LOCAL_DATE)
+        val diarySummaries = runCatching { db.diaryDao().getWeeklySummary(fromDate).firstOrNull() }
+            .getOrNull() ?: emptyList()
+
+        val weightByDate = last30Days
+            .filter { it.weightKg != null }
+            .associate { it.date to it.weightKg!!.toFloat() }
+        val intakeByDate = diarySummaries
+            .filter { it.calories > 0f }
+            .associate { runCatching { LocalDate.parse(it.dateStr) }.getOrNull() to it.calories }
+            .filterKeys { it != null }
+            .mapKeys { it.key!! }
+
+        val trendTdee = AdaptiveTdeeCalculator.computeTrendTdee(weightByDate, intakeByDate)
+        val todayActiveKcal = last30Days.find { it.date == LocalDate.now() }?.activeCaloriesKcal
+
+        AdaptiveTdeeCalculator.computeDailyTarget(
+            trendTdee = trendTdee,
+            formulaTdee = profile.computedTdee(),
+            todayActiveKcal = todayActiveKcal,
+            avgActiveKcal = weekly?.avgActiveKcal
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     init {
         val available = HealthConnectManager.isAvailable(app)

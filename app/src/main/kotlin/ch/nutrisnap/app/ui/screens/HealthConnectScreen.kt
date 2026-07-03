@@ -33,6 +33,7 @@ fun HealthConnectScreen(
     val uiState by viewModel.uiState.collectAsState()
     val adjustedGoal by viewModel.adjustedCalorieGoal.collectAsState()
     val weeklyStats by viewModel.weeklyStats.collectAsState()
+    val adaptiveTarget by viewModel.adaptiveDailyTarget.collectAsState()
 
     if (!uiState.isAvailable) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -90,6 +91,7 @@ fun HealthConnectScreen(
             TodayOverviewCard(
                 data = uiState.todayData,
                 adjustedGoal = adjustedGoal,
+                adaptiveTarget = adaptiveTarget,
                 hasPermission = uiState.hasPermission,
                 isLoading = uiState.isLoading,
                 onConnectClick = onRequestPermission,
@@ -127,7 +129,8 @@ private fun TodayOverviewCard(
     hasPermission: Boolean,
     isLoading: Boolean,
     onConnectClick: () -> Unit,
-    onSyncClick: () -> Unit
+    onSyncClick: () -> Unit,
+    adaptiveTarget: ch.nutrisnap.app.domain.AdaptiveCalorieTarget? = null
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -180,10 +183,26 @@ private fun TodayOverviewCard(
                             tint = Color(0xFF4CAF50), modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Column {
-                            Text("Kalorienziel: $adjustedGoal kcal",
-                                fontWeight = FontWeight.Medium, color = Color(0xFF4CAF50))
-                        Text("Basierend auf deinem TDEE (Grundumsatz × Aktivitätsfaktor)",
-                                fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            val target = adaptiveTarget
+                            if (target != null) {
+                                Text("Kalorienziel: ${target.targetKcal} kcal",
+                                    fontWeight = FontWeight.Medium, color = Color(0xFF4CAF50))
+                                val bonusText = if (target.activityBonusKcal != 0) {
+                                    val sign = if (target.activityBonusKcal > 0) "+" else ""
+                                    " $sign${target.activityBonusKcal} Sport-Bonus"
+                                } else ""
+                                Text(
+                                    "Basis ${target.baseKcal} kcal$bonusText · " +
+                                        if (target.isTrendBased) "aus deinem echten Gewichts-/Ess-Trend"
+                                        else "aus Grundumsatz × Aktivitätsfaktor (noch wenig Trend-Daten)",
+                                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                Text("Kalorienziel: $adjustedGoal kcal",
+                                    fontWeight = FontWeight.Medium, color = Color(0xFF4CAF50))
+                                Text("Basierend auf deinem TDEE (Grundumsatz × Aktivitätsfaktor)",
+                                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 }

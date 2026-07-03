@@ -39,9 +39,12 @@ class HealthConnectManager(context: Context) {
         // (e.g. Google Fit, other trackers) that may inflate or duplicate values.
         private const val SAMSUNG_HEALTH_PACKAGE = "com.sec.android.app.shealth"
 
-        // Sanity cap: nobody legitimately burns more "active" kcal than this in a day.
-        // Used only as a last-resort guard on the unfiltered aggregate fallback.
-        private const val ACTIVE_CALORIES_SANITY_CAP_KCAL = 3000.0
+        // Sanity cap: guards against sensor/aggregation glitches producing absurd values
+        // (e.g. duplicate-counted records). Raised from the original 3000 kcal default
+        // because endurance activity (multi-hour rides/hikes) can legitimately produce
+        // 3000-5000+ kcal active-calorie days. Used only as a last-resort guard on the
+        // unfiltered aggregate fallback.
+        private const val ACTIVE_CALORIES_SANITY_CAP_KCAL = 6000.0
 
         val REQUIRED_PERMISSIONS = setOf(
             HealthPermission.getReadPermission(StepsRecord::class),
