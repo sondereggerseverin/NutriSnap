@@ -41,6 +41,34 @@ data class GeneratedRecipe(
         else ingredients.map { RecipeIngredient(name = it, amount = "") }
 }
 
+/** Timing-Wunsch für den Tagesplan bzgl. Training. */
+enum class WorkoutTiming { NONE, PRE, POST, BOTH }
+
+@Serializable
+data class PlannedMeal(
+    val mealType: String = "LUNCH",
+    val title: String = "",
+    val description: String = "",
+    /** "Pre-Workout" / "Post-Workout" / leer */
+    val timing: String = "",
+    val calories: Float = 0f,
+    val protein: Float = 0f,
+    val carbs: Float = 0f,
+    val fat: Float = 0f,
+    val fiber: Float = 0f
+)
+
+@Serializable
+data class DayPlan(
+    val meals: List<PlannedMeal> = emptyList(),
+    val totalCalories: Float = 0f,
+    val totalProtein: Float = 0f,
+    val totalCarbs: Float = 0f,
+    val totalFat: Float = 0f,
+    val totalFiber: Float = 0f,
+    val note: String = ""
+)
+
 private fun isUrl(input: String): Boolean {
     val trimmed = input.trim()
     return trimmed.startsWith("http://") || trimmed.startsWith("https://")
@@ -85,16 +113,37 @@ class GroqRecipeGeneratorService {
         tryProvider(prompt = buildRandomPrompt())
     }
 
+    /** Generiert einen kompletten Tages-Essensplan basierend auf Kalorien-/Makroziel und Präferenzen. */
+    suspend fun generateDayPlan(
+        targetCalories: Float,
+        targetProtein: Float,
+        targetFiber: Float,
+        includeBreakfast: Boolean,
+        mealCount: Int,
+        highVolume: Boolean,
+        workoutTiming: WorkoutTiming,
+        mustUseIngredients: List<String>,
+        extraNotes: String
+    ): Result<DayPlan> = withContext(Dispatchers.IO) {
+        tryDayPlanProvider(
+            prompt = buildDayPlanPrompt(
+                targetCalories, targetProtein, targetFiber, includeBreakfast,
+                mealCount, highVolume, workoutTiming, mustUseIngredients, extraNotes
+            )
+        )
+    }
+
     private fun buildPrompt(userInput: String): String {
         val isCaption = !isUrl(userInput) && userInput.length > 80
 
         val taskDescription = if (isCaption) {
             """
+Du bist ein erfahrener Ernährungsberater und Koch.
 Der Benutzer hat folgenden Text eingefügt (z.B. einen kopierten Instagram/TikTok-Caption oder ein Rezept aus dem Internet):
 
-\"\"\"
+""${'"'}
 $userInput
-\"\"\"
+""${'"'}
 
 Extrahiere daraus alle Zutaten und Zubereitungsschritte. Falls Mengenangaben fehlen, schätze realistische Werte.
 Falls kein Rezepttitel erkennbar ist, erfinde einen passenden deutschen Namen.
@@ -140,20 +189,17 @@ Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
   "title": "Rezeptname",
   "description": "Kurze Beschreibung",
   "structuredIngredients": [
-    {"name": "Hühnerbrust", "amount": "200g", "calories": 330, "protein": 62.0, "carbs": 0.0, "fat": 7.0}
+    {"name": "Zutat", "amount": "100g", "calories": 100, "protein": 10.0, "carbs": 5.0, "fat": 2.0}
   ],
-  "ingredients": ["200g Hühnerbrust"],
-  "steps": ["Schritt 1", "Schritt 2"],
+  "ingredients": ["100g Zutat"],
+  "steps": ["Schritt 1"],
   "servings": 2,
   "prepTimeMinutes": 30,
-  "calories": 650,
-  "protein": 55.0,
-  "carbs": 45.0,
-  "fat": 25.0
+  "calories": 300,
+  "protein": 25.0,
+  "carbs": 35.0,
+  "fat": 10.0
 }
-
-calories/protein/carbs/fat auf Toplevel = Werte PRO PORTION.
-Werte in structuredIngredients = GESAMT für die gesamte Zutatenmenge.
 """.trimIndent()
 
     private fun buildIngredientsPrompt(ingredients: List<String>, note: String): String {
@@ -235,9 +281,94 @@ $JSON_SCHEMA_HINT
 """.trimIndent()
     }
 
+    private fun buildDayPlanPrompt(
+        targetCalories: Float,
+        targetProtein: Float,
+        targetFiber: Float,
+        includeBreakfast: Boolean,
+        mealCount: Int,
+        highVolume: Boolean,
+        workoutTiming: WorkoutTiming,
+        mustUseIngredients: List<String>,
+        extraNotes: String
+    ): String {
+        val breakfastHint = if (includeBreakfast)
+            "Das Frühstück soll enthalten sein."
+        else
+            "Kein Frühstück einplanen (z.B. Intervallfasten) — nur Mittagessen/Abendessen/Snacks."
+
+        val volumeHint = if (highVolume)
+            "Bevorzuge High-Volume-Gerichte (viel Volumen/Sättigung bei den vorgegebenen Kalorien, z.B. viel Gemüse, magere Proteine, wenig Fett/Öl)."
+        else ""
+
+        val workoutHint = when (workoutTiming) {
+            WorkoutTiming.NONE -> ""
+            WorkoutTiming.PRE -> "Die Person trainiert HEUTE. Eine Mahlzeit soll als Pre-Workout-Mahlzeit markiert werden (leicht verdaulich, moderate Carbs, timing=\"Pre-Workout\")."
+            WorkoutTiming.POST -> "Die Person trainiert HEUTE. Eine Mahlzeit soll als Post-Workout-Mahlzeit markiert werden (proteinreich, timing=\"Post-Workout\")."
+            WorkoutTiming.BOTH -> "Die Person trainiert HEUTE. Plane sowohl eine Pre-Workout- als auch eine Post-Workout-Mahlzeit ein (timing=\"Pre-Workout\" bzw. \"Post-Workout\")."
+        }
+
+        val ingredientsHint = if (mustUseIngredients.isNotEmpty())
+            "Diese Zutaten sollen über den Tag verteilt vorkommen: ${mustUseIngredients.joinToString(", ")}."
+        else ""
+
+        val notesHint = if (extraNotes.isNotBlank()) "Zusätzliche Wünsche: $extraNotes" else ""
+
+        return """
+Du bist ein erfahrener Ernährungsberater. Erstelle einen kompletten Tages-Essensplan mit genau $mealCount Mahlzeiten.
+
+Tagesziele:
+- Kalorien: ca. ${targetCalories.roundToIntSafe()} kcal
+- Protein: ca. ${targetProtein.roundToIntSafe()} g
+- Ballaststoffe: ca. ${targetFiber.roundToIntSafe()} g
+
+$breakfastHint
+$volumeHint
+$workoutHint
+$ingredientsHint
+$notesHint
+
+Jedes Element im "meals"-Array braucht ein mealType-Feld mit genau einem der Werte:
+"BREAKFAST", "LUNCH", "DINNER", "SNACK".
+Die Summe aller Mahlzeiten-Kalorien soll möglichst nah am Tagesziel liegen (Toleranz ca. ±10%).
+
+Berechne die Nährwerte EXAKT basierend auf echten Zutatenmengen.
+Referenzwerte pro 100g: Hühnerbrust=165kcal/31gP, Parmesan=431kcal/38gP,
+Ricotta=174kcal/11gP, Hackfleisch=250kcal/17gP, Pasta=350kcal/13gP,
+Reis=130kcal/3gP, Ei=155kcal/13gP, Butter=717kcal/1gP.
+Ballaststoffreiche Referenzwerte pro 100g: Vollkornprodukte=8-10g, Hülsenfrüchte=6-8g, Gemüse=2-4g, Obst=2-3g.
+
+Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
+{
+  "meals": [
+    {
+      "mealType": "BREAKFAST",
+      "title": "Name der Mahlzeit",
+      "description": "Kurze Beschreibung mit Hauptzutaten/Mengen",
+      "timing": "",
+      "calories": 450,
+      "protein": 30.0,
+      "carbs": 40.0,
+      "fat": 15.0,
+      "fiber": 8.0
+    }
+  ],
+  "totalCalories": 2000,
+  "totalProtein": 150.0,
+  "totalCarbs": 200.0,
+  "totalFat": 60.0,
+  "totalFiber": 32.0,
+  "note": "Kurzer Hinweis oder Tipp zum Plan (1 Satz)"
+}
+
+Das "timing"-Feld nur bei Pre-/Post-Workout-Mahlzeiten befüllen ("Pre-Workout" / "Post-Workout"), sonst leeren String lassen.
+""".trimIndent()
+    }
+
     private fun Float.roundToIntSafe(): Int = this.coerceAtLeast(0f).let { Math.round(it) }
 
-    private fun tryProvider(prompt: String): Result<GeneratedRecipe> {
+    /** Führt den eigentlichen Groq-Call aus und liefert den bereinigten JSON-String zurück. */
+    private fun callGroq(prompt: String, maxTokens: Int = 3000): Result<String> {
         return try {
             val apiKey = BuildConfig.GROQ_API_KEY
             if (apiKey.isBlank()) return Result.failure(Exception(
@@ -247,7 +378,7 @@ $JSON_SCHEMA_HINT
             val requestJson = JSONObject().apply {
                 put("model", "llama-3.3-70b-versatile")
                 put("temperature", 0.7)
-                put("max_tokens", 2000)
+                put("max_tokens", maxTokens)
                 put("messages", org.json.JSONArray().apply {
                     put(JSONObject().apply {
                         put("role", "user")
@@ -277,10 +408,15 @@ $JSON_SCHEMA_HINT
             val cleaned = content.trim()
                 .removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
 
-            val recipe = json.decodeFromString<GeneratedRecipe>(cleaned)
-            Result.success(recipe)
+            Result.success(cleaned)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
+
+    private fun tryProvider(prompt: String): Result<GeneratedRecipe> =
+        callGroq(prompt, maxTokens = 2000).mapCatching { json.decodeFromString<GeneratedRecipe>(it) }
+
+    private fun tryDayPlanProvider(prompt: String): Result<DayPlan> =
+        callGroq(prompt, maxTokens = 3000).mapCatching { json.decodeFromString<DayPlan>(it) }
 }
