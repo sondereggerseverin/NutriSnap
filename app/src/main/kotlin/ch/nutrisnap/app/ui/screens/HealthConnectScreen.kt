@@ -26,6 +26,7 @@ import ch.nutrisnap.app.ui.viewmodel.WeeklyStats
 import java.time.format.TextStyle
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HealthConnectScreen(
     onRequestPermission: () -> Unit,
