@@ -216,7 +216,8 @@ class HealthConnectViewModel(app: Application) : AndroidViewModel(app) {
                 SupabaseSync.upsertHealthDaily(
                     dateStr = cache.date.format(DateTimeFormatter.ISO_LOCAL_DATE),
                     activeCaloriesKcal = cache.activeCaloriesKcal,
-                    steps = cache.steps
+                    steps = cache.steps,
+                    weightKg = cache.weightKg
                 )
             }.onFailure { android.util.Log.w("HealthConnect", "Push health_daily fehlgeschlagen: ${it.message}") }
         }
@@ -227,11 +228,12 @@ class HealthConnectViewModel(app: Application) : AndroidViewModel(app) {
             runCatching {
                 val days = repository.getLast30Days().firstOrNull().orEmpty()
                 for (d in days) {
-                    if (d.activeCaloriesKcal != null || d.steps > 0) {
+                    if (d.activeCaloriesKcal != null || d.steps > 0 || d.weightKg != null) {
                         SupabaseSync.upsertHealthDaily(
                             dateStr = d.date.format(DateTimeFormatter.ISO_LOCAL_DATE),
                             activeCaloriesKcal = d.activeCaloriesKcal,
-                            steps = d.steps
+                            steps = d.steps,
+                            weightKg = d.weightKg
                         )
                     }
                 }

@@ -59,12 +59,16 @@ data class WeightEntryDto(
 
 // Aktivkalorien pro Tag (Health Connect / Samsung Health Tier 0), fuer die Web-App:
 // erlaubt den Sport-Bonus im adaptiven Kalorienziel auch dort zu berechnen.
+// weightKg = Health-Connect-Cache-Gewicht (z.B. Waage via Samsung Health) - das ist die
+// echte Gewichtsquelle des adaptiven Trend-Algorithmus, NICHT die manuelle Eingabe aus
+// weight_entries. Ohne dieses Feld hat die Web-App nie eine Gewichtsquelle fuers Trend-TDEE.
 @Serializable
 data class HealthDailyDto(
     @SerialName("user_id") val userId: String? = null,
     @SerialName("date_str") val dateStr: String,
     @SerialName("active_calories_kcal") val activeCaloriesKcal: Double? = null,
-    val steps: Long? = null
+    val steps: Long? = null,
+    @SerialName("weight_kg") val weightKg: Double? = null
 )
 
 // ─── Sync functions ───────────────────────────────────────────────────────────
@@ -196,10 +200,18 @@ object SupabaseSync {
     // NOTE: onConflict requires UNIQUE (user_id, date_str) on the health_daily table.
     // Android ist die alleinige Quelle (Health Connect / Samsung Health SDK) — es wird
     // nur gepusht, nie von hier zurueckgelesen.
-    suspend fun upsertHealthDaily(dateStr: String, activeCaloriesKcal: Double?, steps: Long?) {
+    suspend fun upsertHealthDaily(
+        dateStr: String,
+        activeCaloriesKcal: Double?,
+        steps: Long?,
+        weightKg: Double? = null
+    ) {
         val uid = userId() ?: return
         sb.postgrest["health_daily"].upsert(
-            HealthDailyDto(userId = uid, dateStr = dateStr, activeCaloriesKcal = activeCaloriesKcal, steps = steps)
+            HealthDailyDto(
+                userId = uid, dateStr = dateStr,
+                activeCaloriesKcal = activeCaloriesKcal, steps = steps, weightKg = weightKg
+            )
         ) {
             onConflict = "user_id,date_str"
         }
