@@ -57,7 +57,7 @@ interface UserProfileDao {
         MealTemplateItem::class,
         GeneratedRecipeEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -198,6 +198,19 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // Phase 4: Sync-Fix — "synced"-Flag fuer diary_entries/recipes, damit
+        // fehlgeschlagene Supabase-Pushes (offline, App-Kill, Token-Ablauf) beim
+        // naechsten App-Resume automatisch nachgeholt werden koennen, statt
+        // stillschweigend verloren zu gehen. Bestehende Zeilen bekommen
+        // DEFAULT 1 (gelten als bereits synchronisiert) — nur neue/geaenderte
+        // Zeilen starten mit synced = 0 und werden dann retried.
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE diary_entries ADD COLUMN synced INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE recipes ADD COLUMN synced INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -208,7 +221,7 @@ abstract class NutriDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
                         MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
-                        MIGRATION_8_9
+                        MIGRATION_8_9, MIGRATION_9_10
                     )
                     .build()
                     .also { INSTANCE = it }

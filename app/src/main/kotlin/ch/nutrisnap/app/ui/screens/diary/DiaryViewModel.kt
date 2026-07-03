@@ -23,7 +23,8 @@ data class DiaryUiState(
     val totalFat:      Float            = 0f,
     val calorieGoal:   Float            = 2000f,
     val proteinGoal:   Float            = 120f,
-    val isLoading:     Boolean          = false
+    val isLoading:     Boolean          = false,
+    val pendingSyncCount: Int           = 0
 )
 
 class DiaryViewModel(app: Application) : AndroidViewModel(app) {
@@ -40,8 +41,9 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         _date.flatMapLatest { date ->
             repo.getEntriesForDate(date).map { date to it }
         },
-        profileRepo.get()
-    ) { (date, entries), profile ->
+        profileRepo.get(),
+        db.diaryDao().unsyncedCountFlow()
+    ) { (date, entries), profile, pendingSyncCount ->
         DiaryUiState(
             selectedDate  = date,
             entries       = entries,
@@ -50,7 +52,8 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
             totalCarbs    = entries.sumOf { it.carbs.toDouble() }.toFloat(),
             totalFat      = entries.sumOf { it.fat.toDouble() }.toFloat(),
             calorieGoal   = profile.dailyCalorieGoal.toFloat(),
-            proteinGoal   = profile.proteinGoalG
+            proteinGoal   = profile.proteinGoalG,
+            pendingSyncCount = pendingSyncCount
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DiaryUiState())
 

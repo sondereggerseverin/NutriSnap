@@ -47,6 +47,16 @@ interface DiaryDao {
 
     @Query("DELETE FROM diary_entries")
     suspend fun deleteAll()
+
+    // ── Sync-Retry ────────────────────────────────────────────────────────
+    @Query("SELECT * FROM diary_entries WHERE synced = 0")
+    suspend fun getUnsynced(): List<DiaryEntry>
+
+    @Query("UPDATE diary_entries SET synced = 1 WHERE id = :id")
+    suspend fun markSynced(id: Long)
+
+    @Query("SELECT COUNT(*) FROM diary_entries WHERE synced = 0")
+    fun unsyncedCountFlow(): Flow<Int>
 }
 
 data class DailySummary(
@@ -76,6 +86,13 @@ interface RecipeDao {
 
     @Query("SELECT * FROM recipes WHERE id = :id")
     suspend fun getById(id: Long): Recipe?
+
+    // ── Sync-Retry ────────────────────────────────────────────────────────
+    @Query("SELECT * FROM recipes WHERE synced = 0")
+    suspend fun getUnsynced(): List<Recipe>
+
+    @Query("UPDATE recipes SET synced = 1 WHERE id = :id")
+    suspend fun markSynced(id: Long)
 }
 
 @Dao

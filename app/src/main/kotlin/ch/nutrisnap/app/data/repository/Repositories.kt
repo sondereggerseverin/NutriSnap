@@ -54,7 +54,9 @@ class DiaryRepository(db: NutriDatabase) {
                 fat         = food.fat      * f
             )
         )
-        dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }
+        dao.getById(id)?.let { entry ->
+            pushSafely { SupabaseSync.upsertDiaryEntry(entry); dao.markSynced(entry.id) }
+        }
         return id
     }
 
@@ -90,7 +92,9 @@ class DiaryRepository(db: NutriDatabase) {
                 fat         = fat
             )
         )
-        dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }
+        dao.getById(id)?.let { entry ->
+            pushSafely { SupabaseSync.upsertDiaryEntry(entry); dao.markSynced(entry.id) }
+        }
         return id
     }
 
@@ -120,13 +124,18 @@ class DiaryRepository(db: NutriDatabase) {
                 fat         = fat
             )
         )
-        dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }
+        dao.getById(id)?.let { entry ->
+            pushSafely { SupabaseSync.upsertDiaryEntry(entry); dao.markSynced(entry.id) }
+        }
         return id
     }
 
     suspend fun updateEntry(entry: DiaryEntry) {
-        dao.update(entry)
-        pushSafely { SupabaseSync.upsertDiaryEntry(entry) }
+        // synced=false speichern, bis der Push bestaetigt ist — bei fehlgeschlagenem
+        // Push holt SyncManager.pushPendingChanges() das beim naechsten Resume nach.
+        val pending = entry.copy(synced = false)
+        dao.update(pending)
+        pushSafely { SupabaseSync.upsertDiaryEntry(pending); dao.markSynced(pending.id) }
     }
 
     suspend fun deleteEntry(entry: DiaryEntry) {
@@ -146,13 +155,16 @@ class RecipeRepository(db: NutriDatabase, context: Context) {
 
     suspend fun saveRecipe(r: Recipe): Long {
         val id = dao.insert(r)
-        dao.getById(id)?.let { saved -> pushSafely { SupabaseSync.upsertRecipe(saved) } }
+        dao.getById(id)?.let { saved ->
+            pushSafely { SupabaseSync.upsertRecipe(saved); dao.markSynced(saved.id) }
+        }
         return id
     }
 
     suspend fun updateRecipe(r: Recipe) {
-        dao.update(r)
-        pushSafely { SupabaseSync.upsertRecipe(r) }
+        val pending = r.copy(synced = false)
+        dao.update(pending)
+        pushSafely { SupabaseSync.upsertRecipe(pending); dao.markSynced(pending.id) }
     }
 
     suspend fun deleteRecipe(r: Recipe) {
@@ -167,7 +179,7 @@ class RecipeRepository(db: NutriDatabase, context: Context) {
         if (result.success && result.recipe != null) {
             val newId = dao.insert(result.recipe)
             val saved = result.recipe.copy(id = newId)
-            pushSafely { SupabaseSync.upsertRecipe(saved) }
+            pushSafely { SupabaseSync.upsertRecipe(saved); dao.markSynced(saved.id) }
             return result.copy(recipe = saved)
         }
         return result
