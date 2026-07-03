@@ -57,6 +57,16 @@ data class WeightEntryDto(
     @SerialName("weight_kg") val weightKg: Float
 )
 
+// Aktivkalorien pro Tag (Health Connect / Samsung Health Tier 0), fuer die Web-App:
+// erlaubt den Sport-Bonus im adaptiven Kalorienziel auch dort zu berechnen.
+@Serializable
+data class HealthDailyDto(
+    @SerialName("user_id") val userId: String? = null,
+    @SerialName("date_str") val dateStr: String,
+    @SerialName("active_calories_kcal") val activeCaloriesKcal: Double? = null,
+    val steps: Long? = null
+)
+
 // ─── Sync functions ───────────────────────────────────────────────────────────
 // NOTE: upsert onConflict requires matching UNIQUE constraints in Supabase:
 //   diary_entries: UNIQUE (user_id, local_id)
@@ -180,5 +190,18 @@ object SupabaseSync {
         return sb.postgrest["weight_entries"].select {
             filter { eq("user_id", uid) }
         }.decodeList()
+    }
+
+    // ── Health (Aktivkalorien / Schritte pro Tag) ────────────────────────────
+    // NOTE: onConflict requires UNIQUE (user_id, date_str) on the health_daily table.
+    // Android ist die alleinige Quelle (Health Connect / Samsung Health SDK) — es wird
+    // nur gepusht, nie von hier zurueckgelesen.
+    suspend fun upsertHealthDaily(dateStr: String, activeCaloriesKcal: Double?, steps: Long?) {
+        val uid = userId() ?: return
+        sb.postgrest["health_daily"].upsert(
+            HealthDailyDto(userId = uid, dateStr = dateStr, activeCaloriesKcal = activeCaloriesKcal, steps = steps)
+        ) {
+            onConflict = "user_id,date_str"
+        }
     }
 }
