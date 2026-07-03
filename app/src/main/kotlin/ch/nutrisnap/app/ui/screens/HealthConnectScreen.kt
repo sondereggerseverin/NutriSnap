@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,6 +29,7 @@ import java.util.Locale
 @Composable
 fun HealthConnectScreen(
     onRequestPermission: () -> Unit,
+    onBack: () -> Unit = {},
     viewModel: HealthConnectViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -35,8 +37,20 @@ fun HealthConnectScreen(
     val weeklyStats by viewModel.weeklyStats.collectAsState()
     val adaptiveTarget by viewModel.adaptiveDailyTarget.collectAsState()
 
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Aktivität & Gesundheit") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                    }
+                }
+            )
+        }
+    ) { padding ->
     if (!uiState.isAvailable) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
                 Icon(Icons.Default.FavoriteBorder, contentDescription = null,
                     modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
@@ -47,11 +61,11 @@ fun HealthConnectScreen(
                     modifier = Modifier.padding(top = 8.dp))
             }
         }
-        return
+        return@Scaffold
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
@@ -61,7 +75,6 @@ fun HealthConnectScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("Aktivität & Gesundheit", fontSize = 24.sp, fontWeight = FontWeight.Bold)
                     Text(
                         if (uiState.hasPermission) "✅ Verbunden mit Samsung Health / Health Connect"
                         else "Nicht verbunden",
@@ -119,6 +132,7 @@ fun HealthConnectScreen(
         if (uiState.weeklyData.any { it.sleepMinutes > 0 }) {
             item { WeeklySleepCard(weeklyData = uiState.weeklyData) }
         }
+    }
     }
 }
 

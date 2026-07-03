@@ -280,7 +280,8 @@ fun MainScaffold(
             composable("health") {
                 HealthConnectScreen(
                     viewModel = hcVm,
-                    onRequestPermission = onRequestHealthPermission
+                    onRequestPermission = onRequestHealthPermission,
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable("notif_settings") {
