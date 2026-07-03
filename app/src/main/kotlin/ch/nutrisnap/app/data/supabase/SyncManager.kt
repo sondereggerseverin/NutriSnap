@@ -20,6 +20,33 @@ object SyncManager {
         runCatching { pullDiary(db) }.onFailure { Log.e("NutriSync", "Pull diary_entries fehlgeschlagen: ${it.message}", it) }
         runCatching { pullRecipes(db) }.onFailure { Log.e("NutriSync", "Pull recipes fehlgeschlagen: ${it.message}", it) }
         runCatching { pullWeight(db) }.onFailure { Log.e("NutriSync", "Pull weight_entries fehlgeschlagen: ${it.message}", it) }
+        runCatching { pushPendingChanges(db) }.onFailure { Log.e("NutriSync", "Push pending fehlgeschlagen: ${it.message}", it) }
+    }
+
+    /**
+     * Retry-Mechanismus fuer den Fall, dass ein Push beim Anlegen/Bearbeiten
+     * (Repositories.kt -> pushSafely) fehlgeschlagen oder gar nicht erst
+     * losgelaufen ist (App wurde vorher gekillt, kein Netz, abgelaufenes
+     * Auth-Token). Alle lokal noch nicht als synced markierten Zeilen werden
+     * hier erneut hochgeladen. Wird bei jedem App-Resume aufgerufen (siehe
+     * MainActivity), zusaetzlich zu pullAll.
+     */
+    suspend fun pushPendingChanges(db: NutriDatabase) {
+        val diaryDao = db.diaryDao()
+        for (entry in diaryDao.getUnsynced()) {
+            runCatching {
+                SupabaseSync.upsertDiaryEntry(entry)
+                diaryDao.markSynced(entry.id)
+            }.onFailure { Log.e("NutriSync", "Retry-Push diary_entry ${entry.id} fehlgeschlagen: ${it.message}", it) }
+        }
+
+        val recipeDao = db.recipeDao()
+        for (recipe in recipeDao.getUnsynced()) {
+            runCatching {
+                SupabaseSync.upsertRecipe(recipe)
+                recipeDao.markSynced(recipe.id)
+            }.onFailure { Log.e("NutriSync", "Retry-Push recipe ${recipe.id} fehlgeschlagen: ${it.message}", it) }
+        }
     }
 
     private suspend fun pullDiary(db: NutriDatabase) {
@@ -33,6 +60,7 @@ object SyncManager {
                 val existing = dao.getById(row.localId)
                 if (existing == null) {
                     // Was deleted locally or never existed (e.g. fresh install) — recreate it.
+                    // synced = true: die Zeile existiert bereits so auf Supabase.
                     dao.insert(
                         DiaryEntry(
                             id = row.localId,
@@ -44,7 +72,8 @@ object SyncManager {
                             calories = row.calories,
                             protein = row.protein,
                             carbs = row.carbs,
-                            fat = row.fat
+                            fat = row.fat,
+                            synced = true
                         )
                     )
                 }
@@ -64,7 +93,10 @@ object SyncManager {
                     )
                 )
                 val linked = dao.getById(newId)
-                if (linked != null) SupabaseSync.upsertDiaryEntry(linked)
+                if (linked != null) {
+                    SupabaseSync.upsertDiaryEntry(linked)
+                    dao.markSynced(newId)
+                }
             }
         }
     }
@@ -94,7 +126,8 @@ object SyncManager {
                             prepTimeMinutes = row.prepTimeMinutes,
                             tags = row.tags,
                             isFavorite = row.isFavorite,
-                            savedAt = row.savedAt
+                            savedAt = row.savedAt,
+                            synced = true
                         )
                     )
                 }
@@ -120,7 +153,10 @@ object SyncManager {
                     )
                 )
                 val linked = dao.getById(newId)
-                if (linked != null) SupabaseSync.upsertRecipe(linked)
+                if (linked != null) {
+                    SupabaseSync.upsertRecipe(linked)
+                    dao.markSynced(newId)
+                }
             }
         }
     }

@@ -18,7 +18,12 @@ data class DiaryEntry(
     val calories: Float,
     val protein: Float,
     val carbs: Float,
-    val fat: Float
+    val fat: Float,
+    // false = noch nicht (erfolgreich) zu Supabase gepusht. Wird bei jedem
+    // App-Resume erneut versucht (siehe SyncManager.pushPendingChanges), damit
+    // ein fehlgeschlagener/verlorener Push (offline, App-Kill, abgelaufenes
+    // Token) nicht stillschweigend verloren geht.
+    val synced: Boolean = false
 )
 
 enum class MealType { BREAKFAST, LUNCH, DINNER, SNACK }
@@ -56,7 +61,9 @@ data class Recipe(
     val collectionId: Long? = null,
     val isFavorite: Boolean = false,
     val showNutrition: Boolean = true,
-    val savedAt: Long = System.currentTimeMillis()
+    val savedAt: Long = System.currentTimeMillis(),
+    // siehe DiaryEntry.synced — gleiches Prinzip fuer Rezepte.
+    val synced: Boolean = false
 ) {
     fun getDietTags(): List<DietTag> =
         tags.split(",").mapNotNull { tag ->

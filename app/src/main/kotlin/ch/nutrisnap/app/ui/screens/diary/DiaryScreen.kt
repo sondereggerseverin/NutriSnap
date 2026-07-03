@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.diary
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,6 +29,41 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+/**
+ * Kleiner Hinweis, wenn noch Eintraege auf den naechsten erfolgreichen Push
+ * zu Supabase warten (z.B. weil das Handy offline war). Verschwindet
+ * automatisch, sobald SyncManager.pushPendingChanges() beim naechsten
+ * App-Resume erfolgreich war. Macht das bisher unsichtbare Sync-Problem
+ * fuer den Nutzer sichtbar statt es nur ins Logcat zu schreiben.
+ */
+@Composable
+private fun SyncPendingBanner(count: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .background(
+                MaterialTheme.colorScheme.secondaryContainer,
+                RoundedCornerShape(12.dp)
+            )
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            Icons.Default.CloudSync, null,
+            modifier = Modifier.size(18.dp),
+            tint = MaterialTheme.colorScheme.onSecondaryContainer
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            if (count == 1) "1 Eintrag wird noch synchronisiert…"
+            else "$count Einträge werden noch synchronisiert…",
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSecondaryContainer
+        )
+    }
+}
+
 @Composable
 fun DiaryScreen(vm: DiaryViewModel = viewModel()) {
     val state by vm.uiState.collectAsState()
@@ -48,6 +84,9 @@ fun DiaryScreen(vm: DiaryViewModel = viewModel()) {
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
             item { DateNavigator(state.selectedDate, vm::prevDay, vm::nextDay) }
+            if (state.pendingSyncCount > 0) {
+                item { SyncPendingBanner(count = state.pendingSyncCount) }
+            }
             item {
                 MacroBar(
                     calories = state.totalCalories, goal = state.calorieGoal,
