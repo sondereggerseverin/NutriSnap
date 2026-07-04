@@ -13,7 +13,19 @@ data class AdaptiveCalorieTarget(
     val baseKcal: Int,
     val activityBonusKcal: Int,
     val isTrendBased: Boolean,   // true = real weight+intake trend, false = BMR*activityFactor formula
-    val deficitKcal: Int
+    val deficitKcal: Int,
+    // 0-100: how much to trust targetKcal. Trend-based grows with more overlapping
+    // days and agreement with the formula estimate; formula-only is capped at a fixed
+    // moderate score since it ignores this person's actual metabolic response entirely.
+    val confidencePercent: Int
+)
+
+/** [computeTrendTdee] result, carrying how much data backed the estimate so
+ *  [computeDailyTarget] can turn that into a confidence score. */
+data class TrendTdeeResult(
+    val tdee: Double,
+    val overlapDays: Int,
+    val spanDays: Long
 )
 
 /**
@@ -61,7 +73,7 @@ object AdaptiveTdeeCalculator {
     fun computeTrendTdee(
         weightByDate: Map<LocalDate, Float>,
         intakeByDate: Map<LocalDate, Float>
-    ): Double? {
+    ): TrendTdeeResult? {
         val days = weightByDate.keys.intersect(intakeByDate.keys).sorted()
         if (days.size < MIN_TREND_DAYS) return null
 
@@ -76,7 +88,8 @@ object AdaptiveTdeeCalculator {
 
         val avgIntake = days.map { intakeByDate.getValue(it) }.average()
 
-        return avgIntake - (weightChangeKg * KCAL_PER_KG) / spanDays
+        val tdee = avgIntake - (weightChangeKg * KCAL_PER_KG) / spanDays
+        return TrendTdeeResult(tdee = tdee, overlapDays = days.size, spanDays = spanDays)
     }
 
     // If the trend TDEE strays further than this from the formula estimate (when one is
@@ -99,18 +112,18 @@ object AdaptiveTdeeCalculator {
      * (e.g. brand-new profile with no weight/height/age set and no history yet).
      */
     fun computeDailyTarget(
-        trendTdee: Double?,
+        trend: TrendTdeeResult?,
         formulaTdee: Double?,
         todayActiveKcal: Double?,
         avgActiveKcal: Double?,
         deficitKcal: Double = DEFAULT_DEFICIT_KCAL
     ): AdaptiveCalorieTarget? {
-        val trustedTrend = trendTdee?.takeIf { trend ->
-            trend >= TREND_MIN_PLAUSIBLE_KCAL &&
+        val trustedTrend = trend?.takeIf {
+            it.tdee >= TREND_MIN_PLAUSIBLE_KCAL &&
                 (formulaTdee == null ||
-                    kotlin.math.abs(trend - formulaTdee) <= formulaTdee * TREND_PLAUSIBILITY_RATIO)
+                    kotlin.math.abs(it.tdee - formulaTdee) <= formulaTdee * TREND_PLAUSIBILITY_RATIO)
         }
-        val maintenance = trustedTrend ?: formulaTdee ?: return null
+        val maintenance = trustedTrend?.tdee ?: formulaTdee ?: return null
         val base = maintenance - deficitKcal
 
         val bonus = if (todayActiveKcal != null && avgActiveKcal != null && avgActiveKcal > 0) {
@@ -124,7 +137,44 @@ object AdaptiveTdeeCalculator {
             baseKcal = base.toInt(),
             activityBonusKcal = bonus.toInt(),
             isTrendBased = trustedTrend != null,
-            deficitKcal = deficitKcal.toInt()
+            deficitKcal = deficitKcal.toInt(),
+            confidencePercent = computeConfidence(trustedTrend, formulaTdee)
         )
+    }
+
+    // Formula-only estimates get a fixed, moderate score: Mifflin-St-Jeor is a solid
+    // population-average, but it has no idea how *this* body actually responds, so it
+    // should never look as trustworthy as a real measured trend.
+    const val FORMULA_ONLY_CONFIDENCE = 55
+
+    // Floor/ceiling for a trusted trend estimate - even a long, clean window is still an
+    // estimate (logging gaps, scale noise), so it never reads as 100% certain; even the
+    // shortest trustable window (MIN_TREND_DAYS) is still worth more than the formula alone.
+    const val TREND_CONFIDENCE_FLOOR = 60
+    const val TREND_CONFIDENCE_CEILING = 95
+
+    // Each overlapping day beyond the minimum window adds this many points, up to the
+    // ceiling - more real data points make the weight/intake trend less noise-dominated.
+    const val CONFIDENCE_PER_EXTRA_DAY = 3
+
+    private fun computeConfidence(trustedTrend: TrendTdeeResult?, formulaTdee: Double?): Int {
+        if (trustedTrend == null) return FORMULA_ONLY_CONFIDENCE
+
+        val dataDepthScore = TREND_CONFIDENCE_FLOOR +
+            (trustedTrend.overlapDays - MIN_TREND_DAYS) * CONFIDENCE_PER_EXTRA_DAY
+
+        // Two independent methods agreeing (trend vs. formula) is itself evidence the
+        // trend is real rather than noise; the closer they are, the higher the score.
+        val agreementScore = if (formulaTdee != null) {
+            val relativeDiff = kotlin.math.abs(trustedTrend.tdee - formulaTdee) / formulaTdee
+            val agreementFactor = (1.0 - relativeDiff / TREND_PLAUSIBILITY_RATIO).coerceIn(0.0, 1.0)
+            dataDepthScore * (0.7 + 0.3 * agreementFactor)
+        } else {
+            // No formula to cross-check against (incomplete profile) - trust the data
+            // depth alone, slightly discounted for the missing second opinion.
+            dataDepthScore * 0.9
+        }
+
+        return agreementScore.toInt().coerceIn(TREND_CONFIDENCE_FLOOR, TREND_CONFIDENCE_CEILING)
     }
 }
