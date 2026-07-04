@@ -35,6 +35,7 @@ fun UserProfile.toEntity() = UserProfileEntity(
 @Dao
 interface UserProfileDao {
     @Query("SELECT * FROM user_profile WHERE id = 1") suspend fun get(): UserProfileEntity?
+    @Query("SELECT * FROM user_profile WHERE id = 1") fun observe(): kotlinx.coroutines.flow.Flow<UserProfileEntity?>
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsert(profile: UserProfileEntity)
 }
 
