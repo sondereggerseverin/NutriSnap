@@ -123,7 +123,7 @@ class HealthConnectViewModel(app: Application) : AndroidViewModel(app) {
         val todayActiveKcal = last30Days.find { it.date == LocalDate.now() }?.activeCaloriesKcal
 
         AdaptiveTdeeCalculator.computeDailyTarget(
-            trendTdee = trendTdee,
+            trend = trendTdee,
             formulaTdee = profile.computedTdee(),
             todayActiveKcal = todayActiveKcal,
             avgActiveKcal = weekly?.avgActiveKcal
