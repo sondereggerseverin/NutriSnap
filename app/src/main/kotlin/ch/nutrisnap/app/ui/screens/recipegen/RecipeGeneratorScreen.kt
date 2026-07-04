@@ -23,8 +23,11 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.GeneratedRecipeEntity
 import ch.nutrisnap.app.data.model.MealType
+import ch.nutrisnap.app.domain.DayPlan
 import ch.nutrisnap.app.domain.GeneratedRecipe
+import ch.nutrisnap.app.domain.PlannedMeal
 import ch.nutrisnap.app.domain.RecipeIngredient
+import ch.nutrisnap.app.domain.WorkoutTiming
 import ch.nutrisnap.app.ui.screens.scan.PhotoCaptureScreen
 import kotlin.math.roundToInt
 
@@ -75,6 +78,10 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
                         IconButton(onClick = { vm.clearRecipe() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück zum Verlauf")
                         }
+                    } else if (state.dayPlan != null) {
+                        IconButton(onClick = { vm.clearDayPlan() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück zur Eingabe")
+                        }
                     }
                     Text("KI-Rezeptgenerator",
                         style = MaterialTheme.typography.headlineSmall,
@@ -82,13 +89,14 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
                 }
             }
 
-            if (state.recipe == null) {
+            if (state.recipe == null && state.dayPlan == null) {
                 item {
                     val tabs = listOf(
                         Triple(RecipeGenMode.FREITEXT, "Freitext", Icons.Default.Edit),
                         Triple(RecipeGenMode.ZUTATEN, "Zutaten", Icons.Default.Kitchen),
                         Triple(RecipeGenMode.FILL_UP, "Fill Up", Icons.Default.LocalFireDepartment),
-                        Triple(RecipeGenMode.ZUFALL, "Zufall", Icons.Default.Casino)
+                        Triple(RecipeGenMode.ZUFALL, "Zufall", Icons.Default.Casino),
+                        Triple(RecipeGenMode.TAGESPLAN, "Tagesplan", Icons.Default.CalendarToday)
                     )
                     ScrollableTabRow(
                         selectedTabIndex = tabs.indexOfFirst { it.first == state.mode }.coerceAtLeast(0),
@@ -137,6 +145,39 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
                             isLoading = state.isLoading,
                             onGenerate = { vm.generateRandomRecipe() }
                         )
+                        RecipeGenMode.TAGESPLAN -> TagesplanInput(
+                            state = state,
+                            vm = vm,
+                            isLoading = state.isDayPlanLoading
+                        )
+                    }
+                }
+            }
+
+            if (state.mode == RecipeGenMode.TAGESPLAN) {
+                state.dayPlanError?.let { error ->
+                    item {
+                        Card(colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Error, null, tint = MaterialTheme.colorScheme.error)
+                                Spacer(Modifier.width(8.dp))
+                                Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+                                IconButton(onClick = vm::clearDayPlanError) { Icon(Icons.Default.Close, null) }
+                            }
+                        }
+                    }
+                }
+
+                state.dayPlan?.let { plan ->
+                    item {
+                        DayPlanResultCard(
+                            plan = plan,
+                            savedMealIndices = state.dayPlanSavedMealIndices,
+                            allSaved = state.dayPlanAllSaved,
+                            onAddMeal = { meal, index -> vm.addPlannedMealToDiary(meal, index) },
+                            onAddAll = { vm.addAllPlannedMealsToDiary() }
+                        )
                     }
                 }
             }
@@ -169,7 +210,7 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
                 }
             }
 
-            if (state.recipe == null && !state.isLoading && state.history.isNotEmpty()) {
+            if (state.recipe == null && state.dayPlan == null && !state.isLoading && state.history.isNotEmpty()) {
                 item {
                     Text("Letzte Rezepte", style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold)
@@ -397,6 +438,234 @@ private fun ZufallInput(
             enabled = !isLoading
         ) {
             GenerateButtonContent(isLoading, "Würfle Rezept…", "Zufallsrezept", Icons.Default.Casino)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun TagesplanInput(
+    state: RecipeGenUiState,
+    vm: RecipeGeneratorViewModel,
+    isLoading: Boolean
+) {
+    Column {
+        Text("Tagesziele", fontWeight = FontWeight.Medium, fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = state.dayPlanTargetCalories,
+                onValueChange = vm::setDayPlanCalories,
+                label = { Text("kcal") }, singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.weight(1f)
+            )
+            OutlinedTextField(
+                value = state.dayPlanTargetProtein,
+                onValueChange = vm::setDayPlanProtein,
+                label = { Text("Protein g") }, singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.weight(1f)
+            )
+            OutlinedTextField(
+                value = state.dayPlanTargetFiber,
+                onValueChange = vm::setDayPlanFiber,
+                label = { Text("Ballaststoffe g") }, singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(Modifier.height(14.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Frühstück einplanen", fontSize = 14.sp)
+            Switch(checked = state.dayPlanIncludeBreakfast, onCheckedChange = vm::setDayPlanIncludeBreakfast)
+        }
+
+        Spacer(Modifier.height(10.dp))
+        Text("Anzahl Mahlzeiten", fontWeight = FontWeight.Medium, fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            FilledTonalIconButton(
+                onClick = { vm.setDayPlanMealCount(state.dayPlanMealCount - 1) },
+                enabled = state.dayPlanMealCount > 2
+            ) { Icon(Icons.Default.Remove, null) }
+            Text("${state.dayPlanMealCount}", fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.width(24.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            FilledTonalIconButton(
+                onClick = { vm.setDayPlanMealCount(state.dayPlanMealCount + 1) },
+                enabled = state.dayPlanMealCount < 6
+            ) { Icon(Icons.Default.Add, null) }
+        }
+
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("High Volume Eating", fontSize = 14.sp)
+            Switch(checked = state.dayPlanHighVolume, onCheckedChange = vm::setDayPlanHighVolume)
+        }
+
+        Spacer(Modifier.height(10.dp))
+        Text("Workout-Timing", fontWeight = FontWeight.Medium, fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(6.dp))
+        val workoutOptions = listOf(
+            WorkoutTiming.NONE to "Keins",
+            WorkoutTiming.PRE to "Vor Training",
+            WorkoutTiming.POST to "Nach Training",
+            WorkoutTiming.BOTH to "Beides"
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            workoutOptions.forEach { (timing, label) ->
+                FilterChip(
+                    selected = state.dayPlanWorkoutTiming == timing,
+                    onClick = { vm.setDayPlanWorkoutTiming(timing) },
+                    label = { Text(label, fontSize = 12.sp) }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+        OutlinedTextField(
+            value = state.dayPlanMustUseIngredients,
+            onValueChange = vm::setDayPlanMustUseIngredients,
+            label = { Text("Zutaten, die vorkommen sollen") },
+            placeholder = { Text("z.B. Hähnchen, Reis, Broccoli") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(Modifier.height(10.dp))
+        OutlinedTextField(
+            value = state.dayPlanExtraNotes,
+            onValueChange = vm::setDayPlanExtraNotes,
+            label = { Text("Zusätzliche Wünsche") },
+            placeholder = { Text("z.B. vegetarisch, wenig Aufwand") },
+            minLines = 2, maxLines = 3,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(Modifier.height(14.dp))
+        val canGenerate = state.dayPlanTargetCalories.toFloatOrNull() != null &&
+            state.dayPlanTargetProtein.toFloatOrNull() != null
+        Button(
+            onClick = { vm.generateDayPlan() },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading && canGenerate
+        ) {
+            GenerateButtonContent(isLoading, "Erstelle Tagesplan…", "Tagesplan generieren", Icons.Default.CalendarToday)
+        }
+        if (!canGenerate) {
+            Spacer(Modifier.height(4.dp))
+            Text("Kalorien- und Proteinziel angeben", fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun DayPlanResultCard(
+    plan: DayPlan,
+    savedMealIndices: Set<Int>,
+    allSaved: Boolean,
+    onAddMeal: (PlannedMeal, Int) -> Unit,
+    onAddAll: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+            Column(Modifier.padding(14.dp)) {
+                Text("Tagesplan", fontWeight = FontWeight.Bold, fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    BudgetStat("${plan.totalCalories.roundToInt()}", "kcal")
+                    BudgetStat("${plan.totalProtein.roundToInt()}g", "Protein")
+                    BudgetStat("${plan.totalCarbs.roundToInt()}g", "Carbs")
+                    BudgetStat("${plan.totalFat.roundToInt()}g", "Fett")
+                    BudgetStat("${plan.totalFiber.roundToInt()}g", "Fasern")
+                }
+                if (plan.note.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(plan.note, fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
+            }
+        }
+
+        plan.meals.forEachIndexed { i, meal ->
+            PlannedMealCard(
+                meal = meal,
+                isSaved = i in savedMealIndices,
+                onAddToDiary = { onAddMeal(meal, i) }
+            )
+        }
+
+        Button(
+            onClick = onAddAll,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !allSaved
+        ) {
+            Icon(if (allSaved) Icons.Default.Check else Icons.Default.BookmarkAdd, null, Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(if (allSaved) "Alle im Tagebuch ✓" else "Alle ins Tagebuch eintragen")
+        }
+    }
+}
+
+@Composable
+private fun PlannedMealCard(
+    meal: PlannedMeal,
+    isSaved: Boolean,
+    onAddToDiary: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val mealLabel = when (meal.mealType) {
+        "BREAKFAST" -> "☀️ Frühstück"
+        "LUNCH" -> "🌤️ Mittagessen"
+        "DINNER" -> "🌙 Abendessen"
+        "SNACK" -> "🍎 Snack"
+        else -> meal.mealType
+    }
+
+    Card(Modifier.fillMaxWidth().clickable { expanded = !expanded }) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(mealLabel, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (meal.timing.isNotBlank()) {
+                            Spacer(Modifier.width(6.dp))
+                            Surface(color = MaterialTheme.colorScheme.tertiaryContainer, shape = MaterialTheme.shapes.small) {
+                                Text(meal.timing, Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 10.sp)
+                            }
+                        }
+                    }
+                    Text(meal.title, fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                        modifier = Modifier.padding(top = 2.dp))
+                }
+                IconButton(onClick = onAddToDiary, enabled = !isSaved) {
+                    Icon(
+                        if (isSaved) Icons.Default.Check else Icons.Default.BookmarkAdd,
+                        if (isSaved) "Eingetragen" else "Ins Tagebuch"
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                MacroChip("${meal.calories.roundToInt()} kcal", MaterialTheme.colorScheme.primaryContainer)
+                MacroChip("P ${meal.protein.toInt()}g", MaterialTheme.colorScheme.secondaryContainer)
+                MacroChip("K ${meal.carbs.toInt()}g", MaterialTheme.colorScheme.tertiaryContainer)
+                MacroChip("F ${meal.fat.toInt()}g", MaterialTheme.colorScheme.surfaceVariant)
+            }
+
+            if (expanded && meal.description.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(meal.description, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }

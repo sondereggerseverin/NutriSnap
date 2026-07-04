@@ -12,10 +12,13 @@ import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.repository.DiaryRepository
 import ch.nutrisnap.app.data.repository.RecipeRepository
 import ch.nutrisnap.app.data.repository.UserProfileRepository
+import ch.nutrisnap.app.domain.DayPlan
 import ch.nutrisnap.app.domain.GeneratedRecipe
 import ch.nutrisnap.app.domain.GroqRecipeGeneratorService
 import ch.nutrisnap.app.domain.GroqVisionService
+import ch.nutrisnap.app.domain.PlannedMeal
 import ch.nutrisnap.app.domain.RecipeIngredient
+import ch.nutrisnap.app.domain.WorkoutTiming
 import ch.nutrisnap.app.domain.ZenMuxImageService
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -26,7 +29,7 @@ import kotlin.math.roundToInt
 import java.time.LocalDate
 
 /** Wie das aktuell angezeigte Rezept erzeugt wurde – steuert Tab-Auswahl in der UI. */
-enum class RecipeGenMode { FREITEXT, ZUTATEN, FILL_UP, ZUFALL }
+enum class RecipeGenMode { FREITEXT, ZUTATEN, FILL_UP, ZUFALL, TAGESPLAN }
 
 data class FillUpBudget(
     val calories: Float = 0f,
@@ -51,7 +54,22 @@ data class RecipeGenUiState(
     val isScanningFridge: Boolean = false,
     val showFridgeCamera: Boolean = false,
     // Fill-Up-Modus
-    val fillUpBudget: FillUpBudget = FillUpBudget()
+    val fillUpBudget: FillUpBudget = FillUpBudget(),
+    // Tagesplan-Modus
+    val dayPlanTargetCalories: String = "",
+    val dayPlanTargetProtein: String = "",
+    val dayPlanTargetFiber: String = "25",
+    val dayPlanIncludeBreakfast: Boolean = true,
+    val dayPlanMealCount: Int = 3,
+    val dayPlanHighVolume: Boolean = false,
+    val dayPlanWorkoutTiming: WorkoutTiming = WorkoutTiming.NONE,
+    val dayPlanMustUseIngredients: String = "",
+    val dayPlanExtraNotes: String = "",
+    val dayPlan: DayPlan? = null,
+    val isDayPlanLoading: Boolean = false,
+    val dayPlanError: String? = null,
+    val dayPlanSavedMealIndices: Set<Int> = emptySet(),
+    val dayPlanAllSaved: Boolean = false
 )
 
 class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
@@ -192,6 +210,108 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
     }
+
+    // ── Tagesplan-Modus ──────────────────────────────────────────────────────
+
+    fun setDayPlanCalories(v: String) = _state.update { it.copy(dayPlanTargetCalories = v) }
+    fun setDayPlanProtein(v: String) = _state.update { it.copy(dayPlanTargetProtein = v) }
+    fun setDayPlanFiber(v: String) = _state.update { it.copy(dayPlanTargetFiber = v) }
+    fun setDayPlanIncludeBreakfast(v: Boolean) = _state.update { it.copy(dayPlanIncludeBreakfast = v) }
+    fun setDayPlanMealCount(v: Int) = _state.update { it.copy(dayPlanMealCount = v.coerceIn(2, 6)) }
+    fun setDayPlanHighVolume(v: Boolean) = _state.update { it.copy(dayPlanHighVolume = v) }
+    fun setDayPlanWorkoutTiming(v: WorkoutTiming) = _state.update { it.copy(dayPlanWorkoutTiming = v) }
+    fun setDayPlanMustUseIngredients(v: String) = _state.update { it.copy(dayPlanMustUseIngredients = v) }
+    fun setDayPlanExtraNotes(v: String) = _state.update { it.copy(dayPlanExtraNotes = v) }
+
+    fun clearDayPlan() = _state.update {
+        it.copy(dayPlan = null, dayPlanError = null, dayPlanSavedMealIndices = emptySet(), dayPlanAllSaved = false)
+    }
+
+    fun clearDayPlanError() = _state.update { it.copy(dayPlanError = null) }
+    fun clearDayPlanAllSavedFlag() = _state.update { it.copy(dayPlanAllSaved = false) }
+
+    fun generateDayPlan() {
+        val s = _state.value
+        val calories = s.dayPlanTargetCalories.toFloatOrNull()
+        val protein = s.dayPlanTargetProtein.toFloatOrNull()
+        if (calories == null || protein == null) {
+            _state.update { it.copy(dayPlanError = "Bitte Kalorien- und Proteinziel angeben") }
+            return
+        }
+        val fiber = s.dayPlanTargetFiber.toFloatOrNull() ?: 25f
+        val ingredients = s.dayPlanMustUseIngredients.split(",").map { it.trim() }.filter { it.isNotBlank() }
+
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    isDayPlanLoading = true, dayPlanError = null, dayPlan = null,
+                    dayPlanSavedMealIndices = emptySet(), dayPlanAllSaved = false
+                )
+            }
+            service.generateDayPlan(
+                targetCalories = calories,
+                targetProtein = protein,
+                targetFiber = fiber,
+                includeBreakfast = s.dayPlanIncludeBreakfast,
+                mealCount = s.dayPlanMealCount,
+                highVolume = s.dayPlanHighVolume,
+                workoutTiming = s.dayPlanWorkoutTiming,
+                mustUseIngredients = ingredients,
+                extraNotes = s.dayPlanExtraNotes
+            ).fold(
+                onSuccess = { plan -> _state.update { it.copy(isDayPlanLoading = false, dayPlan = plan) } },
+                onFailure = { e -> _state.update { it.copy(isDayPlanLoading = false, dayPlanError = e.message ?: "Unbekannter Fehler") } }
+            )
+        }
+    }
+
+    /** Trägt eine einzelne geplante Mahlzeit ins heutige Tagebuch ein. */
+    fun addPlannedMealToDiary(meal: PlannedMeal, index: Int) {
+        viewModelScope.launch {
+            diaryDao.insert(
+                DiaryEntry(
+                    foodItemId  = 0,
+                    foodName    = meal.title,
+                    amountGrams = 1f,
+                    mealType    = meal.mealType.toMealTypeOrDefault(),
+                    dateStr     = LocalDate.now().toString(),
+                    calories    = meal.calories,
+                    protein     = meal.protein,
+                    carbs       = meal.carbs,
+                    fat         = meal.fat
+                )
+            )
+            _state.update { it.copy(dayPlanSavedMealIndices = it.dayPlanSavedMealIndices + index) }
+        }
+    }
+
+    /** Trägt alle Mahlzeiten des generierten Tagesplans auf einmal ins heutige Tagebuch ein. */
+    fun addAllPlannedMealsToDiary() {
+        val plan = _state.value.dayPlan ?: return
+        viewModelScope.launch {
+            plan.meals.forEach { meal ->
+                diaryDao.insert(
+                    DiaryEntry(
+                        foodItemId  = 0,
+                        foodName    = meal.title,
+                        amountGrams = 1f,
+                        mealType    = meal.mealType.toMealTypeOrDefault(),
+                        dateStr     = LocalDate.now().toString(),
+                        calories    = meal.calories,
+                        protein     = meal.protein,
+                        carbs       = meal.carbs,
+                        fat         = meal.fat
+                    )
+                )
+            }
+            _state.update {
+                it.copy(dayPlanSavedMealIndices = plan.meals.indices.toSet(), dayPlanAllSaved = true)
+            }
+        }
+    }
+
+    private fun String.toMealTypeOrDefault(): MealType =
+        runCatching { MealType.valueOf(this) }.getOrDefault(MealType.LUNCH)
 
     // ── Zufalls-Modus ────────────────────────────────────────────────────────
 
