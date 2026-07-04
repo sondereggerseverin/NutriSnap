@@ -3,10 +3,14 @@ package ch.nutrisnap.app.data.repository
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.db.toDomain
 import ch.nutrisnap.app.data.db.toEntity
+import ch.nutrisnap.app.data.supabase.SupabaseSync
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Biologisches Geschlecht für die BMR-Berechnung (Mifflin-St-Jeor braucht den Unterschied). */
@@ -42,6 +46,10 @@ data class UserProfile(
 }
 
 class UserProfileRepository(private val db: NutriDatabase) {
+    private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private fun pushSafely(block: suspend () -> Unit) {
+        syncScope.launch { runCatching { block() } }
+    }
 
     /**
      * Live-reactive: emits again whenever the profile row changes (e.g. after Settings
@@ -55,5 +63,13 @@ class UserProfileRepository(private val db: NutriDatabase) {
 
     suspend fun update(profile: UserProfile) = withContext(Dispatchers.IO) {
         db.userProfileDao().upsert(profile.toEntity())
+        pushSafely {
+            SupabaseSync.upsertUserProfile(
+                weightKg = profile.weightKg, heightCm = profile.heightCm, ageYears = profile.ageYears,
+                dailyCalorieGoal = profile.dailyCalorieGoal, proteinGoalG = profile.proteinGoalG,
+                carbsGoalG = profile.carbsGoalG, fatGoalG = profile.fatGoalG,
+                activityFactor = profile.activityFactor, sex = profile.sex.name
+            )
+        }
     }
 }
