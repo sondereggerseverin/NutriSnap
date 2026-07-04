@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
+/** Biologisches Geschlecht für die BMR-Berechnung (Mifflin-St-Jeor braucht den Unterschied). */
+enum class Sex { MALE, FEMALE, UNSPECIFIED }
+
 data class UserProfile(
     val dailyCalorieGoal: Int   = 2000,
     val proteinGoalG:     Float = 120f,
@@ -17,11 +20,22 @@ data class UserProfile(
     val weightKg:         Float = 0f,
     val heightCm:         Int   = 0,
     val ageYears:         Int   = 0,
-    val activityFactor:   Float = 1.55f
+    val activityFactor:   Float = 1.55f,
+    val sex:              Sex   = Sex.UNSPECIFIED
 ) {
+    /**
+     * Mifflin-St-Jeor. Der Geschlechts-Term macht bis zu ~166 kcal Unterschied
+     * (+5 Männer, -161 Frauen) - ohne Angabe nehmen wir den Mittelwert (-78) als
+     * beste neutrale Schätzung, statt ihn ganz wegzulassen.
+     */
     fun computedBmr(): Double? {
         if (weightKg <= 0f || heightCm <= 0 || ageYears <= 0) return null
-        return 10.0 * weightKg + 6.25 * heightCm - 5.0 * ageYears
+        val base = 10.0 * weightKg + 6.25 * heightCm - 5.0 * ageYears
+        return when (sex) {
+            Sex.MALE        -> base + 5.0
+            Sex.FEMALE      -> base - 161.0
+            Sex.UNSPECIFIED -> base - 78.0
+        }
     }
 
     fun computedTdee(): Double? = computedBmr()?.let { it * activityFactor }

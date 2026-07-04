@@ -5,6 +5,7 @@ import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import ch.nutrisnap.app.data.model.*
+import ch.nutrisnap.app.data.repository.Sex
 import ch.nutrisnap.app.data.repository.UserProfile
 
 @Entity(tableName = "user_profile")
@@ -17,19 +18,22 @@ data class UserProfileEntity(
     val proteinGoalG: Float = 120f,
     val carbsGoalG: Float = 220f,
     val fatGoalG: Float = 65f,
-    val activityFactor: Float = 1.55f
+    val activityFactor: Float = 1.55f,
+    val sex: String = "UNSPECIFIED"
 )
 
 fun UserProfileEntity.toDomain() = UserProfile(
     weightKg = weightKg, heightCm = heightCm, ageYears = ageYears,
     dailyCalorieGoal = dailyCalorieGoal, proteinGoalG = proteinGoalG,
-    carbsGoalG = carbsGoalG, fatGoalG = fatGoalG, activityFactor = activityFactor
+    carbsGoalG = carbsGoalG, fatGoalG = fatGoalG, activityFactor = activityFactor,
+    sex = runCatching { Sex.valueOf(sex) }.getOrDefault(Sex.UNSPECIFIED)
 )
 
 fun UserProfile.toEntity() = UserProfileEntity(
     weightKg = weightKg, heightCm = heightCm, ageYears = ageYears,
     dailyCalorieGoal = dailyCalorieGoal, proteinGoalG = proteinGoalG,
-    carbsGoalG = carbsGoalG, fatGoalG = fatGoalG, activityFactor = activityFactor
+    carbsGoalG = carbsGoalG, fatGoalG = fatGoalG, activityFactor = activityFactor,
+    sex = sex.name
 )
 
 @Dao
@@ -58,7 +62,7 @@ interface UserProfileDao {
         MealTemplateItem::class,
         GeneratedRecipeEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -199,6 +203,15 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // Phase 4: Geschlecht am Profil - Mifflin-St-Jeor BMR braucht den
+        // geschlechtsabhaengigen Term (+5 Maenner / -161 Frauen), der vorher komplett
+        // fehlte. Bestehende Profile bekommen 'UNSPECIFIED' (neutraler Mittelwert -78).
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE user_profile ADD COLUMN sex TEXT NOT NULL DEFAULT 'UNSPECIFIED'")
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -209,7 +222,7 @@ abstract class NutriDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
                         MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
-                        MIGRATION_8_9
+                        MIGRATION_8_9, MIGRATION_9_10
                     )
                     .build()
                     .also { INSTANCE = it }

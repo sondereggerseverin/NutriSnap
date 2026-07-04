@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.nutrisnap.app.data.repository.Sex
 import ch.nutrisnap.app.data.repository.UserProfile
 import ch.nutrisnap.app.health.HealthConnectManager
 import ch.nutrisnap.app.health.HealthConnectStatus
@@ -42,10 +43,15 @@ enum class FitnessGoal(val label: String, val emoji: String, val desc: String) {
 
 private fun computeGoals(
     weightKg: Float, heightCm: Int, ageYears: Int,
-    activityFactor: Float, goal: FitnessGoal
+    activityFactor: Float, goal: FitnessGoal, sex: Sex
 ): Triple<Int, Float, Float> {   // kcal, protein, fat (carbs = rest)
     if (weightKg <= 0 || heightCm <= 0 || ageYears <= 0) return Triple(2000, 120f, 65f)
-    val bmr  = 10f * weightKg + 6.25f * heightCm - 5f * ageYears + 5f
+    val base = 10f * weightKg + 6.25f * heightCm - 5f * ageYears
+    val bmr  = when (sex) {
+        Sex.MALE        -> base + 5f
+        Sex.FEMALE      -> base - 161f
+        Sex.UNSPECIFIED -> base - 78f
+    }
     val tdee = bmr * activityFactor
     val kcal = when (goal) {
         FitnessGoal.LOSE_WEIGHT  -> (tdee - 500).toInt().coerceAtLeast(1200)
@@ -92,6 +98,7 @@ fun SettingsScreen(
     var carbsText   by remember(profile.carbsGoalG)       { mutableStateOf(profile.carbsGoalG.toInt().toString()) }
     var fatText     by remember(profile.fatGoalG)         { mutableStateOf(profile.fatGoalG.toInt().toString()) }
     var activity    by remember(profile.activityFactor)   { mutableStateOf(profile.activityFactor) }
+    var sex         by remember(profile.sex)               { mutableStateOf(profile.sex) }
     var selectedGoal by remember { mutableStateOf(FitnessGoal.MAINTAIN) }
     var showSaved   by remember { mutableStateOf(false) }
 
@@ -107,7 +114,7 @@ fun SettingsScreen(
         val w = weightText.toFloatOrNull() ?: return
         val h = heightText.toIntOrNull()   ?: return
         val a = ageText.toIntOrNull()      ?: return
-        val (kcal, prot, fat) = computeGoals(w, h, a, activity, selectedGoal)
+        val (kcal, prot, fat) = computeGoals(w, h, a, activity, selectedGoal, sex)
         val carbs = ((kcal - prot * 4 - fat * 9) / 4f).coerceAtLeast(50f)
         calorieText = kcal.toString()
         proteinText = prot.toInt().toString()
@@ -239,6 +246,20 @@ fun SettingsScreen(
 
         // ── Körperdaten ───────────────────────────────────────────────────────
         SettingsCard(title = "Körperdaten", icon = Icons.Default.Person) {
+            Text("Geschlecht", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                val sexOptions = listOf(Sex.FEMALE to "Weiblich", Sex.MALE to "Männlich", Sex.UNSPECIFIED to "Keine Angabe")
+                sexOptions.forEach { (option, label) ->
+                    FilterChip(
+                        selected = sex == option,
+                        onClick = { sex = option; applyGoal() },
+                        label = { Text(label, fontSize = 12.sp) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
             GoalField("Gewicht (kg)",  weightText, KeyboardType.Number) {
                 weightText = it; applyGoal()
             }
@@ -271,7 +292,8 @@ fun SettingsScreen(
             weightKg       = weightText.toFloatOrNull() ?: profile.weightKg,
             heightCm       = heightText.toIntOrNull()   ?: profile.heightCm,
             ageYears       = ageText.toIntOrNull()      ?: profile.ageYears,
-            activityFactor = activity
+            activityFactor = activity,
+            sex            = sex
         )
         previewProfile.computedTdee()?.let { tdee ->
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
@@ -300,7 +322,8 @@ fun SettingsScreen(
                     proteinGoalG     = proteinText.toFloatOrNull() ?: 120f,
                     carbsGoalG       = carbsText.toFloatOrNull()   ?: 220f,
                     fatGoalG         = fatText.toFloatOrNull()     ?: 65f,
-                    activityFactor   = activity
+                    activityFactor   = activity,
+                    sex              = sex
                 ))
                 showSaved = true
             },
