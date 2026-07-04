@@ -10,6 +10,7 @@ import ch.nutrisnap.app.data.repository.DiaryRepository
 import ch.nutrisnap.app.data.repository.StatsRepository
 import ch.nutrisnap.app.data.repository.UserProfileRepository
 import ch.nutrisnap.app.data.repository.WeightRepository
+import ch.nutrisnap.app.domain.AdaptiveTdeeCalculator
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -36,10 +37,17 @@ data class HomeUiState(
     val fatGoal:       Float   = 65f,
     val streak:        Int     = 0,
     val lastWeightKg:  Float?  = null,
-    val meals:         List<MealOverview> = emptyList()
+    val meals:         List<MealOverview> = emptyList(),
+    // Wenn true, ist calorieGoal bereits das fertige AdaptiveTdeeCalculator-Ziel
+    // (inkl. gedämpftem Aktivitätsbonus) — burnedKcal wird dann nur noch angezeigt,
+    // nicht nochmal addiert. Wenn false (z.B. Profil unvollständig, zu wenig
+    // Verlaufsdaten), gilt die alte, einfache Logik: statisches Ziel + voller Kalorienverbrauch.
+    val isAdaptiveTarget: Boolean = false,
+    // 0-100, nur relevant wenn isAdaptiveTarget true ist.
+    val tdeeConfidence: Int = 0
 ) {
-    /** Budget = Basis-Ziel + verbrannte Aktivitätskalorien */
-    val adjustedGoal: Float get() = calorieGoal + burnedKcal
+    /** Budget = Basis-Ziel + verbrannte Aktivitätskalorien (nur wenn nicht schon im adaptiven Ziel enthalten) */
+    val adjustedGoal: Float get() = if (isAdaptiveTarget) calorieGoal else calorieGoal + burnedKcal
     /** Übrig = Budget - gegessen (nie negativ) */
     val remaining:    Float get() = (adjustedGoal - totalCalories).coerceAtLeast(0f)
 }
@@ -56,14 +64,47 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     init { refreshStreak() }
 
+    // Rolling window for the adaptive trend: long enough to smooth out noise, short
+    // enough to reflect a recent change in routine (e.g. ramping up ride volume).
+    private val trendWindowDays = 21
+
     val uiState: StateFlow<HomeUiState> = combine(
         diaryRepo.getEntriesForDate(LocalDate.now()),
         profileRepo.get(),
         weightRepo.getRecent(1),
         _streak,
-        hcDao.getCacheForDate(LocalDate.now())
-    ) { entries, profile, weights, streak, hcCache ->
+        hcDao.getCacheForDate(LocalDate.now()),
+        weightRepo.getRecent(trendWindowDays),
+        diaryRepo.getWeeklySummary(LocalDate.now().minusDays(trendWindowDays.toLong())),
+        hcDao.getLast30Days()
+    ) { args ->
+        val entries       = args[0] as List<ch.nutrisnap.app.data.model.DiaryEntry>
+        val profile        = args[1] as ch.nutrisnap.app.data.repository.UserProfile
+        val weights        = args[2] as List<ch.nutrisnap.app.data.model.WeightEntry>
+        val streak         = args[3] as Int
+        val hcCache        = args[4] as ch.nutrisnap.app.data.model.HealthConnectCache?
+        val trendWeights   = args[5] as List<ch.nutrisnap.app.data.model.WeightEntry>
+        val dailySummaries = args[6] as List<ch.nutrisnap.app.data.db.DailySummary>
+        val activityDays   = args[7] as List<ch.nutrisnap.app.data.model.HealthConnectCache>
+
         val byMeal = entries.groupBy { it.mealType }
+
+        val weightByDate = trendWeights.associate { LocalDate.parse(it.dateStr) to it.weightKg }
+        val intakeByDate = dailySummaries.associate { LocalDate.parse(it.dateStr) to it.calories }
+        val trend = AdaptiveTdeeCalculator.computeTrendTdee(weightByDate, intakeByDate)
+
+        val todayActiveKcal = hcCache?.activeCaloriesKcal
+        val avgActiveKcal = activityDays
+            .mapNotNull { it.activeCaloriesKcal }
+            .takeIf { it.isNotEmpty() }
+            ?.average()
+
+        val adaptiveTarget = AdaptiveTdeeCalculator.computeDailyTarget(
+            trend = trend,
+            formulaTdee = profile.computedTdee(),
+            todayActiveKcal = todayActiveKcal,
+            avgActiveKcal = avgActiveKcal
+        )
 
         HomeUiState(
             greeting      = greetingForHour(),
@@ -71,13 +112,15 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             totalProtein  = entries.sumOf { it.protein.toDouble() }.toFloat(),
             totalCarbs    = entries.sumOf { it.carbs.toDouble() }.toFloat(),
             totalFat      = entries.sumOf { it.fat.toDouble() }.toFloat(),
-            calorieGoal   = profile.dailyCalorieGoal.toFloat(),
-            burnedKcal    = hcCache?.activeCaloriesKcal?.toFloat() ?: 0f,
+            calorieGoal   = adaptiveTarget?.targetKcal?.toFloat() ?: profile.dailyCalorieGoal.toFloat(),
+            burnedKcal    = todayActiveKcal?.toFloat() ?: 0f,
             proteinGoal   = profile.proteinGoalG,
             carbsGoal     = profile.carbsGoalG,
             fatGoal       = profile.fatGoalG,
             streak        = streak,
             lastWeightKg  = weights.lastOrNull()?.weightKg ?: profile.weightKg.takeIf { it > 0f },
+            isAdaptiveTarget = adaptiveTarget != null,
+            tdeeConfidence   = adaptiveTarget?.confidencePercent ?: 0,
             meals         = MEAL_META.map { (type, label, icon, color) ->
                 val mealEntries = byMeal[type] ?: emptyList()
                 MealOverview(
