@@ -2,10 +2,12 @@ package ch.nutrisnap.app.data.supabase
 
 import android.util.Log
 import ch.nutrisnap.app.data.db.NutriDatabase
+import ch.nutrisnap.app.data.db.UserProfileEntity
 import ch.nutrisnap.app.data.model.DiaryEntry
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.WeightEntry
+import ch.nutrisnap.app.data.repository.Sex
 
 /**
  * Pulls rows created on the web app (or another device) down into the local
@@ -20,6 +22,39 @@ object SyncManager {
         runCatching { pullDiary(db) }.onFailure { Log.e("NutriSync", "Pull diary_entries fehlgeschlagen: ${it.message}", it) }
         runCatching { pullRecipes(db) }.onFailure { Log.e("NutriSync", "Pull recipes fehlgeschlagen: ${it.message}", it) }
         runCatching { pullWeight(db) }.onFailure { Log.e("NutriSync", "Pull weight_entries fehlgeschlagen: ${it.message}", it) }
+        runCatching { pullUserProfile(db) }.onFailure { Log.e("NutriSync", "Pull user_profiles fehlgeschlagen: ${it.message}", it) }
+    }
+
+    /**
+     * user_profiles ist eine Singleton-Zeile pro Nutzer, kein local_id-Linking nötig.
+     * NOTE: aktuell "last pull wins" — es gibt noch keinen updatedAt-Vergleich, weil das
+     * eine Room-Migration bräuchte. Für Severins Ein-Geräte-Nutzung (Android ist primär,
+     * Web nur gelegentlich fürs Profil) unkritisch; sollte die Web-App aktiver werden,
+     * wäre ein updatedAt-Feld auf UserProfileEntity der nächste Schritt.
+     */
+    private suspend fun pullUserProfile(db: NutriDatabase) {
+        val dao = db.userProfileDao()
+        val remote = SupabaseSync.fetchUserProfile()
+        if (remote == null) {
+            // Kein Remote-Profil (erster Sync für diesen Nutzer) - lokalen Stand hochladen.
+            val local = dao.get() ?: return
+            SupabaseSync.upsertUserProfile(
+                weightKg = local.weightKg, heightCm = local.heightCm, ageYears = local.ageYears,
+                dailyCalorieGoal = local.dailyCalorieGoal, proteinGoalG = local.proteinGoalG,
+                carbsGoalG = local.carbsGoalG, fatGoalG = local.fatGoalG,
+                activityFactor = local.activityFactor, sex = local.sex
+            )
+            return
+        }
+        dao.upsert(
+            UserProfileEntity(
+                weightKg = remote.weightKg, heightCm = remote.heightCm, ageYears = remote.ageYears,
+                dailyCalorieGoal = remote.dailyCalorieGoal, proteinGoalG = remote.proteinGoalG,
+                carbsGoalG = remote.carbsGoalG, fatGoalG = remote.fatGoalG,
+                activityFactor = remote.activityFactor,
+                sex = runCatching { Sex.valueOf(remote.sex) }.getOrDefault(Sex.UNSPECIFIED).name
+            )
+        )
     }
 
     private suspend fun pullDiary(db: NutriDatabase) {
