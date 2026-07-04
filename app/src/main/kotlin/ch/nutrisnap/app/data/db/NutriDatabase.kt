@@ -19,7 +19,7 @@ data class UserProfileEntity(
     val carbsGoalG: Float = 220f,
     val fatGoalG: Float = 65f,
     val activityFactor: Float = 1.55f,
-    @ColumnInfo(defaultValue = "UNSPECIFIED") val sex: String = "UNSPECIFIED"
+    @ColumnInfo(defaultValue = "'UNSPECIFIED'") val sex: String = "UNSPECIFIED"
 )
 
 fun UserProfileEntity.toDomain() = UserProfile(
