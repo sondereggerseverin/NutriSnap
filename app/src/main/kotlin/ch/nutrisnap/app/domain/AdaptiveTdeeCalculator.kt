@@ -79,9 +79,20 @@ object AdaptiveTdeeCalculator {
         return avgIntake - (weightChangeKg * KCAL_PER_KG) / spanDays
     }
 
+    // If the trend TDEE strays further than this from the formula estimate (when one is
+    // available), it's almost certainly short-window weight noise (water, digestion,
+    // timing of the scale) rather than a real metabolic signal - fall back to the formula
+    // instead of trusting it. This is what let a single noisy weight swing send "Basis"
+    // negative and force the safety floor on an otherwise legitimate high-activity day.
+    const val TREND_PLAUSIBILITY_RATIO = 0.35
+
+    // Below this, a trend estimate isn't just "off" - it's not a physiologically
+    // plausible maintenance number for an adult at all, formula-available or not.
+    const val TREND_MIN_PLAUSIBLE_KCAL = 1000.0
+
     /**
-     * Combines the base maintenance estimate (trend-based if available, else the
-     * profile's BMR*activityFactor formula), a fixed deficit, and a damped adjustment
+     * Combines the base maintenance estimate (trend-based if available and plausible, else
+     * the profile's BMR*activityFactor formula), a fixed deficit, and a damped adjustment
      * for how today's activity compares to the recent average.
      *
      * Returns null only if neither a trend nor a formula TDEE is available at all
@@ -94,7 +105,12 @@ object AdaptiveTdeeCalculator {
         avgActiveKcal: Double?,
         deficitKcal: Double = DEFAULT_DEFICIT_KCAL
     ): AdaptiveCalorieTarget? {
-        val maintenance = trendTdee ?: formulaTdee ?: return null
+        val trustedTrend = trendTdee?.takeIf { trend ->
+            trend >= TREND_MIN_PLAUSIBLE_KCAL &&
+                (formulaTdee == null ||
+                    kotlin.math.abs(trend - formulaTdee) <= formulaTdee * TREND_PLAUSIBILITY_RATIO)
+        }
+        val maintenance = trustedTrend ?: formulaTdee ?: return null
         val base = maintenance - deficitKcal
 
         val bonus = if (todayActiveKcal != null && avgActiveKcal != null && avgActiveKcal > 0) {
@@ -107,7 +123,7 @@ object AdaptiveTdeeCalculator {
             targetKcal = target.toInt(),
             baseKcal = base.toInt(),
             activityBonusKcal = bonus.toInt(),
-            isTrendBased = trendTdee != null,
+            isTrendBased = trustedTrend != null,
             deficitKcal = deficitKcal.toInt()
         )
     }
