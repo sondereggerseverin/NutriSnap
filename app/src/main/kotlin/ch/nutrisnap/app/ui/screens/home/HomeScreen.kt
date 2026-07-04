@@ -182,6 +182,12 @@ private fun HomeHeader(state: HomeUiState) {
             Column {
                 Text("${state.greeting} 👋", fontSize = 13.sp, color = Color.White.copy(alpha = 0.85f))
                 Text("Dein Tag im Ueberblick", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                if (state.isAdaptiveTarget) {
+                    Text(
+                        "🎯 Adaptives Ziel · ${state.tdeeConfidence}% Konfidenz",
+                        fontSize = 11.sp, color = Color.White.copy(alpha = 0.75f)
+                    )
+                }
             }
             StreakBadge(state.streak)
         }
