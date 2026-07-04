@@ -21,8 +21,16 @@ class AuthViewModel : ViewModel() {
     init {
         if (AUTH_ENABLED) {
             viewModelScope.launch {
-                AuthRepository.awaitSession()
-                _isLoggedIn.value = AuthRepository.isLoggedIn
+                // Falls der Supabase-Client nicht erzeugt werden kann (z.B. fehlende/leere
+                // SUPABASE_URL/SUPABASE_ANON_KEY im Build), darf das die App nicht crashen -
+                // stattdessen zeigen wir einfach den Login-Screen statt eines harten Absturzes.
+                runCatching {
+                    AuthRepository.awaitSession()
+                    AuthRepository.isLoggedIn
+                }.fold(
+                    onSuccess = { loggedIn -> _isLoggedIn.value = loggedIn },
+                    onFailure = { _isLoggedIn.value = false }
+                )
             }
         }
     }
