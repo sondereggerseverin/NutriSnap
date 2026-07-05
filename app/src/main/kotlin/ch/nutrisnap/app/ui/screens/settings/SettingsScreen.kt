@@ -99,6 +99,7 @@ fun SettingsScreen(
     var fatText     by remember(profile.fatGoalG)         { mutableStateOf(profile.fatGoalG.toInt().toString()) }
     var activity    by remember(profile.activityFactor)   { mutableStateOf(profile.activityFactor) }
     var sex         by remember(profile.sex)               { mutableStateOf(profile.sex) }
+    var applianceModelText by remember(profile.applianceModel) { mutableStateOf(profile.applianceModel) }
     var selectedGoal by remember { mutableStateOf(FitnessGoal.MAINTAIN) }
     var showSaved   by remember { mutableStateOf(false) }
 
@@ -287,6 +288,16 @@ fun SettingsScreen(
             ActivitySlider(value = activity) { activity = it; applyGoal() }
         }
 
+        // ── Küchengerät (für KI-Rezepte) ───────────────────────────────────────
+        SettingsCard(title = "Backofen / Dampfgarer", icon = Icons.Default.Kitchen) {
+            Text("Optional: Modell hinterlegen, damit KI-Rezepte für Ofen/Dampfgarer echte Programme, Temperaturen und Zeiten deines Geräts nutzen.",
+                fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(4.dp))
+            GoalField("Gerätemodell (z.B. V-ZUG Combi-Steam SL CSTSLc)", applianceModelText, KeyboardType.Text) {
+                applianceModelText = it
+            }
+        }
+
         // ── TDEE Preview ──────────────────────────────────────────────────────
         val previewProfile = UserProfile(
             weightKg       = weightText.toFloatOrNull() ?: profile.weightKg,
@@ -323,7 +334,8 @@ fun SettingsScreen(
                     carbsGoalG       = carbsText.toFloatOrNull()   ?: 220f,
                     fatGoalG         = fatText.toFloatOrNull()     ?: 65f,
                     activityFactor   = activity,
-                    sex              = sex
+                    sex              = sex,
+                    applianceModel   = applianceModelText.trim()
                 ))
                 showSaved = true
             },

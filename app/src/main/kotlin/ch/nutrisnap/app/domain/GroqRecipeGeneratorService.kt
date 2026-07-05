@@ -44,6 +44,13 @@ data class GeneratedRecipe(
 /** Timing-Wunsch für den Tagesplan bzgl. Training. */
 enum class WorkoutTiming { NONE, PRE, POST, BOTH }
 
+/** Kochgerät, für das ein Rezept erstellt bzw. angepasst werden soll. */
+enum class CookingMethod(val label: String) {
+    STOVETOP("Pfanne/Herd"),
+    OVEN("Backofen"),
+    STEAM_OVEN("Dampfgarer/Kombi-Dampfgarer")
+}
+
 @Serializable
 data class PlannedMeal(
     val mealType: String = "LUNCH",
@@ -82,16 +89,22 @@ class GroqRecipeGeneratorService {
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
 
-    suspend fun generateRecipe(userInput: String): Result<GeneratedRecipe> = withContext(Dispatchers.IO) {
-        tryProvider(prompt = buildPrompt(userInput))
+    suspend fun generateRecipe(
+        userInput: String,
+        cookingMethod: CookingMethod = CookingMethod.STOVETOP,
+        applianceModel: String = ""
+    ): Result<GeneratedRecipe> = withContext(Dispatchers.IO) {
+        tryProvider(prompt = buildPrompt(userInput) + applianceHint(cookingMethod, applianceModel))
     }
 
     /** Generiert ein Rezept aus einer Liste vorhandener Zutaten (z.B. "was ist im Kühlschrank"). */
     suspend fun generateFromIngredients(
         ingredients: List<String>,
-        note: String = ""
+        note: String = "",
+        cookingMethod: CookingMethod = CookingMethod.STOVETOP,
+        applianceModel: String = ""
     ): Result<GeneratedRecipe> = withContext(Dispatchers.IO) {
-        tryProvider(prompt = buildIngredientsPrompt(ingredients, note))
+        tryProvider(prompt = buildIngredientsPrompt(ingredients, note) + applianceHint(cookingMethod, applianceModel))
     }
 
     /**
@@ -103,14 +116,19 @@ class GroqRecipeGeneratorService {
         remainingProtein: Float,
         remainingCarbs: Float,
         remainingFat: Float,
-        mealLabel: String
+        mealLabel: String,
+        cookingMethod: CookingMethod = CookingMethod.STOVETOP,
+        applianceModel: String = ""
     ): Result<GeneratedRecipe> = withContext(Dispatchers.IO) {
-        tryProvider(prompt = buildFillUpPrompt(remainingCalories, remainingProtein, remainingCarbs, remainingFat, mealLabel))
+        tryProvider(prompt = buildFillUpPrompt(remainingCalories, remainingProtein, remainingCarbs, remainingFat, mealLabel) + applianceHint(cookingMethod, applianceModel))
     }
 
     /** Überrascht mit einem komplett zufälligen, alltagstauglichen Rezept. */
-    suspend fun generateRandom(): Result<GeneratedRecipe> = withContext(Dispatchers.IO) {
-        tryProvider(prompt = buildRandomPrompt())
+    suspend fun generateRandom(
+        cookingMethod: CookingMethod = CookingMethod.STOVETOP,
+        applianceModel: String = ""
+    ): Result<GeneratedRecipe> = withContext(Dispatchers.IO) {
+        tryProvider(prompt = buildRandomPrompt() + applianceHint(cookingMethod, applianceModel))
     }
 
     /** Generiert einen kompletten Tages-Essensplan basierend auf Kalorien-/Makroziel und Präferenzen. */
@@ -123,14 +141,45 @@ class GroqRecipeGeneratorService {
         highVolume: Boolean,
         workoutTiming: WorkoutTiming,
         mustUseIngredients: List<String>,
-        extraNotes: String
+        extraNotes: String,
+        cookingMethod: CookingMethod = CookingMethod.STOVETOP,
+        applianceModel: String = ""
     ): Result<DayPlan> = withContext(Dispatchers.IO) {
         tryDayPlanProvider(
             prompt = buildDayPlanPrompt(
                 targetCalories, targetProtein, targetFiber, includeBreakfast,
                 mealCount, highVolume, workoutTiming, mustUseIngredients, extraNotes
-            )
+            ) + applianceHint(cookingMethod, applianceModel)
         )
+    }
+
+    /**
+     * Schreibt NUR die Zubereitung eines bestehenden Rezepts auf ein anderes Kochgerät um
+     * (z.B. Reis in der Pfanne → Reis im Dampfgarer). Zutaten und Nährwerte bleiben fix,
+     * nur steps/description/prepTimeMinutes werden ans Zielgerät angepasst.
+     */
+    suspend fun adaptRecipeMethod(
+        recipe: GeneratedRecipe,
+        targetMethod: CookingMethod,
+        applianceModel: String = ""
+    ): Result<GeneratedRecipe> = withContext(Dispatchers.IO) {
+        tryProvider(prompt = buildAdaptPrompt(recipe, targetMethod, applianceModel))
+            .map { adapted -> adapted.copy(
+                structuredIngredients = recipe.effectiveIngredients(),
+                ingredients = recipe.ingredients,
+                calories = recipe.calories, protein = recipe.protein,
+                carbs = recipe.carbs, fat = recipe.fat, servings = recipe.servings
+            ) }
+    }
+
+    /** Baut den geräte-spezifischen Zusatzhinweis für den Prompt. Leer für STOVETOP ohne Gerätemodell. */
+    private fun applianceHint(method: CookingMethod, applianceModel: String): String {
+        val modelPart = if (applianceModel.isNotBlank()) " (konkretes Modell: $applianceModel)" else ""
+        return when (method) {
+            CookingMethod.STOVETOP -> "\n\nZubereitung: klassisch auf dem Herd/in der Pfanne."
+            CookingMethod.OVEN -> "\n\nZubereitung: im Backofen$modelPart. Gib in den Schritten konkrete Ofen-Temperatur (°C, Ober-/Unterhitze oder Heissluft) und Backzeit an."
+            CookingMethod.STEAM_OVEN -> "\n\nZubereitung: im Kombi-Dampfgarer$modelPart. Wähle ein passendes Programm (z.B. Dampfgaren, Heissluft mit Beschwaden, Zartgaren mit Dampf, Profi-Backen) und gib in den Schritten Programmname, Temperatur (°C) und Garzeit an."
+        }
     }
 
     private fun buildPrompt(userInput: String): String {
@@ -362,6 +411,33 @@ Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
 }
 
 Das "timing"-Feld nur bei Pre-/Post-Workout-Mahlzeiten befüllen ("Pre-Workout" / "Post-Workout"), sonst leeren String lassen.
+""".trimIndent()
+    }
+
+    private fun buildAdaptPrompt(recipe: GeneratedRecipe, targetMethod: CookingMethod, applianceModel: String): String {
+        val ingredientsList = recipe.effectiveIngredients().joinToString("\n") { "- ${it.amount} ${it.name}" }
+        val stepsList = recipe.steps.joinToString("\n") { "- $it" }
+        val modelPart = if (applianceModel.isNotBlank()) " (konkretes Modell: $applianceModel)" else ""
+        val methodInstruction = when (targetMethod) {
+            CookingMethod.STOVETOP -> "auf dem Herd/in der Pfanne"
+            CookingMethod.OVEN -> "im Backofen$modelPart, mit konkreter Temperatur (°C) und Backzeit"
+            CookingMethod.STEAM_OVEN -> "im Kombi-Dampfgarer$modelPart, mit passendem Programm (z.B. Dampfgaren, Heissluft mit Beschwaden, Zartgaren mit Dampf, Profi-Backen), Temperatur (°C) und Garzeit"
+        }
+        return """
+Du bist ein erfahrener Koch. Hier ist ein bestehendes Rezept:
+
+Titel: ${recipe.title}
+Zutaten:
+$ingredientsList
+
+Bisherige Zubereitung:
+$stepsList
+
+Schreibe NUR die Zubereitungsschritte so um, dass das Gericht $methodInstruction zubereitet wird.
+Zutaten und Mengen bleiben unverändert. Ändere NICHTS an den Nährwerten. Titel und Beschreibung
+darfst du leicht anpassen (z.B. "... aus dem Dampfgarer"), falls sinnvoll.
+
+$JSON_SCHEMA_HINT
 """.trimIndent()
     }
 

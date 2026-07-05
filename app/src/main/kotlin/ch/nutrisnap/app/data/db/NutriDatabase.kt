@@ -19,21 +19,23 @@ data class UserProfileEntity(
     val carbsGoalG: Float = 220f,
     val fatGoalG: Float = 65f,
     val activityFactor: Float = 1.55f,
-    @ColumnInfo(defaultValue = "'UNSPECIFIED'") val sex: String = "UNSPECIFIED"
+    @ColumnInfo(defaultValue = "'UNSPECIFIED'") val sex: String = "UNSPECIFIED",
+    @ColumnInfo(defaultValue = "") val applianceModel: String = ""
 )
 
 fun UserProfileEntity.toDomain() = UserProfile(
     weightKg = weightKg, heightCm = heightCm, ageYears = ageYears,
     dailyCalorieGoal = dailyCalorieGoal, proteinGoalG = proteinGoalG,
     carbsGoalG = carbsGoalG, fatGoalG = fatGoalG, activityFactor = activityFactor,
-    sex = runCatching { Sex.valueOf(sex) }.getOrDefault(Sex.UNSPECIFIED)
+    sex = runCatching { Sex.valueOf(sex) }.getOrDefault(Sex.UNSPECIFIED),
+    applianceModel = applianceModel
 )
 
 fun UserProfile.toEntity() = UserProfileEntity(
     weightKg = weightKg, heightCm = heightCm, ageYears = ageYears,
     dailyCalorieGoal = dailyCalorieGoal, proteinGoalG = proteinGoalG,
     carbsGoalG = carbsGoalG, fatGoalG = fatGoalG, activityFactor = activityFactor,
-    sex = sex.name
+    sex = sex.name, applianceModel = applianceModel
 )
 
 @Dao
@@ -62,7 +64,7 @@ interface UserProfileDao {
         MealTemplateItem::class,
         GeneratedRecipeEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -212,6 +214,14 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // Phase 5: Geräteprofil (Backofen/Kombi-Dampfgarer-Modell) fürs Rezept-Feature -
+        // Grundlage, um Rezepte/Backprogramme direkt aufs vorhandene Gerät zuzuschneiden.
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE user_profile ADD COLUMN applianceModel TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -222,7 +232,7 @@ abstract class NutriDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
                         MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
-                        MIGRATION_8_9, MIGRATION_9_10
+                        MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11
                     )
                     .build()
                     .also { INSTANCE = it }

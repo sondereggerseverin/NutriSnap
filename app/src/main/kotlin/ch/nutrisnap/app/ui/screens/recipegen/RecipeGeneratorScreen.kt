@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.GeneratedRecipeEntity
 import ch.nutrisnap.app.data.model.MealType
+import ch.nutrisnap.app.domain.CookingMethod
 import ch.nutrisnap.app.domain.DayPlan
 import ch.nutrisnap.app.domain.GeneratedRecipe
 import ch.nutrisnap.app.domain.PlannedMeal
@@ -111,6 +112,13 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
                             )
                         }
                     }
+                    Spacer(Modifier.height(12.dp))
+
+                    CookingMethodSelector(
+                        selected = state.cookingMethod,
+                        applianceModel = state.applianceModel,
+                        onSelect = { vm.setCookingMethod(it) }
+                    )
                     Spacer(Modifier.height(12.dp))
 
                     when (state.mode) {
@@ -205,7 +213,11 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
                         onSaveAsRecipe = { vm.saveAsRecipe() },
                         onUpdate = { vm.updateRecipe(it) },
                         onRemoveIngredient = { vm.removeIngredient(it) },
-                        onUpdateIngredient = { i, ing -> vm.updateIngredient(i, ing) }
+                        onUpdateIngredient = { i, ing -> vm.updateIngredient(i, ing) },
+                        cookingMethod = state.cookingMethod,
+                        applianceModel = state.applianceModel,
+                        isAdaptingMethod = state.isAdaptingMethod,
+                        onAdaptToMethod = { vm.adaptCurrentRecipeToMethod(it) }
                     )
                 }
             }
@@ -684,6 +696,61 @@ private fun RowScope.GenerateButtonContent(isLoading: Boolean, loadingText: Stri
     }
 }
 
+// ── Kochgerät-Auswahl ────────────────────────────────────────────────────────
+
+@Composable
+private fun CookingMethodSelector(
+    selected: CookingMethod,
+    applianceModel: String,
+    onSelect: (CookingMethod) -> Unit
+) {
+    Column {
+        Text("Zubereitung", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            CookingMethod.entries.forEach { method ->
+                FilterChip(
+                    selected = selected == method,
+                    onClick = { onSelect(method) },
+                    label = { Text(method.label, fontSize = 12.sp) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+        if (selected != CookingMethod.STOVETOP && applianceModel.isBlank()) {
+            Text("Tipp: Gerätemodell in den Einstellungen hinterlegen für exakte Programme.",
+                fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp))
+        }
+    }
+}
+
+/** Bietet an, das bereits generierte Rezept auf ein anderes Kochgerät umzuschreiben. */
+@Composable
+private fun RecipeMethodAdaptRow(
+    current: CookingMethod,
+    applianceModel: String,
+    isAdapting: Boolean,
+    onAdapt: (CookingMethod) -> Unit
+) {
+    Column {
+        Text("Zubereitung für: ${current.label}", fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            CookingMethod.entries.filter { it != current }.forEach { target ->
+                OutlinedButton(onClick = { onAdapt(target) }, enabled = !isAdapting) {
+                    if (isAdapting) {
+                        CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("→ ${target.label}", fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
 // ── Rezept-Karte ───────────────────────────────────────────────────────────────
 
 @Composable
@@ -694,7 +761,11 @@ private fun RecipeResultCard(
     onSaveAsRecipe: () -> Unit,
     onUpdate: (GeneratedRecipe) -> Unit,
     onRemoveIngredient: (Int) -> Unit,
-    onUpdateIngredient: (Int, RecipeIngredient) -> Unit
+    onUpdateIngredient: (Int, RecipeIngredient) -> Unit,
+    cookingMethod: CookingMethod = CookingMethod.STOVETOP,
+    applianceModel: String = "",
+    isAdaptingMethod: Boolean = false,
+    onAdaptToMethod: (CookingMethod) -> Unit = {}
 ) {
     var checkedIngredients by remember(recipe) { mutableStateOf(setOf<Int>()) }
     var isEditing by remember { mutableStateOf(false) }
@@ -746,6 +817,16 @@ private fun RecipeResultCard(
                 }
             }
             Spacer(Modifier.height(8.dp))
+
+            if (!isEditing) {
+                RecipeMethodAdaptRow(
+                    current = cookingMethod,
+                    applianceModel = applianceModel,
+                    isAdapting = isAdaptingMethod,
+                    onAdapt = onAdaptToMethod
+                )
+                Spacer(Modifier.height(8.dp))
+            }
 
             if (isEditing) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

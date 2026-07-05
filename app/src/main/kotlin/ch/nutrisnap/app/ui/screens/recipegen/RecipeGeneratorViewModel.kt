@@ -12,6 +12,7 @@ import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.repository.DiaryRepository
 import ch.nutrisnap.app.data.repository.RecipeRepository
 import ch.nutrisnap.app.data.repository.UserProfileRepository
+import ch.nutrisnap.app.domain.CookingMethod
 import ch.nutrisnap.app.domain.DayPlan
 import ch.nutrisnap.app.domain.GeneratedRecipe
 import ch.nutrisnap.app.domain.GroqRecipeGeneratorService
@@ -69,7 +70,11 @@ data class RecipeGenUiState(
     val isDayPlanLoading: Boolean = false,
     val dayPlanError: String? = null,
     val dayPlanSavedMealIndices: Set<Int> = emptySet(),
-    val dayPlanAllSaved: Boolean = false
+    val dayPlanAllSaved: Boolean = false,
+    // Kochgerät (gilt für alle Modi + Tagesplan)
+    val cookingMethod: CookingMethod = CookingMethod.STOVETOP,
+    val applianceModel: String = "",
+    val isAdaptingMethod: Boolean = false
 )
 
 class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
@@ -91,6 +96,12 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             dao.getHistory().collect { history ->
                 _state.update { it.copy(history = history) }
+            }
+        }
+        // Geräteprofil aus den Settings laden, damit Ofen-/Dampfgarer-Rezepte aufs echte Gerät passen.
+        viewModelScope.launch {
+            profileRepo.get().collect { profile ->
+                _state.update { it.copy(applianceModel = profile.applianceModel) }
             }
         }
         // Hält das Fill-Up-Budget (übrige Tages-Makros) live aktuell.
@@ -119,11 +130,27 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setMode(mode: RecipeGenMode) = _state.update { it.copy(mode = mode) }
 
+    fun setCookingMethod(method: CookingMethod) = _state.update { it.copy(cookingMethod = method) }
+
+    /** Passt die Zubereitung des aktuell offenen Rezepts an ein anderes Kochgerät an (Zutaten/Makros bleiben fix). */
+    fun adaptCurrentRecipeToMethod(method: CookingMethod) {
+        val current = _state.value.recipe ?: return
+        val applianceModel = _state.value.applianceModel
+        viewModelScope.launch {
+            _state.update { it.copy(isAdaptingMethod = true, error = null) }
+            service.adaptRecipeMethod(current, method, applianceModel).fold(
+                onSuccess = { adapted -> updateRecipe(adapted); _state.update { it.copy(isAdaptingMethod = false, cookingMethod = method) } },
+                onFailure = { e -> _state.update { it.copy(isAdaptingMethod = false, error = e.message ?: "Anpassung fehlgeschlagen") } }
+            )
+        }
+    }
+
     fun generate(userInput: String) {
         if (userInput.isBlank()) return
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null, recipe = null, openHistoryId = null, savedToDiary = false, savedAsRecipe = false) }
-            service.generateRecipe(userInput).fold(
+            val s = _state.value
+            service.generateRecipe(userInput, s.cookingMethod, s.applianceModel).fold(
                 onSuccess = { recipe ->
                     val newId = dao.insert(recipe.toEntity())
                     _state.update { it.copy(isLoading = false, recipe = recipe, openHistoryId = newId.toInt()) }
@@ -179,7 +206,8 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
         if (ingredients.isEmpty()) return
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null, recipe = null, openHistoryId = null, savedToDiary = false, savedAsRecipe = false) }
-            service.generateFromIngredients(ingredients, note).fold(
+            val s = _state.value
+            service.generateFromIngredients(ingredients, note, s.cookingMethod, s.applianceModel).fold(
                 onSuccess = { recipe ->
                     val newId = dao.insert(recipe.toEntity())
                     _state.update { it.copy(isLoading = false, recipe = recipe, openHistoryId = newId.toInt()) }
@@ -198,7 +226,8 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
         val budget = _state.value.fillUpBudget
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null, recipe = null, openHistoryId = null, savedToDiary = false, savedAsRecipe = false) }
-            service.generateFillUp(budget.calories, budget.protein, budget.carbs, budget.fat, mealLabel).fold(
+            val s = _state.value
+            service.generateFillUp(budget.calories, budget.protein, budget.carbs, budget.fat, mealLabel, s.cookingMethod, s.applianceModel).fold(
                 onSuccess = { recipe ->
                     val newId = dao.insert(recipe.toEntity())
                     _state.update { it.copy(isLoading = false, recipe = recipe, openHistoryId = newId.toInt()) }
@@ -257,7 +286,9 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
                 highVolume = s.dayPlanHighVolume,
                 workoutTiming = s.dayPlanWorkoutTiming,
                 mustUseIngredients = ingredients,
-                extraNotes = s.dayPlanExtraNotes
+                extraNotes = s.dayPlanExtraNotes,
+                cookingMethod = s.cookingMethod,
+                applianceModel = s.applianceModel
             ).fold(
                 onSuccess = { plan -> _state.update { it.copy(isDayPlanLoading = false, dayPlan = plan) } },
                 onFailure = { e -> _state.update { it.copy(isDayPlanLoading = false, dayPlanError = e.message ?: "Unbekannter Fehler") } }
@@ -318,7 +349,8 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
     fun generateRandomRecipe() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null, recipe = null, openHistoryId = null, savedToDiary = false, savedAsRecipe = false) }
-            service.generateRandom().fold(
+            val s = _state.value
+            service.generateRandom(s.cookingMethod, s.applianceModel).fold(
                 onSuccess = { recipe ->
                     val newId = dao.insert(recipe.toEntity())
                     _state.update { it.copy(isLoading = false, recipe = recipe, openHistoryId = newId.toInt()) }

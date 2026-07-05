@@ -25,7 +25,9 @@ data class UserProfile(
     val heightCm:         Int   = 0,
     val ageYears:         Int   = 0,
     val activityFactor:   Float = 1.55f,
-    val sex:              Sex   = Sex.UNSPECIFIED
+    val sex:              Sex   = Sex.UNSPECIFIED,
+    /** Modell des Backofens/Kombi-Dampfgarers (z.B. "V-ZUG Combi-Steam SL CSTSLc"), leer = keins hinterlegt. */
+    val applianceModel:   String = ""
 ) {
     /**
      * Mifflin-St-Jeor. Der Geschlechts-Term macht bis zu ~166 kcal Unterschied
