@@ -48,7 +48,8 @@ enum class WorkoutTiming { NONE, PRE, POST, BOTH }
 enum class CookingMethod(val label: String) {
     STOVETOP("Pfanne/Herd"),
     OVEN("Backofen"),
-    STEAM_OVEN("Dampfgarer/Kombi-Dampfgarer")
+    STEAM_OVEN("Dampfgarer/Kombi-Dampfgarer"),
+    SMART("Smart-Mix")
 }
 
 @Serializable
@@ -179,6 +180,22 @@ class GroqRecipeGeneratorService {
             CookingMethod.STOVETOP -> "\n\nZubereitung: klassisch auf dem Herd/in der Pfanne."
             CookingMethod.OVEN -> "\n\nZubereitung: im Backofen$modelPart. Gib in den Schritten konkrete Ofen-Temperatur (°C, Ober-/Unterhitze oder Heissluft) und Backzeit an."
             CookingMethod.STEAM_OVEN -> "\n\nZubereitung: im Kombi-Dampfgarer$modelPart. Wähle ein passendes Programm (z.B. Dampfgaren, Heissluft mit Beschwaden, Zartgaren mit Dampf, Profi-Backen) und gib in den Schritten Programmname, Temperatur (°C) und Garzeit an."
+            CookingMethod.SMART -> """
+
+Zubereitung: Wähle für JEDE Komponente des Gerichts (z.B. Protein, Beilage, Gemüse) einzeln
+das am besten geeignete Gerät aus - Pfanne/Herd, Backofen oder Kombi-Dampfgarer$modelPart.
+Nutze NICHT zwangsläufig nur ein Gerät für alles. Wenn es Zeit spart oder das Ergebnis
+verbessert, verteile die Komponenten auf mehrere Geräte, die PARALLEL laufen (z.B. Fleisch
+scharf in der Pfanne anbraten, während die Beilage gleichzeitig im Ofen/Dampfgarer gart) -
+zeitlich unabhängige Schritte sollen nicht unnötig nacheinander im selben Gerät passieren.
+Beginne JEDEN Zubereitungsschritt mit dem gewählten Gerät in Klammern plus einer sehr kurzen
+Begründung (3-6 Wörter), damit der Nutzer die Wahl auf einen Blick nachvollziehen und bei
+Bedarf abweichen kann, z.B.:
+"(Pfanne – bräunt schön knusprig) Hähnchenbrust bei starker Hitze anbraten..."
+"(Dampfgarer – bleibt saftig & schonend) Süsskartoffeln 20 Min. bei 100°C dampfgaren..."
+Wenn zwei Schritte auf unterschiedlichen Geräten zeitlich parallel laufen sollen, mach das
+in den Schritten explizit klar (z.B. "gleichzeitig", "während Schritt 1 läuft").
+"""
         }
     }
 
@@ -422,6 +439,10 @@ Das "timing"-Feld nur bei Pre-/Post-Workout-Mahlzeiten befüllen ("Pre-Workout" 
             CookingMethod.STOVETOP -> "auf dem Herd/in der Pfanne"
             CookingMethod.OVEN -> "im Backofen$modelPart, mit konkreter Temperatur (°C) und Backzeit"
             CookingMethod.STEAM_OVEN -> "im Kombi-Dampfgarer$modelPart, mit passendem Programm (z.B. Dampfgaren, Heissluft mit Beschwaden, Zartgaren mit Dampf, Profi-Backen), Temperatur (°C) und Garzeit"
+            CookingMethod.SMART -> "mit dem für JEDE Komponente einzeln am besten geeigneten Gerät " +
+                "(Pfanne/Herd, Backofen oder Kombi-Dampfgarer$modelPart) - nutze wo sinnvoll mehrere Geräte " +
+                "PARALLEL statt alles nacheinander in einem Gerät. Beginne jeden Schritt mit dem gewählten " +
+                "Gerät in Klammern plus 3-6 Wörter Begründung, z.B. \"(Pfanne – bräunt schön knusprig) ...\""
         }
         return """
 Du bist ein erfahrener Koch. Hier ist ein bestehendes Rezept:
