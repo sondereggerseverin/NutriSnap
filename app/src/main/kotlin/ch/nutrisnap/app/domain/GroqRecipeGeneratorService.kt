@@ -173,17 +173,39 @@ class GroqRecipeGeneratorService {
             ) }
     }
 
+    /**
+     * Echte Betriebsarten eines V-ZUG Combi-Steam(-artigen) Kombi-Dampfgarers, recherchiert aus
+     * der offiziellen Bedienungsanleitung - NICHT die Dutzenden fest gespeicherten Werksrezepte
+     * (R-/G-Nummern), die an fixe Fertiggerichte gebunden sind und für frei generierte Rezepte
+     * nicht sinnvoll auswählbar wären.
+     */
+    private val STEAM_OVEN_MODES = """
+- Dämpfen (30-100°C, meist 100°C): Gemüse, Reis/Getreide, Hülsenfrüchte, Eierspeisen, Pochieren von Fleisch/Geflügel/Fisch
+- Regenerieren (100-150°C, meist 120°C): Aufwärmen von bereits gegarten Speisen
+- Profi-Backen (100-230°C, meist 210°C): Brot/Gebäck mit glänzender Kruste
+- Heissluft / Heissluft feucht / Heissluft + Beschwaden (je 30-230°C, meist 180°C): Kuchen, Braten, Gratin, Auflauf
+- Zartgaren: angebratenes Fleisch bei niedriger Temperatur schonend bis zur Kerntemperatur weitergaren (kein fixer Zeitwert, sondern bis Zieltemperatur erreicht ist)
+- GarAutomatik (A1-A14, je nach Lebensmittelgruppe, Bräunungsgrad schwach/mittel/stark wählbar): erkennt Menge/Form selbst, für Alltagsrezepte
+""".trimIndent()
+
     /** Baut den geräte-spezifischen Zusatzhinweis für den Prompt. Leer für STOVETOP ohne Gerätemodell. */
     private fun applianceHint(method: CookingMethod, applianceModel: String): String {
         val modelPart = if (applianceModel.isNotBlank()) " (konkretes Modell: $applianceModel)" else ""
         return when (method) {
             CookingMethod.STOVETOP -> "\n\nZubereitung: klassisch auf dem Herd/in der Pfanne."
             CookingMethod.OVEN -> "\n\nZubereitung: im Backofen$modelPart. Gib in den Schritten konkrete Ofen-Temperatur (°C, Ober-/Unterhitze oder Heissluft) und Backzeit an."
-            CookingMethod.STEAM_OVEN -> "\n\nZubereitung: im Kombi-Dampfgarer$modelPart. Wähle ein passendes Programm (z.B. Dampfgaren, Heissluft mit Beschwaden, Zartgaren mit Dampf, Profi-Backen) und gib in den Schritten Programmname, Temperatur (°C) und Garzeit an."
+            CookingMethod.STEAM_OVEN -> """
+
+Zubereitung: im Kombi-Dampfgarer$modelPart. Wähle eine dieser ECHTEN Betriebsarten (keine erfundenen Programmnamen):
+$STEAM_OVEN_MODES
+Gib in den Schritten den genauen Betriebsart-Namen, Temperatur (°C) und Garzeit an (bei Zartgaren die Ziel-Kerntemperatur statt fixer Zeit).
+"""
             CookingMethod.SMART -> """
 
 Zubereitung: Wähle für JEDE Komponente des Gerichts (z.B. Protein, Beilage, Gemüse) einzeln
 das am besten geeignete Gerät aus - Pfanne/Herd, Backofen oder Kombi-Dampfgarer$modelPart.
+Falls Kombi-Dampfgarer gewählt wird, nur diese ECHTEN Betriebsarten verwenden (keine erfundenen Programmnamen):
+$STEAM_OVEN_MODES
 Nutze NICHT zwangsläufig nur ein Gerät für alles. Wenn es Zeit spart oder das Ergebnis
 verbessert, verteile die Komponenten auf mehrere Geräte, die PARALLEL laufen (z.B. Fleisch
 scharf in der Pfanne anbraten, während die Beilage gleichzeitig im Ofen/Dampfgarer gart) -
@@ -192,7 +214,7 @@ Beginne JEDEN Zubereitungsschritt mit dem gewählten Gerät in Klammern plus ein
 Begründung (3-6 Wörter), damit der Nutzer die Wahl auf einen Blick nachvollziehen und bei
 Bedarf abweichen kann, z.B.:
 "(Pfanne – bräunt schön knusprig) Hähnchenbrust bei starker Hitze anbraten..."
-"(Dampfgarer – bleibt saftig & schonend) Süsskartoffeln 20 Min. bei 100°C dampfgaren..."
+"(Dämpfen, 100°C – bleibt saftig & schonend) Süsskartoffeln 20 Min. dampfgaren..."
 Wenn zwei Schritte auf unterschiedlichen Geräten zeitlich parallel laufen sollen, mach das
 in den Schritten explizit klar (z.B. "gleichzeitig", "während Schritt 1 läuft").
 """
@@ -438,9 +460,12 @@ Das "timing"-Feld nur bei Pre-/Post-Workout-Mahlzeiten befüllen ("Pre-Workout" 
         val methodInstruction = when (targetMethod) {
             CookingMethod.STOVETOP -> "auf dem Herd/in der Pfanne"
             CookingMethod.OVEN -> "im Backofen$modelPart, mit konkreter Temperatur (°C) und Backzeit"
-            CookingMethod.STEAM_OVEN -> "im Kombi-Dampfgarer$modelPart, mit passendem Programm (z.B. Dampfgaren, Heissluft mit Beschwaden, Zartgaren mit Dampf, Profi-Backen), Temperatur (°C) und Garzeit"
+            CookingMethod.STEAM_OVEN -> "im Kombi-Dampfgarer$modelPart, mit einer dieser ECHTEN Betriebsarten " +
+                "(keine erfundenen Programmnamen):\n$STEAM_OVEN_MODES\nGib genauen Betriebsart-Namen, Temperatur " +
+                "(°C) und Garzeit an (bei Zartgaren die Ziel-Kerntemperatur statt fixer Zeit)"
             CookingMethod.SMART -> "mit dem für JEDE Komponente einzeln am besten geeigneten Gerät " +
-                "(Pfanne/Herd, Backofen oder Kombi-Dampfgarer$modelPart) - nutze wo sinnvoll mehrere Geräte " +
+                "(Pfanne/Herd, Backofen oder Kombi-Dampfgarer$modelPart - falls Dampfgarer, nur diese ECHTEN " +
+                "Betriebsarten: $STEAM_OVEN_MODES) - nutze wo sinnvoll mehrere Geräte " +
                 "PARALLEL statt alles nacheinander in einem Gerät. Beginne jeden Schritt mit dem gewählten " +
                 "Gerät in Klammern plus 3-6 Wörter Begründung, z.B. \"(Pfanne – bräunt schön knusprig) ...\""
         }
