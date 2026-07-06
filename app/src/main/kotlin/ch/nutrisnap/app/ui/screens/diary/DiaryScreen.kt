@@ -29,9 +29,13 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 @Composable
-fun DiaryScreen(vm: DiaryViewModel = viewModel()) {
+fun DiaryScreen(
+    vm: DiaryViewModel = viewModel(),
+    initialMeal: MealType? = null,
+    autoOpenAdd: Boolean = false
+) {
     val state by vm.uiState.collectAsState()
-    var showAddSheet by remember { mutableStateOf(false) }
+    var showAddSheet by remember { mutableStateOf(autoOpenAdd) }
     var editEntry    by remember { mutableStateOf<DiaryEntry?>(null) }
 
     Scaffold(
@@ -82,7 +86,7 @@ fun DiaryScreen(vm: DiaryViewModel = viewModel()) {
         }
     }
 
-    if (showAddSheet) AddFoodSheet(vm = vm, onDismiss = { showAddSheet = false })
+    if (showAddSheet) AddFoodSheet(vm = vm, initialMeal = initialMeal, onDismiss = { showAddSheet = false })
 
     editEntry?.let { entry ->
         EditEntryDialog(
@@ -241,7 +245,7 @@ enum class AddFoodTab { SEARCH, MANUAL }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
+fun AddFoodSheet(vm: DiaryViewModel, initialMeal: MealType? = null, onDismiss: () -> Unit) {
     var activeTab    by remember { mutableStateOf(AddFoodTab.SEARCH) }
     var showScanner  by remember { mutableStateOf(false) }
     var barcodeStatus by remember { mutableStateOf("") }
@@ -293,11 +297,13 @@ fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
             when (activeTab) {
                 AddFoodTab.SEARCH -> SearchTab(
                     vm = vm,
+                    initialMeal = initialMeal,
                     barcodeStatus = barcodeStatus,
                     onOpenScanner = { showScanner = true },
                     onDismiss = onDismiss
                 )
                 AddFoodTab.MANUAL -> ManualEntryTab(
+                    initialMeal = initialMeal,
                     onSave = { name, kcal, protein, carbs, fat, meal ->
                         vm.addManualEntry(name, kcal, protein, carbs, fat, meal)
                         onDismiss()
@@ -315,6 +321,7 @@ fun AddFoodSheet(vm: DiaryViewModel, onDismiss: () -> Unit) {
 @Composable
 private fun SearchTab(
     vm: DiaryViewModel,
+    initialMeal: MealType? = null,
     barcodeStatus: String,
     onOpenScanner: () -> Unit,
     onDismiss: () -> Unit
@@ -322,7 +329,7 @@ private fun SearchTab(
     var query        by remember { mutableStateOf("") }
     var selectedFood by remember { mutableStateOf<FoodItem?>(null) }
     var amountText   by remember { mutableStateOf("100") }
-    var selectedMeal by remember { mutableStateOf(MealType.LUNCH) }
+    var selectedMeal by remember { mutableStateOf(initialMeal ?: MealType.LUNCH) }
 
     val results   by vm.searchResults.collectAsState()
     val searching by vm.isSearching.collectAsState()
@@ -461,6 +468,7 @@ private fun SearchTab(
 
 @Composable
 private fun ManualEntryTab(
+    initialMeal: MealType? = null,
     onSave: (name: String, kcal: Float, protein: Float, carbs: Float, fat: Float, meal: MealType) -> Unit
 ) {
     var name         by remember { mutableStateOf("") }
@@ -468,7 +476,7 @@ private fun ManualEntryTab(
     var proteinText  by remember { mutableStateOf("") }
     var carbsText    by remember { mutableStateOf("") }
     var fatText      by remember { mutableStateOf("") }
-    var selectedMeal by remember { mutableStateOf(MealType.LUNCH) }
+    var selectedMeal by remember { mutableStateOf(initialMeal ?: MealType.LUNCH) }
 
     val kcal    = kcalText.toFloatOrNull() ?: 0f
     val protein = proteinText.toFloatOrNull() ?: 0f

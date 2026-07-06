@@ -18,10 +18,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.health.HealthConnectManager
 import ch.nutrisnap.app.service.NotificationHelper
 import ch.nutrisnap.app.service.NotificationScheduler
@@ -37,8 +40,7 @@ import ch.nutrisnap.app.ui.screens.fasting.FastingScreen
 import ch.nutrisnap.app.ui.screens.fasting.FastingViewModel
 import ch.nutrisnap.app.ui.screens.home.HomeScreen
 import ch.nutrisnap.app.ui.screens.mealtemplate.MealTemplateScreen
-import ch.nutrisnap.app.ui.screens.recipegen.RecipeGeneratorScreen
-import ch.nutrisnap.app.ui.screens.recipes.RecipesScreen
+import ch.nutrisnap.app.ui.screens.recipes.RecipesHubScreen
 import ch.nutrisnap.app.ui.screens.scan.FoodScanScreen
 import ch.nutrisnap.app.ui.screens.scan.NutritionLabelScanScreen
 import ch.nutrisnap.app.ui.screens.security.BiometricLockScreen
@@ -61,14 +63,14 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Home      : Screen("home",       "Start",    Icons.Default.Home)
     object Diary     : Screen("diary",      "Tagebuch", Icons.Default.MenuBook)
     object Recipes   : Screen("recipes",    "Rezepte",  Icons.Default.RestaurantMenu)
-    object AiRecipes : Screen("ai_recipes", "KI-Koch",  Icons.Default.AutoAwesome)
     object Analysis  : Screen("analysis",   "Analyse",  Icons.Default.BarChart)
     object Settings  : Screen("settings",   "Mehr",     Icons.Default.Settings)
 }
 
+// "KI-Koch" ist als zweiter Tab in RecipesHubScreen (Screen.Recipes) untergebracht,
+// dadurch nur noch 5 statt 6 Bottom-Nav-Items (Material-Empfehlung: max. 5).
 val bottomNavItems = listOf(
-    Screen.Home, Screen.Diary, Screen.Recipes,
-    Screen.AiRecipes, Screen.Analysis, Screen.Settings
+    Screen.Home, Screen.Diary, Screen.Recipes, Screen.Analysis, Screen.Settings
 )
 
 class MainActivity : ComponentActivity() {
@@ -217,7 +219,10 @@ fun MainScaffold(
         NavigationBar {
             bottomNavItems.forEach { screen ->
                 NavigationBarItem(
-                    selected = currentRoute == screen.route,
+                    // "diary" hat optionale Query-Argumente (?meal=...&open=...), daher reicht ein
+                    // Prefix-Vergleich statt exakter Gleichheit, sonst bleibt der Tab unselektiert.
+                    selected = currentRoute == screen.route ||
+                        currentRoute?.startsWith("${screen.route}?") == true,
                     onClick = {
                         navController.navigate(screen.route) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
@@ -238,18 +243,37 @@ fun MainScaffold(
             composable(Screen.Home.route) {
                 HomeScreen(
                     hcVm = hcVm,
-                    onNavigateToDiary = {
-                        navController.navigate(Screen.Diary.route) {
+                    onNavigateToDiary = { meal ->
+                        val route = if (meal != null) "diary?meal=${meal.name}&open=true" else "diary?open=true"
+                        navController.navigate(route) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true; restoreState = true
                         }
                     },
-                    onNavigateToHealth = { navController.navigate("health") }
+                    onNavigateToHealth = { navController.navigate("health") },
+                    onNavigateToWater = { navController.navigate("water") },
+                    onNavigateToFasting = { navController.navigate("fasting") },
+                    onNavigateToFoodScan = { navController.navigate("food_scan") },
+                    onNavigateToRecipeImport = {
+                        navController.navigate(Screen.Recipes.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true; restoreState = true
+                        }
+                    }
                 )
             }
-            composable(Screen.Diary.route)     { DiaryScreen() }
-            composable(Screen.Recipes.route)   { RecipesScreen(sharedUrl = sharedUrl) }
-            composable(Screen.AiRecipes.route) { RecipeGeneratorScreen() }
+            composable(
+                route = "diary?meal={meal}&open={open}",
+                arguments = listOf(
+                    navArgument("meal") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("open") { type = NavType.BoolType; defaultValue = false }
+                )
+            ) { backStackEntry ->
+                val mealArg = backStackEntry.arguments?.getString("meal")?.let { runCatching { MealType.valueOf(it) }.getOrNull() }
+                val openArg = backStackEntry.arguments?.getBoolean("open") ?: false
+                DiaryScreen(initialMeal = mealArg, autoOpenAdd = openArg)
+            }
+            composable(Screen.Recipes.route)   { RecipesHubScreen(sharedUrl = sharedUrl) }
             composable(Screen.Analysis.route)  { AnalysisScreen() }
             composable(Screen.Settings.route) {
                 SettingsScreen(

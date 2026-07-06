@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.HealthConnectCache
+import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.ui.components.MacroRing
 import ch.nutrisnap.app.ui.viewmodel.HealthConnectViewModel
 
@@ -27,21 +28,39 @@ import ch.nutrisnap.app.ui.viewmodel.HealthConnectViewModel
 fun HomeScreen(
     vm: HomeViewModel = viewModel(),
     hcVm: HealthConnectViewModel = viewModel(),
-    onNavigateToDiary: () -> Unit = {},
-    onNavigateToHealth: () -> Unit = {}
+    onNavigateToDiary: (MealType?) -> Unit = {},
+    onNavigateToHealth: () -> Unit = {},
+    onNavigateToWater: () -> Unit = {},
+    onNavigateToFasting: () -> Unit = {},
+    onNavigateToFoodScan: () -> Unit = {},
+    onNavigateToRecipeImport: () -> Unit = {}
 ) {
     val state by vm.uiState.collectAsState()
     val hcState by hcVm.uiState.collectAsState()
     var showWeightDialog by remember { mutableStateOf(false) }
+    var showQuickAdd by remember { mutableStateOf(false) }
 
-    LazyColumnHome(
-        state = state,
-        todayHc = hcState.todayData,
-        hasHcPermission = hcState.hasPermission,
-        onMealClick = { onNavigateToDiary() },
-        onLogWeight = { showWeightDialog = true },
-        onOpenHealth = onNavigateToHealth
-    )
+    Box(Modifier.fillMaxSize()) {
+        LazyColumnHome(
+            state = state,
+            todayHc = hcState.todayData,
+            hasHcPermission = hcState.hasPermission,
+            onMealClick = { meal -> onNavigateToDiary(meal) },
+            onLogWeight = { showWeightDialog = true },
+            onOpenHealth = onNavigateToHealth
+        )
+
+        QuickAddFab(
+            expanded = showQuickAdd,
+            onToggle = { showQuickAdd = !showQuickAdd },
+            onAddFood = { showQuickAdd = false; onNavigateToDiary(null) },
+            onScanFood = { showQuickAdd = false; onNavigateToFoodScan() },
+            onLogWater = { showQuickAdd = false; onNavigateToWater() },
+            onStartFasting = { showQuickAdd = false; onNavigateToFasting() },
+            onImportRecipe = { showQuickAdd = false; onNavigateToRecipeImport() },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+        )
+    }
 
     if (showWeightDialog) {
         WeightEntryDialog(
@@ -52,12 +71,60 @@ fun HomeScreen(
     }
 }
 
+// ── Quick-add speed-dial FAB ───────────────────────────────────────────────────
+// Bündelt die häufigsten Aktionen (Essen loggen, scannen, Wasser, Fasten,
+// Rezept-Import) direkt auf dem Home-Screen, statt sie unter "Mehr" zu verstecken.
+
+@Composable
+private fun QuickAddFab(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onAddFood: () -> Unit,
+    onScanFood: () -> Unit,
+    onLogWater: () -> Unit,
+    onStartFasting: () -> Unit,
+    onImportRecipe: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier, horizontalAlignment = Alignment.End) {
+        if (expanded) {
+            QuickAddAction("Rezept importieren", Icons.Default.Link, onImportRecipe)
+            Spacer(Modifier.height(8.dp))
+            QuickAddAction("Fasten starten", Icons.Default.Timer, onStartFasting)
+            Spacer(Modifier.height(8.dp))
+            QuickAddAction("Wasser eintragen", Icons.Default.WaterDrop, onLogWater)
+            Spacer(Modifier.height(8.dp))
+            QuickAddAction("Essen scannen", Icons.Default.PhotoCamera, onScanFood)
+            Spacer(Modifier.height(8.dp))
+            QuickAddAction("Essen hinzufügen", Icons.Default.Restaurant, onAddFood)
+            Spacer(Modifier.height(12.dp))
+        }
+        FloatingActionButton(onClick = onToggle) {
+            Icon(if (expanded) Icons.Default.Close else Icons.Default.Add, "Schnellaktionen")
+        }
+    }
+}
+
+@Composable
+private fun QuickAddAction(label: String, icon: ImageVector, onClick: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Card(
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Text(label, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+        }
+        Spacer(Modifier.width(8.dp))
+        SmallFloatingActionButton(onClick = onClick) { Icon(icon, label) }
+    }
+}
+
 @Composable
 private fun LazyColumnHome(
     state: HomeUiState,
     todayHc: HealthConnectCache?,
     hasHcPermission: Boolean,
-    onMealClick: () -> Unit,
+    onMealClick: (MealType) -> Unit,
     onLogWeight: () -> Unit,
     onOpenHealth: () -> Unit
 ) {
@@ -271,13 +338,13 @@ private fun StreakBadge(streak: Int) {
 // ── Meal overview grid ─────────────────────────────────────────────────────────
 
 @Composable
-private fun MealOverviewGrid(meals: List<MealOverview>, onClick: () -> Unit) {
+private fun MealOverviewGrid(meals: List<MealOverview>, onClick: (MealType) -> Unit) {
     Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
         for (rowMeals in meals.chunked(2)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 rowMeals.forEach { meal ->
                     Card(
-                        modifier = Modifier.weight(1f).clickable(onClick = onClick),
+                        modifier = Modifier.weight(1f).clickable { onClick(meal.type) },
                         shape = RoundedCornerShape(14.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         elevation = CardDefaults.cardElevation(1.dp)
