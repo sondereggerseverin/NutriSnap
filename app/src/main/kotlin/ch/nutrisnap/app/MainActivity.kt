@@ -244,8 +244,8 @@ fun MainScaffold(
             composable(Screen.Home.route) {
                 HomeScreen(
                     hcVm = hcVm,
-                    onNavigateToDiary = { meal ->
-                        val route = if (meal != null) "diary?meal=${meal.name}&open=true" else "diary?open=true"
+                    onNavigateToDiary = { meal, autoOpenAdd ->
+                        val route = if (meal != null) "diary?meal=${meal.name}&open=$autoOpenAdd" else "diary?open=$autoOpenAdd"
                         navController.navigate(route) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true; restoreState = true

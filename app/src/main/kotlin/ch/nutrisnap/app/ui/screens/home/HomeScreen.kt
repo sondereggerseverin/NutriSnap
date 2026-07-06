@@ -29,7 +29,7 @@ import ch.nutrisnap.app.ui.viewmodel.HealthConnectViewModel
 fun HomeScreen(
     vm: HomeViewModel = viewModel(),
     hcVm: HealthConnectViewModel = viewModel(),
-    onNavigateToDiary: (MealType?) -> Unit = {},
+    onNavigateToDiary: (meal: MealType?, autoOpenAdd: Boolean) -> Unit = { _, _ -> },
     onNavigateToHealth: () -> Unit = {},
     onNavigateToWater: () -> Unit = {},
     onNavigateToFasting: () -> Unit = {},
@@ -46,7 +46,7 @@ fun HomeScreen(
             state = state,
             todayHc = hcState.todayData,
             hasHcPermission = hcState.hasPermission,
-            onMealClick = { meal -> onNavigateToDiary(meal) },
+            onMealClick = { meal -> onNavigateToDiary(meal.type, meal.count == 0) },
             onLogWeight = { showWeightDialog = true },
             onOpenHealth = onNavigateToHealth
         )
@@ -54,7 +54,7 @@ fun HomeScreen(
         QuickAddFab(
             expanded = showQuickAdd,
             onToggle = { showQuickAdd = !showQuickAdd },
-            onAddFood = { showQuickAdd = false; onNavigateToDiary(null) },
+            onAddFood = { showQuickAdd = false; onNavigateToDiary(null, true) },
             onScanFood = { showQuickAdd = false; onNavigateToFoodScan() },
             onLogWater = { showQuickAdd = false; onNavigateToWater() },
             onStartFasting = { showQuickAdd = false; onNavigateToFasting() },
@@ -125,7 +125,7 @@ private fun LazyColumnHome(
     state: HomeUiState,
     todayHc: HealthConnectCache?,
     hasHcPermission: Boolean,
-    onMealClick: (MealType) -> Unit,
+    onMealClick: (MealOverview) -> Unit,
     onLogWeight: () -> Unit,
     onOpenHealth: () -> Unit
 ) {
@@ -249,7 +249,7 @@ private fun HomeHeader(state: HomeUiState) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
             Column {
                 Text("${state.greeting} 👋", fontSize = 13.sp, color = Color.White.copy(alpha = 0.85f))
-                Text("Dein Tag im Ueberblick", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Dein Tag im Überblick", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 if (state.isAdaptiveTarget) {
                     Text(
                         "🎯 Adaptives Ziel · ${state.tdeeConfidence}% Konfidenz",
@@ -275,7 +275,7 @@ private fun HomeHeader(state: HomeUiState) {
                         "${state.remaining.toInt()}",
                         fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White
                     )
-                    Text("kcal uebrig", fontSize = 10.sp, color = Color.White.copy(alpha = 0.8f))
+                    Text("kcal übrig", fontSize = 10.sp, color = Color.White.copy(alpha = 0.8f))
                 }
             }
 
@@ -339,13 +339,13 @@ private fun StreakBadge(streak: Int) {
 // ── Meal overview grid ─────────────────────────────────────────────────────────
 
 @Composable
-private fun MealOverviewGrid(meals: List<MealOverview>, onClick: (MealType) -> Unit) {
+private fun MealOverviewGrid(meals: List<MealOverview>, onClick: (MealOverview) -> Unit) {
     Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
         for (rowMeals in meals.chunked(2)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 rowMeals.forEach { meal ->
                     Card(
-                        modifier = Modifier.weight(1f).clickable { onClick(meal.type) },
+                        modifier = Modifier.weight(1f).clickable { onClick(meal) },
                         shape = RoundedCornerShape(14.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         elevation = CardDefaults.cardElevation(1.dp)
@@ -369,7 +369,7 @@ private fun MealOverviewGrid(meals: List<MealOverview>, onClick: (MealType) -> U
                                         else MaterialTheme.colorScheme.outline
                             )
                             Text(
-                                "${meal.count} Eintraege",
+                                "${meal.count} Einträge",
                                 fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
