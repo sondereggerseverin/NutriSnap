@@ -144,6 +144,7 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun deleteEntry(entry: DiaryEntry) = viewModelScope.launch { repo.deleteEntry(entry) }
+    fun restoreEntry(entry: DiaryEntry) = viewModelScope.launch { repo.restoreEntry(entry) }
 
     /** Reihenfolge innerhalb einer Mahlzeit nach Drag-Reorder persistieren. */
     fun reorderEntries(orderedIds: List<Long>) = viewModelScope.launch { repo.updateSortOrder(orderedIds) }

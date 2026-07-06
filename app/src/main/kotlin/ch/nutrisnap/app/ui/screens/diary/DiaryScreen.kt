@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.data.model.favoriteKey
@@ -51,7 +52,11 @@ fun DiaryScreen(
     val mealPrefs by context.notifDataStore.data.collectAsState(initial = null)
     val mealOrder = remember(mealPrefs) { parseMealOrder(mealPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_MEAL_ORDER)) }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddSheet = true },
                 containerColor = MaterialTheme.colorScheme.primary) {
@@ -101,7 +106,17 @@ fun DiaryScreen(
                         ReorderableMealEntries(
                             entries   = mealEntries,
                             onEdit    = { editEntry = it },
-                            onDelete  = { vm.deleteEntry(it) },
+                            onDelete  = { entry ->
+                                vm.deleteEntry(entry)
+                                scope.launch {
+                                    val result = snackbarHostState.showSnackbar(
+                                        message = "\"${entry.foodName}\" gelöscht",
+                                        actionLabel = "Rückgängig",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                    if (result == SnackbarResult.ActionPerformed) vm.restoreEntry(entry)
+                                }
+                            },
                             onReorder = { ids -> vm.reorderEntries(ids) }
                         )
                     }

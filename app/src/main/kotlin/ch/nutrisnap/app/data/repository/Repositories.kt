@@ -134,6 +134,13 @@ class DiaryRepository(db: NutriDatabase) {
         pushSafely { SupabaseSync.deleteDiaryEntry(entry.id) }
     }
 
+    /** Für Undo nach Löschen: legt den Eintrag mit neuer ID erneut an. */
+    suspend fun restoreEntry(entry: DiaryEntry): Long {
+        val id = dao.insert(entry.copy(id = 0))
+        pushSafely { SupabaseSync.upsertDiaryEntry(entry.copy(id = id)) }
+        return id
+    }
+
     suspend fun deleteAllEntries() = dao.deleteAll()
 
     /**
