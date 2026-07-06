@@ -47,6 +47,7 @@ import ch.nutrisnap.app.ui.screens.scan.ScanChooserScreen
 import ch.nutrisnap.app.ui.screens.security.BiometricLockScreen
 import ch.nutrisnap.app.ui.screens.settings.KEY_BIOMETRIC_LOCK
 import ch.nutrisnap.app.ui.screens.settings.NotificationSettingsScreen
+import ch.nutrisnap.app.ui.screens.settings.MealOrderScreen
 import ch.nutrisnap.app.ui.screens.settings.SettingsScreen
 import ch.nutrisnap.app.ui.screens.settings.YazioImportScreen
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
@@ -288,8 +289,12 @@ fun MainScaffold(
                     onNavigateToCustomFoods   = { navController.navigate("custom_foods") },
                     onNavigateToMealTemplates = { navController.navigate("meal_templates") },
                     onNavigateToYazioImport   = { navController.navigate("yazio_import") },
-                    onNavigateToScan          = { navController.navigate("scan_chooser") }
+                    onNavigateToScan          = { navController.navigate("scan_chooser") },
+                    onNavigateToMealOrder     = { navController.navigate("meal_order") }
                 )
+            }
+            composable("meal_order") {
+                MealOrderScreen(onBack = { navController.popBackStack() })
             }
             composable("scan_chooser") {
                 ScanChooserScreen(

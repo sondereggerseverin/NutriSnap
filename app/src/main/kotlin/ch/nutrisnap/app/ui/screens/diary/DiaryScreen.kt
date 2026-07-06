@@ -32,6 +32,7 @@ import ch.nutrisnap.app.ui.components.EmptyState
 import ch.nutrisnap.app.ui.components.MacroBar
 import ch.nutrisnap.app.ui.components.SectionHeader
 import ch.nutrisnap.app.ui.screens.barcode.BarcodeScannerScreen
+import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -46,6 +47,9 @@ fun DiaryScreen(
     val state by vm.uiState.collectAsState()
     var showAddSheet by remember { mutableStateOf(autoOpenAdd || autoOpenScanner) }
     var editEntry    by remember { mutableStateOf<DiaryEntry?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val mealPrefs by context.notifDataStore.data.collectAsState(initial = null)
+    val mealOrder = remember(mealPrefs) { parseMealOrder(mealPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_MEAL_ORDER)) }
 
     Scaffold(
         floatingActionButton = {
@@ -80,7 +84,7 @@ fun DiaryScreen(
                 }
             } else {
                 val grouped = state.entries.groupBy { it.mealType }
-                MealType.values().forEach { meal ->
+                mealOrder.forEach { meal ->
                     val mealEntries = grouped[meal] ?: return@forEach
                     val mealKcal = mealEntries.sumOf { it.calories.toInt() }
                     item {

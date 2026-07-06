@@ -97,6 +97,7 @@ val Coral    = Color(0xFFE07A5F)
 val CoralLight = Color(0xFFF2C4BB)
 
 val KEY_APP_THEME = stringPreferencesKey("app_theme")
+val KEY_MEAL_ORDER = stringPreferencesKey("meal_order") // komma-getrennte MealType-Namen
 
 @Composable
 fun NutriSnapTheme(content: @Composable () -> Unit) {

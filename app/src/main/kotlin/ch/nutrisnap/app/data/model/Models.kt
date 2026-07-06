@@ -25,6 +25,14 @@ data class DiaryEntry(
 
 enum class MealType { BREAKFAST, LUNCH, DINNER, SNACK }
 
+/** Wandelt den gespeicherten "meal_order"-Preference-String in eine vollständige MealType-Reihenfolge um. */
+fun parseMealOrder(stored: String?): List<MealType> {
+    val defaults = MealType.entries
+    if (stored.isNullOrBlank()) return defaults
+    val parsed = stored.split(",").mapNotNull { runCatching { MealType.valueOf(it) }.getOrNull() }
+    return parsed + defaults.filter { it !in parsed }
+}
+
 // ─── Rezept-Tags / Diät-Filter ───────────────────────────────────────────────
 enum class DietTag(val label: String, val emoji: String) {
     VEGAN("Vegan", "🌱"),

@@ -11,6 +11,8 @@ import ch.nutrisnap.app.data.repository.StatsRepository
 import ch.nutrisnap.app.data.repository.UserProfileRepository
 import ch.nutrisnap.app.data.repository.WeightRepository
 import ch.nutrisnap.app.domain.AdaptiveTdeeCalculator
+import ch.nutrisnap.app.ui.screens.settings.notifDataStore
+import ch.nutrisnap.app.ui.theme.KEY_MEAL_ORDER
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -77,7 +79,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         hcDao.getCacheForDate(LocalDate.now()),
         weightRepo.getRecent(trendWindowDays),
         diaryRepo.getWeeklySummary(LocalDate.now().minusDays(trendWindowDays.toLong())),
-        hcDao.getLast30Days()
+        hcDao.getLast30Days(),
+        app.notifDataStore.data
     ) { args ->
         val entries       = args[0] as List<ch.nutrisnap.app.data.model.DiaryEntry>
         val profile        = args[1] as ch.nutrisnap.app.data.repository.UserProfile
@@ -87,6 +90,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         val trendWeights   = args[5] as List<ch.nutrisnap.app.data.model.WeightEntry>
         val dailySummaries = args[6] as List<ch.nutrisnap.app.data.db.DailySummary>
         val activityDays   = args[7] as List<ch.nutrisnap.app.data.model.HealthConnectCache>
+        val prefs          = args[8] as androidx.datastore.preferences.core.Preferences
+
+        val mealOrder = ch.nutrisnap.app.data.model.parseMealOrder(prefs[KEY_MEAL_ORDER])
+        val orderedMealMeta = mealOrder.map { type -> MEAL_META.first { it.first == type } }
 
         val byMeal = entries.groupBy { it.mealType }
 
@@ -123,7 +130,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             previousWeightKg = trendWeights.dropLast(1).lastOrNull()?.weightKg,
             isAdaptiveTarget = adaptiveTarget != null,
             tdeeConfidence   = adaptiveTarget?.confidencePercent ?: 0,
-            meals         = MEAL_META.map { (type, label, icon, color) ->
+            meals         = orderedMealMeta.map { (type, label, icon, color) ->
                 val mealEntries = byMeal[type] ?: emptyList()
                 MealOverview(
                     type  = type, label = label, icon = icon, color = color,

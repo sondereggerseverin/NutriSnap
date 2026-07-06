@@ -84,7 +84,8 @@ fun SettingsScreen(
     onNavigateToCustomFoods: () -> Unit = {},
     onNavigateToMealTemplates: () -> Unit = {},
     onNavigateToYazioImport: () -> Unit = {},
-    onNavigateToScan: () -> Unit = {}
+    onNavigateToScan: () -> Unit = {},
+    onNavigateToMealOrder: () -> Unit = {}
 ) {
     val state   by vm.uiState.collectAsState()
     val profile  = state.profile
@@ -167,6 +168,12 @@ fun SettingsScreen(
                 OutlinedButton(onClick = onNavigateToNotifSettings, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.Notifications, null, Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp)); Text("Reminder", fontSize = 12.sp)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onNavigateToMealOrder, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Default.DragHandle, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp)); Text("Reihenfolge", fontSize = 12.sp)
                 }
             }
         }
