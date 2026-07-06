@@ -145,5 +145,8 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deleteEntry(entry: DiaryEntry) = viewModelScope.launch { repo.deleteEntry(entry) }
 
+    /** Reihenfolge innerhalb einer Mahlzeit nach Drag-Reorder persistieren. */
+    fun reorderEntries(orderedIds: List<Long>) = viewModelScope.launch { repo.updateSortOrder(orderedIds) }
+
     fun saveCustomFood(item: FoodItem) = viewModelScope.launch { foodRepo.saveCustomFood(item) }
 }

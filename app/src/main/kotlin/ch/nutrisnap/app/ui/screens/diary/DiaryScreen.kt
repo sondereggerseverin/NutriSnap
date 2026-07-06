@@ -2,6 +2,7 @@ package ch.nutrisnap.app.ui.screens.diary
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,11 +15,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import kotlin.math.roundToInt
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.data.model.favoriteKey
@@ -87,12 +93,12 @@ fun DiaryScreen(
                             }
                         )
                     }
-                    items(mealEntries, key = { it.id }) { entry ->
-                        DiaryEntryRow(
-                            entry    = entry,
-                            onEdit   = { editEntry = entry },
-                            onDelete = { vm.deleteEntry(entry) },
-                            modifier = Modifier.animateItem()
+                    item(key = "meal_group_${meal.name}") {
+                        ReorderableMealEntries(
+                            entries   = mealEntries,
+                            onEdit    = { editEntry = it },
+                            onDelete  = { vm.deleteEntry(it) },
+                            onReorder = { ids -> vm.reorderEntries(ids) }
                         )
                     }
                 }
@@ -199,7 +205,8 @@ private fun DiaryEntryRow(
     entry: DiaryEntry,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    dragHandleModifier: Modifier? = null
 ) {
     var showConfirm by remember { mutableStateOf(false) }
 
@@ -257,6 +264,13 @@ private fun DiaryEntryRow(
                     Text("P ${entry.protein.toInt()}  K ${entry.carbs.toInt()}  F ${entry.fat.toInt()}",
                         fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                if (dragHandleModifier != null) {
+                    Icon(
+                        Icons.Default.DragHandle, "Reihenfolge ändern",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(start = 4.dp).size(20.dp).then(dragHandleModifier)
+                    )
+                }
             }
         }
     }
@@ -280,6 +294,65 @@ private fun DiaryEntryRow(
     // Dialog abgebrochen -> Swipe-Zustand zurücksetzen, damit die Karte an Ort bleibt
     LaunchedEffect(showConfirm) {
         if (!showConfirm) dismissState.reset()
+    }
+}
+
+// Grobe Zeilenhöhe der DiaryEntryRow (Card-Innenpadding 10dp*2 + ~1-zeiliger Text ~20dp
+// + Subtext ~16dp + Card-Rand-Padding 3dp*2) – Näherungswert für die Drag-Index-Berechnung,
+// exakte Pixelmessung wäre hier unverhältnismäßig aufwändig.
+private const val DIARY_ROW_HEIGHT_DP = 62
+
+/**
+ * Rendert die Einträge einer Mahlzeit als Drag-&-Drop-sortierbare Liste (Long-Press auf
+ * das Handle-Icon startet das Ziehen). Bewusst als normale Column statt LazyColumn-Items,
+ * da pro Mahlzeit nur wenige Einträge anfallen und die Drag-Index-Berechnung dadurch simpel bleibt.
+ */
+@Composable
+private fun ReorderableMealEntries(
+    entries: List<DiaryEntry>,
+    onEdit: (DiaryEntry) -> Unit,
+    onDelete: (DiaryEntry) -> Unit,
+    onReorder: (List<Long>) -> Unit
+) {
+    var items by remember(entries.map { it.id }) { mutableStateOf(entries) }
+    var draggingId by remember { mutableStateOf<Long?>(null) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val rowHeightPx = with(LocalDensity.current) { DIARY_ROW_HEIGHT_DP.dp.toPx() }
+
+    Column {
+        items.forEach { entry ->
+            val isDragging = entry.id == draggingId
+            DiaryEntryRow(
+                entry    = entry,
+                onEdit   = { onEdit(entry) },
+                onDelete = { onDelete(entry) },
+                modifier = Modifier
+                    .zIndex(if (isDragging) 1f else 0f)
+                    .graphicsLayer { translationY = if (isDragging) dragOffset else 0f },
+                dragHandleModifier = Modifier.pointerInput(entry.id) {
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = { draggingId = entry.id; dragOffset = 0f },
+                        onDragEnd   = {
+                            draggingId = null
+                            dragOffset = 0f
+                            onReorder(items.map { it.id })
+                        },
+                        onDragCancel = { draggingId = null; dragOffset = 0f },
+                        onDrag = { change, delta ->
+                            change.consume()
+                            dragOffset += delta.y
+                            val fromIndex = items.indexOfFirst { it.id == entry.id }
+                            val toIndex = (fromIndex + (dragOffset / rowHeightPx).roundToInt())
+                                .coerceIn(0, items.lastIndex)
+                            if (toIndex != fromIndex) {
+                                items = items.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
+                                dragOffset -= (toIndex - fromIndex) * rowHeightPx
+                            }
+                        }
+                    )
+                }
+            )
+        }
     }
 }
 
@@ -414,11 +487,13 @@ private fun SearchTab(
                 modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
             LazyColumn(Modifier.heightIn(max = 220.dp)) {
                 items(favorites, key = { it.favoriteKey() }) { food ->
-                    ListItem(
-                        headlineContent   = { Text(food.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        supportingContent = { Text("${food.calories.toInt()} kcal/100g${food.brand?.let { " · $it" } ?: ""}") },
-                        leadingContent    = { Icon(Icons.Default.Star, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
-                        modifier          = Modifier.clickable { selectedFood = food }
+                    FoodResultRow(
+                        food     = food,
+                        onClick  = { selectedFood = food },
+                        leading  = {
+                            Icon(Icons.Default.Star, null, tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp))
+                        }
                     )
                     HorizontalDivider()
                 }
@@ -434,11 +509,11 @@ private fun SearchTab(
         LazyColumn(Modifier.heightIn(max = 300.dp)) {
             items(results) { food ->
                 val isFav = food.favoriteKey() in favoriteKeys
-                ListItem(
-                    headlineContent   = { Text(food.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    supportingContent = { Text("${food.calories.toInt()} kcal/100g${food.brand?.let { " · $it" } ?: ""}") },
-                    trailingContent   = {
-                        IconButton(onClick = { vm.toggleFavorite(food) }) {
+                FoodResultRow(
+                    food     = food,
+                    onClick  = { selectedFood = food },
+                    trailingAction = {
+                        IconButton(onClick = { vm.toggleFavorite(food) }, modifier = Modifier.size(36.dp)) {
                             Icon(
                                 if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                 null,
@@ -447,8 +522,7 @@ private fun SearchTab(
                                 modifier = Modifier.size(20.dp)
                             )
                         }
-                    },
-                    modifier = Modifier.clickable { selectedFood = food }
+                    }
                 )
                 HorizontalDivider()
             }
@@ -588,6 +662,44 @@ private fun ManualEntryTab(
             Spacer(Modifier.width(8.dp))
             Text("Manuell hinzufügen")
         }
+    }
+}
+
+/**
+ * Kompakte Ergebnis-Zeile: Icon links, Titel/Subtitel gestapelt, kcal-Wert +
+ * optionale Trailing-Action rechts. Gemeinsam genutzt von Favoriten- und Suchliste.
+ */
+@Composable
+private fun FoodResultRow(
+    food: FoodItem,
+    onClick: () -> Unit,
+    leading: @Composable () -> Unit = {
+        Box(
+            Modifier.size(32.dp).clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(food.name.firstOrNull()?.uppercase() ?: "?", fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    },
+    trailingAction: (@Composable () -> Unit)? = null
+) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 6.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        leading()
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(food.name, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(food.brand ?: "${food.calories.toInt()} kcal/100g", fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.width(8.dp))
+        Text("${food.calories.toInt()} kcal", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary)
+        trailingAction?.invoke()
     }
 }
 

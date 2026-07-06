@@ -8,8 +8,11 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface DiaryDao {
-    @Query("SELECT * FROM diary_entries WHERE dateStr = :dateStr ORDER BY mealType")
+    @Query("SELECT * FROM diary_entries WHERE dateStr = :dateStr ORDER BY mealType, sortOrder, id")
     fun getEntriesForDate(dateStr: String): Flow<List<DiaryEntry>>
+
+    @Query("UPDATE diary_entries SET sortOrder = :sortOrder WHERE id = :id")
+    suspend fun updateSortOrder(id: Long, sortOrder: Int)
 
     @Query("""
         SELECT dateStr, 

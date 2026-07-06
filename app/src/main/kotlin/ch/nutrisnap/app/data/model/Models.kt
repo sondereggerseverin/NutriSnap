@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.data.model
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import kotlinx.serialization.SerialName
@@ -18,7 +19,8 @@ data class DiaryEntry(
     val calories: Float,
     val protein: Float,
     val carbs: Float,
-    val fat: Float
+    val fat: Float,
+    @ColumnInfo(defaultValue = "0") val sortOrder: Int = 0
 )
 
 enum class MealType { BREAKFAST, LUNCH, DINNER, SNACK }

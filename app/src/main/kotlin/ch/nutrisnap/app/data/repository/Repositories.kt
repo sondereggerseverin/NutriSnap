@@ -135,6 +135,15 @@ class DiaryRepository(db: NutriDatabase) {
     }
 
     suspend fun deleteAllEntries() = dao.deleteAll()
+
+    /**
+     * Persistiert die manuell per Drag-Handle geänderte Reihenfolge innerhalb einer Mahlzeit.
+     * orderedIds = Einträge in der neuen Anzeigereihenfolge (Index = neue sortOrder).
+     * Kein Supabase-Sync nötig, da sortOrder rein lokale UI-Präferenz ist.
+     */
+    suspend fun updateSortOrder(orderedIds: List<Long>) {
+        orderedIds.forEachIndexed { index, id -> dao.updateSortOrder(id, index) }
+    }
 }
 
 class RecipeRepository(db: NutriDatabase, context: Context) {
