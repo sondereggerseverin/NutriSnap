@@ -236,11 +236,10 @@ fun RecipesScreen(
     }
 
     addToDiaryRecipe?.let { recipe ->
-        // Gramm/Portion je Rezept aus der letzten Nährwert-Analyse ableiten (falls vorhanden)
-        val gramsPerServing = state.nutritionState.result
-            ?.takeIf { state.nutritionState.recipeId == recipe.id }
-            ?.ingredients?.mapNotNull { it.parsed?.amountG }?.sum()
-            ?.takeIf { it > 0f }
+        // Gramm/Portion direkt aus dem Zutatentext summieren — unabhängig davon,
+        // ob bereits eine Nährwert-Analyse gelaufen ist.
+        val gramsPerServing = RecipeNutritionAnalyzer.estimateTotalGrams(recipe.ingredients)
+            .takeIf { it > 0f }
             ?.div(recipe.servings.coerceAtLeast(1))
 
         AddToDiarySheet(

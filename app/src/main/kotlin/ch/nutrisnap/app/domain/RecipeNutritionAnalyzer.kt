@@ -146,6 +146,18 @@ object RecipeNutritionAnalyzer {
         return hasDigit || hasUnit || hasCountNoun
     }
 
+    /**
+     * Summiert die Gramm-Mengen aller Zutatenzeilen direkt aus dem rohen
+     * Zutatentext — ohne DB-Abgleich oder AI-Aufruf. Wird genutzt, um eine
+     * Gramm-Menge pro Portion sofort anzubieten (z.B. im "Ins Tagebuch"-Dialog),
+     * auch bevor der Nutzer "Neu berechnen" ausgeführt hat.
+     */
+    fun estimateTotalGrams(ingredientsText: String): Float =
+        ingredientsText.lines()
+            .filter { isIngredientLine(it) }
+            .mapNotNull { parseIngredientLine(it)?.amountG }
+            .sum()
+
     fun parseIngredientLine(line: String): ParsedIngredient? {
         val clean = line.trimStart('*', '-', '\u2022', '\u00b7', ' ').trim()
         if (clean.isBlank() || clean.length < 2) return null
