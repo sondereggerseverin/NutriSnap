@@ -23,6 +23,8 @@ data class DiaryUiState(
     val totalFat:      Float            = 0f,
     val calorieGoal:   Float            = 2000f,
     val proteinGoal:   Float            = 120f,
+    val carbsGoal:     Float            = 220f,
+    val fatGoal:       Float            = 65f,
     val isLoading:     Boolean          = false
 )
 
@@ -50,7 +52,9 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
             totalCarbs    = entries.sumOf { it.carbs.toDouble() }.toFloat(),
             totalFat      = entries.sumOf { it.fat.toDouble() }.toFloat(),
             calorieGoal   = profile.dailyCalorieGoal.toFloat(),
-            proteinGoal   = profile.proteinGoalG
+            proteinGoal   = profile.proteinGoalG,
+            carbsGoal     = profile.carbsGoalG,
+            fatGoal       = profile.fatGoalG
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DiaryUiState())
 

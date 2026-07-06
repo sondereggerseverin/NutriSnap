@@ -68,6 +68,50 @@ fun MacroBar(
     }
 }
 
+/**
+ * Nährwert-Fortschrittsbalken im Yazio-Stil: zeigt für Kalorien/Kohlenhydrate/
+ * Protein/Fett je eine "verzehrt / Ziel"-Zeile mit Fortschrittsbalken.
+ * Wird sowohl für Tages- als auch für Mahlzeit-Werte (gegen das Tagesziel) genutzt.
+ */
+@Composable
+fun NutritionFactsProgress(
+    calories: Float, caloriesGoal: Float,
+    carbs: Float,    carbsGoal: Float,
+    protein: Float,  proteinGoal: Float,
+    fat: Float,      fatGoal: Float,
+    modifier: Modifier = Modifier
+) {
+    Card(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            NutritionProgressRow("Kalorien", calories, caloriesGoal, "Cal", Green700)
+            NutritionProgressRow("Kohlenh.", carbs, carbsGoal, "g", Color(0xFFF59E0B))
+            NutritionProgressRow("Protein", protein, proteinGoal, "g", Color(0xFF3B82F6))
+            NutritionProgressRow("Fett", fat, fatGoal, "g", Color(0xFFEF4444))
+        }
+    }
+}
+
+@Composable
+private fun NutritionProgressRow(label: String, value: Float, goal: Float, unit: String, color: Color) {
+    val progress = (value / goal.coerceAtLeast(1f)).coerceIn(0f, 1f)
+    Column {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+            Text("${value.toInt()} / ${goal.toInt()} $unit", fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.height(4.dp))
+        LinearProgressIndicator(
+            progress   = { progress },
+            modifier   = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+            color      = color,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            strokeCap  = androidx.compose.ui.graphics.StrokeCap.Round
+        )
+    }
+}
+
 @Composable
 private fun MacroChip(label: String, grams: Float, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {

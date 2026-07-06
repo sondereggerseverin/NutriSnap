@@ -31,6 +31,7 @@ import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.data.model.favoriteKey
 import ch.nutrisnap.app.ui.components.EmptyState
 import ch.nutrisnap.app.ui.components.MacroBar
+import ch.nutrisnap.app.ui.components.NutritionFactsProgress
 import ch.nutrisnap.app.ui.components.SectionHeader
 import ch.nutrisnap.app.ui.screens.barcode.BarcodeScannerScreen
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
@@ -48,6 +49,7 @@ fun DiaryScreen(
     val state by vm.uiState.collectAsState()
     var showAddSheet by remember { mutableStateOf(autoOpenAdd || autoOpenScanner) }
     var editEntry    by remember { mutableStateOf<DiaryEntry?>(null) }
+    var expandedNutrition by remember { mutableStateOf<MealType?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val mealPrefs by context.notifDataStore.data.collectAsState(initial = null)
     val mealOrder = remember(mealPrefs) { parseMealOrder(mealPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_MEAL_ORDER)) }
@@ -96,11 +98,39 @@ fun DiaryScreen(
                         SectionHeader(
                             title  = meal.label(),
                             action = {
-                                Text("$mealKcal kcal", fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("$mealKcal kcal", fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    IconButton(
+                                        onClick = { expandedNutrition = if (expandedNutrition == meal) null else meal },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            if (expandedNutrition == meal) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                            contentDescription = "Nährwerte anzeigen",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
                             }
                         )
+                    }
+                    if (expandedNutrition == meal) {
+                        item(key = "meal_nutrition_${meal.name}") {
+                            NutritionFactsProgress(
+                                calories = mealEntries.sumOf { it.calories.toDouble() }.toFloat(),
+                                caloriesGoal = state.calorieGoal,
+                                carbs    = mealEntries.sumOf { it.carbs.toDouble() }.toFloat(),
+                                carbsGoal = state.carbsGoal,
+                                protein  = mealEntries.sumOf { it.protein.toDouble() }.toFloat(),
+                                proteinGoal = state.proteinGoal,
+                                fat      = mealEntries.sumOf { it.fat.toDouble() }.toFloat(),
+                                fatGoal  = state.fatGoal,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                            )
+                        }
                     }
                     item(key = "meal_group_${meal.name}") {
                         ReorderableMealEntries(

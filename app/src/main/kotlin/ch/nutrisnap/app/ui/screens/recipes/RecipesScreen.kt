@@ -236,8 +236,16 @@ fun RecipesScreen(
     }
 
     addToDiaryRecipe?.let { recipe ->
+        // Gramm/Portion je Rezept aus der letzten Nährwert-Analyse ableiten (falls vorhanden)
+        val gramsPerServing = state.nutritionState.result
+            ?.takeIf { state.nutritionState.recipeId == recipe.id }
+            ?.ingredients?.mapNotNull { it.parsed?.amountG }?.sum()
+            ?.takeIf { it > 0f }
+            ?.div(recipe.servings.coerceAtLeast(1))
+
         AddToDiarySheet(
             recipe = recipe,
+            gramsPerServing = gramsPerServing,
             onConfirm = { servings, meal -> diaryVm.addRecipeAsMeal(recipe, servings, meal); addToDiaryRecipe = null },
             onDismiss = { addToDiaryRecipe = null }
         )
@@ -678,12 +686,30 @@ private fun NutritionAnalysisCard(
 }
 
 // ── Add to Diary ──────────────────────────────────────────────────────────────
+private enum class DiaryQuantityUnit { SERVING, GRAM }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddToDiarySheet(recipe: Recipe, onConfirm: (Float, MealType) -> Unit, onDismiss: () -> Unit) {
+fun AddToDiarySheet(
+    recipe: Recipe,
+    gramsPerServing: Float? = null,
+    onConfirm: (Float, MealType) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var unit by remember { mutableStateOf(DiaryQuantityUnit.SERVING) }
     var servingsText by remember { mutableStateOf(recipe.servings.toString()) }
+    var gramsText by remember { mutableStateOf(gramsPerServing?.let { (it * recipe.servings).toInt().toString() } ?: "") }
     var selectedMeal by remember { mutableStateOf(MealType.LUNCH) }
-    val servings = servingsText.toFloatOrNull()?.coerceAtLeast(0.1f) ?: 1f
+
+    // Immer in Portionen umrechnen, egal welche Einheit der Nutzer eingibt — die
+    // Datenschicht (addRecipeAsMeal) erwartet weiterhin einen Portionsfaktor.
+    val servings = when (unit) {
+        DiaryQuantityUnit.SERVING -> servingsText.toFloatOrNull()?.coerceAtLeast(0.1f) ?: 1f
+        DiaryQuantityUnit.GRAM -> {
+            val grams = gramsText.toFloatOrNull()?.coerceAtLeast(1f) ?: (gramsPerServing ?: 1f)
+            if (gramsPerServing != null && gramsPerServing > 0f) grams / gramsPerServing else 1f
+        }
+    }
     val calsPerServ = recipe.totalCalories?.let { it / recipe.servings.coerceAtLeast(1) }
     val estCals = calsPerServ?.let { it * servings }
 
@@ -694,16 +720,42 @@ fun AddToDiarySheet(recipe: Recipe, onConfirm: (Float, MealType) -> Unit, onDism
             Text(recipe.title, fontSize=13.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp), verticalAlignment=Alignment.CenterVertically) {
-                OutlinedTextField(value=servingsText, onValueChange={servingsText=it}, label={Text("Portionen")},
+                OutlinedTextField(
+                    value = if (unit == DiaryQuantityUnit.SERVING) servingsText else gramsText,
+                    onValueChange = { if (unit == DiaryQuantityUnit.SERVING) servingsText=it else gramsText=it },
+                    label = { Text("Menge") },
                     keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal), modifier=Modifier.weight(1f), singleLine=true)
-                var expanded by remember { mutableStateOf(false) }
+                var unitExpanded by remember { mutableStateOf(false) }
                 Box {
-                    OutlinedButton(onClick={expanded=true}, modifier=Modifier.height(56.dp)) {
+                    OutlinedButton(onClick={unitExpanded=true}, modifier=Modifier.height(56.dp)) {
+                        Text(if (unit == DiaryQuantityUnit.SERVING) "Portion" else "Gramm"); Icon(Icons.Default.ArrowDropDown,null)
+                    }
+                    DropdownMenu(expanded=unitExpanded, onDismissRequest={unitExpanded=false}) {
+                        DropdownMenuItem(text={Text("Portion")}, onClick={unit=DiaryQuantityUnit.SERVING;unitExpanded=false})
+                        DropdownMenuItem(
+                            text={Text("Gramm")},
+                            enabled = gramsPerServing != null,
+                            onClick={unit=DiaryQuantityUnit.GRAM;unitExpanded=false}
+                        )
+                    }
+                }
+            }
+            if (gramsPerServing == null) {
+                Spacer(Modifier.height(4.dp))
+                Text("Gramm-Eingabe nicht verfügbar — Nährwerte noch nicht analysiert.",
+                    fontSize=11.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp), verticalAlignment=Alignment.CenterVertically) {
+                Text("Mahlzeit:", fontSize=13.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
+                var mealExpanded by remember { mutableStateOf(false) }
+                Box {
+                    OutlinedButton(onClick={mealExpanded=true}) {
                         Text(selectedMeal.label()); Icon(Icons.Default.ArrowDropDown,null)
                     }
-                    DropdownMenu(expanded=expanded, onDismissRequest={expanded=false}) {
+                    DropdownMenu(expanded=mealExpanded, onDismissRequest={mealExpanded=false}) {
                         MealType.values().forEach { meal ->
-                            DropdownMenuItem(text={Text(meal.label())}, onClick={selectedMeal=meal;expanded=false})
+                            DropdownMenuItem(text={Text(meal.label())}, onClick={selectedMeal=meal;mealExpanded=false})
                         }
                     }
                 }
