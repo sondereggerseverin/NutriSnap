@@ -136,7 +136,7 @@ private fun LazyColumnHome(
         item { MealOverviewGrid(state.meals, onClick = onMealClick) }
         item { HealthCard(todayHc, hasHcPermission, onOpenHealth) }
         item { StreakCard(state.streak) }
-        item { WeightQuickCard(state.lastWeightKg, onLogWeight) }
+        item { WeightQuickCard(state.lastWeightKg, state.previousWeightKg, onLogWeight) }
     }
 }
 
@@ -407,7 +407,7 @@ private fun StreakCard(streak: Int) {
 // ── Weight quick-entry card ───────────────────────────────────────────────────
 
 @Composable
-private fun WeightQuickCard(lastWeight: Float?, onLogWeight: () -> Unit) {
+private fun WeightQuickCard(lastWeight: Float?, previousWeight: Float?, onLogWeight: () -> Unit) {
     Card(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         shape = RoundedCornerShape(16.dp),
@@ -421,10 +421,22 @@ private fun WeightQuickCard(lastWeight: Float?, onLogWeight: () -> Unit) {
         ) {
             Column {
                 Text("Aktuelles Gewicht", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                Text(
-                    lastWeight?.let { "%.1f kg".format(it) } ?: "-",
-                    fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        lastWeight?.let { "%.1f kg".format(it) } ?: "-",
+                        fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary
+                    )
+                    val delta = if (lastWeight != null && previousWeight != null) lastWeight - previousWeight else null
+                    if (delta != null && kotlin.math.abs(delta) >= 0.1f) {
+                        Spacer(Modifier.width(8.dp))
+                        val isUp = delta > 0
+                        Text(
+                            "${if (isUp) "↑" else "↓"} %.1f kg".format(kotlin.math.abs(delta)),
+                            fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                            color = if (isUp) Color(0xFFE05555) else Color(0xFF2D7D46)
+                        )
+                    }
+                }
             }
             FilledTonalButton(onClick = onLogWeight) { Text("Eintragen") }
         }

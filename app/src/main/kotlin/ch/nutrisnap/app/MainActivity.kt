@@ -43,6 +43,7 @@ import ch.nutrisnap.app.ui.screens.mealtemplate.MealTemplateScreen
 import ch.nutrisnap.app.ui.screens.recipes.RecipesHubScreen
 import ch.nutrisnap.app.ui.screens.scan.FoodScanScreen
 import ch.nutrisnap.app.ui.screens.scan.NutritionLabelScanScreen
+import ch.nutrisnap.app.ui.screens.scan.ScanChooserScreen
 import ch.nutrisnap.app.ui.screens.security.BiometricLockScreen
 import ch.nutrisnap.app.ui.screens.settings.KEY_BIOMETRIC_LOCK
 import ch.nutrisnap.app.ui.screens.settings.NotificationSettingsScreen
@@ -253,7 +254,7 @@ fun MainScaffold(
                     onNavigateToHealth = { navController.navigate("health") },
                     onNavigateToWater = { navController.navigate("water") },
                     onNavigateToFasting = { navController.navigate("fasting") },
-                    onNavigateToFoodScan = { navController.navigate("food_scan") },
+                    onNavigateToFoodScan = { navController.navigate("scan_chooser") },
                     onNavigateToRecipeImport = {
                         navController.navigate(Screen.Recipes.route) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
@@ -263,15 +264,17 @@ fun MainScaffold(
                 )
             }
             composable(
-                route = "diary?meal={meal}&open={open}",
+                route = "diary?meal={meal}&open={open}&scan={scan}",
                 arguments = listOf(
                     navArgument("meal") { type = NavType.StringType; nullable = true; defaultValue = null },
-                    navArgument("open") { type = NavType.BoolType; defaultValue = false }
+                    navArgument("open") { type = NavType.BoolType; defaultValue = false },
+                    navArgument("scan") { type = NavType.BoolType; defaultValue = false }
                 )
             ) { backStackEntry ->
                 val mealArg = backStackEntry.arguments?.getString("meal")?.let { runCatching { MealType.valueOf(it) }.getOrNull() }
                 val openArg = backStackEntry.arguments?.getBoolean("open") ?: false
-                DiaryScreen(initialMeal = mealArg, autoOpenAdd = openArg)
+                val scanArg = backStackEntry.arguments?.getBoolean("scan") ?: false
+                DiaryScreen(initialMeal = mealArg, autoOpenAdd = openArg, autoOpenScanner = scanArg)
             }
             composable(Screen.Recipes.route)   { RecipesHubScreen(sharedUrl = sharedUrl) }
             composable(Screen.Analysis.route)  { AnalysisScreen() }
@@ -285,8 +288,15 @@ fun MainScaffold(
                     onNavigateToCustomFoods   = { navController.navigate("custom_foods") },
                     onNavigateToMealTemplates = { navController.navigate("meal_templates") },
                     onNavigateToYazioImport   = { navController.navigate("yazio_import") },
-                    onNavigateToFoodScan      = { navController.navigate("food_scan") },
-                    onNavigateToLabelScan     = { navController.navigate("nutrition_label_scan") }
+                    onNavigateToScan          = { navController.navigate("scan_chooser") }
+                )
+            }
+            composable("scan_chooser") {
+                ScanChooserScreen(
+                    onBarcode       = { navController.navigate("diary?open=true&scan=true") },
+                    onPhotoEstimate = { navController.navigate("food_scan") },
+                    onLabelPhoto    = { navController.navigate("nutrition_label_scan") },
+                    onBack          = { navController.popBackStack() }
                 )
             }
             composable("water")   { WaterTrackingScreen() }

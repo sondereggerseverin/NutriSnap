@@ -37,6 +37,7 @@ data class HomeUiState(
     val fatGoal:       Float   = 65f,
     val streak:        Int     = 0,
     val lastWeightKg:  Float?  = null,
+    val previousWeightKg: Float? = null,
     val meals:         List<MealOverview> = emptyList(),
     // Wenn true, ist calorieGoal bereits das fertige AdaptiveTdeeCalculator-Ziel
     // (inkl. gedämpftem Aktivitätsbonus) — burnedKcal wird dann nur noch angezeigt,
@@ -119,6 +120,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             fatGoal       = profile.fatGoalG,
             streak        = streak,
             lastWeightKg  = weights.lastOrNull()?.weightKg ?: profile.weightKg.takeIf { it > 0f },
+            previousWeightKg = trendWeights.dropLast(1).lastOrNull()?.weightKg,
             isAdaptiveTarget = adaptiveTarget != null,
             tdeeConfidence   = adaptiveTarget?.confidencePercent ?: 0,
             meals         = MEAL_META.map { (type, label, icon, color) ->

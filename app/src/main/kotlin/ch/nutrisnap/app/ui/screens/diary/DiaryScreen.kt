@@ -32,10 +32,11 @@ import java.util.Locale
 fun DiaryScreen(
     vm: DiaryViewModel = viewModel(),
     initialMeal: MealType? = null,
-    autoOpenAdd: Boolean = false
+    autoOpenAdd: Boolean = false,
+    autoOpenScanner: Boolean = false
 ) {
     val state by vm.uiState.collectAsState()
-    var showAddSheet by remember { mutableStateOf(autoOpenAdd) }
+    var showAddSheet by remember { mutableStateOf(autoOpenAdd || autoOpenScanner) }
     var editEntry    by remember { mutableStateOf<DiaryEntry?>(null) }
 
     Scaffold(
@@ -86,7 +87,7 @@ fun DiaryScreen(
         }
     }
 
-    if (showAddSheet) AddFoodSheet(vm = vm, initialMeal = initialMeal, onDismiss = { showAddSheet = false })
+    if (showAddSheet) AddFoodSheet(vm = vm, initialMeal = initialMeal, autoOpenScanner = autoOpenScanner, onDismiss = { showAddSheet = false })
 
     editEntry?.let { entry ->
         EditEntryDialog(
@@ -245,9 +246,9 @@ enum class AddFoodTab { SEARCH, MANUAL }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddFoodSheet(vm: DiaryViewModel, initialMeal: MealType? = null, onDismiss: () -> Unit) {
+fun AddFoodSheet(vm: DiaryViewModel, initialMeal: MealType? = null, autoOpenScanner: Boolean = false, onDismiss: () -> Unit) {
     var activeTab    by remember { mutableStateOf(AddFoodTab.SEARCH) }
-    var showScanner  by remember { mutableStateOf(false) }
+    var showScanner  by remember { mutableStateOf(autoOpenScanner) }
     var barcodeStatus by remember { mutableStateOf("") }
 
     if (showScanner) {
