@@ -3,6 +3,7 @@ package ch.nutrisnap.app.ui.screens.home
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -47,6 +48,7 @@ fun HomeScreen(
             todayHc = hcState.todayData,
             hasHcPermission = hcState.hasPermission,
             onMealClick = { meal -> onNavigateToDiary(meal.type, meal.count == 0) },
+            onMealQuickAdd = { meal -> onNavigateToDiary(meal.type, true) },
             onLogWeight = { showWeightDialog = true },
             onOpenHealth = onNavigateToHealth
         )
@@ -126,6 +128,7 @@ private fun LazyColumnHome(
     todayHc: HealthConnectCache?,
     hasHcPermission: Boolean,
     onMealClick: (MealOverview) -> Unit,
+    onMealQuickAdd: (MealOverview) -> Unit,
     onLogWeight: () -> Unit,
     onOpenHealth: () -> Unit
 ) {
@@ -134,7 +137,7 @@ private fun LazyColumnHome(
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
         item { HomeHeader(state) }
-        item { MealOverviewGrid(state.meals, onClick = onMealClick) }
+        item { MealOverviewGrid(state.meals, onClick = onMealClick, onQuickAdd = onMealQuickAdd) }
         item { HealthCard(todayHc, hasHcPermission, onOpenHealth) }
         item { StreakCard(state.streak) }
         item { WeightQuickCard(state.lastWeightKg, state.previousWeightKg, onLogWeight) }
@@ -339,40 +342,55 @@ private fun StreakBadge(streak: Int) {
 // ── Meal overview grid ─────────────────────────────────────────────────────────
 
 @Composable
-private fun MealOverviewGrid(meals: List<MealOverview>, onClick: (MealOverview) -> Unit) {
+private fun MealOverviewGrid(meals: List<MealOverview>, onClick: (MealOverview) -> Unit, onQuickAdd: (MealOverview) -> Unit) {
     Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
         for (rowMeals in meals.chunked(2)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 rowMeals.forEach { meal ->
-                    Card(
-                        modifier = Modifier.weight(1f).clickable { onClick(meal) },
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(1.dp)
-                    ) {
-                        Column(Modifier.padding(14.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    Modifier.size(28.dp).clip(RoundedCornerShape(8.dp))
-                                        .background(meal.color.copy(alpha = 0.15f)),
-                                    contentAlignment = Alignment.Center
-                                ) { Text(meal.icon, fontSize = 14.sp) }
-                                Spacer(Modifier.width(8.dp))
-                                Text(meal.label, fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Box(Modifier.weight(1f)) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth().clickable { onClick(meal) },
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(1.dp)
+                        ) {
+                            Column(Modifier.padding(14.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        Modifier.size(28.dp).clip(RoundedCornerShape(8.dp))
+                                            .background(meal.color.copy(alpha = 0.15f)),
+                                        contentAlignment = Alignment.Center
+                                    ) { Text(meal.icon, fontSize = 14.sp) }
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(meal.label, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    "${meal.kcal.toInt()} kcal",
+                                    fontSize = 18.sp, fontWeight = FontWeight.ExtraBold,
+                                    color = if (meal.count > 0) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.outline
+                                )
+                                Text(
+                                    "${meal.count} Einträge",
+                                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                "${meal.kcal.toInt()} kcal",
-                                fontSize = 18.sp, fontWeight = FontWeight.ExtraBold,
-                                color = if (meal.count > 0) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.outline
-                            )
-                            Text(
-                                "${meal.count} Einträge",
-                                fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
+                        // Direkter Quick-Add: Karten-Klick öffnet Add-Sheet nur bei leerer Mahlzeit
+                        // (siehe onMealClick), dieser Button aber immer — für schnelles Nachtragen
+                        // auch wenn schon Einträge existieren.
+                        Box(
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(6.dp)
+                                .size(22.dp)
+                                .clip(CircleShape)
+                                .background(meal.color)
+                                .clickable { onQuickAdd(meal) },
+                            contentAlignment = Alignment.Center
+                        ) { Icon(Icons.Default.Add, "Zu ${meal.label} hinzufügen", tint = Color.White, modifier = Modifier.size(14.dp)) }
                     }
                 }
                 if (rowMeals.size == 1) Spacer(Modifier.weight(1f))
