@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.diary
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -74,12 +76,23 @@ fun DiaryScreen(
                 val grouped = state.entries.groupBy { it.mealType }
                 MealType.values().forEach { meal ->
                     val mealEntries = grouped[meal] ?: return@forEach
-                    item { SectionHeader(meal.label()) }
+                    val mealKcal = mealEntries.sumOf { it.calories.toInt() }
+                    item {
+                        SectionHeader(
+                            title  = meal.label(),
+                            action = {
+                                Text("$mealKcal kcal", fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        )
+                    }
                     items(mealEntries, key = { it.id }) { entry ->
                         DiaryEntryRow(
                             entry    = entry,
                             onEdit   = { editEntry = entry },
-                            onDelete = { vm.deleteEntry(entry) }
+                            onDelete = { vm.deleteEntry(entry) },
+                            modifier = Modifier.animateItem()
                         )
                     }
                 }
@@ -180,45 +193,70 @@ private fun DateNavigator(date: LocalDate, onPrev: () -> Unit, onNext: () -> Uni
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DiaryEntryRow(entry: DiaryEntry, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun DiaryEntryRow(
+    entry: DiaryEntry,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     var showConfirm by remember { mutableStateOf(false) }
 
     val isRecipeEntry = entry.amountGrams == 0f || entry.foodItemId < 0
     val amountLabel   = if (isRecipeEntry) "1 Port." else "${entry.amountGrams.toInt()} g"
 
-    Card(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 3.dp)
-            .clickable { onEdit() },
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    entry.foodName,
-                    fontWeight = FontWeight.Medium,
-                    fontSize   = 14.sp,
-                    maxLines   = 1,
-                    overflow   = TextOverflow.Ellipsis
-                )
-                Text(amountLabel, fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Spacer(Modifier.width(8.dp))
-            Column(horizontalAlignment = Alignment.End) {
-                Text("${entry.calories.toInt()} kcal",
-                    fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.primary)
-                Text("P ${entry.protein.toInt()}  K ${entry.carbs.toInt()}  F ${entry.fat.toInt()}",
-                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            IconButton(onClick = { showConfirm = true }) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) showConfirm = true
+            false // Karte bleibt sichtbar, bis der Dialog bestätigt wurde
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 3.dp),
+        enableDismissFromStartToEnd = false,
+        backgroundContent = {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.errorContainer)
+                    .padding(horizontal = 20.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
                 Icon(Icons.Default.DeleteOutline, "Löschen",
-                    Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                    tint = MaterialTheme.colorScheme.onErrorContainer)
+            }
+        }
+    ) {
+        Card(
+            Modifier.fillMaxWidth().clickable { onEdit() },
+            shape  = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        entry.foodName,
+                        fontWeight = FontWeight.Medium,
+                        fontSize   = 14.sp,
+                        maxLines   = 1,
+                        overflow   = TextOverflow.Ellipsis
+                    )
+                    Text(amountLabel, fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(Modifier.width(8.dp))
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("${entry.calories.toInt()} kcal",
+                        fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.primary)
+                    Text("P ${entry.protein.toInt()}  K ${entry.carbs.toInt()}  F ${entry.fat.toInt()}",
+                        fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }
@@ -237,6 +275,11 @@ private fun DiaryEntryRow(entry: DiaryEntry, onEdit: () -> Unit, onDelete: () ->
                 TextButton(onClick = { showConfirm = false }) { Text("Abbrechen") }
             }
         )
+    }
+
+    // Dialog abgebrochen -> Swipe-Zustand zurücksetzen, damit die Karte an Ort bleibt
+    LaunchedEffect(showConfirm) {
+        if (!showConfirm) dismissState.reset()
     }
 }
 
