@@ -38,7 +38,10 @@ object RecipeNutritionAnalyzer {
         val fat:      Float = 0f,
         val matched:  Boolean = false,
         /** True if this result came from the AI estimate step rather than a real DB. */
-        val estimated: Boolean = false
+        val estimated: Boolean = false,
+        /** Mikronaehrstoffe für diese Zutat, bereits auf die tatsächliche Menge
+         *  skaliert (nicht pro 100g). Nur Werte, die die Quelle geliefert hat. */
+        val micros: Map<String, Float> = emptyMap()
     )
 
     data class ParsedIngredient(
@@ -59,8 +62,66 @@ object RecipeNutritionAnalyzer {
         val matchedCount:       Int,
         val totalCount:         Int,
         /** How many of the matched ingredients came from the AI estimate (vs. real DB data). */
-        val estimatedCount:     Int = 0
+        val estimatedCount:     Int = 0,
+        /** Summe aller Mikronaehrstoffe über alle Zutaten (absolut, nicht pro Portion). */
+        val totalMicros:        Map<String, Float> = emptyMap()
     )
+
+    /** Alle nicht-null Mikronaehrstoffe eines FoodItem (pro 100g), skaliert auf [factor]. */
+    private fun FoodItem.scaledMicros(factor: Float): Map<String, Float> = buildMap {
+        fiber?.let { put("fiber", it * factor) }
+        sugar?.let { put("sugar", it * factor) }
+        saturatedFat?.let { put("saturatedFat", it * factor) }
+        monoFat?.let { put("monoFat", it * factor) }
+        polyFat?.let { put("polyFat", it * factor) }
+        transFat?.let { put("transFat", it * factor) }
+        salt?.let { put("salt", it * factor) }
+        sodium?.let { put("sodium", it * factor) }
+        alcohol?.let { put("alcohol", it * factor) }
+        cholesterol?.let { put("cholesterol", it * factor) }
+        water?.let { put("water", it * factor) }
+        vitaminA?.let { put("vitaminA", it * factor) }
+        vitaminB1?.let { put("vitaminB1", it * factor) }
+        vitaminB2?.let { put("vitaminB2", it * factor) }
+        vitaminB3?.let { put("vitaminB3", it * factor) }
+        vitaminB5?.let { put("vitaminB5", it * factor) }
+        vitaminB6?.let { put("vitaminB6", it * factor) }
+        vitaminB7?.let { put("vitaminB7", it * factor) }
+        vitaminB11?.let { put("vitaminB11", it * factor) }
+        vitaminB12?.let { put("vitaminB12", it * factor) }
+        vitaminC?.let { put("vitaminC", it * factor) }
+        vitaminD?.let { put("vitaminD", it * factor) }
+        vitaminE?.let { put("vitaminE", it * factor) }
+        vitaminK?.let { put("vitaminK", it * factor) }
+        potassium?.let { put("potassium", it * factor) }
+        calcium?.let { put("calcium", it * factor) }
+        iron?.let { put("iron", it * factor) }
+        magnesium?.let { put("magnesium", it * factor) }
+        zinc?.let { put("zinc", it * factor) }
+        phosphorus?.let { put("phosphorus", it * factor) }
+        copper?.let { put("copper", it * factor) }
+        manganese?.let { put("manganese", it * factor) }
+        fluoride?.let { put("fluoride", it * factor) }
+        iodine?.let { put("iodine", it * factor) }
+        selenium?.let { put("selenium", it * factor) }
+        chromium?.let { put("chromium", it * factor) }
+        molybdenum?.let { put("molybdenum", it * factor) }
+        chloride?.let { put("chloride", it * factor) }
+        choline?.let { put("choline", it * factor) }
+        arsenic?.let { put("arsenic", it * factor) }
+        boron?.let { put("boron", it * factor) }
+        cobalt?.let { put("cobalt", it * factor) }
+        rubidium?.let { put("rubidium", it * factor) }
+        silicon?.let { put("silicon", it * factor) }
+        sulfur?.let { put("sulfur", it * factor) }
+        tin?.let { put("tin", it * factor) }
+        vanadium?.let { put("vanadium", it * factor) }
+    }
+
+    private fun sumMicros(maps: List<Map<String, Float>>): Map<String, Float> =
+        maps.fold(emptyMap()) { acc, m ->
+            (acc.keys + m.keys).associateWith { (acc[it] ?: 0f) + (m[it] ?: 0f) }
+        }
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -306,23 +367,25 @@ object RecipeNutritionAnalyzer {
                                 .replace(Regex("""\s+"""), " ").trim())
                         val local = localSearchTerms.firstNotNullOfOrNull { IngredientNutritionDatabase.lookup(it) }
                         if (local != null) {
+                            val localFood = FoodItem(
+                                name            = parsed.name,
+                                calories = local.calories,
+                                protein  = local.protein,
+                                carbs    = local.carbs,
+                                fat      = local.fat,
+                                fiber    = local.fiber,
+                                source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
+                            )
                             return@async IngredientResult(
                                 line     = line,
                                 parsed   = parsed,
-                                foodItem = FoodItem(
-                                    name            = parsed.name,
-                                    calories = local.calories,
-                                    protein  = local.protein,
-                                    carbs    = local.carbs,
-                                    fat      = local.fat,
-                                    fiber    = local.fiber,
-                                    source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
-                                ),
+                                foodItem = localFood,
                                 calories = local.calories * factor,
                                 protein  = local.protein  * factor,
                                 carbs    = local.carbs    * factor,
                                 fat      = local.fat      * factor,
-                                matched  = true
+                                matched  = true,
+                                micros   = localFood.scaledMicros(factor)
                             )
                         }
 
@@ -336,7 +399,8 @@ object RecipeNutritionAnalyzer {
                                 protein  = food.protein  * factor,
                                 carbs    = food.carbs    * factor,
                                 fat      = food.fat      * factor,
-                                matched  = true
+                                matched  = true,
+                                micros   = food.scaledMicros(factor)
                             )
                         } else {
                             IngredientResult(line, parsed, null)
@@ -401,7 +465,8 @@ object RecipeNutritionAnalyzer {
             fatPerServing      = totFat  / servings,
             matchedCount       = results.count { it.matched },
             totalCount         = results.size,
-            estimatedCount     = results.count { it.estimated }
+            estimatedCount     = results.count { it.estimated },
+            totalMicros        = sumMicros(results.map { it.micros })
         )
     }
 

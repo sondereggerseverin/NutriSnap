@@ -64,7 +64,7 @@ interface UserProfileDao {
         MealTemplateItem::class,
         GeneratedRecipeEntity::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -230,6 +230,24 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // Phase 7: voller Mikronaehrstoff-Ausbau (Yazio-Parität) - Vitamine,
+        // Mineralstoffe und Spurenelemente pro 100g an food_items.
+        private val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val newColumns = listOf(
+                    "monoFat", "polyFat", "transFat", "salt", "alcohol", "cholesterol", "water",
+                    "vitaminA", "vitaminB1", "vitaminB2", "vitaminB3", "vitaminB5", "vitaminB6",
+                    "vitaminB7", "vitaminB11", "vitaminE", "vitaminK",
+                    "magnesium", "zinc", "phosphorus", "copper", "manganese", "fluoride", "iodine",
+                    "selenium", "chromium", "molybdenum", "chloride", "choline",
+                    "arsenic", "boron", "cobalt", "rubidium", "silicon", "sulfur", "tin", "vanadium"
+                )
+                newColumns.forEach { col ->
+                    db.execSQL("ALTER TABLE food_items ADD COLUMN $col REAL")
+                }
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -240,7 +258,8 @@ abstract class NutriDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
                         MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
-                        MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12
+                        MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
+                        MIGRATION_12_13
                     )
                     .build()
                     .also { INSTANCE = it }
