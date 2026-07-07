@@ -45,27 +45,35 @@ class FoodSearchRepository(
         }
     }
 
-    /**
-     * Sortiert zuerst danach, wie gut der Produktname zur Suchanfrage passt
-     * (exakt > beginnt mit > enthält als Wort > enthält als Teilstring), erst
-     * dann nach completenessScore. Ohne das landen bei mehrdeutigen API-
-     * Antworten (OFF liefert keine feste Relevanz-Reihenfolge) beliebige
-     * Treffer oben, und identische Suchen liefern je nach Cache-Zustand
-     * unterschiedliche Ergebnisse.
-     */
-    private fun relevanceComparator(query: String): Comparator<FoodItem> {
-        val q = query.trim().lowercase()
-        fun relevance(item: FoodItem): Int {
-            val name = item.name.lowercase()
-            return when {
-                name == q -> 4
-                name.startsWith(q) -> 3
-                Regex("\\b${Regex.escape(q)}").containsMatchIn(name) -> 2
-                name.contains(q) -> 1
-                else -> 0
+    private fun relevanceComparator(query: String): Comparator<FoodItem> = Companion.relevanceComparator(query)
+
+    companion object {
+        /**
+         * Sortiert zuerst danach, wie gut der Produktname zur Suchanfrage passt
+         * (exakt > beginnt mit > enthält als Wort > enthält als Teilstring), erst
+         * dann nach completenessScore. Ohne das landen bei mehrdeutigen API-
+         * Antworten (OFF liefert keine feste Relevanz-Reihenfolge) beliebige
+         * Treffer oben, und identische Suchen liefern je nach Cache-Zustand
+         * unterschiedliche Ergebnisse.
+         *
+         * Public, damit andere Aufrufer (z.B. Repositories.searchAll, das
+         * lokale DB-Treffer und Remote-Treffer separat zusammenführt) dieselbe
+         * Sortierung anwenden können statt lokale Treffer unsortiert voranzustellen.
+         */
+        fun relevanceComparator(query: String): Comparator<FoodItem> {
+            val q = query.trim().lowercase()
+            fun relevance(item: FoodItem): Int {
+                val name = item.name.lowercase()
+                return when {
+                    name == q -> 4
+                    name.startsWith(q) -> 3
+                    Regex("\\b${Regex.escape(q)}").containsMatchIn(name) -> 2
+                    name.contains(q) -> 1
+                    else -> 0
+                }
             }
+            return compareByDescending<FoodItem> { relevance(it) }.thenByDescending { it.completenessScore }
         }
-        return compareByDescending<FoodItem> { relevance(it) }.thenByDescending { it.completenessScore }
     }
 
     suspend fun searchNaturalLanguage(query: String): List<FoodItem> {

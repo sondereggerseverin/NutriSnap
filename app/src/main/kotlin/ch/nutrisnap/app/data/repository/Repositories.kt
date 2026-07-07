@@ -219,7 +219,11 @@ class FoodItemRepository(db: NutriDatabase) {
         val local      = dao.search(query)
         val remoteList = remoteRepo.search(query)
         val names      = local.map { it.name.lowercase() }.toSet()
-        return local + remoteList.filter { it.name.lowercase() !in names }
+        val combined   = local + remoteList.filter { it.name.lowercase() !in names }
+        // local ist eine rohe DB-LIKE-Query ohne Relevanz-Reihenfolge — ohne diese
+        // Sortierung landen zufällige lokale Cache-Treffer vor besser passenden
+        // Remote-Ergebnissen (z.B. "Mini Chinois" vor "Apfel naturtrüb" bei Suche "apfel").
+        return combined.sortedWith(FoodSearchRepository.relevanceComparator(query))
     }
 
     suspend fun searchBarcode(barcode: String): FoodItem? = remoteRepo.searchByBarcode(barcode)
