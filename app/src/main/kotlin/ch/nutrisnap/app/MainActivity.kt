@@ -77,6 +77,7 @@ val bottomNavItems = listOf(
 
 class MainActivity : ComponentActivity() {
     private var sharedUrl: String? = null
+    private var sharedBatchUrls: List<String> = emptyList()
 
     private val notifPermLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -95,7 +96,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        sharedUrl = extractSharedUrl(intent)
+        val extractedUrls = extractSharedUrls(intent)
+        if (extractedUrls.size > 1) sharedBatchUrls = extractedUrls else sharedUrl = extractedUrls.firstOrNull()
         NotificationHelper.createChannels(this)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -121,6 +123,7 @@ class MainActivity : ComponentActivity() {
                         OfflineBanner(isOnline = isOnline2)
                         MainScaffold(
                             sharedUrl = sharedUrl,
+                            sharedBatchUrls = sharedBatchUrls,
                             hcVm = hcVm2,
                             onRequestHealthPermission = {
                                 healthConnectPermLauncher.launch(HealthConnectManager.REQUIRED_PERMISSIONS)
@@ -170,6 +173,7 @@ class MainActivity : ComponentActivity() {
                             } else {
                                 MainScaffold(
                                     sharedUrl = sharedUrl,
+                                    sharedBatchUrls = sharedBatchUrls,
                                     hcVm = hcVm,
                                     onRequestHealthPermission = {
                                         healthConnectPermLauncher.launch(
@@ -187,20 +191,40 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        sharedUrl = extractSharedUrl(intent)
+        val extractedUrls = extractSharedUrls(intent)
+        if (extractedUrls.size > 1) { sharedBatchUrls = extractedUrls; sharedUrl = null }
+        else { sharedUrl = extractedUrls.firstOrNull(); sharedBatchUrls = emptyList() }
     }
 
-    private fun extractSharedUrl(intent: Intent?): String? {
-        if (intent?.action == Intent.ACTION_SEND && intent.type == "text/plain")
-            return intent.getStringExtra(Intent.EXTRA_TEXT)?.trim()?.takeIf { it.startsWith("http") }
-        if (intent?.action == Intent.ACTION_VIEW) return intent.dataString
-        return null
+    /**
+     * Erkennt einen oder mehrere geteilte Links.
+     * - ACTION_SEND (text/plain): extrahiert ALLE URLs aus dem Text, nicht nur eine am Anfang —
+     *   deckt den Fall ab, dass mehrere Insta/TikTok-Links in einer Notiz zusammen geteilt werden.
+     * - ACTION_SEND_MULTIPLE (text/plain): manche Apps hängen mehrere Texte als
+     *   EXTRA_TEXT-ArrayList an; falls nicht vorhanden, wird der einzelne EXTRA_TEXT genutzt.
+     * - ACTION_VIEW: einzelner Deep-Link.
+     */
+    private fun extractSharedUrls(intent: Intent?): List<String> {
+        if (intent == null) return emptyList()
+        return when {
+            intent.action == Intent.ACTION_SEND && intent.type == "text/plain" ->
+                ch.nutrisnap.app.domain.UrlExtractor.extractAll(intent.getStringExtra(Intent.EXTRA_TEXT) ?: "")
+            intent.action == Intent.ACTION_SEND_MULTIPLE && intent.type == "text/plain" -> {
+                val texts = intent.getCharSequenceArrayListExtra(Intent.EXTRA_TEXT)
+                    ?.joinToString("\n") { it.toString() }
+                    ?: intent.getStringExtra(Intent.EXTRA_TEXT) ?: ""
+                ch.nutrisnap.app.domain.UrlExtractor.extractAll(texts)
+            }
+            intent.action == Intent.ACTION_VIEW -> listOfNotNull(intent.dataString)
+            else -> emptyList()
+        }
     }
 }
 
 @Composable
 fun MainScaffold(
     sharedUrl: String?,
+    sharedBatchUrls: List<String> = emptyList(),
     hcVm: HealthConnectViewModel,
     onRequestHealthPermission: () -> Unit
 ) {
@@ -208,8 +232,8 @@ fun MainScaffold(
     val backEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backEntry?.destination?.route
 
-    LaunchedEffect(sharedUrl) {
-        if (!sharedUrl.isNullOrBlank()) {
+    LaunchedEffect(sharedUrl, sharedBatchUrls) {
+        if (!sharedUrl.isNullOrBlank() || sharedBatchUrls.isNotEmpty()) {
             navController.navigate(Screen.Recipes.route) {
                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                 launchSingleTop = true; restoreState = true
@@ -277,7 +301,7 @@ fun MainScaffold(
                 val scanArg = backStackEntry.arguments?.getBoolean("scan") ?: false
                 DiaryScreen(initialMeal = mealArg, autoOpenAdd = openArg, autoOpenScanner = scanArg)
             }
-            composable(Screen.Recipes.route)   { RecipesHubScreen(sharedUrl = sharedUrl) }
+            composable(Screen.Recipes.route)   { RecipesHubScreen(sharedUrl = sharedUrl, sharedBatchUrls = sharedBatchUrls) }
             composable(Screen.Analysis.route)  { AnalysisScreen() }
             composable(Screen.Settings.route) {
                 SettingsScreen(
