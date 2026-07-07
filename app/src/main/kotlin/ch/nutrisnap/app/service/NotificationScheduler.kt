@@ -12,9 +12,6 @@ object NotificationScheduler {
         schedule(context, 8,  0,  "meal_breakfast", 10)
         schedule(context, 12, 30, "meal_lunch",     11)
         schedule(context, 18, 30, "meal_dinner",    12)
-        schedule(context, 10, 0,  "water",          13)
-        schedule(context, 14, 0,  "water",          14)
-        schedule(context, 17, 0,  "water",          15)
         schedule(context, 21, 0,  "daily_recap",    16)
     }
 

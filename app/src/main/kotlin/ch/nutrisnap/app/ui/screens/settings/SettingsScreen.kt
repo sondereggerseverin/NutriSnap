@@ -77,8 +77,6 @@ private fun computeGoals(
 fun SettingsScreen(
     vm: SettingsViewModel = viewModel(),
     onNavigateToNotifSettings: () -> Unit = {},
-    onNavigateToWater: () -> Unit = {},
-    onNavigateToFasting: () -> Unit = {},
     onNavigateToStats: () -> Unit = {},
     onNavigateToExport: () -> Unit = {},
     onNavigateToCustomFoods: () -> Unit = {},
@@ -150,16 +148,6 @@ fun SettingsScreen(
 
         // Feature-Shortcuts
         SettingsCard(title = "Features", icon = Icons.Default.Apps) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onNavigateToWater, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.WaterDrop, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp)); Text("Wasser", fontSize = 12.sp)
-                }
-                OutlinedButton(onClick = onNavigateToFasting, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.Timer, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp)); Text("Fasten", fontSize = 12.sp)
-                }
-            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onNavigateToStats, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.BarChart, null, Modifier.size(16.dp))

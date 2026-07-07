@@ -53,8 +53,6 @@ interface UserProfileDao {
         UserProfileEntity::class,
         WeightEntry::class,
         FavoriteFoodEntity::class,
-        WaterEntry::class,
-        FastingSession::class,
         RecipeCollection::class,
         HealthConnectCache::class,
         IngredientMatch::class,
@@ -64,7 +62,7 @@ interface UserProfileDao {
         MealTemplateItem::class,
         GeneratedRecipeEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -75,7 +73,6 @@ abstract class NutriDatabase : RoomDatabase() {
     abstract fun userProfileDao(): UserProfileDao
     abstract fun weightDao(): WeightDao
     abstract fun favoriteFoodDao(): FavoriteFoodDao
-    abstract fun waterEntryDao(): WaterEntryDao
     abstract fun recipeCollectionDao(): RecipeCollectionDao
     abstract fun healthConnectDao(): HealthConnectDao
     abstract fun ingredientMatchDao(): IngredientMatchDao
@@ -248,6 +245,15 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // Phase 8: Wassertracking und Fasten entfernt - zugehoerige Tabellen
+        // werden verworfen statt still stehenzubleiben.
+        private val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS water_entries")
+                db.execSQL("DROP TABLE IF EXISTS fasting_sessions")
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -259,7 +265,7 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
                         MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
                         MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
-                        MIGRATION_12_13
+                        MIGRATION_12_13, MIGRATION_13_14
                     )
                     .build()
                     .also { INSTANCE = it }

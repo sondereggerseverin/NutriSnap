@@ -84,11 +84,6 @@
             </intent-filter>
         </activity-alias>
 
-        <service
-            android:name=".service.FastingTimerService"
-            android:foregroundServiceType="dataSync"
-            android:exported="false"/>
-
         <receiver android:name=".service.NotificationReceiver" android:exported="false"/>
 
         <receiver android:name=".service.BootReceiver" android:exported="true">

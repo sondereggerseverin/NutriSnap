@@ -10,7 +10,6 @@ class NotificationReceiver : BroadcastReceiver() {
             "meal_breakfast" -> NotificationHelper.showMealReminder(context, "Fruehstueck", 100)
             "meal_lunch"     -> NotificationHelper.showMealReminder(context, "Mittagessen", 101)
             "meal_dinner"    -> NotificationHelper.showMealReminder(context, "Abendessen", 102)
-            "water"          -> NotificationHelper.showWaterReminder(context, intent.getIntExtra("current_ml", 0))
             "daily_recap"    -> NotificationHelper.showDailyRecap(context,
                 intent.getIntExtra("calories", 0),
                 intent.getIntExtra("goal", 2000),

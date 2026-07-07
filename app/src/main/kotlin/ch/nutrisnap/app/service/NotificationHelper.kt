@@ -12,7 +12,6 @@ import ch.nutrisnap.app.MainActivity
 object NotificationHelper {
 
     const val CHANNEL_REMINDERS = "nutrisnap_reminders"
-    const val CHANNEL_FASTING   = "nutrisnap_fasting"
     const val CHANNEL_DAILY     = "nutrisnap_daily"
 
     fun createChannels(context: Context) {
@@ -20,9 +19,7 @@ object NotificationHelper {
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             listOf(
                 NotificationChannel(CHANNEL_REMINDERS, "Erinnerungen", NotificationManager.IMPORTANCE_DEFAULT)
-                    .apply { description = "Mahlzeiten- und Wasser-Erinnerungen" },
-                NotificationChannel(CHANNEL_FASTING, "Fasten-Timer", NotificationManager.IMPORTANCE_LOW)
-                    .apply { description = "Fasten-Fortschritt"; setSound(null, null) },
+                    .apply { description = "Mahlzeiten-Erinnerungen" },
                 NotificationChannel(CHANNEL_DAILY, "Tagesrueckblick", NotificationManager.IMPORTANCE_DEFAULT)
                     .apply { description = "Abendliche Zusammenfassung" }
             ).forEach { manager.createNotificationChannel(it) }
@@ -39,24 +36,11 @@ object NotificationHelper {
             intent)
     }
 
-    fun showWaterReminder(context: Context, currentMl: Int, goalMl: Int = 2500) {
-        val remaining = goalMl - currentMl
-        notify(context, 101, CHANNEL_REMINDERS,
-            "Trink mehr Wasser!",
-            "Noch ${remaining}ml bis zu deinem Tagesziel von ${goalMl}ml")
-    }
-
     fun showDailyRecap(context: Context, calories: Int, goal: Int, protein: Float) {
         val ok = calories <= goal
         notify(context, 200, CHANNEL_DAILY,
             if (ok) "Super gemacht heute!" else "Dein Tagesrueckblick",
             "Kalorien: $calories / $goal kcal | Protein: ${protein.toInt()}g")
-    }
-
-    fun showFastingGoalReached(context: Context, hours: Int) {
-        notify(context, 300, CHANNEL_FASTING,
-            "Fastenziel erreicht!",
-            "Du hast erfolgreich ${hours}h gefastet!")
     }
 
     private fun notify(

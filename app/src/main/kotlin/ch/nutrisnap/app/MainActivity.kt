@@ -36,8 +36,6 @@ import ch.nutrisnap.app.ui.screens.auth.LoginScreen
 import ch.nutrisnap.app.ui.screens.customfood.CreateCustomFoodScreen
 import ch.nutrisnap.app.ui.screens.diary.DiaryScreen
 import ch.nutrisnap.app.ui.screens.export.ExportScreen
-import ch.nutrisnap.app.ui.screens.fasting.FastingScreen
-import ch.nutrisnap.app.ui.screens.fasting.FastingViewModel
 import ch.nutrisnap.app.ui.screens.home.HomeScreen
 import ch.nutrisnap.app.ui.screens.mealtemplate.MealTemplateScreen
 import ch.nutrisnap.app.ui.screens.recipes.RecipesHubScreen
@@ -53,7 +51,6 @@ import ch.nutrisnap.app.ui.screens.settings.YazioImportScreen
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.screens.stats.WeeklyStatsScreen
 import ch.nutrisnap.app.ui.screens.stats.WeeklyStatsViewModel
-import ch.nutrisnap.app.ui.screens.water.WaterTrackingScreen
 import ch.nutrisnap.app.ui.theme.NutriSnapTheme
 import ch.nutrisnap.app.ui.viewmodel.HealthConnectViewModel
 import ch.nutrisnap.app.utils.NetworkMonitor
@@ -277,8 +274,6 @@ fun MainScaffold(
                         }
                     },
                     onNavigateToHealth = { navController.navigate("health") },
-                    onNavigateToWater = { navController.navigate("water") },
-                    onNavigateToFasting = { navController.navigate("fasting") },
                     onNavigateToFoodScan = { navController.navigate("scan_chooser") },
                     onNavigateToRecipeImport = {
                         navController.navigate(Screen.Recipes.route) {
@@ -306,8 +301,6 @@ fun MainScaffold(
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onNavigateToNotifSettings = { navController.navigate("notif_settings") },
-                    onNavigateToWater         = { navController.navigate("water") },
-                    onNavigateToFasting       = { navController.navigate("fasting") },
                     onNavigateToStats         = { navController.navigate("stats") },
                     onNavigateToExport        = { navController.navigate("export") },
                     onNavigateToCustomFoods   = { navController.navigate("custom_foods") },
@@ -327,11 +320,6 @@ fun MainScaffold(
                     onLabelPhoto    = { navController.navigate("nutrition_label_scan") },
                     onBack          = { navController.popBackStack() }
                 )
-            }
-            composable("water")   { WaterTrackingScreen() }
-            composable("fasting") {
-                val vm: FastingViewModel = viewModel()
-                FastingScreen(viewModel = vm)
             }
             composable("stats") {
                 val vm: WeeklyStatsViewModel = viewModel()

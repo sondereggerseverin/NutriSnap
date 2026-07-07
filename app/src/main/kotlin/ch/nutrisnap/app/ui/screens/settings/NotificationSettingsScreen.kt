@@ -20,7 +20,6 @@ import kotlinx.coroutines.launch
 
 val android.content.Context.notifDataStore by preferencesDataStore("notification_prefs")
 val KEY_MEAL_REMINDERS  = booleanPreferencesKey("meal_reminders")
-val KEY_WATER_REMINDERS = booleanPreferencesKey("water_reminders")
 val KEY_DAILY_RECAP     = booleanPreferencesKey("daily_recap")
 val KEY_BIOMETRIC_LOCK  = booleanPreferencesKey("biometric_lock")
 
@@ -31,7 +30,6 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
     val scope   = rememberCoroutineScope()
 
     val mealReminders  by context.notifDataStore.data.map { it[KEY_MEAL_REMINDERS]  ?: true  }.collectAsState(true)
-    val waterReminders by context.notifDataStore.data.map { it[KEY_WATER_REMINDERS] ?: true  }.collectAsState(true)
     val dailyRecap     by context.notifDataStore.data.map { it[KEY_DAILY_RECAP]     ?: true  }.collectAsState(true)
     val biometricLock  by context.notifDataStore.data.map { it[KEY_BIOMETRIC_LOCK]  ?: false }.collectAsState(false)
 
@@ -50,9 +48,6 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
                     context.notifDataStore.edit { p -> p[KEY_MEAL_REMINDERS] = it }
                     if (it) NotificationScheduler.scheduleAll(context) else NotificationScheduler.cancelAll(context)
                 }
-            }}
-            item { ToggleCard("Wasser-Erinnerungen", "3x taeglich: 10:00, 14:00, 17:00", waterReminders) {
-                scope.launch { context.notifDataStore.edit { p -> p[KEY_WATER_REMINDERS] = it } }
             }}
             item { ToggleCard("Tagesrueckblick", "Jeden Abend um 21:00 Uhr", dailyRecap) {
                 scope.launch { context.notifDataStore.edit { p -> p[KEY_DAILY_RECAP] = it } }

@@ -32,8 +32,6 @@ fun HomeScreen(
     hcVm: HealthConnectViewModel = viewModel(),
     onNavigateToDiary: (meal: MealType?, autoOpenAdd: Boolean) -> Unit = { _, _ -> },
     onNavigateToHealth: () -> Unit = {},
-    onNavigateToWater: () -> Unit = {},
-    onNavigateToFasting: () -> Unit = {},
     onNavigateToFoodScan: () -> Unit = {},
     onNavigateToRecipeImport: () -> Unit = {}
 ) {
@@ -58,8 +56,6 @@ fun HomeScreen(
             onToggle = { showQuickAdd = !showQuickAdd },
             onAddFood = { showQuickAdd = false; onNavigateToDiary(null, true) },
             onScanFood = { showQuickAdd = false; onNavigateToFoodScan() },
-            onLogWater = { showQuickAdd = false; onNavigateToWater() },
-            onStartFasting = { showQuickAdd = false; onNavigateToFasting() },
             onImportRecipe = { showQuickAdd = false; onNavigateToRecipeImport() },
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
         )
@@ -75,8 +71,8 @@ fun HomeScreen(
 }
 
 // ── Quick-add speed-dial FAB ───────────────────────────────────────────────────
-// Bündelt die häufigsten Aktionen (Essen loggen, scannen, Wasser, Fasten,
-// Rezept-Import) direkt auf dem Home-Screen, statt sie unter "Mehr" zu verstecken.
+// Bündelt die häufigsten Aktionen (Essen loggen, scannen, Rezept-Import) direkt
+// auf dem Home-Screen, statt sie unter "Mehr" zu verstecken.
 
 @Composable
 private fun QuickAddFab(
@@ -84,18 +80,12 @@ private fun QuickAddFab(
     onToggle: () -> Unit,
     onAddFood: () -> Unit,
     onScanFood: () -> Unit,
-    onLogWater: () -> Unit,
-    onStartFasting: () -> Unit,
     onImportRecipe: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier, horizontalAlignment = Alignment.End) {
         if (expanded) {
             QuickAddAction("Rezept importieren", Icons.Default.Link, onImportRecipe)
-            Spacer(Modifier.height(8.dp))
-            QuickAddAction("Fasten starten", Icons.Default.Timer, onStartFasting)
-            Spacer(Modifier.height(8.dp))
-            QuickAddAction("Wasser eintragen", Icons.Default.WaterDrop, onLogWater)
             Spacer(Modifier.height(8.dp))
             QuickAddAction("Essen scannen", Icons.Default.PhotoCamera, onScanFood)
             Spacer(Modifier.height(8.dp))
