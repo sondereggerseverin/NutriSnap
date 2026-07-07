@@ -223,6 +223,7 @@ class FoodItemRepository(db: NutriDatabase) {
     }
 
     suspend fun searchBarcode(barcode: String): FoodItem? = remoteRepo.searchByBarcode(barcode)
+    suspend fun getById(id: Int): FoodItem?                = dao.getById(id)
     suspend fun saveCustomFood(item: FoodItem): Long       = dao.insert(item)
     suspend fun deleteFood(item: FoodItem)                 = dao.delete(item)
 }

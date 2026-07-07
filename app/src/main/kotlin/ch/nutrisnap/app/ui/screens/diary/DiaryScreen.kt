@@ -31,6 +31,7 @@ import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.data.model.favoriteKey
 import ch.nutrisnap.app.ui.components.EmptyState
 import ch.nutrisnap.app.ui.components.MacroBar
+import ch.nutrisnap.app.ui.components.MicronutrientTable
 import ch.nutrisnap.app.ui.components.NutritionFactsProgress
 import ch.nutrisnap.app.ui.components.SectionHeader
 import ch.nutrisnap.app.ui.screens.barcode.BarcodeScannerScreen
@@ -49,6 +50,7 @@ fun DiaryScreen(
     val state by vm.uiState.collectAsState()
     var showAddSheet by remember { mutableStateOf(autoOpenAdd || autoOpenScanner) }
     var editEntry    by remember { mutableStateOf<DiaryEntry?>(null) }
+    var detailEntry  by remember { mutableStateOf<DiaryEntry?>(null) }
     var expandedNutrition by remember { mutableStateOf<MealType?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val mealPrefs by context.notifDataStore.data.collectAsState(initial = null)
@@ -135,7 +137,7 @@ fun DiaryScreen(
                     item(key = "meal_group_${meal.name}") {
                         ReorderableMealEntries(
                             entries   = mealEntries,
-                            onEdit    = { editEntry = it },
+                            onEdit    = { detailEntry = it; vm.loadEntryDetail(it) },
                             onDelete  = { entry ->
                                 vm.deleteEntry(entry)
                                 scope.launch {
@@ -156,6 +158,16 @@ fun DiaryScreen(
     }
 
     if (showAddSheet) AddFoodSheet(vm = vm, initialMeal = initialMeal, autoOpenScanner = autoOpenScanner, onDismiss = { showAddSheet = false })
+
+    detailEntry?.let { entry ->
+        val foodItem by vm.entryDetailFood.collectAsState()
+        EntryDetailSheet(
+            entry     = entry,
+            foodItem  = foodItem,
+            onEdit    = { editEntry = entry; detailEntry = null; vm.clearEntryDetail() },
+            onDismiss = { detailEntry = null; vm.clearEntryDetail() }
+        )
+    }
 
     editEntry?.let { entry ->
         EditEntryDialog(
@@ -225,6 +237,108 @@ private fun EditEntryDialog(
             }
         }
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EntryDetailSheet(
+    entry: DiaryEntry,
+    foodItem: ch.nutrisnap.app.data.model.FoodItem?,
+    onEdit: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    // Mikronaehrstoffe liegen im FoodItem pro 100g vor, DiaryEntry speichert die
+    // tatsaechlich verzehrte Menge in Gramm -> auf diese Menge skalieren.
+    val factor = entry.amountGrams / 100f
+    val micros = remember(foodItem, entry.amountGrams) {
+        buildMap<String, Float> {
+            foodItem?.let { f ->
+                f.fiber?.let { put("fiber", it * factor) }
+                f.sugar?.let { put("sugar", it * factor) }
+                f.saturatedFat?.let { put("saturatedFat", it * factor) }
+                f.monoFat?.let { put("monoFat", it * factor) }
+                f.polyFat?.let { put("polyFat", it * factor) }
+                f.transFat?.let { put("transFat", it * factor) }
+                f.salt?.let { put("salt", it * factor) }
+                f.sodium?.let { put("sodium", it * factor) }
+                f.alcohol?.let { put("alcohol", it * factor) }
+                f.cholesterol?.let { put("cholesterol", it * factor) }
+                f.water?.let { put("water", it * factor) }
+                f.vitaminA?.let { put("vitaminA", it * factor) }
+                f.vitaminB1?.let { put("vitaminB1", it * factor) }
+                f.vitaminB2?.let { put("vitaminB2", it * factor) }
+                f.vitaminB3?.let { put("vitaminB3", it * factor) }
+                f.vitaminB5?.let { put("vitaminB5", it * factor) }
+                f.vitaminB6?.let { put("vitaminB6", it * factor) }
+                f.vitaminB7?.let { put("vitaminB7", it * factor) }
+                f.vitaminB11?.let { put("vitaminB11", it * factor) }
+                f.vitaminB12?.let { put("vitaminB12", it * factor) }
+                f.vitaminC?.let { put("vitaminC", it * factor) }
+                f.vitaminD?.let { put("vitaminD", it * factor) }
+                f.vitaminE?.let { put("vitaminE", it * factor) }
+                f.vitaminK?.let { put("vitaminK", it * factor) }
+                f.potassium?.let { put("potassium", it * factor) }
+                f.calcium?.let { put("calcium", it * factor) }
+                f.iron?.let { put("iron", it * factor) }
+                f.magnesium?.let { put("magnesium", it * factor) }
+                f.zinc?.let { put("zinc", it * factor) }
+                f.phosphorus?.let { put("phosphorus", it * factor) }
+                f.copper?.let { put("copper", it * factor) }
+                f.manganese?.let { put("manganese", it * factor) }
+                f.fluoride?.let { put("fluoride", it * factor) }
+                f.iodine?.let { put("iodine", it * factor) }
+                f.selenium?.let { put("selenium", it * factor) }
+                f.chromium?.let { put("chromium", it * factor) }
+                f.molybdenum?.let { put("molybdenum", it * factor) }
+                f.chloride?.let { put("chloride", it * factor) }
+                f.choline?.let { put("choline", it * factor) }
+                f.arsenic?.let { put("arsenic", it * factor) }
+                f.boron?.let { put("boron", it * factor) }
+                f.cobalt?.let { put("cobalt", it * factor) }
+                f.rubidium?.let { put("rubidium", it * factor) }
+                f.silicon?.let { put("silicon", it * factor) }
+                f.sulfur?.let { put("sulfur", it * factor) }
+                f.tin?.let { put("tin", it * factor) }
+                f.vanadium?.let { put("vanadium", it * factor) }
+            }
+        }
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(horizontal = 16.dp).navigationBarsPadding().padding(bottom = 16.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(entry.foodName, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, "Menge bearbeiten") }
+            }
+            val isRecipe = entry.amountGrams == 0f || entry.foodItemId < 0
+            Text(if (isRecipe) "1 Portion" else "${entry.amountGrams.toInt()} g",
+                fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                EntryMacroItem("Kalorien", "${entry.calories.toInt()}", "kcal")
+                EntryMacroItem("Protein", "${entry.protein.toInt()}", "g")
+                EntryMacroItem("Kohlenhy.", "${entry.carbs.toInt()}", "g")
+                EntryMacroItem("Fett", "${entry.fat.toInt()}", "g")
+            }
+            if (micros.isNotEmpty()) {
+                HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                MicronutrientTable(micros, ratio = 1f)
+            } else if (!isRecipe) {
+                Spacer(Modifier.height(12.dp))
+                Text("Keine Mikronährstoffe für diesen Eintrag verfügbar.",
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EntryMacroItem(label: String, value: String, unit: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
+        Text(unit, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 @Composable

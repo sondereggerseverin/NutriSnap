@@ -153,5 +153,17 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     /** Reihenfolge innerhalb einer Mahlzeit nach Drag-Reorder persistieren. */
     fun reorderEntries(orderedIds: List<Long>) = viewModelScope.launch { repo.updateSortOrder(orderedIds) }
 
+    // Eintrag-Detail (Mikronaehrstoffe), analog Yazio: Antippen eines Tagebuch-
+    // Eintrags laedt das zugehoerige FoodItem fuer die volle Naehrwerttabelle.
+    private val _entryDetailFood = MutableStateFlow<FoodItem?>(null)
+    val entryDetailFood: StateFlow<FoodItem?> = _entryDetailFood
+
+    fun loadEntryDetail(entry: DiaryEntry) {
+        _entryDetailFood.value = null
+        if (entry.foodItemId <= 0) return // manuelle Eintraege/Rezepte haben kein FoodItem
+        viewModelScope.launch { _entryDetailFood.value = foodRepo.getById(entry.foodItemId) }
+    }
+    fun clearEntryDetail() { _entryDetailFood.value = null }
+
     fun saveCustomFood(item: FoodItem) = viewModelScope.launch { foodRepo.saveCustomFood(item) }
 }

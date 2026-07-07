@@ -36,6 +36,7 @@ import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import ch.nutrisnap.app.domain.UrlExtractor
 import ch.nutrisnap.app.ui.components.EmptyState
+import ch.nutrisnap.app.ui.components.MicronutrientTable
 import coil.compose.AsyncImage
 
 // ── Unit conversions ──────────────────────────────────────────────────────────
@@ -801,7 +802,7 @@ private fun NutritionAnalysisCard(
                         }
                         if (showMicros) {
                             val perServing = r.totalMicros.mapValues { it.value / recipe.servings.coerceAtLeast(1) }
-                            MicronutrientTable(perServing, ratio)
+                            MicronutrientTable(perServing, ratio, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
                         }
                     }
                 }
@@ -816,85 +817,8 @@ private fun NutritionAnalysisCard(
     }
 }
 
-// ── Mikronaehrstoff-Tabelle (Yazio-Stil: Sonstiges / Vitamine / Mineralstoffe) ─
-/** label, Anzeige-Einheit, Umrechnungsfaktor von Gramm in die Anzeige-Einheit. */
-private val MICRO_META: Map<String, Triple<String, String, Float>> = mapOf(
-    "fiber" to Triple("Ballaststoffe", "g", 1f),
-    "sugar" to Triple("Zucker", "g", 1f),
-    "saturatedFat" to Triple("Gesättigte Fettsäuren", "g", 1f),
-    "monoFat" to Triple("Einfach ungesättigt", "g", 1f),
-    "polyFat" to Triple("Mehrfach ungesättigt", "g", 1f),
-    "transFat" to Triple("Trans-Fette", "g", 1f),
-    "alcohol" to Triple("Alkohol", "g", 1f),
-    "cholesterol" to Triple("Cholesterin", "mg", 1000f),
-    "salt" to Triple("Salz", "g", 1f),
-    "sodium" to Triple("Natrium", "mg", 1000f),
-    "water" to Triple("Wasser", "g", 1f),
-    "vitaminA" to Triple("Vitamin A", "µg", 1_000_000f),
-    "vitaminB1" to Triple("Vitamin B1 (Thiamin)", "mg", 1000f),
-    "vitaminB2" to Triple("Vitamin B2 (Riboflavin)", "mg", 1000f),
-    "vitaminB3" to Triple("Vitamin B3 (Niacin)", "mg", 1000f),
-    "vitaminB5" to Triple("Vitamin B5 (Pantothensäure)", "mg", 1000f),
-    "vitaminB6" to Triple("Vitamin B6", "mg", 1000f),
-    "vitaminB7" to Triple("Vitamin B7 (Biotin)", "µg", 1_000_000f),
-    "vitaminB11" to Triple("Vitamin B11 (Folsäure)", "µg", 1_000_000f),
-    "vitaminB12" to Triple("Vitamin B12", "µg", 1_000_000f),
-    "vitaminC" to Triple("Vitamin C", "mg", 1000f),
-    "vitaminD" to Triple("Vitamin D", "µg", 1_000_000f),
-    "vitaminE" to Triple("Vitamin E", "mg", 1000f),
-    "vitaminK" to Triple("Vitamin K", "µg", 1_000_000f),
-    "potassium" to Triple("Kalium", "mg", 1000f),
-    "calcium" to Triple("Calcium", "mg", 1000f),
-    "iron" to Triple("Eisen", "mg", 1000f),
-    "magnesium" to Triple("Magnesium", "mg", 1000f),
-    "zinc" to Triple("Zink", "mg", 1000f),
-    "phosphorus" to Triple("Phosphor", "mg", 1000f),
-    "copper" to Triple("Kupfer", "mg", 1000f),
-    "manganese" to Triple("Mangan", "mg", 1000f),
-    "fluoride" to Triple("Fluorid", "mg", 1000f),
-    "iodine" to Triple("Jod", "µg", 1_000_000f),
-    "selenium" to Triple("Selen", "µg", 1_000_000f),
-    "chromium" to Triple("Chrom", "µg", 1_000_000f),
-    "molybdenum" to Triple("Molybdän", "µg", 1_000_000f),
-    "chloride" to Triple("Chlorid", "mg", 1000f),
-    "choline" to Triple("Cholin", "mg", 1000f),
-    "arsenic" to Triple("Arsen", "µg", 1_000_000f),
-    "boron" to Triple("Bor", "mg", 1000f),
-    "cobalt" to Triple("Kobalt", "µg", 1_000_000f),
-    "rubidium" to Triple("Rubidium", "mg", 1000f),
-    "silicon" to Triple("Silizium", "mg", 1000f),
-    "sulfur" to Triple("Schwefel", "mg", 1000f),
-    "tin" to Triple("Zinn", "mg", 1000f),
-    "vanadium" to Triple("Vanadium", "µg", 1_000_000f)
-)
-private val MICRO_OTHER = listOf("fiber","sugar","saturatedFat","monoFat","polyFat","transFat","alcohol","cholesterol","salt","sodium","water")
-private val MICRO_VITAMINS = listOf("vitaminA","vitaminB1","vitaminB2","vitaminB3","vitaminB5","vitaminB6","vitaminB7","vitaminB11","vitaminB12","vitaminC","vitaminD","vitaminE","vitaminK")
-private val MICRO_MINERALS = listOf("potassium","calcium","iron","magnesium","zinc","phosphorus","copper","manganese","fluoride","iodine","selenium","chromium","molybdenum","chloride","choline","arsenic","boron","cobalt","rubidium","silicon","sulfur","tin","vanadium")
-
-@Composable
-private fun MicronutrientTable(perServing: Map<String, Float>, ratio: Float) {
-    Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-        listOf("Sonstiges" to MICRO_OTHER, "Vitamine" to MICRO_VITAMINS, "Mineralstoffe" to MICRO_MINERALS)
-            .forEach { (groupLabel, keys) ->
-                val rows = keys.mapNotNull { key -> perServing[key]?.let { key to it } }
-                if (rows.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(groupLabel, fontWeight = FontWeight.SemiBold, fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    rows.forEach { (key, value) ->
-                        val (label, unit, factor) = MICRO_META.getValue(key)
-                        Row(Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f))
-                            val display = value * ratio * factor
-                            val formatted = if (display < 1f && display > 0f) "< 1" else display.toInt().toString()
-                            Text("$formatted $unit", fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f))
-                        }
-                    }
-                }
-            }
-    }
-}
+// (MicronutrientTable + MICRO_META wurden nach ui/components/Components.kt verschoben,
+// damit sie auch von DiaryScreen für einzelne Tagebuch-Einträge genutzt werden können.)
 
 
 private enum class DiaryQuantityUnit { SERVING, GRAM }
