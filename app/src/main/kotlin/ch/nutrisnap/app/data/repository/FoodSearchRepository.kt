@@ -1,10 +1,12 @@
 ﻿package ch.nutrisnap.app.data.repository
 
+import ch.nutrisnap.app.data.api.GroqFoodEstimatorApi
 import ch.nutrisnap.app.data.api.NutritionixApi
 import ch.nutrisnap.app.data.api.SwissFoodApi
 import ch.nutrisnap.app.data.api.UsdaFoodApi
 import ch.nutrisnap.app.data.db.FoodItemDao
 import ch.nutrisnap.app.data.model.FoodItem
+import ch.nutrisnap.app.data.model.FoodSource
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -36,11 +38,18 @@ class FoodSearchRepository(
                 combined = combined + nutritionix
             }
 
+            // Letzter Fallback: einfache/generische Lebensmittel (z.B. "Apfel"), die in
+            // keiner strukturierten Quelle auftauchen (OFF = nur Markenprodukte, USDA =
+            // nur Englisch, Swiss-DB evtl. nicht erreichbar) werden per KI grob geschätzt.
+            if (combined.isEmpty()) {
+                GroqFoodEstimatorApi.estimate(query)?.let { combined = combined + it }
+            }
+
             val result = combined
                 .distinctBy { normalizeKey(it) }
                 .sortedWith(relevanceComparator(query))
 
-            foodItemDao.insertAll(result.take(20))
+            foodItemDao.insertAll(result.filter { it.source != FoodSource.MANUAL }.take(20))
             result
         }
     }
