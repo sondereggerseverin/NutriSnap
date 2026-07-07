@@ -20,10 +20,10 @@ class FoodSearchRepository(
 
     suspend fun search(query: String): List<FoodItem> {
         val cached = foodItemDao.searchFoods(query)
-        // Cache nur vertrauen, wenn mindestens ein wirklich guter Treffer dabei ist —
-        // sonst könnte "apfel" für immer nur alte Zufallstreffer (z.B. Apfelsaft,
-        // Apfelringe) liefern, ohne je neu nach einem echten "Apfel" zu suchen.
-        if (cached.size >= 5 && cached.any { relevance(it, query) >= 3 }) {
+        // Nur ein EXAKTER Namens-Treffer zählt als "gut genug" — "beginnt mit" reicht
+        // nicht, weil z.B. "Apfelringe" auch mit "apfel" beginnt und sonst faelschlich
+        // als Treffer für die Anfrage "apfel" durchgeht, obwohl kein echter Apfel dabei ist.
+        if (cached.size >= 5 && cached.any { relevance(it, query) == 4 }) {
             return cached.sortedWith(relevanceComparator(query))
         }
 
@@ -44,10 +44,10 @@ class FoodSearchRepository(
             }
 
             // Letzter Fallback: einfache/generische Lebensmittel (z.B. "Apfel"), die in
-            // keiner strukturierten Quelle als guter Treffer auftauchen (OFF = nur
+            // keiner strukturierten Quelle als exakter Treffer auftauchen (OFF = nur
             // Markenprodukte, USDA = nur Englisch, Swiss-DB evtl. nicht erreichbar),
-            // werden per KI grob geschätzt — auch wenn schlechte Treffer existieren.
-            if (combined.none { relevance(it, query) >= 3 }) {
+            // werden per KI grob geschätzt — auch wenn ähnlich klingende Treffer existieren.
+            if (combined.none { relevance(it, query) == 4 }) {
                 GroqFoodEstimatorApi.estimate(query)?.let { combined = combined + it }
             }
 
