@@ -30,6 +30,22 @@ data class NutritionState(
 
 enum class RecipeSort { NEWEST, NAME, CALORIES }
 
+enum class BatchStatus { PENDING, RUNNING, DONE, ERROR }
+
+data class BatchImportItem(
+    val url:         String,
+    val status:      BatchStatus = BatchStatus.PENDING,
+    val resultTitle: String?     = null,
+    val error:       String?     = null
+)
+
+data class BatchImportState(
+    val items:     List<BatchImportItem> = emptyList(),
+    val isRunning: Boolean = false
+) {
+    val doneCount: Int get() = items.count { it.status == BatchStatus.DONE }
+}
+
 data class RecipesUiState(
     val recipes:          List<Recipe> = emptyList(),
     val query:            String       = "",
@@ -51,6 +67,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     private val _sort           = MutableStateFlow(RecipeSort.NEWEST)
     private val _importState    = MutableStateFlow(ImportState())
     private val _nutritionState = MutableStateFlow(NutritionState())
+    private val _batchState     = MutableStateFlow(BatchImportState())
+    val batchState: StateFlow<BatchImportState> = _batchState.asStateFlow()
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<RecipesUiState> = combine(
@@ -115,6 +133,45 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                         state.copy(isImporting = false, importError = result.error ?: "Fehler beim Importieren")
                 }
             }
+        }
+    }
+
+    /** Fügt neue URLs zur Batch-Queue hinzu (Duplikate werden ignoriert). */
+    fun addBatchUrls(urls: List<String>) {
+        val existing = _batchState.value.items.map { it.url }.toSet()
+        val newItems = urls.distinct().filter { it !in existing }.map { BatchImportItem(url = it) }
+        if (newItems.isNotEmpty()) _batchState.update { it.copy(items = it.items + newItems) }
+    }
+
+    fun removeBatchItem(url: String) {
+        _batchState.update { it.copy(items = it.items.filterNot { i -> i.url == url }) }
+    }
+
+    fun clearBatch() { _batchState.value = BatchImportState() }
+
+    /** Importiert alle noch offenen Items sequenziell (schont Insta/TikTok-Endpunkte, vermeidet Rate-Limits). */
+    fun runBatchImport() {
+        if (_batchState.value.isRunning) return
+        viewModelScope.launch {
+            _batchState.update { it.copy(isRunning = true) }
+            val queue = _batchState.value.items.filter { it.status != BatchStatus.DONE }
+            for (item in queue) {
+                _batchState.update { st ->
+                    st.copy(items = st.items.map { if (it.url == item.url) it.copy(status = BatchStatus.RUNNING) else it })
+                }
+                val result = repo.importFromUrl(item.url)
+                _batchState.update { st ->
+                    st.copy(items = st.items.map {
+                        if (it.url != item.url) it
+                        else when {
+                            result.success            -> it.copy(status = BatchStatus.DONE, resultTitle = result.recipe?.title)
+                            result.instagramBlocked    -> it.copy(status = BatchStatus.ERROR, error = "Instagram blockiert – manuell einfügen nötig")
+                            else                       -> it.copy(status = BatchStatus.ERROR, error = result.error ?: "Fehler")
+                        }
+                    })
+                }
+            }
+            _batchState.update { it.copy(isRunning = false) }
         }
     }
 
