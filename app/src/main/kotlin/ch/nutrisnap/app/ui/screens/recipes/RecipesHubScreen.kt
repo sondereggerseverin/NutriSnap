@@ -25,7 +25,7 @@ private enum class RecipeTab { SAVED, AI }
 // Grund: 6 Bottom-Nav-Items sind zu viele (Material-Empfehlung: max. 5) und
 // beide Screens drehen sich um dasselbe Thema (Rezepte).
 @Composable
-fun RecipesHubScreen(sharedUrl: String?) {
+fun RecipesHubScreen(sharedUrl: String?, sharedBatchUrls: List<String> = emptyList()) {
     var tab by remember { mutableStateOf(RecipeTab.SAVED) }
 
     Column(Modifier.fillMaxSize()) {
@@ -44,7 +44,7 @@ fun RecipesHubScreen(sharedUrl: String?) {
             )
         }
         when (tab) {
-            RecipeTab.SAVED -> RecipesScreen(sharedUrl = sharedUrl)
+            RecipeTab.SAVED -> RecipesScreen(sharedUrl = sharedUrl, sharedBatchUrls = sharedBatchUrls)
             RecipeTab.AI    -> RecipeGeneratorScreen()
         }
     }
