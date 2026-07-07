@@ -50,6 +50,13 @@ data class RecipeDto(
     @SerialName("local_id") val localId: Long? = null
 )
 
+// Partial-Update-Body zum Verlinken einer bestehenden Remote-Zeile (per id) mit
+// einer neu entstandenen lokalen Row-ID. Wird verwendet statt upsert, weil upsert
+// mit onConflict=(user_id,local_id) bei einer neuen local_id immer eine NEUE Zeile
+// anlegt statt die bestehende (von der Web-App erstellte) Zeile zu aktualisieren.
+@Serializable
+private data class LocalIdPatch(@SerialName("local_id") val localId: Long)
+
 @Serializable
 data class WeightEntryDto(
     @SerialName("user_id") val userId: String? = null,
@@ -140,6 +147,19 @@ object SupabaseSync {
         }.decodeList()
     }
 
+    /** Verlinkt eine bestehende (z.B. von der Web-App erstellte) Remote-Zeile per
+     *  Primärschlüssel [remoteId] mit der neu erzeugten lokalen [localId] — ohne
+     *  eine neue Zeile anzulegen. Verhindert Duplikate beim nächsten Sync. */
+    suspend fun linkDiaryLocalId(remoteId: Long, localId: Long) {
+        val uid = userId() ?: return
+        sb.postgrest["diary_entries"].update(LocalIdPatch(localId)) {
+            filter {
+                eq("id", remoteId)
+                eq("user_id", uid)
+            }
+        }
+    }
+
     // ── Recipes ────────────────────────────────────────────────────────────
     suspend fun upsertRecipe(recipe: Recipe) {
         val uid = userId() ?: return
@@ -185,6 +205,19 @@ object SupabaseSync {
         return sb.postgrest["recipes"].select {
             filter { eq("user_id", uid) }
         }.decodeList()
+    }
+
+    /** Verlinkt eine bestehende (z.B. von der Web-App erstellte) Remote-Zeile per
+     *  Primärschlüssel [remoteId] mit der neu erzeugten lokalen [localId] — ohne
+     *  eine neue Zeile anzulegen. Verhindert Duplikate beim nächsten Sync. */
+    suspend fun linkRecipeLocalId(remoteId: Long, localId: Long) {
+        val uid = userId() ?: return
+        sb.postgrest["recipes"].update(LocalIdPatch(localId)) {
+            filter {
+                eq("id", remoteId)
+                eq("user_id", uid)
+            }
+        }
     }
 
     // ── Weight ─────────────────────────────────────────────────────────────

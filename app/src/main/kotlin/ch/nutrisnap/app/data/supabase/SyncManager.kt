@@ -98,8 +98,10 @@ object SyncManager {
                         fat = row.fat
                     )
                 )
-                val linked = dao.getById(newId)
-                if (linked != null) SupabaseSync.upsertDiaryEntry(linked)
+                // Zurueckverlinken statt upsert: sonst legt der naechste Sync wegen
+                // der frisch vergebenen local_id eine ZWEITE Remote-Zeile an, statt
+                // die bestehende Web-Zeile (row.id) zu aktualisieren -> Duplikate.
+                if (row.id != null) SupabaseSync.linkDiaryLocalId(row.id, newId)
             }
         }
     }
@@ -154,8 +156,9 @@ object SyncManager {
                         savedAt = row.savedAt
                     )
                 )
-                val linked = dao.getById(newId)
-                if (linked != null) SupabaseSync.upsertRecipe(linked)
+                // Zurueckverlinken statt upsert (siehe pullDiary) — verhindert, dass
+                // dieselbe Web-Rezept-Zeile bei jedem Sync erneut dupliziert wird.
+                if (row.id != null) SupabaseSync.linkRecipeLocalId(row.id, newId)
             }
         }
     }
