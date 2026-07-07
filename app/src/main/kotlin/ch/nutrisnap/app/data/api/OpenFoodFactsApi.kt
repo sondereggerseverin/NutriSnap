@@ -31,7 +31,7 @@ object OpenFoodFactsApi {
                 // Barcode lookup
                 if (query.startsWith("barcode:")) {
                     val code = query.removePrefix("barcode:")
-                    val url = "https://world.openfoodfacts.org/api/v0/product/$code.json?fields=product_name,brands,nutriments,code"
+                    val url = "https://world.openfoodfacts.org/api/v0/product/$code.json?fields=product_name,brands,nutriments,code,serving_size"
                     val req = Request.Builder().url(url)
                         .header("User-Agent", "NutriSnap/1.0 (Android)").build()
                     val body = client.newCall(req).execute().use { it.body?.string() ?: return@runCatching emptyList() }
@@ -44,7 +44,7 @@ object OpenFoodFactsApi {
                     val encoded = java.net.URLEncoder.encode(query.take(60), "UTF-8")
                     val url = "https://world.openfoodfacts.org/cgi/search.pl" +
                             "?search_terms=$encoded&search_simple=1&action=process&json=1" +
-                            "&page_size=$limit&fields=product_name,brands,nutriments,code"
+                            "&page_size=$limit&fields=product_name,brands,nutriments,code,serving_size"
                     val req = Request.Builder().url(url)
                         .header("User-Agent", "NutriSnap/1.0 (Android)").build()
                     val body = client.newCall(req).execute().use { it.body?.string() ?: return@runCatching emptyList() }
@@ -62,6 +62,7 @@ object OpenFoodFactsApi {
             ?: n.optDouble("energy_kcal_100g", -1.0).toFloat().takeIf { it > 0 })
             ?: return null
         val name = p.optString("product_name", "").ifBlank { return null }
+        val (servingSize, servingUnit) = parseServingSize(p.optString("serving_size", ""))
         return FoodItem(
             name              = name,
             brand             = p.optString("brands", "").ifBlank { null },
@@ -70,6 +71,8 @@ object OpenFoodFactsApi {
             protein           = n.optDouble("proteins_100g", 0.0).toFloat(),
             carbs             = n.optDouble("carbohydrates_100g", 0.0).toFloat(),
             fat               = n.optDouble("fat_100g", 0.0).toFloat(),
+            servingSize       = servingSize,
+            servingUnit       = servingUnit,
             fiber             = n.g("fiber_100g"),
             sugar             = n.g("sugars_100g"),
             saturatedFat      = n.g("saturated-fat_100g"),
@@ -117,4 +120,12 @@ object OpenFoodFactsApi {
     /** Liest ein _100g-Nutriment als Float, oder null wenn nicht vorhanden. */
     private fun JSONObject.g(key: String): Float? =
         if (has(key)) optDouble(key, Double.NaN).toFloat().takeIf { !it.isNaN() } else null
+
+    /** Parst OFFs freitextiges serving_size-Feld (z.B. "50 g", "1 riegel (40g)") zu (Menge, Einheit). */
+    private fun parseServingSize(raw: String): Pair<Float, String> {
+        val m = Regex("""(\d+(?:[.,]\d+)?)\s*(g|ml|kg|l)\b""", RegexOption.IGNORE_CASE).find(raw)
+            ?: return 100f to "g"
+        val amount = m.groupValues[1].replace(",", ".").toFloatOrNull() ?: return 100f to "g"
+        return amount to m.groupValues[2].lowercase()
+    }
 }
