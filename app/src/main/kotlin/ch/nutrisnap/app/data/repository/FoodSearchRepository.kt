@@ -18,7 +18,7 @@ class FoodSearchRepository(
 
     suspend fun search(query: String): List<FoodItem> {
         val cached = foodItemDao.searchFoods(query)
-        if (cached.size >= 5) return cached.sortedByDescending { it.completenessScore }
+        if (cached.size >= 5) return cached.sortedWith(relevanceComparator(query))
 
         return coroutineScope {
             val offDeferred = async { runCatching { openFoodFactsSearch(query) }.getOrDefault(emptyList()) }
@@ -38,11 +38,34 @@ class FoodSearchRepository(
 
             val result = combined
                 .distinctBy { normalizeKey(it) }
-                .sortedByDescending { it.completenessScore }
+                .sortedWith(relevanceComparator(query))
 
             foodItemDao.insertAll(result.take(20))
             result
         }
+    }
+
+    /**
+     * Sortiert zuerst danach, wie gut der Produktname zur Suchanfrage passt
+     * (exakt > beginnt mit > enthält als Wort > enthält als Teilstring), erst
+     * dann nach completenessScore. Ohne das landen bei mehrdeutigen API-
+     * Antworten (OFF liefert keine feste Relevanz-Reihenfolge) beliebige
+     * Treffer oben, und identische Suchen liefern je nach Cache-Zustand
+     * unterschiedliche Ergebnisse.
+     */
+    private fun relevanceComparator(query: String): Comparator<FoodItem> {
+        val q = query.trim().lowercase()
+        fun relevance(item: FoodItem): Int {
+            val name = item.name.lowercase()
+            return when {
+                name == q -> 4
+                name.startsWith(q) -> 3
+                Regex("\\b${Regex.escape(q)}").containsMatchIn(name) -> 2
+                name.contains(q) -> 1
+                else -> 0
+            }
+        }
+        return compareByDescending<FoodItem> { relevance(it) }.thenByDescending { it.completenessScore }
     }
 
     suspend fun searchNaturalLanguage(query: String): List<FoodItem> {
