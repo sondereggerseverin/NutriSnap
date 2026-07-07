@@ -3,9 +3,11 @@ package ch.nutrisnap.app.ui.screens.diary
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -711,6 +713,22 @@ private fun SearchTab(
             }
         }
         Spacer(Modifier.height(12.dp))
+        val presets = remember(food) { ch.nutrisnap.app.domain.FoodPortionPresets.forFood(food) }
+        if (presets.isNotEmpty()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.horizontalScroll(rememberScrollState())
+            ) {
+                presets.forEach { preset ->
+                    FilterChip(
+                        selected = amountText.toFloatOrNull() == preset.grams,
+                        onClick  = { amountText = preset.grams.toInt().toString() },
+                        label    = { Text(preset.label, fontSize = 12.sp) }
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = amountText, onValueChange = { amountText = it },
