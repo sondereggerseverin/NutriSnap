@@ -3,12 +3,12 @@ import { useState, useEffect, useRef, useCallback } from "react";
 
 // ─── THEME & TOKENS ───────────────────────────────────────────────────────────
 const COLORS = {
-  primary: "#2D7D46",       // forest green
-  primaryLight: "#4CAF70",
-  primaryDark: "#1B5E35",
-  accent: "#F4A225",        // warm amber
-  accentLight: "#FFD67A",
-  bg: "#F7F8F5",            // warm off-white
+  primary: "#2D6A4F",       // forest green (== AppTheme.FOREST_GREEN.primary in der APK)
+  primaryLight: "#52B788",
+  primaryDark: "#1B4332",
+  accent: "#E07A5F",        // == AppTheme.FOREST_GREEN.accent
+  accentLight: "#F2C4BB",
+  bg: "#F8F4EF",            // warm off-white
   card: "#FFFFFF",
   surface: "#EFF3ED",
   text: "#1A2B1E",
@@ -123,6 +123,10 @@ const INITIAL_STATE = {
   favorites: ["1", "4", "7"],
   recipes: SAMPLE_RECIPES,
   customFoods: [],
+  // Adaptives Kalorienziel (AdaptiveTdeeCalculator in der APK)
+  adaptiveTarget: { active: true, confidence: 82 },
+  // Health-Connect-Zusammenfassung fürs Home-Dashboard
+  health: { connected: true, steps: 6420, activeKcal: 310, sleepMinutes: 431 },
 };
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -905,120 +909,6 @@ function InputField({ label, value, onChange, placeholder, type="text" }) {
   );
 }
 
-// ─── SEARCH SCREEN ────────────────────────────────────────────────────────────
-function SearchScreen({ state, dispatch }) {
-  const [query, setQuery] = useState("");
-  const [tab, setTab] = useState("all"); // all | favorites | custom | barcode
-  const [addTarget, setAddTarget] = useState(null);
-  const [showFoodDetail, setShowFoodDetail] = useState(null);
-  const [scanning, setScanning] = useState(false);
-
-  const allFoods = [...FOOD_DB, ...state.customFoods];
-  const results = query.length > 1
-    ? allFoods.filter(f => f.name.toLowerCase().includes(query.toLowerCase()) || (f.brand && f.brand.toLowerCase().includes(query.toLowerCase())))
-    : allFoods.slice(0, 8);
-
-  function doScan() {
-    setScanning(true);
-    setTimeout(() => { setScanning(false); setShowFoodDetail(FOOD_DB[0]); }, 2000);
-  }
-
-  return (
-    <div style={{ padding: "16px 16px 80px" }}>
-      <div style={{ position: "relative", marginBottom: 14 }}>
-        <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Lebensmittel suchen…"
-          style={{ width: "100%", padding: "12px 14px 12px 40px", border: `1.5px solid ${COLORS.border}`, borderRadius: 12, fontSize: 15, color: COLORS.text, outline: "none", background: COLORS.card, boxSizing: "border-box" }} />
-        <span style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", fontSize: 17, color: COLORS.textLight }}>🔍</span>
-      </div>
-
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        {[["all","Alle"],["favorites","❤️ Favoriten"],["custom","✏️ Eigene"],["barcode","📷 Scan"]].map(([t,l]) => (
-          <Pill key={t} active={tab===t} onClick={() => setTab(t)}>{l}</Pill>
-        ))}
-      </div>
-
-      {tab === "barcode" ? (
-        <div style={{ textAlign: "center", padding: "32px 0" }}>
-          <div style={{ width: 240, height: 180, background: COLORS.card, borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px", border: `2px dashed ${COLORS.border}` }}>
-            {scanning ? (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 44, height: 44, borderRadius: "50%", border: `3px solid ${COLORS.primary}`, borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />
-                <div style={{ fontSize: 14, color: COLORS.textMid }}>Scanne Barcode…</div>
-              </div>
-            ) : (
-              <div style={{ fontSize: 60 }}>📷</div>
-            )}
-          </div>
-          <button onClick={doScan} disabled={scanning} style={{ padding: "13px 36px", background: COLORS.primary, color: "#fff", border: "none", borderRadius: 14, fontWeight: 700, fontSize: 16, cursor: "pointer", marginBottom: 16 }}>
-            Barcode scannen
-          </button>
-          <div style={{ fontSize: 13, color: COLORS.textLight }}>Scanne den Barcode eines Produkts um automatisch die Nährwerte zu laden</div>
-        </div>
-      ) : (
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <span style={{ fontSize: 13, color: COLORS.textMid }}>
-              {query.length > 1 ? `${results.length} Treffer` : "Beliebte Lebensmittel"}
-            </span>
-            <button onClick={() => dispatch({ type: "SHOW_CREATE_FOOD" })} style={{ background: "none", border: "none", color: COLORS.primary, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>+ Eigenes erstellen</button>
-          </div>
-          {results.map(f => {
-            const isFav = state.favorites.includes(f.id);
-            return (
-              <div key={f.id} onClick={() => setShowFoodDetail(f)} style={{ display: "flex", alignItems: "center", padding: "12px 0", borderBottom: `1px solid ${COLORS.border}`, cursor: "pointer" }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, color: COLORS.text, fontSize: 14 }}>{f.name}</div>
-                  <div style={{ fontSize: 12, color: COLORS.textLight }}>{f.brand || "Generisch"} • {f.serving}{f.servingUnit}</div>
-                </div>
-                <div style={{ textAlign: "right", marginRight: 12 }}>
-                  <div style={{ fontWeight: 700, color: COLORS.primary, fontSize: 14 }}>{f.kcal} kcal</div>
-                  <div style={{ fontSize: 11, color: COLORS.textLight }}>P:{f.protein}g K:{f.carbs}g F:{f.fat}g</div>
-                </div>
-                <button onClick={(e) => { e.stopPropagation(); dispatch({ type: "TOGGLE_FAVORITE", foodId: f.id }); }}
-                  style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: isFav ? "#E05252" : COLORS.border }}>
-                  {isFav ? "❤️" : "🤍"}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {showFoodDetail && (
-        <Modal title={showFoodDetail.name} onClose={() => setShowFoodDetail(null)}>
-          <FoodDetailView food={showFoodDetail} />
-        </Modal>
-      )}
-    </div>
-  );
-}
-
-function FoodDetailView({ food }) {
-  const nutrients = [
-    { l: "Kalorien", v: food.kcal, u: "kcal" },
-    { l: "Protein", v: food.protein, u: "g" },
-    { l: "Kohlenhydrate", v: food.carbs, u: "g" },
-    { l: "davon Zucker", v: food.sugar, u: "g" },
-    { l: "Fett", v: food.fat, u: "g" },
-    { l: "Ballaststoffe", v: food.fiber, u: "g" },
-    { l: "Natrium", v: food.sodium, u: "g" },
-  ];
-  return (
-    <div>
-      <div style={{ background: COLORS.surface, borderRadius: 12, padding: 14, marginBottom: 14 }}>
-        <div style={{ fontSize: 13, color: COLORS.textLight, marginBottom: 2 }}>{food.brand || "Generisch"}</div>
-        <div style={{ fontSize: 13, color: COLORS.textMid }}>Portionsgröße: {food.serving}{food.servingUnit}</div>
-      </div>
-      {nutrients.map(({ l, v, u }) => (
-        <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: `1px solid ${COLORS.border}` }}>
-          <span style={{ fontSize: 14, color: COLORS.textMid }}>{l}</span>
-          <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>{v} {u}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // ─── PROFILE SCREEN ───────────────────────────────────────────────────────────
 function ProfileScreen({ state, dispatch }) {
   const [editGoals, setEditGoals] = useState(false);
@@ -1106,17 +996,32 @@ function ProfileScreen({ state, dispatch }) {
 }
 
 // ─── HOME (DASHBOARD) SCREEN ──────────────────────────────────────────────────
-function HomeScreen({ state, dispatch }) {
+function FabAction({ label, icon, onClick }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ background: COLORS.card, borderRadius: 8, padding: "6px 10px", fontSize: 12, fontWeight: 600, color: COLORS.textMid, boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>{label}</span>
+      <button onClick={onClick} style={{ width: 40, height: 40, borderRadius: "50%", border: "none", background: COLORS.card, boxShadow: "0 2px 8px rgba(0,0,0,0.15)", fontSize: 17, cursor: "pointer" }}>{icon}</button>
+    </div>
+  );
+}
+
+function HomeScreen({ state, dispatch, onNavigate }) {
   const diary = state.diary[today] || { breakfast: [], lunch: [], dinner: [], snack: [] };
   const totals = sumDay(diary);
   const goals = state.goals;
   const [showWeightModal, setShowWeightModal] = useState(false);
   const [weightInput, setWeightInput] = useState("");
+  const [quickAddMeal, setQuickAddMeal] = useState(null); // null | mealKey, für die Quick-Add-Badges
+  const [fabOpen, setFabOpen] = useState(false);
 
   const timeHour = new Date().getHours();
   const greeting = timeHour < 12 ? "Guten Morgen" : timeHour < 18 ? "Guten Tag" : "Guten Abend";
 
   const lastWeight = state.weight[state.weight.length - 1];
+  const prevWeight = state.weight[state.weight.length - 2];
+  const weightDelta = lastWeight && prevWeight ? +(lastWeight.value - prevWeight.value).toFixed(1) : null;
+
+  const health = state.health || {};
 
   const meals = [
     { key: "breakfast", label: "Frühstück", icon: "☀️", color: COLORS.breakfast },
@@ -1133,6 +1038,9 @@ function HomeScreen({ state, dispatch }) {
           <div>
             <div style={{ fontSize: 13, opacity: 0.8, marginBottom: 2 }}>{greeting} 👋</div>
             <div style={{ fontSize: 20, fontWeight: 700 }}>Dein Tag im Überblick</div>
+            {state.adaptiveTarget?.active && (
+              <div style={{ fontSize: 11, opacity: 0.75, marginTop: 2 }}>🎯 Adaptives Ziel · {state.adaptiveTarget.confidence}% Konfidenz</div>
+            )}
           </div>
           <StreakBadge streak={state.streak} />
         </div>
@@ -1157,6 +1065,12 @@ function HomeScreen({ state, dispatch }) {
                 <div style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>{totals.kcal}</div>
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.7)" }}>gegessen</div>
               </div>
+              {health.activeKcal > 0 && (
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>+{health.activeKcal}</div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.7)" }}>aktiv</div>
+                </div>
+              )}
               <div style={{ textAlign: "center" }}>
                 <div style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>{goals.kcal}</div>
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.7)" }}>Ziel</div>
@@ -1183,16 +1097,49 @@ function HomeScreen({ state, dispatch }) {
           const entries = diary[key] || [];
           const mTotals = sumMeal(entries);
           return (
-            <div key={key} style={{ background: COLORS.card, borderRadius: 14, padding: 14, boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
+            <div key={key} style={{ position: "relative", background: COLORS.card, borderRadius: 14, padding: 14, boxShadow: "0 1px 6px rgba(0,0,0,0.05)", cursor: "pointer" }}
+              onClick={() => entries.length === 0 && setQuickAddMeal(key)}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                 <div style={{ width: 28, height: 28, borderRadius: 8, background: color+"22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>{icon}</div>
                 <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.textMid }}>{label}</span>
               </div>
               <div style={{ fontSize: 18, fontWeight: 800, color: entries.length > 0 ? COLORS.primary : COLORS.border }}>{mTotals.kcal} kcal</div>
               <div style={{ fontSize: 11, color: COLORS.textLight }}>{entries.length} Einträge</div>
+              {/* Quick-Add-Badge: legt auch bei bereits befüllten Mahlzeiten sofort nach */}
+              <button
+                onClick={(e) => { e.stopPropagation(); setQuickAddMeal(key); }}
+                style={{ position: "absolute", top: 6, right: 6, width: 22, height: 22, borderRadius: "50%", border: "none", background: color, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                title={`Zu ${label} hinzufügen`}
+              >+</button>
             </div>
           );
         })}
+      </div>
+
+      {/* Health-Connect-Karte */}
+      <div style={{ margin: "12px 16px 0", background: COLORS.card, borderRadius: 16, padding: 16, boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: health.connected ? 12 : 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 15 }}>❤️</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.text }}>Health Connect</span>
+          </div>
+          <span style={{ fontSize: 14, color: COLORS.textLight }}>›</span>
+        </div>
+        {!health.connected ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: COLORS.textLight }}>ℹ️ Tippe um Health Connect zu verbinden</div>
+        ) : (
+          <div style={{ display: "flex", justifyContent: "space-around" }}>
+            {[["👟", `${health.steps.toLocaleString("de-DE")}`, "Schritte"],
+              ["🔥", `${health.activeKcal} kcal`, "Verbrannt"],
+              ["😴", `${Math.floor(health.sleepMinutes/60)}h ${health.sleepMinutes%60}m`, "Schlaf"]].map(([icon, value, label]) => (
+              <div key={label} style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 20 }}>{icon}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.primary, marginTop: 2 }}>{value}</div>
+                <div style={{ fontSize: 9, color: COLORS.textLight }}>{label}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Streak card */}
@@ -1209,11 +1156,42 @@ function HomeScreen({ state, dispatch }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>⚖️ Aktuelles Gewicht</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: COLORS.primary }}>{lastWeight?.value || "—"} kg</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <span style={{ fontSize: 22, fontWeight: 800, color: COLORS.primary }}>{lastWeight?.value || "—"} kg</span>
+              {weightDelta !== null && Math.abs(weightDelta) >= 0.1 && (
+                <span style={{ fontSize: 13, fontWeight: 600, color: weightDelta > 0 ? COLORS.danger : COLORS.primary }}>
+                  {weightDelta > 0 ? "↑" : "↓"} {Math.abs(weightDelta)} kg
+                </span>
+              )}
+            </div>
           </div>
           <button onClick={() => setShowWeightModal(true)} style={{ background: COLORS.surface, border: "none", borderRadius: 10, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: COLORS.textMid }}>Eintragen</button>
         </div>
       </div>
+
+      {/* Quick-Add-Speed-Dial FAB (analog zur APK: schnellster Weg, um Essen/Gewicht nachzutragen) */}
+      <div style={{ position: "fixed", bottom: 76, right: "max(16px, calc(50% - 240px + 16px))", zIndex: 60, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+        {fabOpen && (
+          <>
+            <FabAction label="Rezept importieren" icon="🔗" onClick={() => { setFabOpen(false); onNavigate?.("recipes"); }} />
+            <FabAction label="Gewicht eintragen" icon="⚖️" onClick={() => { setFabOpen(false); setShowWeightModal(true); }} />
+            <FabAction label="Essen hinzufügen" icon="🍽️" onClick={() => { setFabOpen(false); setQuickAddMeal(meals.find(m => (diary[m.key]||[]).length === 0)?.key || "snack"); }} />
+          </>
+        )}
+        <button onClick={() => setFabOpen(o => !o)} style={{ width: 56, height: 56, borderRadius: "50%", border: "none", background: COLORS.primary, color: "#fff", fontSize: 24, boxShadow: "0 4px 12px rgba(0,0,0,0.25)", cursor: "pointer" }}>
+          {fabOpen ? "✕" : "+"}
+        </button>
+      </div>
+
+      {quickAddMeal && (
+        <AddFoodModal
+          mealType={quickAddMeal}
+          favorites={state.favorites}
+          customFoods={state.customFoods}
+          onClose={() => setQuickAddMeal(null)}
+          onAdd={(entry) => { dispatch({ type: "ADD_ENTRY", date: today, mealKey: quickAddMeal, entry }); setQuickAddMeal(null); }}
+        />
+      )}
 
       {showWeightModal && (
         <Modal title="Gewicht eintragen" onClose={() => setShowWeightModal(false)}>
@@ -1282,13 +1260,15 @@ export default function NutriSnap() {
   const [appState, setAppState] = useState(INITIAL_STATE);
   function appDispatch(action) { setAppState(prev => reducer(prev, action)); }
 
+  // 5 Bottom-Nav-Tabs analog zur APK (Screen.Home/Diary/Recipes/Analysis/Settings
+  // in MainActivity.kt) — Suchen läuft über den Add-Food-Dialog im Tagebuch,
+  // Profil ist Teil von "Mehr".
   const tabs = [
-    { key: "home", label: "Home", icon: "🏠" },
+    { key: "home", label: "Start", icon: "🏠" },
     { key: "diary", label: "Tagebuch", icon: "📔" },
-    { key: "search", label: "Suchen", icon: "🔍" },
     { key: "recipes", label: "Rezepte", icon: "🍽️" },
     { key: "analysis", label: "Analyse", icon: "📊" },
-    { key: "profile", label: "Profil", icon: "👤" },
+    { key: "profile", label: "Mehr", icon: "⚙️" },
   ];
 
   return (
@@ -1307,9 +1287,8 @@ export default function NutriSnap() {
 
       {/* Content */}
       <div style={{ overflowY: "auto", height: "calc(100vh - 120px)" }}>
-        {tab === "home" && <HomeScreen state={appState} dispatch={appDispatch} />}
+        {tab === "home" && <HomeScreen state={appState} dispatch={appDispatch} onNavigate={setTab} />}
         {tab === "diary" && <DiaryScreen state={appState} dispatch={appDispatch} />}
-        {tab === "search" && <SearchScreen state={appState} dispatch={appDispatch} />}
         {tab === "recipes" && <RecipesScreen state={appState} dispatch={appDispatch} />}
         {tab === "analysis" && <AnalysisScreen state={appState} />}
         {tab === "profile" && <ProfileScreen state={appState} dispatch={appDispatch} />}
