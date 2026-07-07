@@ -34,6 +34,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
+import ch.nutrisnap.app.domain.UrlExtractor
 import ch.nutrisnap.app.ui.components.EmptyState
 import coil.compose.AsyncImage
 
@@ -72,7 +73,8 @@ private fun Recipe.isIncomplete(): Boolean =
 fun RecipesScreen(
     vm: RecipesViewModel = viewModel(),
     diaryVm: ch.nutrisnap.app.ui.screens.diary.DiaryViewModel = viewModel(),
-    sharedUrl: String? = null
+    sharedUrl: String? = null,
+    sharedBatchUrls: List<String> = emptyList()
 ) {
     val state by vm.uiState.collectAsState()
     var showImportSheet   by remember { mutableStateOf(false) }
@@ -81,15 +83,27 @@ fun RecipesScreen(
     var addToDiaryRecipe  by remember { mutableStateOf<Recipe?>(null) }
     var editRecipe        by remember { mutableStateOf<Recipe?>(null) }
     var hideIncomplete    by remember { mutableStateOf(false) }
+    var showBatchSheet    by remember { mutableStateOf(false) }
+    val batchState by vm.batchState.collectAsState()
 
     LaunchedEffect(sharedUrl) { if (!sharedUrl.isNullOrBlank()) showImportSheet = true }
     LaunchedEffect(state.instagramBlocked) { if (state.instagramBlocked) showImportSheet = true }
+    LaunchedEffect(sharedBatchUrls) {
+        if (sharedBatchUrls.isNotEmpty()) { vm.addBatchUrls(sharedBatchUrls); showBatchSheet = true }
+    }
 
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(onClick = { showImportSheet = true },
-                containerColor = MaterialTheme.colorScheme.secondary) {
-                Icon(Icons.Default.Link, "Rezept importieren", tint = MaterialTheme.colorScheme.onSecondary)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                SmallFloatingActionButton(onClick = { showBatchSheet = true },
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer) {
+                    Icon(Icons.Default.PlaylistAdd, "Mehrere Rezepte importieren")
+                }
+                Spacer(Modifier.height(8.dp))
+                FloatingActionButton(onClick = { showImportSheet = true },
+                    containerColor = MaterialTheme.colorScheme.secondary) {
+                    Icon(Icons.Default.Link, "Rezept importieren", tint = MaterialTheme.colorScheme.onSecondary)
+                }
             }
         }
     ) { padding ->
@@ -187,6 +201,19 @@ fun RecipesScreen(
             openAtManualCaption = state.instagramBlocked,
             onImport = { url -> vm.importFromUrl(url) },
             onDismiss = { showImportSheet = false; vm.clearError(); vm.clearInstagramBlocked() }
+        )
+    }
+
+    if (showBatchSheet) {
+        BatchImportSheet(
+            state = batchState,
+            onAddUrls = vm::addBatchUrls,
+            onRemoveItem = vm::removeBatchItem,
+            onStart = vm::runBatchImport,
+            onDismiss = {
+                showBatchSheet = false
+                if (!batchState.isRunning && batchState.items.all { it.status == BatchStatus.DONE }) vm.clearBatch()
+            }
         )
     }
 
@@ -444,6 +471,100 @@ fun ImportSheet(prefillUrl: String, isLoading: Boolean, error: String?,
                 Spacer(Modifier.height(12.dp))
                 Button(onClick={ if(manualCaption.isNotBlank()){vm.saveManualRecipe(url.trim(),manualTitle.trim().ifBlank{null},manualCaption.trim());onDismiss()}}, enabled=manualCaption.isNotBlank(), modifier=Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Save,null,Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Speichern")
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+// ── Batch-Import-Sheet ──────────────────────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BatchImportSheet(
+    state: BatchImportState,
+    onAddUrls: (List<String>) -> Unit,
+    onRemoveItem: (String) -> Unit,
+    onStart: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var pasteText by remember { mutableStateOf("") }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(horizontal = 16.dp).navigationBarsPadding().padding(bottom = 8.dp)) {
+            Text("Mehrere Rezepte importieren", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Spacer(Modifier.height(4.dp))
+            Text("Links (ein oder mehrere pro Zeile) einfügen, z.B. aus Notizen-App",
+                fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = pasteText, onValueChange = { pasteText = it },
+                label = { Text("Links einfügen") },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp), maxLines = 8
+            )
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = {
+                    val urls = UrlExtractor.extractAll(pasteText)
+                    if (urls.isNotEmpty()) { onAddUrls(urls); pasteText = "" }
+                },
+                enabled = UrlExtractor.extractAll(pasteText).isNotEmpty(),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp))
+                Text("Zur Warteschlange hinzufügen")
+            }
+
+            if (state.items.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
+                Text(
+                    "${state.doneCount}/${state.items.size} importiert",
+                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(4.dp))
+                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 280.dp)) {
+                    items(state.items, key = { it.url }) { item ->
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val (icon, tint) = when (item.status) {
+                                BatchStatus.PENDING -> Icons.Default.Schedule to MaterialTheme.colorScheme.onSurfaceVariant
+                                BatchStatus.RUNNING  -> Icons.Default.Sync      to MaterialTheme.colorScheme.primary
+                                BatchStatus.DONE     -> Icons.Default.CheckCircle to MaterialTheme.colorScheme.primary
+                                BatchStatus.ERROR    -> Icons.Default.Error     to MaterialTheme.colorScheme.error
+                            }
+                            Icon(icon, null, Modifier.size(18.dp), tint = tint)
+                            Spacer(Modifier.width(8.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    item.resultTitle ?: item.url,
+                                    fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+                                )
+                                if (item.error != null) {
+                                    Text(item.error, fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                            if (item.status == BatchStatus.PENDING && !state.isRunning) {
+                                IconButton(onClick = { onRemoveItem(item.url) }, Modifier.size(28.dp)) {
+                                    Icon(Icons.Default.Close, "Entfernen", Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = onStart,
+                    enabled = !state.isRunning && state.items.any { it.status != BatchStatus.DONE },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (state.isRunning) {
+                        CircularProgressIndicator(Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text(if (state.isRunning) "Importiere…" else "Import starten")
                 }
             }
             Spacer(Modifier.height(8.dp))
