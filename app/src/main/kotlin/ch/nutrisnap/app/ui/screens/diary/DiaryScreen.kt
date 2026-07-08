@@ -36,11 +36,22 @@ import ch.nutrisnap.app.ui.components.MacroBar
 import ch.nutrisnap.app.ui.components.MicronutrientTable
 import ch.nutrisnap.app.ui.components.NutritionFactsProgress
 import ch.nutrisnap.app.ui.components.SectionHeader
+import ch.nutrisnap.app.domain.EntryPlausibilityChecker
+import ch.nutrisnap.app.domain.FoodPortionPresets
 import ch.nutrisnap.app.ui.screens.barcode.BarcodeScannerScreen
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+/** Schlaegt anhand der Tageszeit eine Mahlzeit fuer Quick-Add vor. */
+private fun defaultMealForNow(): MealType = when (LocalTime.now().hour) {
+    in 5..10  -> MealType.BREAKFAST
+    in 11..14 -> MealType.LUNCH
+    in 17..21 -> MealType.DINNER
+    else      -> MealType.SNACK
+}
 
 @Composable
 fun DiaryScreen(
@@ -60,6 +71,7 @@ fun DiaryScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val quickAddFavorites by vm.favorites.collectAsState()
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -83,6 +95,28 @@ fun DiaryScreen(
                     fat      = state.totalFat,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
+            }
+            if (quickAddFavorites.isNotEmpty()) {
+                item {
+                    QuickAddBar(
+                        favorites = quickAddFavorites,
+                        onQuickAdd = { food ->
+                            val grams = FoodPortionPresets.forFood(food).firstOrNull()?.grams
+                                ?: food.servingSize.takeIf { it > 0f } ?: 100f
+                            val meal = defaultMealForNow()
+                            vm.quickAddFavorite(food, grams, meal) { entry ->
+                                scope.launch {
+                                    val result = snackbarHostState.showSnackbar(
+                                        message = "\"${food.name}\" (${grams.toInt()} g) hinzugefügt",
+                                        actionLabel = "Rückgängig",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                    if (result == SnackbarResult.ActionPerformed) vm.deleteEntry(entry)
+                                }
+                            }
+                        }
+                    )
+                }
             }
             if (state.entries.isEmpty()) {
                 item {
@@ -340,6 +374,49 @@ private fun EntryMacroItem(label: String, value: String, unit: String) {
         Text(value, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
         Text(unit, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/**
+ * Ein-Tap-Schnellzugriff auf Favoriten direkt im Tagebuch — spart bei häufig
+ * gegessenen Dingen den Umweg über Sheet -> Suche -> Auswahl -> Bestätigen.
+ * Menge/Mahlzeit werden automatisch vorgeschlagen (Standardportion, Tageszeit);
+ * für Anpassungen bleibt der normale "+"-Button/Sheet-Weg.
+ */
+@Composable
+private fun QuickAddBar(favorites: List<FoodItem>, onQuickAdd: (FoodItem) -> Unit) {
+    Column(Modifier.padding(top = 4.dp, bottom = 4.dp)) {
+        Text(
+            "⚡ Schnell hinzufügen", fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, bottom = 6.dp)
+        )
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            favorites.take(10).forEach { food ->
+                Column(
+                    Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .clickable { onQuickAdd(food) }
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .widthIn(max = 110.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        food.name, fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Text(
+                        "${food.calories.toInt()} kcal/100g", fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -612,6 +689,7 @@ private fun SearchTab(
     var selectedFood by remember { mutableStateOf<FoodItem?>(null) }
     var amountText   by remember { mutableStateOf("100") }
     var selectedMeal by remember { mutableStateOf(initialMeal ?: MealType.LUNCH) }
+    var portionWarning by remember { mutableStateOf<String?>(null) }
 
     val results   by vm.searchResults.collectAsState()
     val searching by vm.isSearching.collectAsState()
@@ -756,9 +834,32 @@ private fun SearchTab(
                 Text("Zurück")
             }
             Button(
-                onClick  = { if (grams > 0) { vm.addEntry(food, grams, selectedMeal); onDismiss() } },
+                onClick  = {
+                    if (grams > 0) {
+                        val warning = EntryPlausibilityChecker.checkPortion(grams)
+                        if (warning != null) portionWarning = warning
+                        else { vm.addEntry(food, grams, selectedMeal); onDismiss() }
+                    }
+                },
                 modifier = Modifier.weight(1f), enabled = grams > 0
             ) { Text("Hinzufügen") }
+        }
+        portionWarning?.let { warning ->
+            AlertDialog(
+                onDismissRequest = { portionWarning = null },
+                title   = { Text("Menge prüfen") },
+                text    = { Text(warning) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        vm.addEntry(food, grams, selectedMeal)
+                        portionWarning = null
+                        onDismiss()
+                    }) { Text("Trotzdem hinzufügen") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { portionWarning = null }) { Text("Anpassen") }
+                }
+            )
         }
     }
 }
@@ -776,6 +877,7 @@ private fun ManualEntryTab(
     var carbsText    by remember { mutableStateOf("") }
     var fatText      by remember { mutableStateOf("") }
     var selectedMeal by remember { mutableStateOf(initialMeal ?: MealType.LUNCH) }
+    var manualWarning by remember { mutableStateOf<String?>(null) }
 
     val kcal    = kcalText.toFloatOrNull() ?: 0f
     val protein = proteinText.toFloatOrNull() ?: 0f
@@ -835,13 +937,35 @@ private fun ManualEntryTab(
         }
 
         Button(
-            onClick  = { if (isValid) onSave(name, kcal, protein, carbs, fat, selectedMeal) },
+            onClick  = {
+                if (isValid) {
+                    val warning = EntryPlausibilityChecker.checkManualEntry(kcal, protein, carbs, fat)
+                    if (warning != null) manualWarning = warning
+                    else onSave(name, kcal, protein, carbs, fat, selectedMeal)
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
             enabled  = isValid
         ) {
             Icon(Icons.Default.Add, null, Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text("Manuell hinzufügen")
+        }
+        manualWarning?.let { warning ->
+            AlertDialog(
+                onDismissRequest = { manualWarning = null },
+                title   = { Text("Werte prüfen") },
+                text    = { Text(warning) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        onSave(name, kcal, protein, carbs, fat, selectedMeal)
+                        manualWarning = null
+                    }) { Text("Trotzdem speichern") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { manualWarning = null }) { Text("Anpassen") }
+                }
+            )
         }
     }
 }
