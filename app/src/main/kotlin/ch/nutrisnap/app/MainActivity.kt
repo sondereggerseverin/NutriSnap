@@ -63,15 +63,6 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
-// Sanfte Tab-Wechsel (Bottom-Nav) per Fade statt hartem Cut; Push-Screens (Settings-
-// Unterseiten etc.) per horizontalem Slide, damit die Navigationsrichtung erkennbar bleibt.
-private val tabEnter  = fadeIn(tween(220))
-private val tabExit   = fadeOut(tween(180))
-private val pushEnter = slideInHorizontally(tween(280)) { it / 3 } + fadeIn(tween(280))
-private val pushExit  = slideOutHorizontally(tween(280)) { -it / 3 } + fadeOut(tween(200))
-private val popEnter  = slideInHorizontally(tween(280)) { -it / 3 } + fadeIn(tween(280))
-private val popExit   = slideOutHorizontally(tween(280)) { it / 3 } + fadeOut(tween(200))
-
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Home      : Screen("home",       "Start",    Icons.Default.Home)
     object Diary     : Screen("diary",      "Tagebuch", Icons.Default.MenuBook)
