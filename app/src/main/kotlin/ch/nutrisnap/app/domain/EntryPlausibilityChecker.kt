@@ -6,8 +6,7 @@ import kotlin.math.abs
  * Einfache Plausibilitaetspruefung fuer Tagebuch-Eintraege. Faengt Tippfehler
  * ab (z.B. 1000g statt 100g, oder kcal/Makro-Werte die nicht zusammenpassen),
  * ohne den Nutzer bei normalen Eintraegen zu unterbrechen.
- */
-object EntryPlausibilityChecker {
+ */object EntryPlausibilityChecker {
 
     private const val MAX_PLAUSIBLE_GRAMS = 1500f
     private const val MAX_PLAUSIBLE_KCAL_MANUAL = 3000f
