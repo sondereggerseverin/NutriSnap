@@ -60,9 +60,10 @@ interface UserProfileDao {
         CustomFoodItem::class,
         MealTemplate::class,
         MealTemplateItem::class,
-        GeneratedRecipeEntity::class
+        GeneratedRecipeEntity::class,
+        ShoppingListItem::class
     ],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -79,6 +80,7 @@ abstract class NutriDatabase : RoomDatabase() {
     abstract fun customFoodDao(): CustomFoodDao
     abstract fun mealTemplateDao(): MealTemplateDao
     abstract fun generatedRecipeDao(): GeneratedRecipeDao
+    abstract fun shoppingListDao(): ShoppingListDao
 
     companion object {
         @Volatile private var INSTANCE: NutriDatabase? = null
@@ -254,6 +256,22 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // Phase 9: Einkaufsliste-Feature
+        private val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS shopping_list_items (" +
+                        "id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, " +
+                        "name TEXT NOT NULL, " +
+                        "amount REAL, " +
+                        "unit TEXT, " +
+                        "checked INTEGER NOT NULL DEFAULT 0, " +
+                        "recipeTitle TEXT, " +
+                        "createdAt INTEGER NOT NULL DEFAULT 0)"
+                )
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -265,7 +283,7 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
                         MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
                         MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
-                        MIGRATION_12_13, MIGRATION_13_14
+                        MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15
                     )
                     .build()
                     .also { INSTANCE = it }

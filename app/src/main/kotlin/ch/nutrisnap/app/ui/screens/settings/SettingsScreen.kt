@@ -83,7 +83,8 @@ fun SettingsScreen(
     onNavigateToMealTemplates: () -> Unit = {},
     onNavigateToYazioImport: () -> Unit = {},
     onNavigateToScan: () -> Unit = {},
-    onNavigateToMealOrder: () -> Unit = {}
+    onNavigateToMealOrder: () -> Unit = {},
+    onNavigateToShoppingList: () -> Unit = {}
 ) {
     val state   by vm.uiState.collectAsState()
     val profile  = state.profile
@@ -162,6 +163,10 @@ fun SettingsScreen(
                 OutlinedButton(onClick = onNavigateToMealOrder, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.DragHandle, null, Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp)); Text("Reihenfolge", fontSize = 12.sp)
+                }
+                OutlinedButton(onClick = onNavigateToShoppingList, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Default.ShoppingCart, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp)); Text("Einkaufsliste", fontSize = 12.sp)
                 }
             }
         }

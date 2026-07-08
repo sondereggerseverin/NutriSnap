@@ -74,6 +74,7 @@ private fun Recipe.isIncomplete(): Boolean =
 fun RecipesScreen(
     vm: RecipesViewModel = viewModel(),
     diaryVm: ch.nutrisnap.app.ui.screens.diary.DiaryViewModel = viewModel(),
+    shoppingVm: ch.nutrisnap.app.ui.screens.shopping.ShoppingListViewModel = viewModel(),
     sharedUrl: String? = null,
     sharedBatchUrls: List<String> = emptyList()
 ) {
@@ -259,7 +260,19 @@ fun RecipesScreen(
             onAddToDiary = { r -> addToDiaryRecipe = r; selectedRecipe = null },
             onEdit       = { editRecipe = live; selectedRecipe = null },
             onAnalyze    = { vm.analyzeNutrition(live) },
-            onVerify     = { showVerifySheet = true }
+            onVerify     = { showVerifySheet = true },
+            onAddToShoppingList = { r ->
+                val ratio = r.servings.toFloat() / live.servings.coerceAtLeast(1).toFloat()
+                val names = live.ingredients.lines().mapNotNull { rawLine ->
+                    if (rawLine.isBlank()) return@mapNotNull null
+                    val scaled = if (ratio != 1f) scaleNumbers(rawLine, ratio) else rawLine
+                    val isHeader = !scaled.startsWith("•") && !scaled.startsWith("-") &&
+                        scaled.isNotEmpty() && !scaled[0].isDigit() && !scaled.startsWith(" ") && scaled.length > 2
+                    if (isHeader) null else scaled.trimStart('•', '-', ' ').trim().takeIf { it.isNotBlank() }
+                }
+                shoppingVm.addRecipeIngredients(live.title, names.map { Triple(it, null, null) })
+                selectedRecipe = null
+            }
         )
     }
 
@@ -583,7 +596,8 @@ fun RecipeDetailSheet(
     onAddToDiary: (Recipe) -> Unit,
     onEdit: () -> Unit,
     onAnalyze: () -> Unit,
-    onVerify: () -> Unit = {}
+    onVerify: () -> Unit = {},
+    onAddToShoppingList: (Recipe) -> Unit = {}
 ) {
     val context = LocalContext.current
     var servings   by remember(recipe.id) { mutableStateOf(recipe.servings) }
@@ -650,6 +664,12 @@ fun RecipeDetailSheet(
                     Icon(Icons.Default.PlaylistAdd,null,Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Ins Tagebuch ($servings Port.)")
+                }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick={onAddToShoppingList(recipe.copy(servings=servings))}, modifier=Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.ShoppingCart,null,Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Zutaten zur Einkaufsliste")
                 }
                 Spacer(Modifier.height(12.dp))
             }

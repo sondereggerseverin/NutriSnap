@@ -307,7 +307,8 @@ fun MainScaffold(
                     onNavigateToMealTemplates = { navController.navigate("meal_templates") },
                     onNavigateToYazioImport   = { navController.navigate("yazio_import") },
                     onNavigateToScan          = { navController.navigate("scan_chooser") },
-                    onNavigateToMealOrder     = { navController.navigate("meal_order") }
+                    onNavigateToMealOrder     = { navController.navigate("meal_order") },
+                    onNavigateToShoppingList  = { navController.navigate("shopping_list") }
                 )
             }
             composable("meal_order") {
@@ -355,6 +356,9 @@ fun MainScaffold(
             }
             composable("nutrition_label_scan") {
                 NutritionLabelScanScreen(onNavigateBack = { navController.popBackStack() })
+            }
+            composable("shopping_list") {
+                ch.nutrisnap.app.ui.screens.shopping.ShoppingListScreen(onBack = { navController.popBackStack() })
             }
         }
     }
