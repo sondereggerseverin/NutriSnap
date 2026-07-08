@@ -39,6 +39,9 @@ class DiaryRepository(db: NutriDatabase) {
     fun getWeeklySummary(from: LocalDate): Flow<List<ch.nutrisnap.app.data.db.DailySummary>> =
         dao.getWeeklySummary(from.toString())
 
+    /** Fuer Quick-Add: nach dem Insert den vollen Eintrag laden (fuer Undo-Snackbar). */
+    suspend fun getById(id: Long): DiaryEntry? = dao.getById(id)
+
     suspend fun addEntry(food: FoodItem, amountGrams: Float, mealType: MealType, date: LocalDate): Long {
         val f = amountGrams / 100f
         val id = dao.insert(
