@@ -389,7 +389,7 @@ private fun QuickAddBar(favorites: List<FoodItem>, onQuickAdd: (FoodItem) -> Uni
         Text(
             "⚡ Schnell hinzufügen", fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, bottom = 6.dp)
+            modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 6.dp)
         )
         Row(
             Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
