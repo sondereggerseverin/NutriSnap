@@ -1,10 +1,14 @@
 package ch.nutrisnap.app.ui.theme
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.stringPreferencesKey
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import androidx.compose.ui.platform.LocalContext
@@ -85,6 +89,27 @@ enum class AppTheme(
         outline            = Color(0xFFD1D5DB),
         error              = Color(0xFFDC2626)
     )
+
+    /** Dunkles Pendant: gleiche Akzentfarben (aufgehellt für Kontrast), neutrale dunkle
+     *  Flächen statt der hellen Background/Surface-Werte aus [toColorScheme]. */
+    fun toDarkColorScheme() = darkColorScheme(
+        primary            = primaryLight,
+        onPrimary          = primaryDark,
+        primaryContainer   = primaryDark,
+        onPrimaryContainer = primaryLight,
+        secondary          = accentLight,
+        onSecondary        = primaryDark,
+        secondaryContainer = primaryDark,
+        onSecondaryContainer = accentLight,
+        background         = Color(0xFF15171A),
+        onBackground       = Color(0xFFE3E3E3),
+        surface            = Color(0xFF1C1E22),
+        onSurface          = Color(0xFFE3E3E3),
+        surfaceVariant     = Color(0xFF2A2D31),
+        onSurfaceVariant   = Color(0xFFA8ADB4),
+        outline            = Color(0xFF4B4F55),
+        error              = Color(0xFFEF5350)
+    )
 }
 
 // Legacy color aliases (used by Components.kt)
@@ -99,20 +124,38 @@ val CoralLight = Color(0xFFF2C4BB)
 val KEY_APP_THEME = stringPreferencesKey("app_theme")
 val KEY_MEAL_ORDER = stringPreferencesKey("meal_order") // komma-getrennte MealType-Namen
 
+// ── Typography ─────────────────────────────────────────────────────────────────
+// Durchgaengige Groessen-/Gewichts-Hierarchie statt einzelner Ad-hoc-Ueberschreibungen
+// in den Screens (vorher wurde ueberall mit rohen fontSize=13.sp etc. gearbeitet).
+val NutriSnapTypography = Typography(
+    displayLarge   = TextStyle(fontWeight = FontWeight.Bold,     fontSize = 36.sp, lineHeight = 44.sp),
+    displayMedium  = TextStyle(fontWeight = FontWeight.Bold,     fontSize = 30.sp, lineHeight = 38.sp),
+    displaySmall   = TextStyle(fontWeight = FontWeight.Bold,     fontSize = 26.sp, lineHeight = 34.sp),
+    headlineLarge  = TextStyle(fontWeight = FontWeight.Bold,     fontSize = 28.sp, lineHeight = 34.sp),
+    headlineMedium = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 30.sp),
+    headlineSmall  = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp),
+    titleLarge     = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 18.sp, lineHeight = 24.sp),
+    titleMedium    = TextStyle(fontWeight = FontWeight.Medium,   fontSize = 16.sp, lineHeight = 22.sp, letterSpacing = 0.15.sp),
+    titleSmall     = TextStyle(fontWeight = FontWeight.Medium,   fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.1.sp),
+    bodyLarge      = TextStyle(fontWeight = FontWeight.Normal,   fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.5.sp),
+    bodyMedium     = TextStyle(fontWeight = FontWeight.Normal,   fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.25.sp),
+    bodySmall      = TextStyle(fontWeight = FontWeight.Normal,   fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.4.sp),
+    labelLarge     = TextStyle(fontWeight = FontWeight.Medium,   fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.1.sp),
+    labelMedium    = TextStyle(fontWeight = FontWeight.Medium,   fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.5.sp),
+    labelSmall     = TextStyle(fontWeight = FontWeight.Medium,   fontSize = 11.sp, lineHeight = 16.sp, letterSpacing = 0.5.sp)
+)
+
 @Composable
 fun NutriSnapTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
     val prefs by context.notifDataStore.data.collectAsState(initial = null)
     val themeName = prefs?.get(KEY_APP_THEME) ?: AppTheme.FOREST_GREEN.name
     val theme = runCatching { AppTheme.valueOf(themeName) }.getOrDefault(AppTheme.FOREST_GREEN)
+    val useDarkColors = isSystemInDarkTheme()
 
     MaterialTheme(
-        colorScheme = theme.toColorScheme(),
-        typography  = Typography(
-            headlineLarge = MaterialTheme.typography.headlineLarge.copy(
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Default
-            ),
-        ),
-        content = content
+        colorScheme = if (useDarkColors) theme.toDarkColorScheme() else theme.toColorScheme(),
+        typography  = NutriSnapTypography,
+        content     = content
     )
 }
