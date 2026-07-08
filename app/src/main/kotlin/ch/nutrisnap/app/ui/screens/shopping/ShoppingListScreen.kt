@@ -20,38 +20,48 @@ import ch.nutrisnap.app.data.model.ShoppingListItem
 @Composable
 fun ShoppingListScreen(onBack: () -> Unit, vm: ShoppingListViewModel = viewModel()) {
     val items by vm.items.collectAsState()
+    val aggregated by vm.aggregated.collectAsState()
     var showAdd by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
+    var aggregatedMode by remember { mutableStateOf(false) }
 
     val open = items.filter { !it.checked }
     val done = items.filter { it.checked }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Einkaufsliste") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Zurück") } },
-                actions = {
-                    Box {
-                        IconButton(onClick = { menuExpanded = true }) { Icon(Icons.Default.MoreVert, "Mehr") }
-                        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                            DropdownMenuItem(
-                                text = { Text("Erledigte entfernen") },
-                                onClick = { vm.clearChecked(); menuExpanded = false },
-                                enabled = done.isNotEmpty()
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Liste leeren") },
-                                onClick = { vm.clearAll(); menuExpanded = false },
-                                enabled = items.isNotEmpty()
-                            )
+            Column {
+                TopAppBar(
+                    title = { Text("Einkaufsliste") },
+                    navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Zurück") } },
+                    actions = {
+                        Box {
+                            IconButton(onClick = { menuExpanded = true }) { Icon(Icons.Default.MoreVert, "Mehr") }
+                            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                                DropdownMenuItem(
+                                    text = { Text("Erledigte entfernen") },
+                                    onClick = { vm.clearChecked(); menuExpanded = false },
+                                    enabled = done.isNotEmpty()
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Liste leeren") },
+                                    onClick = { vm.clearAll(); menuExpanded = false },
+                                    enabled = items.isNotEmpty()
+                                )
+                            }
                         }
                     }
+                )
+                TabRow(selectedTabIndex = if (aggregatedMode) 1 else 0) {
+                    Tab(selected = !aggregatedMode, onClick = { aggregatedMode = false }, text = { Text("Nach Rezept") })
+                    Tab(selected = aggregatedMode, onClick = { aggregatedMode = true }, text = { Text("Gesamt") })
                 }
-            )
+            }
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAdd = true }) { Icon(Icons.Default.Add, "Eintrag hinzufügen") }
+            if (!aggregatedMode) {
+                FloatingActionButton(onClick = { showAdd = true }) { Icon(Icons.Default.Add, "Eintrag hinzufügen") }
+            }
         }
     ) { padding ->
         if (items.isEmpty()) {
@@ -65,6 +75,20 @@ fun ShoppingListScreen(onBack: () -> Unit, vm: ShoppingListViewModel = viewModel
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+            }
+        } else if (aggregatedMode) {
+            LazyColumn(Modifier.padding(padding).padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                item { Spacer(Modifier.height(8.dp)) }
+                item {
+                    Text("Alle Zutaten zusammengefasst — gleiche Zutat aus mehreren Rezepten wird addiert.",
+                        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp))
+                }
+                items(aggregated, key = { it.name }) { agg ->
+                    AggregatedRow(agg, onToggle = { vm.toggleAggregated(agg) })
+                }
+                item { Spacer(Modifier.height(80.dp)) }
             }
         } else {
             LazyColumn(Modifier.padding(padding).padding(horizontal = 16.dp),
@@ -101,6 +125,29 @@ fun ShoppingListScreen(onBack: () -> Unit, vm: ShoppingListViewModel = viewModel
             onDismiss = { showAdd = false },
             onSave = { name, amount, unit -> vm.addItem(name, amount, unit); showAdd = false }
         )
+    }
+}
+
+@Composable
+private fun AggregatedRow(agg: AggregatedShoppingItem, onToggle: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(checked = agg.checked, onCheckedChange = { onToggle() })
+        Column(Modifier.weight(1f)) {
+            Text(
+                agg.name,
+                textDecoration = if (agg.checked) TextDecoration.LineThrough else null,
+                color = if (agg.checked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+            )
+            if (agg.totalGrams > 0f) {
+                Text("${agg.totalGrams.toInt()} g", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (agg.itemIds.size > 1) {
+            Text("×${agg.itemIds.size}", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+        }
     }
 }
 
