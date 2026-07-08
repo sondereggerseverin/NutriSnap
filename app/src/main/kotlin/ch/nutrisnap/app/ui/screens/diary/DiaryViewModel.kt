@@ -104,6 +104,19 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
+     * Ein-Tap-Hinzufuegen aus der Quick-Add-Leiste (Favoriten). Meal wird per
+     * Tageszeit vorgeschlagen, Menge ist die Standard-Portion des Foods.
+     * Liefert den gespeicherten Eintrag zurueck, damit die UI eine Undo-Snackbar
+     * anzeigen kann (analog zum bestehenden Loeschen-Undo).
+     */
+    fun quickAddFavorite(food: FoodItem, grams: Float, meal: MealType, onAdded: (DiaryEntry) -> Unit) {
+        viewModelScope.launch {
+            val id = repo.addEntry(food, grams, meal, _date.value)
+            repo.getById(id)?.let { onAdded(it) }
+        }
+    }
+
+    /**
      * Manueller Eintrag: Name + kcal + optionale Makros, keine FoodItem-Referenz.
      * foodItemId = -999 markiert manuelle Einträge.
      */
