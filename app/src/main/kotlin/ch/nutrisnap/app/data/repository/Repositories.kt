@@ -9,6 +9,7 @@ import ch.nutrisnap.app.data.api.UsdaFoodApi
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.data.supabase.SupabaseSync
+import ch.nutrisnap.app.data.supabase.SyncStatusHolder
 import ch.nutrisnap.app.domain.RecipeScraper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,11 +23,16 @@ import java.time.LocalDate
 private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 private fun pushSafely(block: suspend () -> Unit) {
     syncScope.launch {
-        runCatching { block() }.onFailure {
-            // Vorher komplett stumm geschluckt -> jetzt sichtbar in Logcat, damit
-            // Sync-Fehler (fehlende UNIQUE-Constraint, RLS-Policy, offline, ...) auffindbar sind.
-            Log.e("NutriSync", "Push zu Supabase fehlgeschlagen: ${it.message}", it)
-        }
+        SyncStatusHolder.opStarted()
+        runCatching { block() }
+            .onSuccess { SyncStatusHolder.opSucceeded() }
+            .onFailure {
+                // Vorher komplett stumm geschluckt -> jetzt sichtbar in Logcat UND im
+                // SyncStatusHolder, damit Sync-Fehler (fehlende UNIQUE-Constraint,
+                // RLS-Policy, offline, ...) auffindbar sind statt im Nirvana zu landen.
+                Log.e("NutriSync", "Push zu Supabase fehlgeschlagen: ${it.message}", it)
+                SyncStatusHolder.opFailed(it.message)
+            }
     }
 }
 
@@ -234,3 +240,4 @@ class FoodItemRepository(db: NutriDatabase) {
     suspend fun saveCustomFood(item: FoodItem): Long       = dao.insert(item)
     suspend fun deleteFood(item: FoodItem)                 = dao.delete(item)
 }
+
