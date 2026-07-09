@@ -6,11 +6,15 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CustomFoodDao {
+
     @Query("SELECT * FROM custom_foods ORDER BY createdAt DESC")
     fun getAll(): Flow<List<CustomFoodItem>>
 
     @Query("SELECT * FROM custom_foods WHERE name LIKE '%' || :query || '%' ORDER BY createdAt DESC")
     fun search(query: String): Flow<List<CustomFoodItem>>
+
+    @Query("SELECT * FROM custom_foods WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Int): CustomFoodItem?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(item: CustomFoodItem): Long
