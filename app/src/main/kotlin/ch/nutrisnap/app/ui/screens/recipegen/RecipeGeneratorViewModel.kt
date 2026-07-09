@@ -131,6 +131,15 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setCookingMethod(method: CookingMethod) = _state.update { it.copy(cookingMethod = method) }
 
+    /** Erlaubt das Hinterlegen des Gerätemodells direkt aus dem Rezeptgenerator statt über die Einstellungen. */
+    fun setApplianceModel(value: String) {
+        _state.update { it.copy(applianceModel = value) }
+        viewModelScope.launch {
+            val current = profileRepo.get().first()
+            profileRepo.update(current.copy(applianceModel = value))
+        }
+    }
+
     /** Passt die Zubereitung des aktuell offenen Rezepts an ein anderes Kochgerät an (Zutaten/Makros bleiben fix). */
     fun adaptCurrentRecipeToMethod(method: CookingMethod) {
         val current = _state.value.recipe ?: return
