@@ -83,7 +83,6 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
     private val imageService = ZenMuxImageService(app)
     private val db           = NutriDatabase.getInstance(app)
     private val dao         = db.generatedRecipeDao()
-    private val diaryDao    = db.diaryDao()
     private val recipeRepo  = RecipeRepository(db, app)
     private val diaryRepo   = DiaryRepository(db)
     private val profileRepo = UserProfileRepository(db)
@@ -299,11 +298,11 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
     /** Trägt eine einzelne geplante Mahlzeit ins heutige Tagebuch ein. */
     fun addPlannedMealToDiary(meal: PlannedMeal, index: Int) {
         viewModelScope.launch {
-            diaryDao.insert(
+            diaryRepo.insertAndSync(
                 DiaryEntry(
-                    foodItemId  = 0,
+                    foodItemId  = -999,
                     foodName    = meal.title,
-                    amountGrams = 1f,
+                    amountGrams = 0f,
                     mealType    = meal.mealType.toMealTypeOrDefault(),
                     dateStr     = LocalDate.now().toString(),
                     calories    = meal.calories,
@@ -321,11 +320,11 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
         val plan = _state.value.dayPlan ?: return
         viewModelScope.launch {
             plan.meals.forEach { meal ->
-                diaryDao.insert(
+                diaryRepo.insertAndSync(
                     DiaryEntry(
-                        foodItemId  = 0,
+                        foodItemId  = -999,
                         foodName    = meal.title,
-                        amountGrams = 1f,
+                        amountGrams = 0f,
                         mealType    = meal.mealType.toMealTypeOrDefault(),
                         dateStr     = LocalDate.now().toString(),
                         calories    = meal.calories,
@@ -450,11 +449,11 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
     fun addToDiary(recipe: GeneratedRecipe, servings: Int, mealType: MealType) {
         viewModelScope.launch {
             val factor = servings.coerceAtLeast(1).toFloat() / recipe.servings.coerceAtLeast(1).toFloat()
-            diaryDao.insert(
+            diaryRepo.insertAndSync(
                 DiaryEntry(
-                    foodItemId  = 0,
+                    foodItemId  = -999,
                     foodName    = recipe.title,
-                    amountGrams = servings.toFloat(),
+                    amountGrams = 0f,
                     mealType    = mealType,
                     dateStr     = LocalDate.now().toString(),
                     calories    = recipe.calories * factor,

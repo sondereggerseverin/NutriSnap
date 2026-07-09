@@ -133,6 +133,19 @@ class DiaryRepository(db: NutriDatabase) {
         return id
     }
 
+    /**
+     * Generischer Insert-Pfad fuer Aufrufer ausserhalb dieses Repositories (z.B.
+     * KI-Tagesplan in RecipeGeneratorViewModel), die einen fertigen DiaryEntry
+     * (foodItemId bereits gesetzt, z.B. -999) direkt anlegen wollen. Stellt sicher,
+     * dass JEDER Insert-Pfad ueber Supabase synct statt db.diaryDao().insert()
+     * direkt aufzurufen und den Push zu umgehen.
+     */
+    suspend fun insertAndSync(entry: DiaryEntry): Long {
+        val id = dao.insert(entry)
+        dao.getById(id)?.let { saved -> pushSafely { SupabaseSync.upsertDiaryEntry(saved) } }
+        return id
+    }
+
     suspend fun updateEntry(entry: DiaryEntry) {
         dao.update(entry)
         pushSafely { SupabaseSync.upsertDiaryEntry(entry) }
