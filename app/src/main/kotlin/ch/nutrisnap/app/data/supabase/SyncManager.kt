@@ -19,10 +19,27 @@ import ch.nutrisnap.app.data.repository.Sex
 object SyncManager {
 
     suspend fun pullAll(db: NutriDatabase) {
-        runCatching { pullDiary(db) }.onFailure { Log.e("NutriSync", "Pull diary_entries fehlgeschlagen: ${it.message}", it) }
-        runCatching { pullRecipes(db) }.onFailure { Log.e("NutriSync", "Pull recipes fehlgeschlagen: ${it.message}", it) }
-        runCatching { pullWeight(db) }.onFailure { Log.e("NutriSync", "Pull weight_entries fehlgeschlagen: ${it.message}", it) }
-        runCatching { pullUserProfile(db) }.onFailure { Log.e("NutriSync", "Pull user_profiles fehlgeschlagen: ${it.message}", it) }
+        SyncStatusHolder.opStarted()
+        var firstError: String? = null
+
+        runCatching { pullDiary(db) }.onFailure {
+            Log.e("NutriSync", "Pull diary_entries fehlgeschlagen: ${it.message}", it)
+            firstError = firstError ?: it.message
+        }
+        runCatching { pullRecipes(db) }.onFailure {
+            Log.e("NutriSync", "Pull recipes fehlgeschlagen: ${it.message}", it)
+            firstError = firstError ?: it.message
+        }
+        runCatching { pullWeight(db) }.onFailure {
+            Log.e("NutriSync", "Pull weight_entries fehlgeschlagen: ${it.message}", it)
+            firstError = firstError ?: it.message
+        }
+        runCatching { pullUserProfile(db) }.onFailure {
+            Log.e("NutriSync", "Pull user_profiles fehlgeschlagen: ${it.message}", it)
+            firstError = firstError ?: it.message
+        }
+
+        if (firstError != null) SyncStatusHolder.opFailed(firstError) else SyncStatusHolder.opSucceeded()
     }
 
     /**
@@ -176,3 +193,4 @@ object SyncManager {
         }
     }
 }
+
