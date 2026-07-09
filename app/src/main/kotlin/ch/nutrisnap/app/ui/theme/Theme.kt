@@ -114,6 +114,24 @@ enum class AppTheme(
         accent       = Color(0xFF10B981),
         accentLight  = Color(0xFFD1FAE5),
         background   = Color(0xFFFFF5F5)
+    ),
+    MIDNIGHT_INDIGO(
+        label = "Midnight Indigo", emoji = "🌌",
+        primary      = Color(0xFF3730A3),
+        primaryDark  = Color(0xFF1E1B4B),
+        primaryLight = Color(0xFFE0E7FF),
+        accent       = Color(0xFFFBBF24),
+        accentLight  = Color(0xFFFEF3C7),
+        background   = Color(0xFFF5F5FF)
+    ),
+    CITRUS_ZEST(
+        label = "Citrus Zest", emoji = "🍋",
+        primary      = Color(0xFF65A30D),
+        primaryDark  = Color(0xFF3F6212),
+        primaryLight = Color(0xFFECFCCB),
+        accent       = Color(0xFFEC4899),
+        accentLight  = Color(0xFFFCE7F3),
+        background   = Color(0xFFFAFDF0)
     );
 
     fun toColorScheme() = lightColorScheme(
