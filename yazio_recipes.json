@@ -1,0 +1,5140 @@
+[
+  {
+    "id": "b5882770-7448-4778-b19e-2423a8d95754",
+    "title": "Proteinshake",
+    "servings": 1,
+    "caloriesPerServing": 475.4,
+    "proteinPerServing": 39.54,
+    "carbsPerServing": 26.46,
+    "fatPerServing": 24.52,
+    "fiberPerServing": 2.65,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Milch Drink UHT",
+        "amount": 300.0,
+        "unit": "milliliter",
+        "producer": "Valflora"
+      },
+      {
+        "name": "Bodylab Whey Marzipan",
+        "amount": 30.0,
+        "unit": "gram",
+        "producer": "Bodylab24"
+      },
+      {
+        "name": "Himbeeren, frisch",
+        "amount": 20.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Peanut Butter",
+        "amount": 30.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "14c288ca-195b-4623-bc31-c370559a1925",
+    "title": "Poulet Gehacktes mit Linsennudeln",
+    "servings": 3,
+    "caloriesPerServing": 623.07,
+    "proteinPerServing": 55.12,
+    "carbsPerServing": 57.1,
+    "fatPerServing": 17.39,
+    "fiberPerServing": 7.9,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Filets de poulet",
+        "amount": 345.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Paniermehl M Classic",
+        "amount": 45.0,
+        "unit": "gram",
+        "producer": "Migros Jowa"
+      },
+      {
+        "name": "Bio wachteleier",
+        "amount": 45.0,
+        "unit": "gram",
+        "producer": "Wachteleier"
+      },
+      {
+        "name": "Halbrahm",
+        "amount": 150.0,
+        "unit": "milliliter",
+        "producer": "Valflora"
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 170.0,
+        "unit": "whole.regular",
+        "producer": null
+      },
+      {
+        "name": "Sedanini rote linsen",
+        "amount": 250.0,
+        "unit": "gram",
+        "producer": "You"
+      }
+    ]
+  },
+  {
+    "id": "532abbce-eada-4c3a-9e9d-b0187a8913f7",
+    "title": "Dip-Sauce",
+    "servings": 1,
+    "caloriesPerServing": 374.0,
+    "proteinPerServing": 31.05,
+    "carbsPerServing": 20.25,
+    "fatPerServing": 17.3,
+    "fiberPerServing": 0.0,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Magerquark",
+        "amount": 300.0,
+        "unit": "gram",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Tomato Ketchup 50%",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": "Heinz"
+      },
+      {
+        "name": "Thomynaise",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": "Thomy"
+      }
+    ]
+  },
+  {
+    "id": "2b075ad9-2154-40e9-98b6-5634fc04857e",
+    "title": "Linsendahl",
+    "servings": 1,
+    "caloriesPerServing": 3107.0,
+    "proteinPerServing": 171.2,
+    "carbsPerServing": 300.2,
+    "fatPerServing": 120.2,
+    "fiberPerServing": 86.0,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Pomodori Pelatic",
+        "amount": 800.0,
+        "unit": "gram",
+        "producer": "Longobardi"
+      },
+      {
+        "name": "coconut milk",
+        "amount": 500.0,
+        "unit": "gram",
+        "producer": "Authentic thai cuisine"
+      },
+      {
+        "name": "Rote Linsen",
+        "amount": 500.0,
+        "unit": "gram",
+        "producer": "Migros Bio"
+      },
+      {
+        "name": "Fleischbrühe (Bouillon)",
+        "amount": 1000.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "92daa96e-e075-4c18-98d6-a1dee4ce5068",
+    "title": "Pinke Nudeln",
+    "servings": 1,
+    "caloriesPerServing": 2132.2,
+    "proteinPerServing": 86.11,
+    "carbsPerServing": 400.92,
+    "fatPerServing": 14.59,
+    "fiberPerServing": 27.5,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Ruchmehl",
+        "amount": 350.0,
+        "unit": "gram",
+        "producer": "Coop Naturaplan"
+      },
+      {
+        "name": "Hartweizengriess",
+        "amount": 250.0,
+        "unit": "gram",
+        "producer": "MClassic"
+      },
+      {
+        "name": "Hühnerei, Eier, roh",
+        "amount": 60.0,
+        "unit": "egg.regular",
+        "producer": null
+      },
+      {
+        "name": "Mineralwasser, Still",
+        "amount": 600.0,
+        "unit": "milliliter",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "d1f2b145-c13d-46cd-8bf6-1c7ee81087ff",
+    "title": "Nudelauflauf",
+    "servings": 1,
+    "caloriesPerServing": 5843.7,
+    "proteinPerServing": 466.37,
+    "carbsPerServing": 435.82,
+    "fatPerServing": 211.48,
+    "fiberPerServing": 27.99,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Urdinkelvollkornmehl",
+        "amount": 300.0,
+        "unit": "gram",
+        "producer": "Agrinatura"
+      },
+      {
+        "name": "Hartweizengriess",
+        "amount": 300.0,
+        "unit": "gram",
+        "producer": "Zwicky"
+      },
+      {
+        "name": "Trutenhackfleisch",
+        "amount": 1100.0,
+        "unit": "gram",
+        "producer": ""
+      },
+      {
+        "name": "Hühnerei, Eier, roh",
+        "amount": 120.0,
+        "unit": "egg.regular",
+        "producer": null
+      },
+      {
+        "name": "Rotwein Merlot",
+        "amount": 300.0,
+        "unit": "milliliter",
+        "producer": null
+      },
+      {
+        "name": "Karotten (Möhren), frisch",
+        "amount": 450.0,
+        "unit": "whole.large",
+        "producer": null
+      },
+      {
+        "name": "Zwiebeln, gedünstet",
+        "amount": 150.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Saurer Halbrahm",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "Coop Qualité & Prix"
+      },
+      {
+        "name": "Reibkäse M BudGet",
+        "amount": 190.0,
+        "unit": "gram",
+        "producer": "Migros"
+      }
+    ]
+  },
+  {
+    "id": "2e8b4568-f37e-4ffb-a8eb-cc67c28de233",
+    "title": "High Protein Cinnamon Roll",
+    "servings": 12,
+    "caloriesPerServing": 193.77,
+    "proteinPerServing": 11.02,
+    "carbsPerServing": 27.75,
+    "fatPerServing": 4.2,
+    "fiberPerServing": 3.54,
+    "imageUrl": "https://images.yazio.com/app/recipe/user/9bd5be16-fddb-41bc-a301-757959ec837b.webp",
+    "ingredients": [
+      {
+        "name": "Dinkel Vollkornmehl",
+        "amount": 440.0,
+        "unit": "gram",
+        "producer": "Goldähren (Aldi)"
+      },
+      {
+        "name": "Milsana Körniger Frischkäse",
+        "amount": 500.0,
+        "unit": "milliliter",
+        "producer": "Milsani (Aldi)"
+      },
+      {
+        "name": "Magerquark",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Frischkäse Light (Fitline 0,2)",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": "Exquisa"
+      },
+      {
+        "name": "Vitareform Dreiviertelfett Margarine 60%",
+        "amount": 60.0,
+        "unit": "gram",
+        "producer": "Bellasan (Aldi)"
+      },
+      {
+        "name": "Xylit",
+        "amount": 30.0,
+        "unit": "gram",
+        "producer": "Xucker"
+      },
+      {
+        "name": "Zimt",
+        "amount": 10.0,
+        "unit": "teaspoon",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "00ba5d59-d0f2-4dc8-94c2-65c576f8e555",
+    "title": "Flohsamenschalenbowl",
+    "servings": 1,
+    "caloriesPerServing": 916.52,
+    "proteinPerServing": 79.2,
+    "carbsPerServing": 71.14,
+    "fatPerServing": 28.21,
+    "fiberPerServing": 23.07,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Haferflocken",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Flohsamenschalen",
+        "amount": 12.0,
+        "unit": "gram",
+        "producer": "Zirkulin"
+      },
+      {
+        "name": "Whey Protein Coconut",
+        "amount": 30.0,
+        "unit": "gram",
+        "producer": "Bodylab24"
+      },
+      {
+        "name": "Himbeeren, frisch",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Peanut Butter",
+        "amount": 25.0,
+        "unit": "milliliter",
+        "producer": "American Style"
+      },
+      {
+        "name": "Milch",
+        "amount": 400.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "Magerquark",
+        "amount": 250.0,
+        "unit": "can",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Chiasamen",
+        "amount": 10.0,
+        "unit": "tablespoon",
+        "producer": "Dm Bio"
+      }
+    ]
+  },
+  {
+    "id": "589ea2b8-da33-4bb8-a8fc-3ade6208678a",
+    "title": "Pancakes",
+    "servings": 1,
+    "caloriesPerServing": 1209.3,
+    "proteinPerServing": 107.34,
+    "carbsPerServing": 130.48,
+    "fatPerServing": 23.82,
+    "fiberPerServing": 20.96,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Haferflocken",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Hühnerei, Eier, roh",
+        "amount": 120.0,
+        "unit": "egg.regular",
+        "producer": null
+      },
+      {
+        "name": "Whey Protein Coconut",
+        "amount": 40.0,
+        "unit": "gram",
+        "producer": "Bodylab24"
+      },
+      {
+        "name": "Himbeeren, frisch",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Magerquark",
+        "amount": 400.0,
+        "unit": "portion",
+        "producer": "Mbudget"
+      },
+      {
+        "name": "Dinkelmehl hell",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": "Landi"
+      }
+    ]
+  },
+  {
+    "id": "eb29a437-6d1d-4d07-8a6c-05070709a2fa",
+    "title": "Chia pudding with mango",
+    "servings": 1,
+    "caloriesPerServing": 663.5,
+    "proteinPerServing": 42.08,
+    "carbsPerServing": 40.74,
+    "fatPerServing": 31.92,
+    "fiberPerServing": 15.72,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Coconut Milk",
+        "amount": 100.0,
+        "unit": "milliliter",
+        "producer": "Thai Kitchen"
+      },
+      {
+        "name": "Chiasamen",
+        "amount": 35.0,
+        "unit": "gram",
+        "producer": "Natur Gut (Penny)"
+      },
+      {
+        "name": "Mango, frisch",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Magerquark",
+        "amount": 330.0,
+        "unit": "gram",
+        "producer": "Milfina (Aldi)"
+      }
+    ]
+  },
+  {
+    "id": "7ed5f0f4-4a4b-48c5-9f83-38d29ae0ef19",
+    "title": "Kokosglace selfmade",
+    "servings": 1,
+    "caloriesPerServing": 1069.25,
+    "proteinPerServing": 82.67,
+    "carbsPerServing": 42.42,
+    "fatPerServing": 58.95,
+    "fiberPerServing": 14.7,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Milch",
+        "amount": 500.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "Whey Protein Coconut",
+        "amount": 75.0,
+        "unit": "gram",
+        "producer": "Bodylab24"
+      },
+      {
+        "name": "Joghurt 1,5% Fett",
+        "amount": 150.0,
+        "unit": "package",
+        "producer": null
+      },
+      {
+        "name": "Kokosnuss raspeln",
+        "amount": 75.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "97d0f4bd-27ed-45b4-9129-08c5369b6b27",
+    "title": "Poulet Curry mit Dinkel 09.05",
+    "servings": 2,
+    "caloriesPerServing": 775.05,
+    "proteinPerServing": 68.95,
+    "carbsPerServing": 69.45,
+    "fatPerServing": 24.48,
+    "fiberPerServing": 3.85,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Dinkellocken",
+        "amount": 150.0,
+        "unit": "gram",
+        "producer": "Alnatura"
+      },
+      {
+        "name": "Brust-Geschnetzeltes",
+        "amount": 440.0,
+        "unit": "gram",
+        "producer": "MClassic"
+      },
+      {
+        "name": "Bratensauce",
+        "amount": 700.0,
+        "unit": "milliliter",
+        "producer": "Knorr"
+      }
+    ]
+  },
+  {
+    "id": "475c55df-1f67-4f39-97e8-13037f90fdc3",
+    "title": "Kartoffeln wedges mit parmesan",
+    "servings": 1,
+    "caloriesPerServing": 2900.0,
+    "proteinPerServing": 98.76,
+    "carbsPerServing": 323.0,
+    "fatPerServing": 122.32,
+    "fiberPerServing": 44.2,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Kartoffel Wedges",
+        "amount": 1700.0,
+        "unit": "gram",
+        "producer": "Selbstgemacht"
+      },
+      {
+        "name": "Parmesan Käse",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "5b95b1f6-bc7d-40fa-8134-07c177a8efde",
+    "title": "Wedges small",
+    "servings": 1,
+    "caloriesPerServing": 569.6,
+    "proteinPerServing": 34.48,
+    "carbsPerServing": 38.18,
+    "fatPerServing": 32.16,
+    "fiberPerServing": 2.24,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Bratkartoffeln",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Champignon Rahmsauce",
+        "amount": 140.0,
+        "unit": "gram",
+        "producer": "Maggi"
+      },
+      {
+        "name": "Filets de poulet",
+        "amount": 120.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "470e7400-27ef-42b9-b806-bc943ce955b8",
+    "title": "Oreo Frühstück 2026",
+    "servings": 5,
+    "caloriesPerServing": 539.27,
+    "proteinPerServing": 45.49,
+    "carbsPerServing": 51.11,
+    "fatPerServing": 14.76,
+    "fiberPerServing": 8.49,
+    "imageUrl": "https://images.yazio.com/app/recipe/user/f1a5e1f7-101a-4606-a614-fd3e73dc4a60.webp",
+    "ingredients": [
+      {
+        "name": "Kakaopulver",
+        "amount": 60.0,
+        "unit": "gram",
+        "producer": "Patissier"
+      },
+      {
+        "name": "Haferflocken",
+        "amount": 250.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Milch",
+        "amount": 600.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "Bodylab Whey Protein Latte Macchiato",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "Bodylab24"
+      },
+      {
+        "name": "Kekse",
+        "amount": 55.0,
+        "unit": "cookie",
+        "producer": "Oreo"
+      },
+      {
+        "name": "Joghurt Nature ",
+        "amount": 375.0,
+        "unit": "milliliter",
+        "producer": "Migros"
+      }
+    ]
+  },
+  {
+    "id": "e3e7b6da-9adf-48fe-b467-778b26b0956a",
+    "title": "Thai Curry mit Reis",
+    "servings": 3,
+    "caloriesPerServing": 858.6,
+    "proteinPerServing": 72.34,
+    "carbsPerServing": 107.44,
+    "fatPerServing": 13.55,
+    "fiberPerServing": 7.49,
+    "imageUrl": "https://images.yazio.com/app/recipe/user/2e1c1b45-b014-4f98-b643-f959006d1e21.webp",
+    "ingredients": [
+      {
+        "name": "White Rice, cooked",
+        "amount": 900.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Pouletbrust",
+        "amount": 680.0,
+        "unit": "gram",
+        "producer": "Migros"
+      },
+      {
+        "name": "Yellow  Curry Paste",
+        "amount": 100.0,
+        "unit": "portion",
+        "producer": "Thai Kitchen"
+      },
+      {
+        "name": "Milch 3.5% fett",
+        "amount": 300.0,
+        "unit": "milliliter",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Brokkoli (Broccoli), gekocht",
+        "amount": 280.0,
+        "unit": "piece.large",
+        "producer": null
+      },
+      {
+        "name": "Karotten (Möhren), frisch",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Cremefine 15% Fett",
+        "amount": 100.0,
+        "unit": "milliliter",
+        "producer": "Rama"
+      }
+    ]
+  },
+  {
+    "id": "da96158f-f03a-46c3-a5bf-acbe68c8ae9a",
+    "title": "Pizza High Protein",
+    "servings": 8,
+    "caloriesPerServing": 462.43,
+    "proteinPerServing": 31.18,
+    "carbsPerServing": 49.49,
+    "fatPerServing": 14.59,
+    "fiberPerServing": 3.06,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Dinkelmehl",
+        "amount": 500.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "magerquark M- Budget",
+        "amount": 500.0,
+        "unit": "gram",
+        "producer": "M Budget"
+      },
+      {
+        "name": "Tomatensoße (Tomatensauce) Konserve",
+        "amount": 180.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Cotto Schinken",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "Migros"
+      },
+      {
+        "name": "Mozzarella",
+        "amount": 400.0,
+        "unit": "gram",
+        "producer": "Mbudget"
+      },
+      {
+        "name": "Pouletschenkel",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Optigal Migros"
+      },
+      {
+        "name": "Pouletschenkel",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Optigal Migros"
+      }
+    ]
+  },
+  {
+    "id": "f55d2e2e-54db-4bcf-a307-48e049a2956f",
+    "title": "Thai Curry",
+    "servings": 1,
+    "caloriesPerServing": 2460.4,
+    "proteinPerServing": 333.6,
+    "carbsPerServing": 16.22,
+    "fatPerServing": 116.0,
+    "fiberPerServing": 4.0,
+    "imageUrl": "https://images.yazio.com/app/recipe/user/2e3980da-aa89-43de-9a49-5dd54ac2c410.webp",
+    "ingredients": [
+      {
+        "name": "Kokosnussmilch fettreduziert",
+        "amount": 800.0,
+        "unit": "can",
+        "producer": "Asia Green Garden (Aldi)"
+      },
+      {
+        "name": "Trutenbrust Minifilet ",
+        "amount": 1000.0,
+        "unit": "gram",
+        "producer": "Carnesi lidl"
+      },
+      {
+        "name": "Poulet Brustfilet",
+        "amount": 400.0,
+        "unit": "gram",
+        "producer": "Bio Natura"
+      },
+      {
+        "name": "Olivenöl",
+        "amount": 10.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "d2f41f0a-8e9f-49ba-8a9f-7d28b220fc52",
+    "title": "Thunfischaufstrich",
+    "servings": 1,
+    "caloriesPerServing": 631.5,
+    "proteinPerServing": 78.2,
+    "carbsPerServing": 4.5,
+    "fatPerServing": 33.36,
+    "fiberPerServing": 0.0,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Rosa Thon",
+        "amount": 310.0,
+        "unit": "can",
+        "producer": "M Classic"
+      },
+      {
+        "name": "Thomynaise",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Thomy"
+      }
+    ]
+  },
+  {
+    "id": "d8ca9bd4-0aa8-4e55-8926-c60f45e98ff5",
+    "title": "Hackbällchen mit Nudeln ",
+    "servings": 2,
+    "caloriesPerServing": 1096.8,
+    "proteinPerServing": 68.83,
+    "carbsPerServing": 72.0,
+    "fatPerServing": 58.53,
+    "fiberPerServing": 0.0,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Hackbällchen",
+        "amount": 540.0,
+        "unit": "gram",
+        "producer": "Selbstgemacht"
+      },
+      {
+        "name": "Dinkel Spirelli",
+        "amount": 200.0,
+        "unit": "portion",
+        "producer": "Alnatura"
+      }
+    ]
+  },
+  {
+    "id": "f38903c9-a76d-48be-a1f3-740ce3463af0",
+    "title": "Salatdressing",
+    "servings": 1,
+    "caloriesPerServing": 176.8,
+    "proteinPerServing": 10.01,
+    "carbsPerServing": 4.05,
+    "fatPerServing": 13.25,
+    "fiberPerServing": 0.0,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Cottage cheese ",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Mbudget"
+      },
+      {
+        "name": "Thomynaise",
+        "amount": 30.0,
+        "unit": "gram",
+        "producer": "Thomy"
+      }
+    ]
+  },
+  {
+    "id": "b2f62967-22e5-4711-9c00-180958c62c55",
+    "title": "Bolognese",
+    "servings": 1,
+    "caloriesPerServing": 3903.5,
+    "proteinPerServing": 269.88,
+    "carbsPerServing": 48.05,
+    "fatPerServing": 281.49,
+    "fiberPerServing": 14.97,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Rinderhackfleisch",
+        "amount": 1000.0,
+        "unit": "gram",
+        "producer": "Migros M Classic"
+      },
+      {
+        "name": "Rote Paprika, frisch",
+        "amount": 150.0,
+        "unit": "whole.regular",
+        "producer": null
+      },
+      {
+        "name": "Karotten (Möhren), frisch",
+        "amount": 150.0,
+        "unit": "whole.large",
+        "producer": null
+      },
+      {
+        "name": "Kokosmilch",
+        "amount": 500.0,
+        "unit": "milliliter",
+        "producer": "Thai Kitchen"
+      },
+      {
+        "name": "Mozzarella",
+        "amount": 350.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Weißwein (trocken) 12 Vol.%",
+        "amount": 125.0,
+        "unit": "glass",
+        "producer": null
+      },
+      {
+        "name": "Mineralwasser, Still",
+        "amount": 400.0,
+        "unit": "milliliter",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "b3231aed-dc86-4110-bcbf-00b11672ea11",
+    "title": "Saltay chicken udon noodles",
+    "servings": 1,
+    "caloriesPerServing": 2920.5,
+    "proteinPerServing": 282.66,
+    "carbsPerServing": 271.14,
+    "fatPerServing": 73.23,
+    "fiberPerServing": 21.03,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Udon Nudeln ",
+        "amount": 300.0,
+        "unit": "gram",
+        "producer": "Asia Green Garden (Aldi)"
+      },
+      {
+        "name": "Hähnchen-Brustfilet-Teilstück",
+        "amount": 1000.0,
+        "unit": "gram",
+        "producer": "Märkische Geflügelspez. GmbH"
+      },
+      {
+        "name": "Peanut Butter",
+        "amount": 60.0,
+        "unit": "milliliter",
+        "producer": "American Style"
+      },
+      {
+        "name": "Sojasoße (Soyasoße)",
+        "amount": 100.0,
+        "unit": "milliliter",
+        "producer": null
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 85.0,
+        "unit": "whole.regular",
+        "producer": null
+      },
+      {
+        "name": "THAI CURRY Erdnuss-Satay Sauce",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "Aldi"
+      },
+      {
+        "name": "Mineralwasser, Still",
+        "amount": 371.0,
+        "unit": "milliliter",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "6bd7d9c6-ac11-49de-a166-5524650059d8",
+    "title": "Nudeln selfmade ",
+    "servings": 1,
+    "caloriesPerServing": 3496.76,
+    "proteinPerServing": 142.45,
+    "carbsPerServing": 647.16,
+    "fatPerServing": 27.41,
+    "fiberPerServing": 43.65,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Hartweizengriess",
+        "amount": 485.0,
+        "unit": "gram",
+        "producer": "Migros Classic"
+      },
+      {
+        "name": "Ruchmehl",
+        "amount": 485.0,
+        "unit": "gram",
+        "producer": "Coop Naturaplan"
+      },
+      {
+        "name": "Hühnerei, Eier, roh",
+        "amount": 138.0,
+        "unit": "egg.regular",
+        "producer": null
+      },
+      {
+        "name": "Mineralwasser, Still",
+        "amount": 1000.0,
+        "unit": "glass",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "f2558dda-4cc5-44e7-b15e-73eff09d70e0",
+    "title": "20.Mai Spiralnudeln mit Poulet",
+    "servings": 4,
+    "caloriesPerServing": 1068.62,
+    "proteinPerServing": 76.32,
+    "carbsPerServing": 97.39,
+    "fatPerServing": 40.62,
+    "fiberPerServing": 0.46,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Poulet Brust filet",
+        "amount": 1000.0,
+        "unit": "portion",
+        "producer": "Aldi"
+      },
+      {
+        "name": "Dinkel Spirelli",
+        "amount": 500.0,
+        "unit": "portion",
+        "producer": "Alnatura"
+      },
+      {
+        "name": "Creme Fraiche",
+        "amount": 120.0,
+        "unit": "gram",
+        "producer": "M Budget"
+      },
+      {
+        "name": "Halbrahm",
+        "amount": 368.0,
+        "unit": "gram",
+        "producer": "Valflora"
+      },
+      {
+        "name": "Peperoni",
+        "amount": 166.0,
+        "unit": "gram",
+        "producer": "Peperoni"
+      }
+    ]
+  },
+  {
+    "id": "e8515bae-e661-4c28-b918-3c7acb5f9009",
+    "title": "Juice plus shake",
+    "servings": 1,
+    "caloriesPerServing": 578.43,
+    "proteinPerServing": 60.4,
+    "carbsPerServing": 57.09,
+    "fatPerServing": 9.44,
+    "fiberPerServing": 7.04,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Milch 1.5%",
+        "amount": 333.0,
+        "unit": "milliliter",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Magerquark",
+        "amount": 300.0,
+        "unit": "gram",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Complete Chocolate +",
+        "amount": 105.0,
+        "unit": "gram",
+        "producer": "Juice Plus"
+      }
+    ]
+  },
+  {
+    "id": "cdd2b641-2011-4567-86cc-df99f0345e9f",
+    "title": "Oreo Donuts geil",
+    "servings": 8,
+    "caloriesPerServing": 129.33,
+    "proteinPerServing": 7.03,
+    "carbsPerServing": 10.98,
+    "fatPerServing": 4.81,
+    "fiberPerServing": 1.88,
+    "imageUrl": "https://images.yazio.com/app/recipe/user/070ddaeb-69f1-4c88-891f-a3c2c3901eae.webp",
+    "ingredients": [
+      {
+        "name": "Haferflocken",
+        "amount": 80.0,
+        "unit": "portion",
+        "producer": null
+      },
+      {
+        "name": "Hühnerei, Eier, roh",
+        "amount": 120.0,
+        "unit": "egg.regular",
+        "producer": null
+      },
+      {
+        "name": "Kakaopulver",
+        "amount": 26.0,
+        "unit": "tablespoon",
+        "producer": "Patissier"
+      },
+      {
+        "name": "Vanillejoghurt",
+        "amount": 240.0,
+        "unit": "gram",
+        "producer": "Landliebe"
+      },
+      {
+        "name": "Cookeo Black 'N Cream",
+        "amount": 33.0,
+        "unit": "piece",
+        "producer": "Hofer"
+      },
+      {
+        "name": "Whey Protein Coconut",
+        "amount": 10.0,
+        "unit": "gram",
+        "producer": "Bodylab24"
+      },
+      {
+        "name": "Magerquark",
+        "amount": 75.0,
+        "unit": "gram",
+        "producer": "Milfina (Aldi)"
+      }
+    ]
+  },
+  {
+    "id": "2eb1a264-cf98-434e-9b73-41f54dbe2cf3",
+    "title": "Pouletbrust + Nudeln",
+    "servings": 3,
+    "caloriesPerServing": 804.77,
+    "proteinPerServing": 71.33,
+    "carbsPerServing": 63.48,
+    "fatPerServing": 28.27,
+    "fiberPerServing": 4.08,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Nudeln, gekocht (aus Hartweizengrieß)",
+        "amount": 600.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Pouletbrust-Filet",
+        "amount": 700.0,
+        "unit": "gram",
+        "producer": "Country's best"
+      },
+      {
+        "name": "Crème fraîche fleurette 33% Etrez",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "Etrez"
+      },
+      {
+        "name": "Milch",
+        "amount": 180.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "High Protein Drink",
+        "amount": 125.0,
+        "unit": "milliliter",
+        "producer": "Milsani (Aldi)"
+      }
+    ]
+  },
+  {
+    "id": "076afc77-5ec8-4dee-a8ca-dbcaa43910e9",
+    "title": "Hörnli - Müscheligratin",
+    "servings": 1,
+    "caloriesPerServing": 804.6,
+    "proteinPerServing": 73.03,
+    "carbsPerServing": 54.7,
+    "fatPerServing": 32.38,
+    "fiberPerServing": 0.0,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Käsenudeln",
+        "amount": 350.0,
+        "unit": "gram",
+        "producer": "Selbstgemacht"
+      },
+      {
+        "name": "Pouletfilet-Geschnetzeltes",
+        "amount": 220.0,
+        "unit": "gram",
+        "producer": "Wiesenhof"
+      },
+      {
+        "name": "Sauer Halbrahm",
+        "amount": 60.0,
+        "unit": "gram",
+        "producer": "Milfina"
+      }
+    ]
+  },
+  {
+    "id": "2c822a0a-9da6-41ae-bebe-cce05aa987c7",
+    "title": "Kokos overnight oats",
+    "servings": 1,
+    "caloriesPerServing": 792.3,
+    "proteinPerServing": 57.33,
+    "carbsPerServing": 52.2,
+    "fatPerServing": 35.88,
+    "fiberPerServing": 13.33,
+    "imageUrl": "https://images.yazio.com/app/recipe/user/ab5b5a92-a676-4491-a3e1-149a14035228.webp",
+    "ingredients": [
+      {
+        "name": "Haferflocken",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "bio chiasamen",
+        "amount": 15.0,
+        "unit": "gram",
+        "producer": "Bio"
+      },
+      {
+        "name": "Kokosraspeln",
+        "amount": 20.0,
+        "unit": "tablespoon",
+        "producer": null
+      },
+      {
+        "name": "Magerquark",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Kokosnussmilch fettreduziert",
+        "amount": 50.0,
+        "unit": "milliliter",
+        "producer": "Asia Green Garden (Aldi)"
+      },
+      {
+        "name": "Raffaello",
+        "amount": 10.0,
+        "unit": "portion",
+        "producer": "Ferrero"
+      },
+      {
+        "name": "Milch",
+        "amount": 100.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "Bodylab Whey Protein Kokosnuss",
+        "amount": 30.0,
+        "unit": "gram",
+        "producer": "Bodylab24"
+      }
+    ]
+  },
+  {
+    "id": "0395ea27-bc07-45ca-aabc-d5e638c9791f",
+    "title": "Sweet potato minced beef",
+    "servings": 2,
+    "caloriesPerServing": 682.3,
+    "proteinPerServing": 62.81,
+    "carbsPerServing": 25.67,
+    "fatPerServing": 38.28,
+    "fiberPerServing": 3.96,
+    "imageUrl": "https://images.yazio.com/app/recipe/user/424fb41e-444d-45cc-b944-2b903ac25e93.webp",
+    "ingredients": [
+      {
+        "name": "Gratin & Pizza Mix",
+        "amount": 160.0,
+        "unit": "gram",
+        "producer": "Coop Prix Garantie"
+      },
+      {
+        "name": "Rinderhackfleisch light",
+        "amount": 400.0,
+        "unit": "portion",
+        "producer": "Country's Best Aldi"
+      },
+      {
+        "name": "Olivenöl",
+        "amount": 15.0,
+        "unit": "tablespoon",
+        "producer": null
+      },
+      {
+        "name": "Sweet Potato, baked",
+        "amount": 240.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "300caf79-4e1e-4c18-949b-5e6922ebc917",
+    "title": "Naanbrot",
+    "servings": 1,
+    "caloriesPerServing": 3111.0,
+    "proteinPerServing": 125.6,
+    "carbsPerServing": 576.4,
+    "fatPerServing": 27.0,
+    "fiberPerServing": 30.4,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Dinkelmehl hell",
+        "amount": 800.0,
+        "unit": "portion",
+        "producer": "Coop Qualité & Prix"
+      },
+      {
+        "name": "Milch",
+        "amount": 300.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "Nature Joghurt",
+        "amount": 300.0,
+        "unit": "gram",
+        "producer": "Forster Molkerei"
+      }
+    ]
+  },
+  {
+    "id": "b9316dee-b003-49a4-88e6-a775ee682c99",
+    "title": "Nudeln mit Pouletbrust ",
+    "servings": 1,
+    "caloriesPerServing": 1510.8,
+    "proteinPerServing": 129.66,
+    "carbsPerServing": 138.22,
+    "fatPerServing": 45.69,
+    "fiberPerServing": 9.18,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Nudeln, gekocht (aus Hartweizengrieß)",
+        "amount": 450.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Pouletbrust-Filet",
+        "amount": 410.0,
+        "unit": "gram",
+        "producer": "Country's best"
+      },
+      {
+        "name": "Thai",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "Thai milk coco"
+      },
+      {
+        "name": "High Protein Milk Drink",
+        "amount": 150.0,
+        "unit": "gram",
+        "producer": "Milbona (Lidl)"
+      }
+    ]
+  },
+  {
+    "id": "4d404e98-53a0-45d2-8434-743bcc679429",
+    "title": "Chicken Nuggets (Zweifel)",
+    "servings": 1,
+    "caloriesPerServing": 4473.3,
+    "proteinPerServing": 418.68,
+    "carbsPerServing": 308.42,
+    "fatPerServing": 167.12,
+    "fiberPerServing": 26.83,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Paprika",
+        "amount": 380.0,
+        "unit": "gram",
+        "producer": "Zweifel"
+      },
+      {
+        "name": "Hähnchen-Ministeak",
+        "amount": 1600.0,
+        "unit": "portion",
+        "producer": "Purland (Kaufland)"
+      },
+      {
+        "name": "Hühnerei, Eier, roh",
+        "amount": 240.0,
+        "unit": "egg.regular",
+        "producer": null
+      },
+      {
+        "name": "Dinkelmehl",
+        "amount": 150.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "3600a577-e990-4b25-ac65-954d92042680",
+    "title": "Lasagne selfmade September",
+    "servings": 1,
+    "caloriesPerServing": 7529.6,
+    "proteinPerServing": 368.95,
+    "carbsPerServing": 845.5,
+    "fatPerServing": 288.5,
+    "fiberPerServing": 29.24,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Butter",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 130.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Karotten (Möhren), frisch",
+        "amount": 150.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Milch",
+        "amount": 1400.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "Dinkelmehl",
+        "amount": 270.0,
+        "unit": "tablespoon",
+        "producer": null
+      },
+      {
+        "name": "Tomatenpüree",
+        "amount": 80.0,
+        "unit": "gram",
+        "producer": "Thomy"
+      },
+      {
+        "name": "Bio Passierte Tomaten",
+        "amount": 690.0,
+        "unit": "can",
+        "producer": "Natur Aktiv  (Hofer)"
+      },
+      {
+        "name": "Lasagne",
+        "amount": 650.0,
+        "unit": "gram",
+        "producer": "Pasta Nobile"
+      },
+      {
+        "name": "Yogurt caffè intero",
+        "amount": 280.0,
+        "unit": "gram",
+        "producer": "bonla"
+      },
+      {
+        "name": "Rindshackfleisch",
+        "amount": 1000.0,
+        "unit": "gram",
+        "producer": "Aldi Suisse"
+      }
+    ]
+  },
+  {
+    "id": "96ee3935-2f61-432f-8b6f-cf3f2c491f5c",
+    "title": "Reis mit Quinoa",
+    "servings": 1,
+    "caloriesPerServing": 5127.0,
+    "proteinPerServing": 136.0,
+    "carbsPerServing": 1035.5,
+    "fatPerServing": 37.8,
+    "fiberPerServing": 0.0,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Quinoa tricolore ",
+        "amount": 450.0,
+        "unit": "gram",
+        "producer": "Hofer"
+      },
+      {
+        "name": "Basmati Reis",
+        "amount": 1000.0,
+        "unit": "gram",
+        "producer": "Bon-Ri (Aldi)"
+      },
+      {
+        "name": "Mineralwasser, Still",
+        "amount": 2000.0,
+        "unit": "milliliter",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "0d387944-e27e-4f20-9400-ec4918a0cea9",
+    "title": "Salatsauce Hüttenkäse",
+    "servings": 1,
+    "caloriesPerServing": 410.45,
+    "proteinPerServing": 26.38,
+    "carbsPerServing": 12.78,
+    "fatPerServing": 27.98,
+    "fiberPerServing": 0.27,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Mayonnaise light",
+        "amount": 40.0,
+        "unit": "gram",
+        "producer": "Thomy"
+      },
+      {
+        "name": "Senf (Mostrich), scharf",
+        "amount": 5.0,
+        "unit": "teaspoon",
+        "producer": null
+      },
+      {
+        "name": "Kuhmilch (Vollmilch) 3,5% Fett",
+        "amount": 100.0,
+        "unit": "milliliter",
+        "producer": null
+      },
+      {
+        "name": "Cottage Cheese",
+        "amount": 150.0,
+        "unit": "gram",
+        "producer": "Coop Qualité & Prix"
+      },
+      {
+        "name": "Hühnerei, Eier, roh",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Speisesalz",
+        "amount": 5.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "cbc55e86-ce79-49b8-8333-d1b3bd03e517",
+    "title": "Gedeckte Kirschtorte",
+    "servings": 1,
+    "caloriesPerServing": 4542.75,
+    "proteinPerServing": 104.58,
+    "carbsPerServing": 484.91,
+    "fatPerServing": 235.09,
+    "fiberPerServing": 35.29,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Weissmehl",
+        "amount": 250.0,
+        "unit": "gram",
+        "producer": "Coop"
+      },
+      {
+        "name": "Butter",
+        "amount": 150.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Zucker, weiß",
+        "amount": 225.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Hühnerei, Eier, roh",
+        "amount": 300.0,
+        "unit": "egg.regular",
+        "producer": null
+      },
+      {
+        "name": "Kirschen, frisch",
+        "amount": 500.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Mandeln",
+        "amount": 150.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "78451653-d932-44f9-ad81-ffad82fbaffa",
+    "title": "Blueberry Overnight Oats",
+    "servings": 2,
+    "caloriesPerServing": 482.15,
+    "proteinPerServing": 24.44,
+    "carbsPerServing": 47.74,
+    "fatPerServing": 15.62,
+    "fiberPerServing": 21.41,
+    "imageUrl": "https://images.yazio.com/app/recipe/user/52a3ea14-35bc-48b2-90d8-90dd70207f33.webp",
+    "ingredients": [
+      {
+        "name": "Haferflocken",
+        "amount": 80.0,
+        "unit": "portion",
+        "producer": null
+      },
+      {
+        "name": "Heidelbeeren (Blaubeeren), frisch",
+        "amount": 400.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "bio chiasamen",
+        "amount": 40.0,
+        "unit": "gram",
+        "producer": "Bio"
+      },
+      {
+        "name": "Milch   Teilentrahmt Drink",
+        "amount": 240.0,
+        "unit": "milliliter",
+        "producer": "Milbona (Lidl)"
+      },
+      {
+        "name": "Magerquark",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Kokosraspeln",
+        "amount": 10.0,
+        "unit": "tablespoon",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "f7b135cd-66a5-4be2-9b37-4b60c290f985",
+    "title": "Salatsauce neu ",
+    "servings": 1,
+    "caloriesPerServing": 1191.7,
+    "proteinPerServing": 66.55,
+    "carbsPerServing": 28.82,
+    "fatPerServing": 89.59,
+    "fiberPerServing": 1.71,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Magerquark \"milfina\"",
+        "amount": 300.0,
+        "unit": "gram",
+        "producer": "Aldi"
+      },
+      {
+        "name": "Cottage Cheese",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "Migros Mbudget"
+      },
+      {
+        "name": "Delikatess Mayonaise",
+        "amount": 90.0,
+        "unit": "gram",
+        "producer": "Thomys"
+      },
+      {
+        "name": "Kuhmilch (Vollmilch) 3,5% Fett",
+        "amount": 160.0,
+        "unit": "milliliter",
+        "producer": null
+      },
+      {
+        "name": "Delikatess Senf, mittelscharf",
+        "amount": 20.0,
+        "unit": "milliliter",
+        "producer": "Thomy"
+      },
+      {
+        "name": "Hühnerei, Eier, roh",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "25ac3c27-98bd-4484-990b-4d01da457400",
+    "title": "Kaiserschmarrn ",
+    "servings": 1,
+    "caloriesPerServing": 687.3,
+    "proteinPerServing": 53.19,
+    "carbsPerServing": 79.85,
+    "fatPerServing": 16.98,
+    "fiberPerServing": 0.0,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Magerquark",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "Züger"
+      },
+      {
+        "name": "Kuhmilch (Vollmilch) 3,5% Fett",
+        "amount": 50.0,
+        "unit": "milliliter",
+        "producer": null
+      },
+      {
+        "name": "Bio wachteleier",
+        "amount": 120.0,
+        "unit": "piece",
+        "producer": "Wachteleier"
+      },
+      {
+        "name": "UrDinkelmehl hell",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Panflor (Landi)"
+      }
+    ]
+  },
+  {
+    "id": "d5684bc5-c6c1-41f6-a12c-6b9bacc15c7f",
+    "title": "Tomatensauce",
+    "servings": 1,
+    "caloriesPerServing": 1901.7,
+    "proteinPerServing": 42.2,
+    "carbsPerServing": 118.0,
+    "fatPerServing": 135.57,
+    "fiberPerServing": 24.07,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Pizza Sauce Basilico",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "Longobardi"
+      },
+      {
+        "name": "Tomaten Gehackt",
+        "amount": 400.0,
+        "unit": "can",
+        "producer": "Cucina Nobile"
+      },
+      {
+        "name": "Halbrahm UHT",
+        "amount": 500.0,
+        "unit": "milliliter",
+        "producer": "Valflora"
+      },
+      {
+        "name": "Mineralwasser, Still",
+        "amount": 1280.0,
+        "unit": "milliliter",
+        "producer": null
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 500.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Tomatenpüree",
+        "amount": 210.0,
+        "unit": "gram",
+        "producer": "Thomy"
+      }
+    ]
+  },
+  {
+    "id": "c5f19769-196f-4c39-bd3e-c2000df55ab9",
+    "title": "Tiramisu",
+    "servings": 1,
+    "caloriesPerServing": 5122.5,
+    "proteinPerServing": 136.35,
+    "carbsPerServing": 532.16,
+    "fatPerServing": 268.33,
+    "fiberPerServing": 0.0,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Magerquark",
+        "amount": 500.0,
+        "unit": "can",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Mascarpone",
+        "amount": 500.0,
+        "unit": "gram",
+        "producer": "Rewe"
+      },
+      {
+        "name": "Vollrahm",
+        "amount": 75.0,
+        "unit": "milliliter",
+        "producer": "Coop"
+      },
+      {
+        "name": "Zucker, weiß",
+        "amount": 250.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Löffelbiskuit",
+        "amount": 310.0,
+        "unit": "gram",
+        "producer": "Aldi"
+      },
+      {
+        "name": "Hühnerei, Eier, roh",
+        "amount": 300.0,
+        "unit": "egg.regular",
+        "producer": null
+      },
+      {
+        "name": "Schwarzer Kaffee",
+        "amount": 400.0,
+        "unit": "mug.regular",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "d0dc114e-9158-4cbf-9e3b-bf546947371b",
+    "title": "Frühstücksbowl new",
+    "servings": 1,
+    "caloriesPerServing": 708.82,
+    "proteinPerServing": 61.04,
+    "carbsPerServing": 67.66,
+    "fatPerServing": 10.77,
+    "fiberPerServing": 34.6,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Magerquark",
+        "amount": 500.0,
+        "unit": "can",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Chiasamen, getrocknet",
+        "amount": 12.0,
+        "unit": "tablespoon",
+        "producer": null
+      },
+      {
+        "name": "Flohsamen",
+        "amount": 25.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Himbeeren, frisch",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Apfelmus, gesüßt",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Vollkornhaferflocken",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": "Migros Classic"
+      }
+    ]
+  },
+  {
+    "id": "07f718dc-0163-44ad-ad5a-8571fb730f52",
+    "title": "Salatsauce ohne Öl & Mayo",
+    "servings": 1,
+    "caloriesPerServing": 642.45,
+    "proteinPerServing": 46.94,
+    "carbsPerServing": 27.34,
+    "fatPerServing": 37.2,
+    "fiberPerServing": 0.9,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Magerquark",
+        "amount": 250.0,
+        "unit": "can",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Cottage cheese ",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Mbudget"
+      },
+      {
+        "name": "Kuhmilch (Vollmilch) 3,5% Fett",
+        "amount": 180.0,
+        "unit": "milliliter",
+        "producer": null
+      },
+      {
+        "name": "Essig (Branntweinessig, Weißweinessig)",
+        "amount": 20.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Senf (Mostrich), scharf",
+        "amount": 15.0,
+        "unit": "tablespoon",
+        "producer": null
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Frischkäse",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Hofburger (Aldi)"
+      }
+    ]
+  },
+  {
+    "id": "a4ce0b15-44bb-477a-8071-1fe0d33b509e",
+    "title": "Salsatsauce lecker ",
+    "servings": 1,
+    "caloriesPerServing": 275.0,
+    "proteinPerServing": 19.58,
+    "carbsPerServing": 9.17,
+    "fatPerServing": 16.97,
+    "fiberPerServing": 0.0,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Thomynaise",
+        "amount": 30.0,
+        "unit": "gram",
+        "producer": "Thomy"
+      },
+      {
+        "name": "Hühnerei, Eier, roh",
+        "amount": 60.0,
+        "unit": "egg.regular",
+        "producer": null
+      },
+      {
+        "name": "Kressi",
+        "amount": 20.0,
+        "unit": "milliliter",
+        "producer": "Chirat"
+      },
+      {
+        "name": "Mustard",
+        "amount": 10.0,
+        "unit": "gram",
+        "producer": "Thomy"
+      },
+      {
+        "name": "Milch",
+        "amount": 50.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "Magerquark",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Milfina (Aldi)"
+      }
+    ]
+  },
+  {
+    "id": "5158e4ee-019e-402b-8246-fb992c3b8138",
+    "title": "Sosse mit Frischkäse",
+    "servings": 1,
+    "caloriesPerServing": 773.0,
+    "proteinPerServing": 37.19,
+    "carbsPerServing": 42.61,
+    "fatPerServing": 49.56,
+    "fiberPerServing": 0.51,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Cremia Balance",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "Alpenmark"
+      },
+      {
+        "name": "Milch",
+        "amount": 600.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "Coconut milk",
+        "amount": 115.0,
+        "unit": "gram",
+        "producer": "Thai     Kitchen"
+      },
+      {
+        "name": "Senf (Mostrich), scharf",
+        "amount": 10.0,
+        "unit": "tablespoon",
+        "producer": null
+      },
+      {
+        "name": "Tomatenpüree",
+        "amount": 15.0,
+        "unit": "teaspoon",
+        "producer": "Migros"
+      }
+    ]
+  },
+  {
+    "id": "fd58e0a7-6ae2-4195-b605-fdafabaaad59",
+    "title": "Pizza High Protein",
+    "servings": 4,
+    "caloriesPerServing": 508.77,
+    "proteinPerServing": 50.6,
+    "carbsPerServing": 60.02,
+    "fatPerServing": 6.03,
+    "fiberPerServing": 9.07,
+    "imageUrl": "https://images.yazio.com/app/recipe/user/ad3e7e64-02bd-408a-9f2f-756b0f084405.webp",
+    "ingredients": [
+      {
+        "name": "Magerquark",
+        "amount": 400.0,
+        "unit": "gram",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Rosa Thon",
+        "amount": 310.0,
+        "unit": "can",
+        "producer": "M Classic"
+      },
+      {
+        "name": "Dinkel Vollkornmehl",
+        "amount": 320.0,
+        "unit": "gram",
+        "producer": "Goldähren (Aldi)"
+      },
+      {
+        "name": "High protein mozzarella ",
+        "amount": 160.0,
+        "unit": "package",
+        "producer": "Milsani"
+      },
+      {
+        "name": "Pizzasauce",
+        "amount": 250.0,
+        "unit": "gram",
+        "producer": "Mutti"
+      },
+      {
+        "name": "Peperoni",
+        "amount": 100.0,
+        "unit": "portion",
+        "producer": "Peperoni"
+      }
+    ]
+  },
+  {
+    "id": "6bfb6f4b-5e3b-4286-9ec3-53c5c018e9a6",
+    "title": "Vegi lasagne",
+    "servings": 1,
+    "caloriesPerServing": 5806.7,
+    "proteinPerServing": 305.34,
+    "carbsPerServing": 721.5,
+    "fatPerServing": 171.3,
+    "fiberPerServing": 78.7,
+    "imageUrl": "https://images.yazio.com/app/recipe/user/44c3d821-0096-425c-bd3b-3906c8b5325a.webp",
+    "ingredients": [
+      {
+        "name": "Vemondo Veganes Hack ",
+        "amount": 800.0,
+        "unit": "gram",
+        "producer": "Lidl"
+      },
+      {
+        "name": "Tomaten (passiert), Konserve",
+        "amount": 800.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 170.0,
+        "unit": "whole.regular",
+        "producer": null
+      },
+      {
+        "name": "Dinkelmehl",
+        "amount": 600.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Hartweizengrieß (Hartweizengries)",
+        "amount": 250.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Hühnerei, Eier, roh",
+        "amount": 120.0,
+        "unit": "egg.regular",
+        "producer": null
+      },
+      {
+        "name": "Milch",
+        "amount": 1000.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "Butter",
+        "amount": 80.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Chipeno Rauchige Chipotle Sauce",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "chipeno"
+      },
+      {
+        "name": "Karotten (Möhren), frisch",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "a3a9a12c-52b9-4698-868e-2d617cc4308b",
+    "title": "Poulet für Fajitas",
+    "servings": 3,
+    "caloriesPerServing": 666.07,
+    "proteinPerServing": 93.89,
+    "carbsPerServing": 14.41,
+    "fatPerServing": 26.99,
+    "fiberPerServing": 3.05,
+    "imageUrl": "https://images.yazio.com/app/recipe/user/13db672d-7f2e-4afb-94bc-06c1ac7ab6b1.webp",
+    "ingredients": [
+      {
+        "name": "Pouletbrust",
+        "amount": 1100.0,
+        "unit": "gram",
+        "producer": "Migros"
+      },
+      {
+        "name": "Mais, Konserve",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Peperoni",
+        "amount": 100.0,
+        "unit": "portion",
+        "producer": "Peperoni"
+      },
+      {
+        "name": "Chipeño Smoky Chipotle Sauce",
+        "amount": 140.0,
+        "unit": "milliliter",
+        "producer": "Chipeño GmbH"
+      }
+    ]
+  },
+  {
+    "id": "866a9e33-781e-4384-9f57-29c3c28ddd1b",
+    "title": "Dinkelzopf",
+    "servings": 1,
+    "caloriesPerServing": 3419.0,
+    "proteinPerServing": 121.21,
+    "carbsPerServing": 498.84,
+    "fatPerServing": 92.11,
+    "fiberPerServing": 40.0,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Kuhmilch (Vollmilch) 3,5% Fett",
+        "amount": 450.0,
+        "unit": "milliliter",
+        "producer": null
+      },
+      {
+        "name": "Butter",
+        "amount": 75.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Zucker, weiß",
+        "amount": 5.0,
+        "unit": "teaspoon",
+        "producer": null
+      },
+      {
+        "name": "UrDinkelmehl hell",
+        "amount": 350.0,
+        "unit": "gram",
+        "producer": "Argi Natura"
+      },
+      {
+        "name": "Dinkel-Vollkornmehl",
+        "amount": 400.0,
+        "unit": "gram",
+        "producer": "Happy Harvest"
+      }
+    ]
+  },
+  {
+    "id": "08b9b3f9-c343-49cd-bf40-e537c3ed5765",
+    "title": "Kartoffeltaler",
+    "servings": 1,
+    "caloriesPerServing": 1079.7,
+    "proteinPerServing": 85.16,
+    "carbsPerServing": 30.32,
+    "fatPerServing": 67.74,
+    "fiberPerServing": 4.0,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Hüttenkäse",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "Migros M Budget"
+      },
+      {
+        "name": "Kartoffeln roh",
+        "amount": 150.0,
+        "unit": "gram",
+        "producer": ""
+      },
+      {
+        "name": "Hühnerei, Eier, roh",
+        "amount": 60.0,
+        "unit": "egg.regular",
+        "producer": null
+      },
+      {
+        "name": "Apenzeller Reibkäse",
+        "amount": 150.0,
+        "unit": "gram",
+        "producer": "Migros"
+      },
+      {
+        "name": "Alpstein Bergkäse",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": "Alp Senn GmbH"
+      }
+    ]
+  },
+  {
+    "id": "afa0b42e-a036-42a9-8410-7536bddd71a6",
+    "title": "Poulet nudeln",
+    "servings": 6,
+    "caloriesPerServing": 677.15,
+    "proteinPerServing": 49.92,
+    "carbsPerServing": 71.94,
+    "fatPerServing": 17.33,
+    "fiberPerServing": 3.73,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Filets de poulet",
+        "amount": 944.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Dinkel locken",
+        "amount": 550.0,
+        "unit": "gram",
+        "producer": "Bioland"
+      },
+      {
+        "name": "Kokosmilch",
+        "amount": 500.0,
+        "unit": "milliliter",
+        "producer": "Thai Kitchen"
+      },
+      {
+        "name": "Peperoni",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Peperoni"
+      },
+      {
+        "name": "Karotten (Möhren), frisch",
+        "amount": 150.0,
+        "unit": "whole.large",
+        "producer": null
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 170.0,
+        "unit": "whole.regular",
+        "producer": null
+      },
+      {
+        "name": "Rotwein (trocken) 12 Vol.%",
+        "amount": 200.0,
+        "unit": "milliliter",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "63efc810-85c4-4929-973b-2dd8f43b26b0",
+    "title": "Butter Chicken Dehli Style selfmade",
+    "servings": 1,
+    "caloriesPerServing": 3315.7,
+    "proteinPerServing": 480.0,
+    "carbsPerServing": 99.32,
+    "fatPerServing": 112.51,
+    "fiberPerServing": 4.38,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Brust-Geschnetzeltes",
+        "amount": 500.0,
+        "unit": "gram",
+        "producer": "MClassic"
+      },
+      {
+        "name": "Pouletfilet-Geschnetzeltes",
+        "amount": 1400.0,
+        "unit": "portion",
+        "producer": "Wiesenhof"
+      },
+      {
+        "name": "Joghurt Nature Migros Bio",
+        "amount": 200.0,
+        "unit": "milliliter",
+        "producer": "Migros"
+      },
+      {
+        "name": "Pizza Sauce ",
+        "amount": 400.0,
+        "unit": "gram",
+        "producer": "Mutti"
+      },
+      {
+        "name": "Pomodori Pelatic",
+        "amount": 400.0,
+        "unit": "gram",
+        "producer": "Longobardi"
+      },
+      {
+        "name": "Coconut Milk light",
+        "amount": 250.0,
+        "unit": "package",
+        "producer": "Authentic thai cuisine"
+      },
+      {
+        "name": "Cashewkerne (geschält)",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Hofer"
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 284.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "80f652a9-1b90-4de6-9cd4-24f871bda0a1",
+    "title": "Gemüse Nudeln",
+    "servings": 1,
+    "caloriesPerServing": 5621.0,
+    "proteinPerServing": 273.91,
+    "carbsPerServing": 646.9,
+    "fatPerServing": 198.52,
+    "fiberPerServing": 49.8,
+    "imageUrl": "https://images.yazio.com/app/recipe/user/a1887bfd-c756-4176-ad96-f1d5aa238bba.webp",
+    "ingredients": [
+      {
+        "name": "Tortiglioni N46",
+        "amount": 750.0,
+        "unit": "gram",
+        "producer": "Agnesi"
+      },
+      {
+        "name": "Hüttenkäse Natur",
+        "amount": 500.0,
+        "unit": "portion",
+        "producer": "Milsani (Aldi)"
+      },
+      {
+        "name": "Polpa Fein Gehackte Tomaten",
+        "amount": 400.0,
+        "unit": "can",
+        "producer": "Mutti"
+      },
+      {
+        "name": "Vollrahm",
+        "amount": 250.0,
+        "unit": "milliliter",
+        "producer": "Valflora"
+      },
+      {
+        "name": "Brokkoli (Broccoli), frisch",
+        "amount": 500.0,
+        "unit": "whole.regular",
+        "producer": null
+      },
+      {
+        "name": "Rote Paprika, frisch",
+        "amount": 450.0,
+        "unit": "whole.regular",
+        "producer": null
+      },
+      {
+        "name": "Karotten (Möhren), frisch",
+        "amount": 400.0,
+        "unit": "whole.medium",
+        "producer": null
+      },
+      {
+        "name": "Grana Padano",
+        "amount": 250.0,
+        "unit": "gram",
+        "producer": "Cucina (Aldi)"
+      },
+      {
+        "name": "Mineralwasser, Still",
+        "amount": 833.0,
+        "unit": "milliliter",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "814f2fbf-abcc-4bab-a49c-a515d3e1d469",
+    "title": "Cinque pi Crevetten",
+    "servings": 2,
+    "caloriesPerServing": 779.7,
+    "proteinPerServing": 41.15,
+    "carbsPerServing": 52.02,
+    "fatPerServing": 43.59,
+    "fiberPerServing": 7.42,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Grana Padano",
+        "amount": 40.0,
+        "unit": "gram",
+        "producer": "Mifroma"
+      },
+      {
+        "name": "Vollrahm",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "Valflora"
+      },
+      {
+        "name": "High Protein Milk Drink",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Milbona (Lidl)"
+      },
+      {
+        "name": "Hörnli Urdinkel",
+        "amount": 150.0,
+        "unit": "gram",
+        "producer": "Terra Suisse"
+      },
+      {
+        "name": "Party Garnelen, gekocht geschält",
+        "amount": 190.0,
+        "unit": "gram",
+        "producer": "Almare Seafood (Aldi)"
+      }
+    ]
+  },
+  {
+    "id": "69ba8fc5-e632-49d9-b2cd-e73b174b36a2",
+    "title": "Fisch",
+    "servings": 1,
+    "caloriesPerServing": 1078.0,
+    "proteinPerServing": 158.4,
+    "carbsPerServing": 7.6,
+    "fatPerServing": 46.2,
+    "fiberPerServing": 0.0,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Saurer Halbrahm",
+        "amount": 200.0,
+        "unit": "milliliter",
+        "producer": "Milbona (Lidl)"
+      },
+      {
+        "name": "Pangasius Naturbelassen",
+        "amount": 900.0,
+        "unit": "gram",
+        "producer": "Golden Seafood"
+      },
+      {
+        "name": "Mineralwasser, Still",
+        "amount": 600.0,
+        "unit": "milliliter",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "667a687e-76b8-4395-b582-a0af2a0159f8",
+    "title": "Aronia Chia Pudding",
+    "servings": 5,
+    "caloriesPerServing": 439.66,
+    "proteinPerServing": 37.14,
+    "carbsPerServing": 24.89,
+    "fatPerServing": 15.9,
+    "fiberPerServing": 21.15,
+    "imageUrl": "https://images.yazio.com/app/recipe/user/b41149f2-f6ee-4d87-9806-0fb80f5ffd6e.webp",
+    "ingredients": [
+      {
+        "name": "Flavn Tasty Raspberry Cheesecake",
+        "amount": 15.0,
+        "unit": "portion",
+        "producer": "ESN"
+      },
+      {
+        "name": "Zimt",
+        "amount": 10.0,
+        "unit": "teaspoon",
+        "producer": null
+      },
+      {
+        "name": "Bio Aronia Pulver ",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": "Aronia vital"
+      },
+      {
+        "name": "ahornsirup",
+        "amount": 25.0,
+        "unit": "portion",
+        "producer": "Natural"
+      },
+      {
+        "name": "Bio Whey Protein Erdbeere",
+        "amount": 30.0,
+        "unit": "portion",
+        "producer": "AlpenPower"
+      },
+      {
+        "name": "Magerquark",
+        "amount": 1000.0,
+        "unit": "can",
+        "producer": "Milbona (Lidl)"
+      },
+      {
+        "name": "bio chiasamen",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "Bio"
+      },
+      {
+        "name": "Milch",
+        "amount": 500.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      }
+    ]
+  },
+  {
+    "id": "61e2b83a-f5f1-4fcf-9bae-2ad13a88bf31",
+    "title": "Reis mit Pouletgeschnetzeltem",
+    "servings": 5,
+    "caloriesPerServing": 712.67,
+    "proteinPerServing": 58.0,
+    "carbsPerServing": 72.51,
+    "fatPerServing": 20.27,
+    "fiberPerServing": 2.47,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Poulet Geschnetzeltes",
+        "amount": 1000.0,
+        "unit": "gram",
+        "producer": "Coop"
+      },
+      {
+        "name": "Riso  arborio",
+        "amount": 416.0,
+        "unit": "gram",
+        "producer": "Delizie Del Sole Eurospin"
+      },
+      {
+        "name": "Karotten (Möhren), frisch",
+        "amount": 150.0,
+        "unit": "whole.large",
+        "producer": null
+      },
+      {
+        "name": "Rote Paprika, frisch",
+        "amount": 150.0,
+        "unit": "whole.regular",
+        "producer": null
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 170.0,
+        "unit": "whole.regular",
+        "producer": null
+      },
+      {
+        "name": "Coconut milk",
+        "amount": 500.0,
+        "unit": "milliliter",
+        "producer": "Thai Kitchen"
+      }
+    ]
+  },
+  {
+    "id": "f66c6894-be96-41cc-b2a1-bcb45ff3c3fe",
+    "title": "Salatsauce mit Magerquark",
+    "servings": 1,
+    "caloriesPerServing": 1135.4,
+    "proteinPerServing": 27.97,
+    "carbsPerServing": 15.88,
+    "fatPerServing": 108.19,
+    "fiberPerServing": 0.41,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "magerquark M- Budget",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "M Budget"
+      },
+      {
+        "name": "Essig (Branntweinessig, Weißweinessig)",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Senf (Mostrich), scharf",
+        "amount": 10.0,
+        "unit": "tablespoon",
+        "producer": null
+      },
+      {
+        "name": "Rapsöl",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Kuhmilch (Vollmilch) 3,5% Fett",
+        "amount": 50.0,
+        "unit": "milliliter",
+        "producer": null
+      },
+      {
+        "name": "Bio wachteleier",
+        "amount": 45.0,
+        "unit": "piece",
+        "producer": "Wachteleier"
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 20.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "8c8e2db4-9101-4f20-8395-f55d12c9feda",
+    "title": "Proteinbaguette ",
+    "servings": 4,
+    "caloriesPerServing": 262.05,
+    "proteinPerServing": 22.29,
+    "carbsPerServing": 25.07,
+    "fatPerServing": 7.46,
+    "fiberPerServing": 2.03,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "magerquark M- Budget",
+        "amount": 166.0,
+        "unit": "gram",
+        "producer": "M Budget"
+      },
+      {
+        "name": "Proteinpulver Geschmacksneutral",
+        "amount": 20.0,
+        "unit": "gram",
+        "producer": "Bodylab24"
+      },
+      {
+        "name": "Dinkelmehl",
+        "amount": 116.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Olivenöl",
+        "amount": 15.0,
+        "unit": "tablespoon",
+        "producer": null
+      },
+      {
+        "name": "Rosa Thunfisch im Salzwasser",
+        "amount": 155.0,
+        "unit": "can",
+        "producer": "Migros"
+      },
+      {
+        "name": "Tomaten, frisch",
+        "amount": 180.0,
+        "unit": "whole.regular",
+        "producer": null
+      },
+      {
+        "name": "Tomatensoße (Tomatensauce) Konserve",
+        "amount": 60.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Mozzarella",
+        "amount": 40.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "409eb9fa-05d1-415d-84d4-35e59cdac7f9",
+    "title": "Million Dollar Spaghetti ",
+    "servings": 8,
+    "caloriesPerServing": 632.71,
+    "proteinPerServing": 42.19,
+    "carbsPerServing": 62.29,
+    "fatPerServing": 22.4,
+    "fiberPerServing": 4.22,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Rindshackfleisch",
+        "amount": 625.0,
+        "unit": "gram",
+        "producer": "Migros"
+      },
+      {
+        "name": "Pizzasauce",
+        "amount": 800.0,
+        "unit": "package",
+        "producer": "Mutti"
+      },
+      {
+        "name": "Cottage cheese",
+        "amount": 560.0,
+        "unit": "gram",
+        "producer": "Coop Prix Garanti"
+      },
+      {
+        "name": "Drink teilentrahmte Milch Coop 1.5%",
+        "amount": 120.0,
+        "unit": "milliliter",
+        "producer": "Coop"
+      },
+      {
+        "name": "Alpstein Bergkäse",
+        "amount": 220.0,
+        "unit": "gram",
+        "producer": "Alp Senn GmbH"
+      },
+      {
+        "name": "Spaghetti, gekocht",
+        "amount": 1500.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "44c8056a-bcba-4cef-b41e-9313f21fe6d2",
+    "title": "Kartoffelgratin",
+    "servings": 20,
+    "caloriesPerServing": 396.1,
+    "proteinPerServing": 7.75,
+    "carbsPerServing": 32.99,
+    "fatPerServing": 25.3,
+    "fiberPerServing": 0.12,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Speisekartoffeln mehligkochend",
+        "amount": 3600.0,
+        "unit": "gram",
+        "producer": "Globus"
+      },
+      {
+        "name": "Milch 1.5",
+        "amount": 1500.0,
+        "unit": "milliliter",
+        "producer": "Milbona (Lidl)"
+      },
+      {
+        "name": "Vollrahm",
+        "amount": 1000.0,
+        "unit": "gram",
+        "producer": "Coop"
+      },
+      {
+        "name": "Halbrahm",
+        "amount": 500.0,
+        "unit": "milliliter",
+        "producer": "Valflora"
+      }
+    ]
+  },
+  {
+    "id": "a2547fac-4222-41e8-a0a6-a7dd7aa0d957",
+    "title": "Wedges mit Poulet",
+    "servings": 1,
+    "caloriesPerServing": 675.5,
+    "proteinPerServing": 45.97,
+    "carbsPerServing": 45.2,
+    "fatPerServing": 35.41,
+    "fiberPerServing": 2.8,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Filets de poulet",
+        "amount": 165.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Champignon Rahmsauce",
+        "amount": 140.0,
+        "unit": "gram",
+        "producer": "Maggi"
+      },
+      {
+        "name": "Bratkartoffeln",
+        "amount": 250.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "0b82c02a-d360-4e0b-b47f-de3a6095811f",
+    "title": "Kartoffelstock mit Truten",
+    "servings": 1,
+    "caloriesPerServing": 673.0,
+    "proteinPerServing": 38.48,
+    "carbsPerServing": 51.3,
+    "fatPerServing": 33.4,
+    "fiberPerServing": 0.5,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Kartoffelstock ",
+        "amount": 400.0,
+        "unit": "gram",
+        "producer": "Selbergemacht"
+      },
+      {
+        "name": "Bratensauce",
+        "amount": 100.0,
+        "unit": "milliliter",
+        "producer": "Knorr"
+      },
+      {
+        "name": "Putenfleisch",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Pute"
+      }
+    ]
+  },
+  {
+    "id": "16abbd26-38c2-4925-9e63-27d5188101cb",
+    "title": "Thunfischaufstrich 110 g ",
+    "servings": 1,
+    "caloriesPerServing": 683.25,
+    "proteinPerServing": 80.22,
+    "carbsPerServing": 7.2,
+    "fatPerServing": 36.98,
+    "fiberPerServing": 0.1,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Rosa Thon",
+        "amount": 310.0,
+        "unit": "can",
+        "producer": "M Classic"
+      },
+      {
+        "name": "Thomynaise",
+        "amount": 110.0,
+        "unit": "gram",
+        "producer": "Thomy"
+      },
+      {
+        "name": "Aromat",
+        "amount": 15.0,
+        "unit": "gram",
+        "producer": "Aromat"
+      }
+    ]
+  },
+  {
+    "id": "7ec95e9f-d88f-4f1b-bbb0-22a2f7a8fc56",
+    "title": "Oreo Frühstück mini",
+    "servings": 1,
+    "caloriesPerServing": 586.53,
+    "proteinPerServing": 39.25,
+    "carbsPerServing": 65.16,
+    "fatPerServing": 16.41,
+    "fiberPerServing": 8.89,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Haferflocken",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Oreo Choc‘o Brownie",
+        "amount": 22.0,
+        "unit": "cookie",
+        "producer": "Mondelez International"
+      },
+      {
+        "name": "Joghurt 1,5% Fett",
+        "amount": 60.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Kakaopulver",
+        "amount": 10.0,
+        "unit": "gram",
+        "producer": "Patissier"
+      },
+      {
+        "name": "Ovo Crunch",
+        "amount": 15.0,
+        "unit": "gram",
+        "producer": "Wander"
+      },
+      {
+        "name": "milfina Milch 0.1%",
+        "amount": 150.0,
+        "unit": "milliliter",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Tripple Protein Vanilla",
+        "amount": 30.0,
+        "unit": "gram",
+        "producer": "Lifeplus"
+      }
+    ]
+  },
+  {
+    "id": "aca3d0a0-433a-4bcd-bc13-35e8b54f7ea8",
+    "title": "Ne Overnight Oats ",
+    "servings": 1,
+    "caloriesPerServing": 517.92,
+    "proteinPerServing": 36.62,
+    "carbsPerServing": 44.7,
+    "fatPerServing": 19.7,
+    "fiberPerServing": 6.57,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Vollkorn-haferflocken",
+        "amount": 50.0,
+        "unit": "portion",
+        "producer": "Migros"
+      },
+      {
+        "name": "Kakaopulver",
+        "amount": 3.0,
+        "unit": "gram",
+        "producer": "Patissier"
+      },
+      {
+        "name": "Whey Protein White Chocolate ",
+        "amount": 25.0,
+        "unit": "gram",
+        "producer": "Bodylab24"
+      },
+      {
+        "name": "Milch",
+        "amount": 160.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "Peanut Butter",
+        "amount": 25.0,
+        "unit": "milliliter",
+        "producer": "American Style"
+      }
+    ]
+  },
+  {
+    "id": "2b6683bf-fdea-4c42-ab39-8d8128ff4bd6",
+    "title": "Kartoffelstock",
+    "servings": 1,
+    "caloriesPerServing": 2767.4,
+    "proteinPerServing": 67.87,
+    "carbsPerServing": 453.09,
+    "fatPerServing": 61.72,
+    "fiberPerServing": 34.32,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Vollrahm",
+        "amount": 50.0,
+        "unit": "milliliter",
+        "producer": "Valflora"
+      },
+      {
+        "name": "Milch",
+        "amount": 700.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "Butter",
+        "amount": 40.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Kartoffeln (ohne Schale), gekocht",
+        "amount": 2200.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "743c2f4e-01bd-42ad-b09f-ca686c49a7fd",
+    "title": "Himmlische Apfeltorte",
+    "servings": 24,
+    "caloriesPerServing": 108.34,
+    "proteinPerServing": 0.58,
+    "carbsPerServing": 12.69,
+    "fatPerServing": 5.88,
+    "fiberPerServing": 0.96,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Apfel (mit Schale), frisch",
+        "amount": 1000.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Süssmost",
+        "amount": 500.0,
+        "unit": "milliliter",
+        "producer": "Migros"
+      },
+      {
+        "name": "Puddingpulver",
+        "amount": 74.0,
+        "unit": "package",
+        "producer": null
+      },
+      {
+        "name": "Vollrahm",
+        "amount": 400.0,
+        "unit": "milliliter",
+        "producer": "Coop"
+      },
+      {
+        "name": "Vanillezucker",
+        "amount": 16.0,
+        "unit": "bag",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "29d3ea05-1d81-418a-8696-d2b77610c053",
+    "title": "Risotto mit Poulet",
+    "servings": 5,
+    "caloriesPerServing": 712.41,
+    "proteinPerServing": 63.13,
+    "carbsPerServing": 74.39,
+    "fatPerServing": 19.01,
+    "fiberPerServing": 1.83,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Dinkelmehl hell",
+        "amount": 115.0,
+        "unit": "gram",
+        "producer": "Landi"
+      },
+      {
+        "name": "Coconut Milk",
+        "amount": 300.0,
+        "unit": "portion",
+        "producer": "Thai Kitchen"
+      },
+      {
+        "name": "Brust-Geschnetzeltes",
+        "amount": 1000.0,
+        "unit": "gram",
+        "producer": "MClassic"
+      },
+      {
+        "name": "Grana Padano",
+        "amount": 70.0,
+        "unit": "gram",
+        "producer": "Mifroma"
+      },
+      {
+        "name": "Ben's original risotto",
+        "amount": 800.0,
+        "unit": "gram",
+        "producer": "Uncle Ben's"
+      }
+    ]
+  },
+  {
+    "id": "8f558cdf-e977-4a13-b8a7-41c01e22d123",
+    "title": "Fackelspiess Reis",
+    "servings": 1,
+    "caloriesPerServing": 789.1,
+    "proteinPerServing": 51.39,
+    "carbsPerServing": 49.39,
+    "fatPerServing": 42.6,
+    "fiberPerServing": 1.37,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Fackelspiess",
+        "amount": 260.0,
+        "unit": "gram",
+        "producer": "Grill Mi"
+      },
+      {
+        "name": "Risotto, gekocht",
+        "amount": 335.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "5ba54ccd-2736-4270-888d-4aa18ea0087a",
+    "title": "Gurken Poulet Salat",
+    "servings": 1,
+    "caloriesPerServing": 2331.2,
+    "proteinPerServing": 323.79,
+    "carbsPerServing": 105.84,
+    "fatPerServing": 61.13,
+    "fiberPerServing": 11.78,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Mayo Light",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Le Gusto"
+      },
+      {
+        "name": "Salatgurke (mit Schale), frisch",
+        "amount": 1200.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Heinz Tomato Ketchup ohne Zucker und Salz",
+        "amount": 60.0,
+        "unit": "gram",
+        "producer": "Heinz"
+      },
+      {
+        "name": "Joghurt mild 0,1% Fett",
+        "amount": 500.0,
+        "unit": "gram",
+        "producer": "Weihenstephan"
+      },
+      {
+        "name": "körniger Frischkäse light",
+        "amount": 540.0,
+        "unit": "gram",
+        "producer": "KClassic/ KAUFLAND"
+      },
+      {
+        "name": "würziger Gurkentopf",
+        "amount": 260.0,
+        "unit": "piece",
+        "producer": "KClassic/ KAUFLAND"
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 70.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Hähnchen-Brustfilet-Teilstück",
+        "amount": 1000.0,
+        "unit": "gram",
+        "producer": "Märkische Geflügelspez. GmbH"
+      }
+    ]
+  },
+  {
+    "id": "8958010b-2d8c-4fd2-9a21-183ff3f852b6",
+    "title": "Lotus Cheesecake High Protein",
+    "servings": 16,
+    "caloriesPerServing": 195.61,
+    "proteinPerServing": 10.47,
+    "carbsPerServing": 13.45,
+    "fatPerServing": 10.83,
+    "fiberPerServing": 0.15,
+    "imageUrl": "https://images.yazio.com/app/recipe/user/aafd289b-b782-4389-bef8-eb776e2cb14b.webp",
+    "ingredients": [
+      {
+        "name": "Biscoff Kekse",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Lotus"
+      },
+      {
+        "name": "Magerquark",
+        "amount": 1500.0,
+        "unit": "can",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Joghurt 1,5% Fett",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Puddingpulver Vanille",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Ruf"
+      },
+      {
+        "name": "Butter",
+        "amount": 70.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Lotuscreme",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Lotus Biscoff"
+      },
+      {
+        "name": "Kokosöl",
+        "amount": 50.0,
+        "unit": "milliliter",
+        "producer": "Alnatura"
+      }
+    ]
+  },
+  {
+    "id": "43a9cb04-3ad6-4e6b-acab-b129a03bafa7",
+    "title": "Lasagne selfmade",
+    "servings": 1,
+    "caloriesPerServing": 7949.7,
+    "proteinPerServing": 541.21,
+    "carbsPerServing": 524.95,
+    "fatPerServing": 407.9,
+    "fiberPerServing": 3.2,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Milch",
+        "amount": 1900.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "Beurre",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Lasagne verdi",
+        "amount": 500.0,
+        "unit": "gram",
+        "producer": "Cucina Nobile"
+      },
+      {
+        "name": "Mozzarella",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "Züger Frischkäse AG"
+      },
+      {
+        "name": "hack",
+        "amount": 1500.0,
+        "unit": "gram",
+        "producer": "Aldi"
+      },
+      {
+        "name": "Reibkäse aus Gruyère AOP",
+        "amount": 320.0,
+        "unit": "gram",
+        "producer": "Milfana"
+      },
+      {
+        "name": "Pomodori Pelatic",
+        "amount": 400.0,
+        "unit": "gram",
+        "producer": "Longobardi"
+      },
+      {
+        "name": "Weissmehl",
+        "amount": 40.0,
+        "unit": "gram",
+        "producer": "Coop"
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Mineralwasser, Still",
+        "amount": 300.0,
+        "unit": "milliliter",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "5f0f573f-9e42-4a51-ab63-ece5769a25f8",
+    "title": "Sauce für Poulet",
+    "servings": 1,
+    "caloriesPerServing": 701.14,
+    "proteinPerServing": 30.88,
+    "carbsPerServing": 25.38,
+    "fatPerServing": 52.26,
+    "fiberPerServing": 1.99,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Philadelphia Balance",
+        "amount": 200.0,
+        "unit": "can",
+        "producer": "Philadelphia"
+      },
+      {
+        "name": "Vollrahm",
+        "amount": 68.0,
+        "unit": "milliliter",
+        "producer": "Valflora"
+      },
+      {
+        "name": "Milch",
+        "amount": 150.0,
+        "unit": "milliliter",
+        "producer": "Coop Qualité & Prix"
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 85.0,
+        "unit": "whole.regular",
+        "producer": null
+      },
+      {
+        "name": "Crème Fraîche (Creme Fraiche) 30% Fett",
+        "amount": 60.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "e2b041c0-e2a1-478a-8e59-4e1b4408db6d",
+    "title": "Reis mit Vegi Curry",
+    "servings": 1,
+    "caloriesPerServing": 1039.5,
+    "proteinPerServing": 42.98,
+    "carbsPerServing": 153.56,
+    "fatPerServing": 24.8,
+    "fiberPerServing": 10.79,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Tofu",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Basmatireis, gekocht",
+        "amount": 500.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Planted chicken",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": "Planted Foods"
+      },
+      {
+        "name": "Kichererbsen, gekocht",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Currysoße",
+        "amount": 100.0,
+        "unit": "milliliter",
+        "producer": "Eigene Herstellung"
+      }
+    ]
+  },
+  {
+    "id": "dbb5c5e4-6478-4b31-80d6-49864d6b7fe5",
+    "title": "Rühreier",
+    "servings": 1,
+    "caloriesPerServing": 822.16,
+    "proteinPerServing": 59.27,
+    "carbsPerServing": 14.17,
+    "fatPerServing": 55.73,
+    "fiberPerServing": 0.84,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Eier, roh (ohne Schale)",
+        "amount": 400.0,
+        "unit": "gram",
+        "producer": "Hühnerei"
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 60.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Milch   Teilentrahmt Drink",
+        "amount": 132.0,
+        "unit": "milliliter",
+        "producer": "Milbona (Lidl)"
+      },
+      {
+        "name": "Philadelphia Kräuter Doppelrahmstufe",
+        "amount": 44.0,
+        "unit": "gram",
+        "producer": "Kraft"
+      }
+    ]
+  },
+  {
+    "id": "8f838a18-e973-42a0-8d53-e8ab3e36633a",
+    "title": "Cocktailsauce",
+    "servings": 1,
+    "caloriesPerServing": 268.15,
+    "proteinPerServing": 18.09,
+    "carbsPerServing": 10.5,
+    "fatPerServing": 16.68,
+    "fiberPerServing": 0.24,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Thomynaise",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": "Thomy"
+      },
+      {
+        "name": "Tomato Ketchup 50%",
+        "amount": 25.0,
+        "unit": "gram",
+        "producer": "Heinz"
+      },
+      {
+        "name": "Senf (Mostrich), scharf",
+        "amount": 15.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Magerquark",
+        "amount": 150.0,
+        "unit": "gram",
+        "producer": "Coop Qualité & Prix"
+      }
+    ]
+  },
+  {
+    "id": "572c1edf-a7d1-4cee-9636-f8bf3888fc72",
+    "title": "Morgenshake",
+    "servings": 1,
+    "caloriesPerServing": 617.29,
+    "proteinPerServing": 69.87,
+    "carbsPerServing": 56.96,
+    "fatPerServing": 13.07,
+    "fiberPerServing": 5.9,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "magerquark M- Budget",
+        "amount": 260.0,
+        "unit": "gram",
+        "producer": "M Budget"
+      },
+      {
+        "name": "Bodylab Whey Marzipan",
+        "amount": 20.0,
+        "unit": "gram",
+        "producer": "Bodylab24"
+      },
+      {
+        "name": "Raw Hanfprotein Pulver",
+        "amount": 33.0,
+        "unit": "gram",
+        "producer": "A-Ware"
+      },
+      {
+        "name": "Banane",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Milch   Teilentrahmt Drink",
+        "amount": 322.0,
+        "unit": "milliliter",
+        "producer": "Milbona (Lidl)"
+      }
+    ]
+  },
+  {
+    "id": "57dbe4e1-ca90-4a51-aea5-33b50f275f65",
+    "title": "High Protein Cheescake",
+    "servings": 3,
+    "caloriesPerServing": 545.83,
+    "proteinPerServing": 34.72,
+    "carbsPerServing": 33.23,
+    "fatPerServing": 29.37,
+    "fiberPerServing": 4.34,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Kaltcreme Vanille",
+        "amount": 56.0,
+        "unit": "gram",
+        "producer": "Pistor"
+      },
+      {
+        "name": "Magerquark",
+        "amount": 600.0,
+        "unit": "gram",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Doppelrahmstufe",
+        "amount": 300.0,
+        "unit": "gram",
+        "producer": "Philadelphia"
+      },
+      {
+        "name": "Hühnerei, Eier, roh",
+        "amount": 180.0,
+        "unit": "egg.regular",
+        "producer": null
+      },
+      {
+        "name": "Himbeeren TK",
+        "amount": 250.0,
+        "unit": "gram",
+        "producer": "Migros Budget"
+      }
+    ]
+  },
+  {
+    "id": "a7a262f0-f08a-45f2-b6ce-8ba64e93e10d",
+    "title": "Pizza Thon",
+    "servings": 1,
+    "caloriesPerServing": 1654.39,
+    "proteinPerServing": 122.21,
+    "carbsPerServing": 169.83,
+    "fatPerServing": 51.12,
+    "fiberPerServing": 8.74,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Hefezopf ",
+        "amount": 300.0,
+        "unit": "gram",
+        "producer": " Selbstgemacht"
+      },
+      {
+        "name": "Rosa Thon",
+        "amount": 155.0,
+        "unit": "can",
+        "producer": "M Classic"
+      },
+      {
+        "name": "Mozzarella fettreduziert",
+        "amount": 250.0,
+        "unit": "gram",
+        "producer": "Carloni"
+      },
+      {
+        "name": "Tomatensoße (Tomatensauce) Konserve",
+        "amount": 167.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Mais",
+        "amount": 193.0,
+        "unit": "gram",
+        "producer": "MClassic Migros"
+      }
+    ]
+  },
+  {
+    "id": "b425a573-b359-4823-bc10-037a46ea10cd",
+    "title": "Proteinshake",
+    "servings": 1,
+    "caloriesPerServing": 753.8,
+    "proteinPerServing": 60.78,
+    "carbsPerServing": 39.46,
+    "fatPerServing": 36.92,
+    "fiberPerServing": 7.02,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Himbeeren, gefroren",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Lidl"
+      },
+      {
+        "name": "Bodylab Whey Protein Kokosnuss",
+        "amount": 40.0,
+        "unit": "gram",
+        "producer": "Bodylab24"
+      },
+      {
+        "name": "Milch UHT 2,5%",
+        "amount": 500.0,
+        "unit": "milliliter",
+        "producer": "Migros Valflora"
+      },
+      {
+        "name": "Erdnussbutter",
+        "amount": 40.0,
+        "unit": "gram",
+        "producer": "Barney's Best"
+      }
+    ]
+  },
+  {
+    "id": "ad3832c8-8448-4fa3-ab2e-d0d51b629715",
+    "title": "Lachs Brokkoli Kartoffelauflauf",
+    "servings": 1,
+    "caloriesPerServing": 5169.74,
+    "proteinPerServing": 296.9,
+    "carbsPerServing": 365.36,
+    "fatPerServing": 283.9,
+    "fiberPerServing": 62.04,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Kartoffeln roh",
+        "amount": 2118.0,
+        "unit": "gram",
+        "producer": ""
+      },
+      {
+        "name": "Norwegisches Lachsfilet",
+        "amount": 1000.0,
+        "unit": "gram",
+        "producer": "Aldi"
+      },
+      {
+        "name": "Vollrahm",
+        "amount": 300.0,
+        "unit": "milliliter",
+        "producer": "Valflora"
+      },
+      {
+        "name": "Mineralwasser, Still",
+        "amount": 500.0,
+        "unit": "milliliter",
+        "producer": null
+      },
+      {
+        "name": "Milch",
+        "amount": 300.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "M-Budget TK Brokkoli",
+        "amount": 656.0,
+        "unit": "gram",
+        "producer": "Migros"
+      },
+      {
+        "name": "Grana Padano",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Mifroma"
+      }
+    ]
+  },
+  {
+    "id": "80313299-6bc4-4113-b024-4ffdf116a671",
+    "title": "Oreo Frühstück",
+    "servings": 1,
+    "caloriesPerServing": 740.2,
+    "proteinPerServing": 53.52,
+    "carbsPerServing": 89.12,
+    "fatPerServing": 16.67,
+    "fiberPerServing": 8.13,
+    "imageUrl": "https://images.yazio.com/app/recipe/user/843f7de0-17cf-4d8d-9569-2833d98071cf.webp",
+    "ingredients": [
+      {
+        "name": "Haferflocken",
+        "amount": 75.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Ovomaltine Crunchy Cream",
+        "amount": 30.0,
+        "unit": "gram",
+        "producer": "Wander"
+      },
+      {
+        "name": "Kakaopulver",
+        "amount": 15.0,
+        "unit": "gram",
+        "producer": "Ja!"
+      },
+      {
+        "name": "milfina Milch 0.1%",
+        "amount": 225.0,
+        "unit": "milliliter",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Joghurt 0,1% Fett",
+        "amount": 40.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Tripple Protein Vanilla",
+        "amount": 45.0,
+        "unit": "gram",
+        "producer": "Lifeplus"
+      }
+    ]
+  },
+  {
+    "id": "a9ee1ac7-60e5-4d8c-a1f8-7fa46d4bd2f3",
+    "title": "Senftomatensosse",
+    "servings": 1,
+    "caloriesPerServing": 933.75,
+    "proteinPerServing": 44.64,
+    "carbsPerServing": 54.1,
+    "fatPerServing": 58.3,
+    "fiberPerServing": 1.68,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Cremia Balance",
+        "amount": 175.0,
+        "unit": "gram",
+        "producer": "Alpenmark"
+      },
+      {
+        "name": "Saurer Halbrahm",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "Coop Qualité & Prix"
+      },
+      {
+        "name": "Milch   Teilentrahmt Drink",
+        "amount": 700.0,
+        "unit": "milliliter",
+        "producer": "Milbona (Lidl)"
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 120.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Mineralwasser, Still",
+        "amount": 250.0,
+        "unit": "milliliter",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "14237e2e-953c-4fc6-9044-9e65787f05fc",
+    "title": "High Protein Cheescake low carb",
+    "servings": 4,
+    "caloriesPerServing": 368.55,
+    "proteinPerServing": 35.68,
+    "carbsPerServing": 15.88,
+    "fatPerServing": 16.71,
+    "fiberPerServing": 3.34,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Magerquark",
+        "amount": 500.0,
+        "unit": "gram",
+        "producer": "Coop Qualité & Prix"
+      },
+      {
+        "name": "Magerquark",
+        "amount": 300.0,
+        "unit": "gram",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Philadelphia Balance",
+        "amount": 400.0,
+        "unit": "gram",
+        "producer": "Kraft"
+      },
+      {
+        "name": "Hühnerei, Eier, roh",
+        "amount": 210.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Himbeeren, frisch",
+        "amount": 250.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "8bbe267e-8109-4a1d-93df-49d5855f42b7",
+    "title": "Salatdressing",
+    "servings": 1,
+    "caloriesPerServing": 9351.7,
+    "proteinPerServing": 49.29,
+    "carbsPerServing": 19.34,
+    "fatPerServing": 1021.84,
+    "fiberPerServing": 3.4,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Rapsöl",
+        "amount": 1000.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Cottage cheese",
+        "amount": 400.0,
+        "unit": "gram",
+        "producer": "Mbudget"
+      },
+      {
+        "name": "Essig (Branntweinessig, Weißweinessig)",
+        "amount": 250.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Mineralwasser, Still",
+        "amount": 400.0,
+        "unit": "milliliter",
+        "producer": null
+      },
+      {
+        "name": "Hühnerei, Eier, roh",
+        "amount": 60.0,
+        "unit": "egg.regular",
+        "producer": null
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "3c639dbc-8985-4636-b71f-5c6416942450",
+    "title": "Protein Wraps",
+    "servings": 1,
+    "caloriesPerServing": 1258.94,
+    "proteinPerServing": 84.74,
+    "carbsPerServing": 104.23,
+    "fatPerServing": 53.16,
+    "fiberPerServing": 15.27,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Maiskörner Migros",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Migros"
+      },
+      {
+        "name": "Vollkorn Tortilla Wraps",
+        "amount": 186.0,
+        "unit": "piece",
+        "producer": "Snack Day (Lidl)"
+      },
+      {
+        "name": "Pouletfilet Spiessli Curry Sesam",
+        "amount": 300.0,
+        "unit": "gram",
+        "producer": "BBQ Zeit Zum Grillen (Aldi)"
+      },
+      {
+        "name": "Crème Fraiche",
+        "amount": 60.0,
+        "unit": "gram",
+        "producer": "Coop Qualité & Prix"
+      },
+      {
+        "name": "Eisbergsalat, frisch",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "b12474e7-5717-4143-ad20-4a9953cfbd53",
+    "title": "Poulet mit Spinat",
+    "servings": 1,
+    "caloriesPerServing": 2422.8,
+    "proteinPerServing": 281.36,
+    "carbsPerServing": 57.15,
+    "fatPerServing": 111.96,
+    "fiberPerServing": 0.06,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Filets de poulet",
+        "amount": 1000.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Creme Fraiche",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "M Budget"
+      },
+      {
+        "name": "Milch",
+        "amount": 400.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "Olivenöl",
+        "amount": 20.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Blattspinat",
+        "amount": 500.0,
+        "unit": "gram",
+        "producer": "Spar"
+      },
+      {
+        "name": "Getrocknete Tomaten",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "enerBiO"
+      },
+      {
+        "name": "Fleischbrühe (Bouillon)",
+        "amount": 300.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "3273701a-c928-4dcd-a9b4-343df4050901",
+    "title": "Brokkoli Taler",
+    "servings": 1,
+    "caloriesPerServing": 854.4,
+    "proteinPerServing": 89.12,
+    "carbsPerServing": 17.14,
+    "fatPerServing": 44.18,
+    "fiberPerServing": 15.0,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Brokkoli (Broccoli), frisch",
+        "amount": 500.0,
+        "unit": "whole.regular",
+        "producer": null
+      },
+      {
+        "name": "Hühnerei, Eier, roh",
+        "amount": 120.0,
+        "unit": "egg.regular",
+        "producer": null
+      },
+      {
+        "name": "Gratin & Pizza Mix",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "Coop Prix Garantie"
+      }
+    ]
+  },
+  {
+    "id": "828f255e-1f17-4ac5-8cd2-4e4f98f07958",
+    "title": "Butter Chicken mit Wildreis",
+    "servings": 8,
+    "caloriesPerServing": 523.2,
+    "proteinPerServing": 48.81,
+    "carbsPerServing": 65.93,
+    "fatPerServing": 6.08,
+    "fiberPerServing": 5.87,
+    "imageUrl": "https://images.yazio.com/app/recipe/user/af633d15-e874-4161-9939-d28939e8c888.webp",
+    "ingredients": [
+      {
+        "name": "Poulet-Minifilet",
+        "amount": 1330.0,
+        "unit": "gram",
+        "producer": "Bonvalle (Lidl)"
+      },
+      {
+        "name": "Wild Rice Mix",
+        "amount": 600.0,
+        "unit": "gram",
+        "producer": "Mister Rice"
+      },
+      {
+        "name": "Pizzasauce",
+        "amount": 400.0,
+        "unit": "package",
+        "producer": "Mutti"
+      },
+      {
+        "name": "Polpa Fein Gehackte Tomaten",
+        "amount": 400.0,
+        "unit": "can",
+        "producer": "Mutti"
+      },
+      {
+        "name": "Griechischer Joghurt 2% Fett",
+        "amount": 520.0,
+        "unit": "milliliter",
+        "producer": "Qualité Suisse"
+      },
+      {
+        "name": "Mineralwasser, Still",
+        "amount": 1680.0,
+        "unit": "milliliter",
+        "producer": null
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 255.0,
+        "unit": "whole.regular",
+        "producer": null
+      },
+      {
+        "name": "Rapsöl",
+        "amount": 15.0,
+        "unit": "tablespoon",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "c9d1904e-fef3-4b69-aff0-a0b46d3cd1ec",
+    "title": "Fackelspies Kartoffeln",
+    "servings": 1,
+    "caloriesPerServing": 839.8,
+    "proteinPerServing": 51.43,
+    "carbsPerServing": 40.43,
+    "fatPerServing": 51.64,
+    "fiberPerServing": 2.91,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Fackelspiess",
+        "amount": 260.0,
+        "unit": "gram",
+        "producer": "Grill Mi"
+      },
+      {
+        "name": "Bratkartoffeln",
+        "amount": 260.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "2ac068c6-5e9d-4b2f-a68b-8ff3b2bffada",
+    "title": "Morge",
+    "servings": 1,
+    "caloriesPerServing": 302.1,
+    "proteinPerServing": 48.56,
+    "carbsPerServing": 15.99,
+    "fatPerServing": 4.15,
+    "fiberPerServing": 0.0,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Magerquark",
+        "amount": 260.0,
+        "unit": "gram",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Milch",
+        "amount": 80.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "Whey Protein Coconut",
+        "amount": 25.0,
+        "unit": "gram",
+        "producer": "Bodylab24"
+      }
+    ]
+  },
+  {
+    "id": "112a125b-74f4-4e4a-87f3-ec9820ec088a",
+    "title": "Fajitas Sauce",
+    "servings": 1,
+    "caloriesPerServing": 1602.0,
+    "proteinPerServing": 258.09,
+    "carbsPerServing": 30.97,
+    "fatPerServing": 52.84,
+    "fiberPerServing": 3.94,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Tomatenmark, Konserve",
+        "amount": 80.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Brust-Geschnetzeltes",
+        "amount": 1000.0,
+        "unit": "gram",
+        "producer": "MClassic"
+      },
+      {
+        "name": "Coconut milk",
+        "amount": 215.0,
+        "unit": "gram",
+        "producer": "Thai     Kitchen"
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 110.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "b31c8a4a-9d5c-47c5-96a5-f2c2024c5ac0",
+    "title": "Pouletfleisch 27.10.24",
+    "servings": 1,
+    "caloriesPerServing": 3025.6,
+    "proteinPerServing": 470.16,
+    "carbsPerServing": 17.88,
+    "fatPerServing": 119.3,
+    "fiberPerServing": 0.0,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Vollrahm",
+        "amount": 236.0,
+        "unit": "milliliter",
+        "producer": "Coop Qualité & Prix"
+      },
+      {
+        "name": "Pizzasauce",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "Mutti"
+      },
+      {
+        "name": "Pouletfilet-Geschnetzeltes",
+        "amount": 2100.0,
+        "unit": "portion",
+        "producer": "Wiesenhof"
+      }
+    ]
+  },
+  {
+    "id": "f1aea776-fc22-433d-9967-b8534c65fc73",
+    "title": "Hähnchen mit Paprikarahmsauce 25.9",
+    "servings": 1,
+    "caloriesPerServing": 2942.4,
+    "proteinPerServing": 358.47,
+    "carbsPerServing": 35.42,
+    "fatPerServing": 148.5,
+    "fiberPerServing": 12.95,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Halbrahm",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Migros"
+      },
+      {
+        "name": "Coconut milk",
+        "amount": 150.0,
+        "unit": "gram",
+        "producer": "Thai     Kitchen"
+      },
+      {
+        "name": "Pouletfilet-Geschnetzeltes",
+        "amount": 1400.0,
+        "unit": "portion",
+        "producer": "Wiesenhof"
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 120.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Rote Paprika, frisch",
+        "amount": 300.0,
+        "unit": "whole.regular",
+        "producer": null
+      },
+      {
+        "name": "Creme Fraiche",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "M Budget"
+      },
+      {
+        "name": "Grana Padano",
+        "amount": 120.0,
+        "unit": "gram",
+        "producer": "Mifroma"
+      }
+    ]
+  },
+  {
+    "id": "fada682a-cbf7-4498-b88a-be6f134b4e68",
+    "title": "Leckere Protein Knöpfli",
+    "servings": 1,
+    "caloriesPerServing": 1323.8,
+    "proteinPerServing": 103.84,
+    "carbsPerServing": 151.07,
+    "fatPerServing": 32.07,
+    "fiberPerServing": 16.6,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Hühnerei, Eier, roh",
+        "amount": 240.0,
+        "unit": "egg.regular",
+        "producer": null
+      },
+      {
+        "name": "Magerquark",
+        "amount": 500.0,
+        "unit": "can",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Dinkelvollkornmehl",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": "Edeka Bio"
+      }
+    ]
+  },
+  {
+    "id": "2de151fd-a645-4aa6-ae24-c1b95095f298",
+    "title": "Kohlrabi + Karotten mit Sahnesauce",
+    "servings": 1,
+    "caloriesPerServing": 2385.0,
+    "proteinPerServing": 56.6,
+    "carbsPerServing": 104.82,
+    "fatPerServing": 187.1,
+    "fiberPerServing": 34.56,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Karotten (Möhren), gekocht",
+        "amount": 800.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Kohlrabi, gekocht",
+        "amount": 1000.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Vollrahm",
+        "amount": 500.0,
+        "unit": "milliliter",
+        "producer": "Coop"
+      },
+      {
+        "name": "Milch",
+        "amount": 600.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      }
+    ]
+  },
+  {
+    "id": "0186032e-b79d-477d-ad72-4497380a425b",
+    "title": "Mango Chia Pudding",
+    "servings": 2,
+    "caloriesPerServing": 490.35,
+    "proteinPerServing": 22.2,
+    "carbsPerServing": 31.9,
+    "fatPerServing": 26.1,
+    "fiberPerServing": 14.72,
+    "imageUrl": "https://images.yazio.com/app/recipe/user/b12b80ba-28f5-4824-8cee-fab9258c99f0.webp",
+    "ingredients": [
+      {
+        "name": "Mango, frisch",
+        "amount": 350.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Magerquark",
+        "amount": 300.0,
+        "unit": "gram",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "bio chiasamen",
+        "amount": 60.0,
+        "unit": "gram",
+        "producer": "Bio"
+      },
+      {
+        "name": "Kokosnussmilch fettreduziert",
+        "amount": 200.0,
+        "unit": "milliliter",
+        "producer": "Asia Green Garden (Aldi)"
+      },
+      {
+        "name": "Kokosraspeln",
+        "amount": 10.0,
+        "unit": "tablespoon",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "5e8093ca-73dd-4d64-8b14-3ab450c01947",
+    "title": "Skyr Cinnamon Rolls",
+    "servings": 9,
+    "caloriesPerServing": 255.89,
+    "proteinPerServing": 13.09,
+    "carbsPerServing": 32.74,
+    "fatPerServing": 5.45,
+    "fiberPerServing": 1.33,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Skyr",
+        "amount": 425.0,
+        "unit": "gram",
+        "producer": "Envia"
+      },
+      {
+        "name": "Sucorine Xylit",
+        "amount": 80.0,
+        "unit": "gram",
+        "producer": "Migros"
+      },
+      {
+        "name": "Dinkelmehl Typ 630",
+        "amount": 400.0,
+        "unit": "gram",
+        "producer": "Goldähren (Aldi)"
+      },
+      {
+        "name": "Butter",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Whey protein vanilla ",
+        "amount": 25.0,
+        "unit": "gram",
+        "producer": "Lidl"
+      }
+    ]
+  },
+  {
+    "id": "81b24788-7e78-4e62-9e7f-4e1b7b0c52b1",
+    "title": "Gesunde Himbeerglace",
+    "servings": 1,
+    "caloriesPerServing": 854.6,
+    "proteinPerServing": 85.9,
+    "carbsPerServing": 67.7,
+    "fatPerServing": 21.34,
+    "fiberPerServing": 30.8,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Rahm",
+        "amount": 40.0,
+        "unit": "milliliter",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Himbeeren",
+        "amount": 440.0,
+        "unit": "gram",
+        "producer": "M-Budget"
+      },
+      {
+        "name": "Magerquark",
+        "amount": 500.0,
+        "unit": "gram",
+        "producer": "Migros M Budget"
+      },
+      {
+        "name": "Whey Protein Coconut",
+        "amount": 40.0,
+        "unit": "gram",
+        "producer": "Bodylab24"
+      }
+    ]
+  },
+  {
+    "id": "dfbeff42-a9f2-459d-84ee-2e440b311326",
+    "title": "Himbeer Chia Overnight Oats",
+    "servings": 2,
+    "caloriesPerServing": 511.79,
+    "proteinPerServing": 37.99,
+    "carbsPerServing": 49.13,
+    "fatPerServing": 12.8,
+    "fiberPerServing": 17.22,
+    "imageUrl": "https://images.yazio.com/app/recipe/user/98eba20d-77e5-4cd0-9699-3cea85307ecd.webp",
+    "ingredients": [
+      {
+        "name": "Haferflocken",
+        "amount": 80.0,
+        "unit": "portion",
+        "producer": null
+      },
+      {
+        "name": "Himbeeren, frisch",
+        "amount": 250.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Milch   Teilentrahmt Drink",
+        "amount": 320.0,
+        "unit": "milliliter",
+        "producer": "Milbona (Lidl)"
+      },
+      {
+        "name": "Magerquark",
+        "amount": 440.0,
+        "unit": "gram",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "bio chiasamen",
+        "amount": 40.0,
+        "unit": "portion",
+        "producer": "Bio"
+      },
+      {
+        "name": "Zimt",
+        "amount": 4.0,
+        "unit": "teaspoon",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "6c173ef5-ab1a-46f3-a67f-e43d22760a07",
+    "title": "Overnight Oats 2.0",
+    "servings": 1,
+    "caloriesPerServing": 596.19,
+    "proteinPerServing": 60.11,
+    "carbsPerServing": 66.61,
+    "fatPerServing": 10.84,
+    "fiberPerServing": 6.39,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Milch",
+        "amount": 170.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "Vollkornhaferflocken",
+        "amount": 60.0,
+        "unit": "gram",
+        "producer": "Migros Classic"
+      },
+      {
+        "name": "Naturjoghurt 3,8% ",
+        "amount": 38.0,
+        "unit": "gram",
+        "producer": "Landliebe"
+      },
+      {
+        "name": "Haselnussjoghurt",
+        "amount": 35.0,
+        "unit": "gram",
+        "producer": "Lünebest"
+      },
+      {
+        "name": "Quarkhimmel",
+        "amount": 175.0,
+        "unit": "gram",
+        "producer": "Migros M Classic"
+      },
+      {
+        "name": "Tripple proteinshake",
+        "amount": 40.0,
+        "unit": "gram",
+        "producer": "Life Plus"
+      }
+    ]
+  },
+  {
+    "id": "fd5c28a4-cc1e-40b0-832b-f2d4070ba8d1",
+    "title": "Pouletknusper",
+    "servings": 5,
+    "caloriesPerServing": 753.83,
+    "proteinPerServing": 78.91,
+    "carbsPerServing": 63.9,
+    "fatPerServing": 17.86,
+    "fiberPerServing": 3.12,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Filets de poulet",
+        "amount": 1157.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Joghurt Nature ",
+        "amount": 200.0,
+        "unit": "portion",
+        "producer": "Migros"
+      },
+      {
+        "name": "Cornflakes Prix Garantie",
+        "amount": 150.0,
+        "unit": "gram",
+        "producer": "Coop"
+      },
+      {
+        "name": "Grana Padano",
+        "amount": 250.0,
+        "unit": "gram",
+        "producer": "Hofer"
+      },
+      {
+        "name": "Kartoffeln (ohne Schale), gekocht",
+        "amount": 1000.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "b043715e-a222-44eb-9d01-8c71d676d6ad",
+    "title": "Cottage Cheese Lava Cake",
+    "servings": 1,
+    "caloriesPerServing": 830.4,
+    "proteinPerServing": 79.41,
+    "carbsPerServing": 18.49,
+    "fatPerServing": 46.67,
+    "fiberPerServing": 2.25,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Cottage cheese",
+        "amount": 450.0,
+        "unit": "portion",
+        "producer": "Migros"
+      },
+      {
+        "name": "Hühnerei, Eier, roh",
+        "amount": 240.0,
+        "unit": "egg.regular",
+        "producer": null
+      },
+      {
+        "name": "Kakaopulver",
+        "amount": 30.0,
+        "unit": "gram",
+        "producer": "Aldi Back Family"
+      }
+    ]
+  },
+  {
+    "id": "285b057b-ff00-4d61-a809-2ab6cfbb249e",
+    "title": "Basmati Reis gekocht",
+    "servings": 1,
+    "caloriesPerServing": 3580.0,
+    "proteinPerServing": 86.0,
+    "carbsPerServing": 780.0,
+    "fatPerServing": 11.0,
+    "fiberPerServing": 0.0,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Basmati Reis Hofer",
+        "amount": 1000.0,
+        "unit": "gram",
+        "producer": "Hofmann Menü"
+      },
+      {
+        "name": "Mineralwasser, Still",
+        "amount": 1950.0,
+        "unit": "milliliter",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "99332ad8-a3d9-46a0-9c0a-4b6437b91e14",
+    "title": "Hm oreo frühstück solala ende mai",
+    "servings": 5,
+    "caloriesPerServing": 637.49,
+    "proteinPerServing": 54.45,
+    "carbsPerServing": 58.22,
+    "fatPerServing": 17.52,
+    "fiberPerServing": 8.49,
+    "imageUrl": "https://images.yazio.com/app/recipe/user/772464ed-0dbd-4646-b3fe-e6a508f4cd99.webp",
+    "ingredients": [
+      {
+        "name": "Haferflocken",
+        "amount": 250.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Kakaopulver",
+        "amount": 104.0,
+        "unit": "gram",
+        "producer": "Aldi Back Family"
+      },
+      {
+        "name": "Bodylab Whey Protein Latte Macchiato",
+        "amount": 125.0,
+        "unit": "gram",
+        "producer": "Bodylab24"
+      },
+      {
+        "name": "Veganes Schoko Protein",
+        "amount": 156.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Designer Flavour Powder (Black & White Cookie Sandwich)",
+        "amount": 12.0,
+        "unit": "gram",
+        "producer": "ESN"
+      },
+      {
+        "name": "Milch",
+        "amount": 650.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "Cookeo Black 'N Cream",
+        "amount": 55.0,
+        "unit": "piece",
+        "producer": "Hofer"
+      },
+      {
+        "name": "Magerquark",
+        "amount": 250.0,
+        "unit": "gram",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Joghurt 1,5% Fett",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "5a8c22c6-34ec-443c-b847-e0429ea501fb",
+    "title": "Tomatensauce ",
+    "servings": 1,
+    "caloriesPerServing": 1949.13,
+    "proteinPerServing": 31.87,
+    "carbsPerServing": 119.68,
+    "fatPerServing": 142.57,
+    "fiberPerServing": 17.04,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 240.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Tomaten, frisch",
+        "amount": 900.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Rahm",
+        "amount": 100.0,
+        "unit": "milliliter",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Milch",
+        "amount": 100.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "Sauer Halbrahm",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": "Milfina"
+      },
+      {
+        "name": "Coconut milk",
+        "amount": 500.0,
+        "unit": "bottle",
+        "producer": "Thai Kitchen"
+      },
+      {
+        "name": "Saucenbinder hell",
+        "amount": 50.0,
+        "unit": "gram",
+        "producer": "Maizena"
+      },
+      {
+        "name": "Tomatenpüree",
+        "amount": 33.0,
+        "unit": "gram",
+        "producer": "Thomy"
+      },
+      {
+        "name": "Passata rustica",
+        "amount": 189.0,
+        "unit": "gram",
+        "producer": "Cucina Nobile"
+      }
+    ]
+  },
+  {
+    "id": "7a2cab90-3fba-49a4-80b5-669912655623",
+    "title": "Safranrisotto",
+    "servings": 1,
+    "caloriesPerServing": 3475.0,
+    "proteinPerServing": 71.77,
+    "carbsPerServing": 777.38,
+    "fatPerServing": 5.38,
+    "fiberPerServing": 12.1,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 150.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Risotto d'Italia",
+        "amount": 1000.0,
+        "unit": "gram",
+        "producer": "Migros"
+      },
+      {
+        "name": "Mineralwasser, Still",
+        "amount": 2806.0,
+        "unit": "milliliter",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "9cdb6640-e0e5-42f6-b697-2bd532a77135",
+    "title": "Kirsche & Erbeershake",
+    "servings": 1,
+    "caloriesPerServing": 589.0,
+    "proteinPerServing": 53.42,
+    "carbsPerServing": 55.17,
+    "fatPerServing": 13.94,
+    "fiberPerServing": 9.12,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Magerquark",
+        "amount": 300.0,
+        "unit": "gram",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Kirschen, frisch",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Erdbeeren, frisch",
+        "amount": 75.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Juice plus Vanilla",
+        "amount": 30.0,
+        "unit": "gram",
+        "producer": "Complete"
+      },
+      {
+        "name": "Milch",
+        "amount": 300.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "Peanut Butter",
+        "amount": 11.0,
+        "unit": "milliliter",
+        "producer": "American Style"
+      }
+    ]
+  },
+  {
+    "id": "d3bf5c70-5b56-454b-b46b-8acb32d9c857",
+    "title": "Poulet Gurkensalat 7 Juni",
+    "servings": 10,
+    "caloriesPerServing": 283.39,
+    "proteinPerServing": 38.58,
+    "carbsPerServing": 8.46,
+    "fatPerServing": 9.58,
+    "fiberPerServing": 1.61,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Cottage chees",
+        "amount": 500.0,
+        "unit": "gram",
+        "producer": "zuger"
+      },
+      {
+        "name": "Hüttenkäse",
+        "amount": 110.0,
+        "unit": "gram",
+        "producer": "Migros M Budget"
+      },
+      {
+        "name": "Joghurt Nature 1.5%",
+        "amount": 650.0,
+        "unit": "gram",
+        "producer": "Culinarum"
+      },
+      {
+        "name": "Thomynaise",
+        "amount": 120.0,
+        "unit": "gram",
+        "producer": "Thomy"
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 200.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Salatgurke (mit Schale), frisch",
+        "amount": 1400.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Poulet-Minutenschnitzel",
+        "amount": 1300.0,
+        "unit": "gram",
+        "producer": "Country's best"
+      }
+    ]
+  },
+  {
+    "id": "86f22f2a-d376-4145-82e9-1aedea5bd883",
+    "title": "Overnight Oats",
+    "servings": 1,
+    "caloriesPerServing": 637.45,
+    "proteinPerServing": 56.42,
+    "carbsPerServing": 54.2,
+    "fatPerServing": 19.85,
+    "fiberPerServing": 8.74,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Peanut Butter",
+        "amount": 25.0,
+        "unit": "milliliter",
+        "producer": "American Style"
+      },
+      {
+        "name": "Vollkorn Haferflocken ",
+        "amount": 50.0,
+        "unit": "portion",
+        "producer": "Golden Bridge"
+      },
+      {
+        "name": "Milch",
+        "amount": 150.0,
+        "unit": "milliliter",
+        "producer": "Milfina"
+      },
+      {
+        "name": "Quarkhimmel",
+        "amount": 235.0,
+        "unit": "gram",
+        "producer": "Migros M Classic"
+      },
+      {
+        "name": "Bodylab Whey Marzipan",
+        "amount": 25.0,
+        "unit": "gram",
+        "producer": "Bodylab24"
+      }
+    ]
+  },
+  {
+    "id": "d84e471d-7ecc-460f-84d1-204cc5d359f2",
+    "title": "Ghackets mit Härdöpfelstock",
+    "servings": 1,
+    "caloriesPerServing": 2923.6,
+    "proteinPerServing": 196.24,
+    "carbsPerServing": 19.74,
+    "fatPerServing": 227.25,
+    "fiberPerServing": 6.4,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Creme fraiche",
+        "amount": 220.0,
+        "unit": "gram",
+        "producer": "Mbudget"
+      },
+      {
+        "name": "rinderhackfleisch",
+        "amount": 1000.0,
+        "unit": "gram",
+        "producer": "MClassic"
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 100.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "ebbe7179-ac5b-4581-bd5f-0c93e5b88027",
+    "title": "Protein morning shake",
+    "servings": 1,
+    "caloriesPerServing": 775.3,
+    "proteinPerServing": 83.03,
+    "carbsPerServing": 79.4,
+    "fatPerServing": 12.2,
+    "fiberPerServing": 7.61,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Banane",
+        "amount": 120.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Whey Protein",
+        "amount": 30.0,
+        "unit": "gram",
+        "producer": "Bodylab"
+      },
+      {
+        "name": "Kuhmilch (Vollmilch) 3,5% Fett",
+        "amount": 200.0,
+        "unit": "milliliter",
+        "producer": null
+      },
+      {
+        "name": "Himbeeren, frisch",
+        "amount": 40.0,
+        "unit": "gram",
+        "producer": null
+      },
+      {
+        "name": "Magerquark",
+        "amount": 500.0,
+        "unit": "can",
+        "producer": "Milfina (Aldi)"
+      },
+      {
+        "name": "Apfel (mit Schale), frisch",
+        "amount": 130.0,
+        "unit": "fruit.regular",
+        "producer": null
+      }
+    ]
+  },
+  {
+    "id": "ae08548a-0cd9-413d-81e6-f0bfeffbd61d",
+    "title": "Salatsauce nur Magerquark ",
+    "servings": 1,
+    "caloriesPerServing": 174.8,
+    "proteinPerServing": 21.67,
+    "carbsPerServing": 15.19,
+    "fatPerServing": 3.52,
+    "fiberPerServing": 0.61,
+    "imageUrl": null,
+    "ingredients": [
+      {
+        "name": "Magerquark",
+        "amount": 200.0,
+        "unit": "portion",
+        "producer": "Mbudget"
+      },
+      {
+        "name": "Delikatess Senf",
+        "amount": 10.0,
+        "unit": "portion",
+        "producer": "Thomy"
+      },
+      {
+        "name": "Kuhmilch (Vollmilch) 3,5% Fett",
+        "amount": 50.0,
+        "unit": "milliliter",
+        "producer": null
+      },
+      {
+        "name": "Zwiebel, frisch",
+        "amount": 15.0,
+        "unit": "gram",
+        "producer": null
+      }
+    ]
+  }
+]

@@ -1,0 +1,113 @@
+{
+  "products": [
+    {
+      "id": "8e02864e-042a-4916-a472-8447678b4b84",
+      "date": "2026-07-06 00:42:03",
+      "daytime": "dinner",
+      "type": "product",
+      "product_id": "a5bf0ea2-becf-11e6-a9b9-e0071b8a8723",
+      "amount": 500,
+      "serving": "gram",
+      "serving_quantity": 500
+    },
+    {
+      "id": "340112cd-1cef-4603-90e1-b1485c85b954",
+      "date": "2026-07-06 00:42:25",
+      "daytime": "dinner",
+      "type": "product",
+      "product_id": "9cdc7e0a-becf-11e6-8bfc-e0071b8a8723",
+      "amount": 50,
+      "serving": "gram",
+      "serving_quantity": 50
+    },
+    {
+      "id": "94ecdfd0-1913-4f38-a419-d4831acdeeb1",
+      "date": "2026-07-06 00:42:35",
+      "daytime": "dinner",
+      "type": "product",
+      "product_id": "417d9166-8cde-43d0-8cd2-637e8dd123a2",
+      "amount": 12,
+      "serving": "tablespoon",
+      "serving_quantity": 1
+    },
+    {
+      "id": "9a5eac34-c70f-48c2-9a14-5a1dcdb1639b",
+      "date": "2026-07-06 15:07:28",
+      "daytime": "snack",
+      "type": "product",
+      "product_id": "f0045b83-49de-4875-801c-ab6d77991189",
+      "amount": 50,
+      "serving": "bar",
+      "serving_quantity": 1
+    },
+    {
+      "id": "b80f3ca3-16e1-4ed6-ae89-e55952f498f8",
+      "date": "2026-07-06 18:02:50",
+      "daytime": "dinner",
+      "type": "product",
+      "product_id": "bc9d450f-1ecc-4abd-9454-d8e50a7e56b5",
+      "amount": 240,
+      "serving": "package",
+      "serving_quantity": 1
+    },
+    {
+      "id": "21ff2b62-8c05-4a5f-992b-7697350991e1",
+      "date": "2026-07-06 18:03:22",
+      "daytime": "dinner",
+      "type": "product",
+      "product_id": "03ee7f6c-9e93-4152-b187-381d7cb7c6a8",
+      "amount": 40,
+      "serving": "bar",
+      "serving_quantity": 1
+    },
+    {
+      "id": "7fc10d47-7ac0-4bc5-be54-fc5a458d06f7",
+      "date": "2026-07-06 18:04:14",
+      "daytime": "lunch",
+      "type": "product",
+      "product_id": "9de916a0-becf-11e6-9587-e0071b8a8723",
+      "amount": 250,
+      "serving": "gram",
+      "serving_quantity": 250
+    },
+    {
+      "id": "8732d2ad-3761-4d2c-aa99-4349ac1922e4",
+      "date": "2026-07-06 20:23:53",
+      "daytime": "dinner",
+      "type": "product",
+      "product_id": "a299be20-becf-11e6-8622-e0071b8a8723",
+      "amount": 120,
+      "serving": "gram",
+      "serving_quantity": 120
+    },
+    {
+      "id": "20671f13-8617-4565-b632-17b94f2c2334",
+      "date": "2026-07-06 20:24:08",
+      "daytime": "dinner",
+      "type": "product",
+      "product_id": "4d7b10f7-42dd-43c4-9991-7f1b79f73bae",
+      "amount": 90,
+      "serving": "gram",
+      "serving_quantity": 90
+    }
+  ],
+  "recipe_portions": [
+    {
+      "id": "7c5548cc-80bf-4e64-bd7f-a18edf99f77d",
+      "date": "2026-07-06 15:05:29",
+      "daytime": "lunch",
+      "type": "recipe_portion",
+      "recipe_id": "828f255e-1f17-4ac5-8cd2-4e4f98f07958",
+      "portion_count": 1
+    },
+    {
+      "id": "facae833-3bf2-477c-9310-5a954d5f8e18",
+      "date": "2026-07-06 15:06:42",
+      "daytime": "breakfast",
+      "type": "recipe_portion",
+      "recipe_id": "667a687e-76b8-4395-b582-a0af2a0159f8",
+      "portion_count": 1
+    }
+  ],
+  "simple_products": []
+}

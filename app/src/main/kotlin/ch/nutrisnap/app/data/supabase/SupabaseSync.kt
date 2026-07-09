@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.data.supabase
 
+import ch.nutrisnap.app.data.model.CustomFoodItem
 import ch.nutrisnap.app.data.model.DiaryEntry
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.model.Recipe
@@ -10,7 +11,7 @@ import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// ─── DTOs (match Supabase table columns) ─────────────────────────────────────
+// ─── DTOs (match Supabase table columns) ────────────────────────────────────
 
 @Serializable
 data class DiaryEntryDto(
@@ -51,9 +52,7 @@ data class RecipeDto(
 )
 
 // Partial-Update-Body zum Verlinken einer bestehenden Remote-Zeile (per id) mit
-// einer neu entstandenen lokalen Row-ID. Wird verwendet statt upsert, weil upsert
-// mit onConflict=(user_id,local_id) bei einer neuen local_id immer eine NEUE Zeile
-// anlegt statt die bestehende (von der Web-App erstellte) Zeile zu aktualisieren.
+// einer neu entstandenen lokalen Row-ID. Verhindert Duplikate beim nächsten Sync.
 @Serializable
 private data class LocalIdPatch(@SerialName("local_id") val localId: Long)
 
@@ -64,9 +63,28 @@ data class WeightEntryDto(
     @SerialName("weight_kg") val weightKg: Float
 )
 
-// Ein Profil pro Nutzer (kein local_id-Linking nötig, da 1:1 über user_id).
-// NOTE: braucht UNIQUE (user_id) auf der user_profiles-Tabelle in Supabase, sonst
-// schlägt der onConflict-Upsert fehl.
+/**
+ * DTO fuer eigene Lebensmittel (custom_foods Tabelle).
+ * Supabase-Tabelle benoetigt: UNIQUE (user_id, local_id).
+ */
+@Serializable
+data class CustomFoodDto(
+    val id: Long? = null,
+    @SerialName("user_id") val userId: String? = null,
+    val name: String,
+    val calories: Float,
+    val protein: Float,
+    val carbs: Float,
+    val fat: Float,
+    val fiber: Float = 0f,
+    val barcode: String? = null,
+    val brand: String? = null,
+    val category: String? = null,
+    @SerialName("portion_size_g") val portionSizeG: Float = 100f,
+    @SerialName("created_at") val createdAt: Long = System.currentTimeMillis(),
+    @SerialName("local_id") val localId: Long? = null
+)
+
 @Serializable
 data class UserProfileDto(
     @SerialName("user_id") val userId: String? = null,
@@ -82,11 +100,6 @@ data class UserProfileDto(
     @SerialName("updated_at") val updatedAt: Long = System.currentTimeMillis()
 )
 
-// Aktivkalorien pro Tag (Health Connect / Samsung Health Tier 0), fuer die Web-App:
-// erlaubt den Sport-Bonus im adaptiven Kalorienziel auch dort zu berechnen.
-// weightKg = Health-Connect-Cache-Gewicht (z.B. Waage via Samsung Health) - das ist die
-// echte Gewichtsquelle des adaptiven Trend-Algorithmus, NICHT die manuelle Eingabe aus
-// weight_entries. Ohne dieses Feld hat die Web-App nie eine Gewichtsquelle fuers Trend-TDEE.
 @Serializable
 data class HealthDailyDto(
     @SerialName("user_id") val userId: String? = null,
@@ -96,11 +109,12 @@ data class HealthDailyDto(
     @SerialName("weight_kg") val weightKg: Double? = null
 )
 
-// ─── Sync functions ───────────────────────────────────────────────────────────
+// ─── Sync functions ──────────────────────────────────────────────────────────
 // NOTE: upsert onConflict requires matching UNIQUE constraints in Supabase:
-//   diary_entries: UNIQUE (user_id, local_id)
-//   recipes:       UNIQUE (user_id, local_id)
-//   weight_entries: UNIQUE (user_id, date_str)   [already used by the web app]
+//   diary_entries:  UNIQUE (user_id, local_id)
+//   recipes:        UNIQUE (user_id, local_id)
+//   custom_foods:   UNIQUE (user_id, local_id)   ← NEU
+//   weight_entries: UNIQUE (user_id, date_str)
 //   user_profiles:  UNIQUE (user_id)
 
 object SupabaseSync {
@@ -108,7 +122,7 @@ object SupabaseSync {
     private val sb get() = SupabaseClient.client
     private fun userId() = sb.auth.currentUserOrNull()?.id
 
-    // ── Diary ──────────────────────────────────────────────────────────────
+    // ── Diary ────────────────────────────────────────────────────────────
     suspend fun upsertDiaryEntry(entry: DiaryEntry) {
         val uid = userId() ?: return
         sb.postgrest["diary_entries"].upsert(
@@ -124,9 +138,7 @@ object SupabaseSync {
                 fat = entry.fat,
                 localId = entry.id
             )
-        ) {
-            onConflict = "user_id,local_id"
-        }
+        ) { onConflict = "user_id,local_id" }
     }
 
     suspend fun deleteDiaryEntry(localId: Long) {
@@ -147,9 +159,6 @@ object SupabaseSync {
         }.decodeList()
     }
 
-    /** Verlinkt eine bestehende (z.B. von der Web-App erstellte) Remote-Zeile per
-     *  Primärschlüssel [remoteId] mit der neu erzeugten lokalen [localId] — ohne
-     *  eine neue Zeile anzulegen. Verhindert Duplikate beim nächsten Sync. */
     suspend fun linkDiaryLocalId(remoteId: Long, localId: Long) {
         val uid = userId() ?: return
         sb.postgrest["diary_entries"].update(LocalIdPatch(localId)) {
@@ -160,7 +169,7 @@ object SupabaseSync {
         }
     }
 
-    // ── Recipes ────────────────────────────────────────────────────────────
+    // ── Recipes ──────────────────────────────────────────────────────────
     suspend fun upsertRecipe(recipe: Recipe) {
         val uid = userId() ?: return
         sb.postgrest["recipes"].upsert(
@@ -184,9 +193,7 @@ object SupabaseSync {
                 savedAt = recipe.savedAt,
                 localId = recipe.id
             )
-        ) {
-            onConflict = "user_id,local_id"
-        }
+        ) { onConflict = "user_id,local_id" }
     }
 
     suspend fun deleteRecipe(localId: Long) {
@@ -207,9 +214,6 @@ object SupabaseSync {
         }.decodeList()
     }
 
-    /** Verlinkt eine bestehende (z.B. von der Web-App erstellte) Remote-Zeile per
-     *  Primärschlüssel [remoteId] mit der neu erzeugten lokalen [localId] — ohne
-     *  eine neue Zeile anzulegen. Verhindert Duplikate beim nächsten Sync. */
     suspend fun linkRecipeLocalId(remoteId: Long, localId: Long) {
         val uid = userId() ?: return
         sb.postgrest["recipes"].update(LocalIdPatch(localId)) {
@@ -220,14 +224,56 @@ object SupabaseSync {
         }
     }
 
-    // ── Weight ─────────────────────────────────────────────────────────────
+    // ── Custom Foods ──────────────────────────────────────────────────────
+    /**
+     * Pushed ein eigenes Lebensmittel zu Supabase.
+     * Supabase-Tabelle: custom_foods mit UNIQUE (user_id, local_id).
+     */
+    suspend fun upsertCustomFood(food: CustomFoodItem) {
+        val uid = userId() ?: return
+        sb.postgrest["custom_foods"].upsert(
+            CustomFoodDto(
+                userId = uid,
+                name = food.name,
+                calories = food.calories,
+                protein = food.protein,
+                carbs = food.carbs,
+                fat = food.fat,
+                fiber = food.fiber,
+                barcode = food.barcode,
+                brand = food.brand,
+                category = food.category,
+                portionSizeG = food.portionSizeG,
+                createdAt = food.createdAt,
+                localId = food.id.toLong()
+            )
+        ) { onConflict = "user_id,local_id" }
+    }
+
+    suspend fun deleteCustomFood(localId: Int) {
+        val uid = userId() ?: return
+        sb.postgrest["custom_foods"].delete {
+            filter {
+                eq("user_id", uid)
+                eq("local_id", localId)
+            }
+        }
+    }
+
+    /** Fetch all remote custom foods for the current user. */
+    suspend fun fetchCustomFoods(): List<CustomFoodDto> {
+        val uid = userId() ?: return emptyList()
+        return sb.postgrest["custom_foods"].select {
+            filter { eq("user_id", uid) }
+        }.decodeList()
+    }
+
+    // ── Weight ───────────────────────────────────────────────────────────
     suspend fun upsertWeight(entry: WeightEntry) {
         val uid = userId() ?: return
         sb.postgrest["weight_entries"].upsert(
             WeightEntryDto(userId = uid, dateStr = entry.dateStr, weightKg = entry.weightKg)
-        ) {
-            onConflict = "user_id,date_str"
-        }
+        ) { onConflict = "user_id,date_str" }
     }
 
     suspend fun deleteWeight(dateStr: String) {
@@ -248,26 +294,33 @@ object SupabaseSync {
         }.decodeList()
     }
 
-    // ── User Profile (1 Zeile pro Nutzer) ────────────────────────────────────
-    // "Last write wins" über updatedAt: erlaubt der Web-App (NutriSnap-Web), das
-    // Profil ebenfalls zu bearbeiten, ohne dass ein älterer Android-Stand ein
-    // frischeres Web-Update beim nächsten Sync wieder überschreibt.
+    // ── User Profile ─────────────────────────────────────────────────────
     suspend fun upsertUserProfile(
-        weightKg: Float, heightCm: Int, ageYears: Int,
-        dailyCalorieGoal: Int, proteinGoalG: Float, carbsGoalG: Float, fatGoalG: Float,
-        activityFactor: Float, sex: String
+        weightKg: Float,
+        heightCm: Int,
+        ageYears: Int,
+        dailyCalorieGoal: Int,
+        proteinGoalG: Float,
+        carbsGoalG: Float,
+        fatGoalG: Float,
+        activityFactor: Float,
+        sex: String
     ) {
         val uid = userId() ?: return
         sb.postgrest["user_profiles"].upsert(
             UserProfileDto(
-                userId = uid, weightKg = weightKg, heightCm = heightCm, ageYears = ageYears,
-                dailyCalorieGoal = dailyCalorieGoal, proteinGoalG = proteinGoalG,
-                carbsGoalG = carbsGoalG, fatGoalG = fatGoalG,
-                activityFactor = activityFactor, sex = sex
+                userId = uid,
+                weightKg = weightKg,
+                heightCm = heightCm,
+                ageYears = ageYears,
+                dailyCalorieGoal = dailyCalorieGoal,
+                proteinGoalG = proteinGoalG,
+                carbsGoalG = carbsGoalG,
+                fatGoalG = fatGoalG,
+                activityFactor = activityFactor,
+                sex = sex
             )
-        ) {
-            onConflict = "user_id"
-        }
+        ) { onConflict = "user_id" }
     }
 
     /** Fetch the remote profile row for the current user, if any. */
@@ -278,10 +331,7 @@ object SupabaseSync {
         }.decodeSingleOrNull()
     }
 
-    // ── Health (Aktivkalorien / Schritte pro Tag) ────────────────────────────
-    // NOTE: onConflict requires UNIQUE (user_id, date_str) on the health_daily table.
-    // Android ist die alleinige Quelle (Health Connect / Samsung Health SDK) — es wird
-    // nur gepusht, nie von hier zurueckgelesen.
+    // ── Health (Aktivkalorien / Schritte pro Tag) ─────────────────────────
     suspend fun upsertHealthDaily(
         dateStr: String,
         activeCaloriesKcal: Double?,
@@ -291,11 +341,26 @@ object SupabaseSync {
         val uid = userId() ?: return
         sb.postgrest["health_daily"].upsert(
             HealthDailyDto(
-                userId = uid, dateStr = dateStr,
-                activeCaloriesKcal = activeCaloriesKcal, steps = steps, weightKg = weightKg
+                userId = uid,
+                dateStr = dateStr,
+                activeCaloriesKcal = activeCaloriesKcal,
+                steps = steps,
+                weightKg = weightKg
             )
+        ) { onConflict = "user_id,date_str" }
+    }
+
+    /** Verlinkt eine bestehende Remote-custom_food-Zeile mit der neu erzeugten lokalen ID.
+     *  Verhindert Duplikate beim naechsten Sync (analog zu linkDiaryLocalId). */
+    suspend fun linkCustomFoodLocalId(remoteId: Long, localId: Int) {
+        val uid = userId() ?: return
+        sb.postgrest["custom_foods"].update(
+            mapOf("local_id" to localId)
         ) {
-            onConflict = "user_id,date_str"
+            filter {
+                eq("id", remoteId)
+                eq("user_id", uid)
+            }
         }
     }
 }
