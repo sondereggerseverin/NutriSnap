@@ -34,6 +34,7 @@ import ch.nutrisnap.app.health.HealthConnectManager
 import ch.nutrisnap.app.service.NotificationHelper
 import ch.nutrisnap.app.service.NotificationScheduler
 import ch.nutrisnap.app.ui.components.OfflineBanner
+import ch.nutrisnap.app.ui.components.SyncStatusBanner
 import ch.nutrisnap.app.ui.screens.HealthConnectScreen
 import ch.nutrisnap.app.ui.screens.analysis.AnalysisScreen
 import ch.nutrisnap.app.ui.screens.auth.AuthViewModel
@@ -123,6 +124,7 @@ class MainActivity : ComponentActivity() {
                     LaunchedEffect(Unit) { healthConnectViewModel = hcVm2 }
                     Column(modifier = Modifier.fillMaxSize()) {
                         OfflineBanner(isOnline = isOnline2)
+                        SyncStatusBanner()
                         MainScaffold(
                             sharedUrl = sharedUrl,
                             sharedBatchUrls = sharedBatchUrls,
@@ -170,6 +172,7 @@ class MainActivity : ComponentActivity() {
 
                         Column(modifier = Modifier.fillMaxSize()) {
                             OfflineBanner(isOnline = isOnline)
+                            SyncStatusBanner()
                             if (!isUnlocked) {
                                 BiometricLockScreen(onUnlocked = { isUnlocked = true })
                             } else {
@@ -445,3 +448,4 @@ fun MainScaffold(
         }
     }
 }
+
