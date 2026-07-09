@@ -9,6 +9,7 @@ import ch.nutrisnap.app.data.api.UsdaFoodApi
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.data.supabase.SupabaseSync
+import ch.nutrisnap.app.data.supabase.SyncStatusHolder
 import ch.nutrisnap.app.domain.RecipeScraper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,11 +23,16 @@ import java.time.LocalDate
 private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 private fun pushSafely(block: suspend () -> Unit) {
     syncScope.launch {
-        runCatching { block() }.onFailure {
-            // Vorher komplett stumm geschluckt -> jetzt sichtbar in Logcat, damit
-            // Sync-Fehler (fehlende UNIQUE-Constraint, RLS-Policy, offline, ...) auffindbar sind.
-            Log.e("NutriSync", "Push zu Supabase fehlgeschlagen: ${it.message}", it)
-        }
+        SyncStatusHolder.opStarted()
+        runCatching { block() }
+            .onSuccess { SyncStatusHolder.opSucceeded() }
+            .onFailure {
+                // Vorher komplett stumm geschluckt -> jetzt sichtbar in Logcat UND im
+                // SyncStatusHolder, damit Sync-Fehler (fehlende UNIQUE-Constraint,
+                // RLS-Policy, offline, ...) auffindbar sind statt im Nirvana zu landen.
+                Log.e("NutriSync", "Push zu Supabase fehlgeschlagen: ${it.message}", it)
+                SyncStatusHolder.opFailed(it.message)
+            }
     }
 }
 
@@ -38,6 +44,9 @@ class DiaryRepository(db: NutriDatabase) {
 
     fun getWeeklySummary(from: LocalDate): Flow<List<ch.nutrisnap.app.data.db.DailySummary>> =
         dao.getWeeklySummary(from.toString())
+
+    /** Fuer Quick-Add: nach dem Insert den vollen Eintrag laden (fuer Undo-Snackbar). */
+    suspend fun getById(id: Long): DiaryEntry? = dao.getById(id)
 
     suspend fun addEntry(food: FoodItem, amountGrams: Float, mealType: MealType, date: LocalDate): Long {
         val f = amountGrams / 100f
@@ -121,6 +130,19 @@ class DiaryRepository(db: NutriDatabase) {
             )
         )
         dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }
+        return id
+    }
+
+    /**
+     * Generischer Insert-Pfad fuer Aufrufer ausserhalb dieses Repositories (z.B.
+     * KI-Tagesplan in RecipeGeneratorViewModel), die einen fertigen DiaryEntry
+     * (foodItemId bereits gesetzt, z.B. -999) direkt anlegen wollen. Stellt sicher,
+     * dass JEDER Insert-Pfad ueber Supabase synct statt db.diaryDao().insert()
+     * direkt aufzurufen und den Push zu umgehen.
+     */
+    suspend fun insertAndSync(entry: DiaryEntry): Long {
+        val id = dao.insert(entry)
+        dao.getById(id)?.let { saved -> pushSafely { SupabaseSync.upsertDiaryEntry(saved) } }
         return id
     }
 
@@ -231,3 +253,4 @@ class FoodItemRepository(db: NutriDatabase) {
     suspend fun saveCustomFood(item: FoodItem): Long       = dao.insert(item)
     suspend fun deleteFood(item: FoodItem)                 = dao.delete(item)
 }
+

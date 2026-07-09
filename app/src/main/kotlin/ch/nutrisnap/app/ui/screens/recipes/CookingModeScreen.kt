@@ -18,6 +18,37 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.nutrisnap.app.data.model.Recipe
+import kotlin.math.round
+
+/**
+ * Extrahiert eine fuehrende Mengenangabe am Zeilenanfang (z.B. "200g", "2 ", "1,5 EL",
+ * "1/2 Zwiebel") und skaliert sie um [factor]. Zeilen ohne erkennbare Zahl am Anfang
+ * (z.B. "Salz nach Geschmack") werden unveraendert zurueckgegeben.
+ */
+private val leadingQuantityRegex = Regex("""^\s*(\d+/\d+|\d+(?:[.,]\d+)?)(\s*)(.*)$""", RegexOption.DOT_MATCHES_ALL)
+
+private fun scaleIngredientLine(line: String, factor: Double): String {
+    val match = leadingQuantityRegex.find(line) ?: return line
+    val (numStr, spacer, rest) = match.destructured
+    val value = if (numStr.contains("/")) {
+        val parts = numStr.split("/")
+        val n = parts[0].toDoubleOrNull() ?: return line
+        val d = parts[1].toDoubleOrNull() ?: return line
+        if (d == 0.0) return line
+        n / d
+    } else {
+        numStr.replace(",", ".").toDoubleOrNull() ?: return line
+    }
+    val scaled = value * factor
+    val rounded = round(scaled * 100) / 100.0
+    val formatted = if (rounded == rounded.toLong().toDouble()) {
+        rounded.toLong().toString()
+    } else {
+        // Zwei Nachkommastellen max, unnoetige Nullen weg, deutsches Komma statt Punkt
+        rounded.toString().trimEnd('0').trimEnd('.').replace(".", ",")
+    }
+    return "$formatted$spacer$rest"
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,6 +78,14 @@ fun CookingModeScreen(recipe: Recipe, onBack: () -> Unit) {
     var currentStep by remember { mutableStateOf(0) }
     var completedSteps by remember { mutableStateOf(setOf<Int>()) }
     var showIngredients by remember { mutableStateOf(false) }
+
+    // Portionsskalierung: Basis ist recipe.servings (mind. 1, falls schlecht befuellt).
+    val baseServings = remember(recipe.servings) { recipe.servings.coerceAtLeast(1) }
+    var servings by remember(baseServings) { mutableStateOf(baseServings) }
+    val scaledIngredients = remember(ingredients, servings, baseServings) {
+        val factor = servings.toDouble() / baseServings.toDouble()
+        ingredients.map { scaleIngredientLine(it, factor) }
+    }
 
     Scaffold(
         topBar = {
@@ -84,7 +123,40 @@ fun CookingModeScreen(recipe: Recipe, onBack: () -> Unit) {
                 ) {
                     Text("Zutaten", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(12.dp))
-                    ingredients.forEach { ingredient ->
+
+                    // Portionen-Stepper
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Portionen", style = MaterialTheme.typography.bodyLarge)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            OutlinedIconButton(
+                                onClick = { if (servings > 1) servings-- },
+                                enabled = servings > 1
+                            ) { Icon(Icons.Default.Remove, "Weniger Portionen") }
+                            Text(
+                                "$servings",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                            OutlinedIconButton(onClick = { servings++ }) {
+                                Icon(Icons.Default.Add, "Mehr Portionen")
+                            }
+                        }
+                    }
+                    if (servings != baseServings) {
+                        Text(
+                            "Original: $baseServings Portion${if (baseServings == 1) "" else "en"} – Mengen unten angepasst",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(Modifier.height(16.dp))
+
+                    scaledIngredients.forEach { ingredient ->
                         Row(modifier = Modifier.padding(vertical = 4.dp)) {
                             Text("• ", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                             Text(ingredient, style = MaterialTheme.typography.bodyLarge)
@@ -192,3 +264,4 @@ fun CookingModeScreen(recipe: Recipe, onBack: () -> Unit) {
         }
     }
 }
+

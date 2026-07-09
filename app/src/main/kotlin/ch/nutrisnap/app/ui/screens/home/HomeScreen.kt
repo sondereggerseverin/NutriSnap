@@ -24,6 +24,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.HealthConnectCache
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.ui.components.MacroRing
+import ch.nutrisnap.app.ui.theme.LocalAppTheme
 import ch.nutrisnap.app.ui.viewmodel.HealthConnectViewModel
 
 @Composable
@@ -229,12 +230,17 @@ private fun HealthStatItem(icon: String, value: String, label: String) {
 
 @Composable
 private fun HomeHeader(state: HomeUiState) {
+    // Feste, mode-unabhängige Theme-Farben statt colorScheme.primary/onPrimaryContainer:
+    // Diese Material3-Rollen vertauschen ihre Helligkeit zwischen Light- und Dark-Scheme
+    // (siehe Theme.kt), wodurch der Gradient im Dark-Mode fast einfarbig hell würde und
+    // die fest weiße Schrift dieses Headers unlesbar machte.
+    val appTheme = LocalAppTheme.current
     Column(
         Modifier
             .fillMaxWidth()
             .background(
                 Brush.linearGradient(
-                    listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimaryContainer)
+                    listOf(appTheme.primary, appTheme.primaryDark)
                 )
             )
             .padding(20.dp, 24.dp, 20.dp, 28.dp)

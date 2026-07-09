@@ -8,6 +8,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -29,6 +34,7 @@ import ch.nutrisnap.app.health.HealthConnectManager
 import ch.nutrisnap.app.service.NotificationHelper
 import ch.nutrisnap.app.service.NotificationScheduler
 import ch.nutrisnap.app.ui.components.OfflineBanner
+import ch.nutrisnap.app.ui.components.SyncStatusBanner
 import ch.nutrisnap.app.ui.screens.HealthConnectScreen
 import ch.nutrisnap.app.ui.screens.analysis.AnalysisScreen
 import ch.nutrisnap.app.ui.screens.auth.AuthViewModel
@@ -118,6 +124,7 @@ class MainActivity : ComponentActivity() {
                     LaunchedEffect(Unit) { healthConnectViewModel = hcVm2 }
                     Column(modifier = Modifier.fillMaxSize()) {
                         OfflineBanner(isOnline = isOnline2)
+                        SyncStatusBanner()
                         MainScaffold(
                             sharedUrl = sharedUrl,
                             sharedBatchUrls = sharedBatchUrls,
@@ -165,6 +172,7 @@ class MainActivity : ComponentActivity() {
 
                         Column(modifier = Modifier.fillMaxSize()) {
                             OfflineBanner(isOnline = isOnline)
+                            SyncStatusBanner()
                             if (!isUnlocked) {
                                 BiometricLockScreen(onUnlocked = { isUnlocked = true })
                             } else {
@@ -218,6 +226,17 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// ── Navigations-Transitions ────────────────────────────────────────────────────
+// Tabs (Bottom-Nav): sanftes Ueberblenden statt hartem Schnitt.
+// Gestapelte Screens (Settings-Unterseiten etc.): seitliches Hinein-/Hinausschieben,
+// vermittelt Vorwaerts-/Zurueck-Navigation analog zur System-Navigation.
+private val tabEnter = fadeIn(tween(220))
+private val tabExit  = fadeOut(tween(180))
+private val pushEnter = slideInHorizontally(tween(280)) { it / 4 } + fadeIn(tween(280))
+private val pushExit  = slideOutHorizontally(tween(280)) { -it / 4 } + fadeOut(tween(200))
+private val popEnter  = slideInHorizontally(tween(280)) { -it / 4 } + fadeIn(tween(280))
+private val popExit   = slideOutHorizontally(tween(280)) { it / 4 } + fadeOut(tween(200))
+
 @Composable
 fun MainScaffold(
     sharedUrl: String?,
@@ -263,7 +282,11 @@ fun MainScaffold(
             startDestination = Screen.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(Screen.Home.route) {
+            composable(
+                Screen.Home.route,
+                enterTransition = { tabEnter }, exitTransition = { tabExit },
+                popEnterTransition = { tabEnter }, popExitTransition = { tabExit }
+            ) {
                 HomeScreen(
                     hcVm = hcVm,
                     onNavigateToDiary = { meal, autoOpenAdd ->
@@ -289,16 +312,30 @@ fun MainScaffold(
                     navArgument("meal") { type = NavType.StringType; nullable = true; defaultValue = null },
                     navArgument("open") { type = NavType.BoolType; defaultValue = false },
                     navArgument("scan") { type = NavType.BoolType; defaultValue = false }
-                )
+                ),
+                enterTransition = { tabEnter }, exitTransition = { tabExit },
+                popEnterTransition = { tabEnter }, popExitTransition = { tabExit }
             ) { backStackEntry ->
                 val mealArg = backStackEntry.arguments?.getString("meal")?.let { runCatching { MealType.valueOf(it) }.getOrNull() }
                 val openArg = backStackEntry.arguments?.getBoolean("open") ?: false
                 val scanArg = backStackEntry.arguments?.getBoolean("scan") ?: false
                 DiaryScreen(initialMeal = mealArg, autoOpenAdd = openArg, autoOpenScanner = scanArg)
             }
-            composable(Screen.Recipes.route)   { RecipesHubScreen(sharedUrl = sharedUrl, sharedBatchUrls = sharedBatchUrls) }
-            composable(Screen.Analysis.route)  { AnalysisScreen() }
-            composable(Screen.Settings.route) {
+            composable(
+                Screen.Recipes.route,
+                enterTransition = { tabEnter }, exitTransition = { tabExit },
+                popEnterTransition = { tabEnter }, popExitTransition = { tabExit }
+            ) { RecipesHubScreen(sharedUrl = sharedUrl, sharedBatchUrls = sharedBatchUrls) }
+            composable(
+                Screen.Analysis.route,
+                enterTransition = { tabEnter }, exitTransition = { tabExit },
+                popEnterTransition = { tabEnter }, popExitTransition = { tabExit }
+            ) { AnalysisScreen() }
+            composable(
+                Screen.Settings.route,
+                enterTransition = { tabEnter }, exitTransition = { tabExit },
+                popEnterTransition = { tabEnter }, popExitTransition = { tabExit }
+            ) {
                 SettingsScreen(
                     onNavigateToNotifSettings = { navController.navigate("notif_settings") },
                     onNavigateToStats         = { navController.navigate("stats") },
@@ -307,13 +344,22 @@ fun MainScaffold(
                     onNavigateToMealTemplates = { navController.navigate("meal_templates") },
                     onNavigateToYazioImport   = { navController.navigate("yazio_import") },
                     onNavigateToScan          = { navController.navigate("scan_chooser") },
-                    onNavigateToMealOrder     = { navController.navigate("meal_order") }
+                    onNavigateToMealOrder     = { navController.navigate("meal_order") },
+                    onNavigateToShoppingList  = { navController.navigate("shopping_list") }
                 )
             }
-            composable("meal_order") {
+            composable(
+                "meal_order",
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) {
                 MealOrderScreen(onBack = { navController.popBackStack() })
             }
-            composable("scan_chooser") {
+            composable(
+                "scan_chooser",
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) {
                 ScanChooserScreen(
                     onBarcode       = { navController.navigate("diary?open=true&scan=true") },
                     onPhotoEstimate = { navController.navigate("food_scan") },
@@ -321,41 +367,85 @@ fun MainScaffold(
                     onBack          = { navController.popBackStack() }
                 )
             }
-            composable("stats") {
+            composable(
+                "stats",
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) {
                 val vm: WeeklyStatsViewModel = viewModel()
                 WeeklyStatsScreen(viewModel = vm)
             }
-            composable("export") {
+            composable(
+                "export",
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) {
                 ExportScreen(onBack = { navController.popBackStack() })
             }
-            composable("health") {
+            composable(
+                "health",
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) {
                 HealthConnectScreen(
                     viewModel = hcVm,
                     onRequestPermission = onRequestHealthPermission,
                     onBack = { navController.popBackStack() }
                 )
             }
-            composable("notif_settings") {
+            composable(
+                "notif_settings",
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) {
                 NotificationSettingsScreen(onBack = { navController.popBackStack() })
             }
-            composable("custom_foods") {
+            composable(
+                "custom_foods",
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) {
                 CreateCustomFoodScreen(onBack = { navController.popBackStack() })
             }
-            composable("meal_templates") {
+            composable(
+                "meal_templates",
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) {
                 MealTemplateScreen(
                     onBack = { navController.popBackStack() },
                     onTemplateSelected = { navController.popBackStack() }
                 )
             }
-            composable("yazio_import") {
+            composable(
+                "yazio_import",
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) {
                 YazioImportScreen(onBack = { navController.popBackStack() })
             }
-            composable("food_scan") {
+            composable(
+                "food_scan",
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) {
                 FoodScanScreen(onNavigateBack = { navController.popBackStack() })
             }
-            composable("nutrition_label_scan") {
+            composable(
+                "nutrition_label_scan",
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) {
                 NutritionLabelScanScreen(onNavigateBack = { navController.popBackStack() })
+            }
+            composable(
+                "shopping_list",
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) {
+                ch.nutrisnap.app.ui.screens.shopping.ShoppingListScreen(onBack = { navController.popBackStack() })
             }
         }
     }
 }
+

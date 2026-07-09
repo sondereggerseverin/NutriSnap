@@ -9,7 +9,6 @@ import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.WeightEntry
 import ch.nutrisnap.app.data.repository.Sex
-import kotlinx.coroutines.flow.first
 
 /**
  * Pulls rows created on the web app (or another device) down into the local
@@ -47,10 +46,18 @@ object SyncManager {
         else SyncStatusHolder.opSucceeded()
     }
 
+    /**
+     * user_profiles ist eine Singleton-Zeile pro Nutzer, kein local_id-Linking nötig.
+     * NOTE: aktuell "last pull wins" — es gibt noch keinen updatedAt-Vergleich, weil das
+     * eine Room-Migration bräuchte. Für Severins Ein-Geräte-Nutzung (Android ist primär,
+     * Web nur gelegentlich fürs Profil) unkritisch; sollte die Web-App aktiver werden,
+     * wäre ein updatedAt-Feld auf UserProfileEntity der nächste Schritt.
+     */
     private suspend fun pullUserProfile(db: NutriDatabase) {
         val dao = db.userProfileDao()
         val remote = SupabaseSync.fetchUserProfile()
         if (remote == null) {
+            // Kein Remote-Profil (erster Sync für diesen Nutzer) - lokalen Stand hochladen.
             val local = dao.get() ?: return
             SupabaseSync.upsertUserProfile(
                 weightKg = local.weightKg,
@@ -86,7 +93,10 @@ object SyncManager {
         for (row in remoteRows) {
             val mealType = runCatching { MealType.valueOf(row.mealType) }.getOrDefault(MealType.SNACK)
             if (row.localId != null) {
-                if (dao.getById(row.localId) == null) {
+                // Row already linked to a local row — make sure it exists locally.
+                val existing = dao.getById(row.localId)
+                if (existing == null) {
+                    // Was deleted locally or never existed (e.g. fresh install) — recreate it.
                     dao.insert(
                         DiaryEntry(
                             id = row.localId,
@@ -103,6 +113,7 @@ object SyncManager {
                     )
                 }
             } else {
+                // Web-created row with no local_id yet — insert locally, then link back.
                 val newId = dao.insert(
                     DiaryEntry(
                         foodItemId = -999,
@@ -116,6 +127,9 @@ object SyncManager {
                         fat = row.fat
                     )
                 )
+                // Zurueckverlinken statt upsert: sonst legt der naechste Sync wegen
+                // der frisch vergebenen local_id eine ZWEITE Remote-Zeile an, statt
+                // die bestehende Web-Zeile (row.id) zu aktualisieren -> Duplikate.
                 if (row.id != null) SupabaseSync.linkDiaryLocalId(row.id, newId)
             }
         }
@@ -126,7 +140,8 @@ object SyncManager {
         val remoteRows = SupabaseSync.fetchRecipes()
         for (row in remoteRows) {
             if (row.localId != null) {
-                if (dao.getById(row.localId) == null) {
+                val existing = dao.getById(row.localId)
+                if (existing == null) {
                     dao.insert(
                         Recipe(
                             id = row.localId,
@@ -170,6 +185,8 @@ object SyncManager {
                         savedAt = row.savedAt
                     )
                 )
+                // Zurueckverlinken statt upsert (siehe pullDiary) — verhindert, dass
+                // dieselbe Web-Rezept-Zeile bei jedem Sync erneut dupliziert wird.
                 if (row.id != null) SupabaseSync.linkRecipeLocalId(row.id, newId)
             }
         }
@@ -179,6 +196,8 @@ object SyncManager {
         val dao = db.weightDao()
         val remoteRows = SupabaseSync.fetchWeightEntries()
         for (row in remoteRows) {
+            // weight_entries uses dateStr as the primary key, so a plain upsert
+            // (REPLACE on conflict) is enough — no local_id linking needed.
             val existing = dao.getByDate(row.dateStr)
             if (existing == null || existing.weightKg != row.weightKg) {
                 dao.upsert(WeightEntry(dateStr = row.dateStr, weightKg = row.weightKg))
@@ -195,7 +214,6 @@ object SyncManager {
     private suspend fun pullCustomFoods(db: NutriDatabase) {
         val dao = db.customFoodDao()
         val remoteRows = SupabaseSync.fetchCustomFoods()
-
         for (row in remoteRows) {
             if (row.localId != null) {
                 val existing = dao.getById(row.localId.toInt())
@@ -218,7 +236,6 @@ object SyncManager {
                     )
                 }
             } else {
-                // Web-App hat dieses Lebensmittel angelegt — lokal einfuegen
                 val newId = dao.insert(
                     CustomFoodItem(
                         name = row.name,
@@ -234,7 +251,6 @@ object SyncManager {
                         createdAt = row.createdAt
                     )
                 )
-                // local_id zurueckschreiben damit naechster Sync upserted statt dupliziert
                 if (row.id != null) SupabaseSync.linkCustomFoodLocalId(row.id, newId.toInt())
             }
         }

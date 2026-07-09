@@ -3,6 +3,7 @@ package ch.nutrisnap.app.data.repository
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.WeightEntry
 import ch.nutrisnap.app.data.supabase.SupabaseSync
+import ch.nutrisnap.app.data.supabase.SyncStatusHolder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -14,7 +15,12 @@ class WeightRepository(db: NutriDatabase) {
     private val dao = db.weightDao()
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private fun pushSafely(block: suspend () -> Unit) {
-        syncScope.launch { runCatching { block() } }
+        syncScope.launch {
+            SyncStatusHolder.opStarted()
+            runCatching { block() }
+                .onSuccess { SyncStatusHolder.opSucceeded() }
+                .onFailure { SyncStatusHolder.opFailed(it.message) }
+        }
     }
 
     fun getAll(): Flow<List<WeightEntry>> = dao.getAll()

@@ -1,10 +1,12 @@
 ﻿package ch.nutrisnap.app.data.repository
 
+import ch.nutrisnap.app.data.api.GroqFoodEstimatorApi
 import ch.nutrisnap.app.data.api.NutritionixApi
 import ch.nutrisnap.app.data.api.SwissFoodApi
 import ch.nutrisnap.app.data.api.UsdaFoodApi
 import ch.nutrisnap.app.data.db.FoodItemDao
 import ch.nutrisnap.app.data.model.FoodItem
+import ch.nutrisnap.app.data.model.FoodSource
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -18,7 +20,12 @@ class FoodSearchRepository(
 
     suspend fun search(query: String): List<FoodItem> {
         val cached = foodItemDao.searchFoods(query)
-        if (cached.size >= 5) return cached.sortedWith(relevanceComparator(query))
+        // Nur ein EXAKTER Namens-Treffer zählt als "gut genug" — "beginnt mit" reicht
+        // nicht, weil z.B. "Apfelringe" auch mit "apfel" beginnt und sonst faelschlich
+        // als Treffer für die Anfrage "apfel" durchgeht, obwohl kein echter Apfel dabei ist.
+        if (cached.size >= 5 && cached.any { relevance(it, query) == 4 }) {
+            return cached.sortedWith(relevanceComparator(query))
+        }
 
         return coroutineScope {
             val offDeferred = async { runCatching { openFoodFactsSearch(query) }.getOrDefault(emptyList()) }
@@ -36,18 +43,44 @@ class FoodSearchRepository(
                 combined = combined + nutritionix
             }
 
+            // Letzter Fallback: einfache/generische Lebensmittel (z.B. "Apfel"), die in
+            // keiner strukturierten Quelle als exakter Treffer auftauchen (OFF = nur
+            // Markenprodukte, USDA = nur Englisch, Swiss-DB evtl. nicht erreichbar),
+            // werden per KI grob geschätzt — auch wenn ähnlich klingende Treffer existieren.
+            if (combined.none { relevance(it, query) == 4 }) {
+                GroqFoodEstimatorApi.estimate(query)?.let { combined = combined + it }
+            }
+
             val result = combined
                 .distinctBy { normalizeKey(it) }
                 .sortedWith(relevanceComparator(query))
 
-            foodItemDao.insertAll(result.take(20))
+            foodItemDao.insertAll(result.filter { it.source != FoodSource.MANUAL }.take(20))
             result
         }
     }
 
     private fun relevanceComparator(query: String): Comparator<FoodItem> = Companion.relevanceComparator(query)
+    private fun relevance(item: FoodItem, query: String): Int = Companion.relevance(item, query)
 
     companion object {
+        /**
+         * Wie gut der Produktname zur Suchanfrage passt:
+         * 4 = exakt, 3 = beginnt mit Anfrage, 2 = enthält als eigenes Wort,
+         * 1 = enthält als Teilstring, 0 = kein Treffer.
+         */
+        fun relevance(item: FoodItem, query: String): Int {
+            val q = query.trim().lowercase()
+            val name = item.name.lowercase()
+            return when {
+                name == q -> 4
+                name.startsWith(q) -> 3
+                Regex("\\b${Regex.escape(q)}").containsMatchIn(name) -> 2
+                name.contains(q) -> 1
+                else -> 0
+            }
+        }
+
         /**
          * Sortiert zuerst danach, wie gut der Produktname zur Suchanfrage passt
          * (exakt > beginnt mit > enthält als Wort > enthält als Teilstring), erst
@@ -60,20 +93,8 @@ class FoodSearchRepository(
          * lokale DB-Treffer und Remote-Treffer separat zusammenführt) dieselbe
          * Sortierung anwenden können statt lokale Treffer unsortiert voranzustellen.
          */
-        fun relevanceComparator(query: String): Comparator<FoodItem> {
-            val q = query.trim().lowercase()
-            fun relevance(item: FoodItem): Int {
-                val name = item.name.lowercase()
-                return when {
-                    name == q -> 4
-                    name.startsWith(q) -> 3
-                    Regex("\\b${Regex.escape(q)}").containsMatchIn(name) -> 2
-                    name.contains(q) -> 1
-                    else -> 0
-                }
-            }
-            return compareByDescending<FoodItem> { relevance(it) }.thenByDescending { it.completenessScore }
-        }
+        fun relevanceComparator(query: String): Comparator<FoodItem> =
+            compareByDescending<FoodItem> { relevance(it, query) }.thenByDescending { it.completenessScore }
     }
 
     suspend fun searchNaturalLanguage(query: String): List<FoodItem> {
