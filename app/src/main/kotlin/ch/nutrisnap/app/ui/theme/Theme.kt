@@ -71,6 +71,51 @@ enum class AppTheme(
         accent       = Color(0xFFD4A017),
         accentLight  = Color(0xFFFFF3CC),
         background   = Color(0xFFFFF5F6)
+    ),
+    LAGOON_TEAL(
+        label = "Lagoon Teal", emoji = "🏝️",
+        primary      = Color(0xFF0F766E),
+        primaryDark  = Color(0xFF0B4F49),
+        primaryLight = Color(0xFFCCFBF1),
+        accent       = Color(0xFFFB923C),
+        accentLight  = Color(0xFFFFEDD5),
+        background   = Color(0xFFF0FDFA)
+    ),
+    GOLDEN_AMBER(
+        label = "Golden Amber", emoji = "🍯",
+        primary      = Color(0xFFB45309),
+        primaryDark  = Color(0xFF78350F),
+        primaryLight = Color(0xFFFEF3C7),
+        accent       = Color(0xFF0891B2),
+        accentLight  = Color(0xFFCFFAFE),
+        background   = Color(0xFFFFFBEB)
+    ),
+    SLATE_CHARCOAL(
+        label = "Slate Charcoal", emoji = "🖤",
+        primary      = Color(0xFF334155),
+        primaryDark  = Color(0xFF1E293B),
+        primaryLight = Color(0xFFE2E8F0),
+        accent       = Color(0xFFF59E0B),
+        accentLight  = Color(0xFFFEF3C7),
+        background   = Color(0xFFF8FAFC)
+    ),
+    CHERRY_RED(
+        label = "Cherry Red", emoji = "🍒",
+        primary      = Color(0xFFB91C1C),
+        primaryDark  = Color(0xFF7F1D1D),
+        primaryLight = Color(0xFFFEE2E2),
+        accent       = Color(0xFF10B981),
+        accentLight  = Color(0xFFD1FAE5),
+        background   = Color(0xFFFFF5F5)
+    ),
+    MIDNIGHT_INDIGO(
+        label = "Midnight Indigo", emoji = "🌌",
+        primary      = Color(0xFF3730A3),
+        primaryDark  = Color(0xFF1E1B4B),
+        primaryLight = Color(0xFFE0E7FF),
+        accent       = Color(0xFFFBBF24),
+        accentLight  = Color(0xFFFEF3C7),
+        background   = Color(0xFFF5F5FF)
     );
 
     fun toColorScheme() = lightColorScheme(
