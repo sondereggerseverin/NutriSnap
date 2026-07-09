@@ -117,7 +117,8 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
                     CookingMethodSelector(
                         selected = state.cookingMethod,
                         applianceModel = state.applianceModel,
-                        onSelect = { vm.setCookingMethod(it) }
+                        onSelect = { vm.setCookingMethod(it) },
+                        onSetApplianceModel = { vm.setApplianceModel(it) }
                     )
                     Spacer(Modifier.height(12.dp))
 
@@ -698,30 +699,89 @@ private fun RowScope.GenerateButtonContent(isLoading: Boolean, loadingText: Stri
 
 // ── Kochgerät-Auswahl ────────────────────────────────────────────────────────
 
+private fun CookingMethod.icon(): androidx.compose.ui.graphics.vector.ImageVector = when (this) {
+    CookingMethod.STOVETOP   -> Icons.Default.Whatshot
+    CookingMethod.OVEN       -> Icons.Default.Fireplace
+    CookingMethod.STEAM_OVEN -> Icons.Default.WaterDrop
+    CookingMethod.SMART      -> Icons.Default.Bolt
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun CookingMethodSelector(
     selected: CookingMethod,
     applianceModel: String,
-    onSelect: (CookingMethod) -> Unit
+    onSelect: (CookingMethod) -> Unit,
+    onSetApplianceModel: (String) -> Unit
 ) {
-    Column {
-        Text("Zubereitung", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(4.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            CookingMethod.entries.forEach { method ->
-                FilterChip(
-                    selected = selected == method,
-                    onClick = { onSelect(method) },
-                    label = { Text(method.label, fontSize = 12.sp) },
-                    modifier = Modifier.weight(1f)
-                )
+    var showApplianceDialog by remember { mutableStateOf(false) }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Text("Zubereitung", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(8.dp))
+            // Chips sizen sich an ihrem eigenen Text statt gleich breit erzwungen zu werden -
+            // sonst wickelt "Dampfgarer/Kombi-Dampfgarer" hässlich über mehrere Zeilen.
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                CookingMethod.entries.forEach { method ->
+                    FilterChip(
+                        selected = selected == method,
+                        onClick = { onSelect(method) },
+                        label = { Text(method.label, fontSize = 13.sp) },
+                        leadingIcon = { Icon(method.icon(), null, Modifier.size(16.dp)) }
+                    )
+                }
+            }
+            if (selected != CookingMethod.STOVETOP) {
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().clickable { showApplianceDialog = true }
+                ) {
+                    Icon(Icons.Default.Tune, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        if (applianceModel.isBlank()) "Gerätemodell hinterlegen für exakte Programme"
+                        else "Gerät: $applianceModel",
+                        fontSize = 11.sp, fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(Icons.Default.ChevronRight, null, Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary)
+                }
             }
         }
-        if (selected != CookingMethod.STOVETOP && applianceModel.isBlank()) {
-            Text("Tipp: Gerätemodell in den Einstellungen hinterlegen für exakte Programme.",
-                fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp))
-        }
+    }
+
+    if (showApplianceDialog) {
+        var text by remember { mutableStateOf(applianceModel) }
+        AlertDialog(
+            onDismissRequest = { showApplianceDialog = false },
+            title = { Text("Gerätemodell") },
+            text = {
+                Column {
+                    Text("Für exakte Ofen-/Dampfgarer-Programme (z.B. V-ZUG, Miele).",
+                        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = text, onValueChange = { text = it },
+                        placeholder = { Text("z.B. V-ZUG Combi-Steam SL CSTSLc") },
+                        singleLine = true, modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { onSetApplianceModel(text.trim()); showApplianceDialog = false }) {
+                    Text("Speichern")
+                }
+            },
+            dismissButton = { TextButton(onClick = { showApplianceDialog = false }) { Text("Abbrechen") } }
+        )
     }
 }
 
