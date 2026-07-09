@@ -3,8 +3,10 @@ package ch.nutrisnap.app.ui.theme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -121,6 +123,12 @@ val Cream    = Color(0xFFF8F4EF)
 val Coral    = Color(0xFFE07A5F)
 val CoralLight = Color(0xFFF2C4BB)
 
+// Gibt Zugriff auf die rohen, mode-unabhängigen AppTheme-Farben (primary/primaryDark/...),
+// z.B. für Hero-Header mit fest weißer Schrift, die unabhängig vom Light/Dark-Farbschema
+// immer ausreichend Kontrast brauchen (die Material3-Rollen primary/onPrimaryContainer
+// vertauschen ihre Helligkeit zwischen Light- und Dark-Scheme und eignen sich dafür nicht).
+val LocalAppTheme = staticCompositionLocalOf { AppTheme.FOREST_GREEN }
+
 val KEY_APP_THEME = stringPreferencesKey("app_theme")
 val KEY_MEAL_ORDER = stringPreferencesKey("meal_order") // komma-getrennte MealType-Namen
 
@@ -153,9 +161,11 @@ fun NutriSnapTheme(content: @Composable () -> Unit) {
     val theme = runCatching { AppTheme.valueOf(themeName) }.getOrDefault(AppTheme.FOREST_GREEN)
     val useDarkColors = isSystemInDarkTheme()
 
-    MaterialTheme(
-        colorScheme = if (useDarkColors) theme.toDarkColorScheme() else theme.toColorScheme(),
-        typography  = NutriSnapTypography,
-        content     = content
-    )
+    CompositionLocalProvider(LocalAppTheme provides theme) {
+        MaterialTheme(
+            colorScheme = if (useDarkColors) theme.toDarkColorScheme() else theme.toColorScheme(),
+            typography  = NutriSnapTypography,
+            content     = content
+        )
+    }
 }
