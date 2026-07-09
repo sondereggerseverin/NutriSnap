@@ -610,45 +610,67 @@ fun ThemePickerSection(
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Text("App-Design", fontWeight = FontWeight.Bold, fontSize = 15.sp,
             modifier = Modifier.padding(bottom = 10.dp))
-        androidx.compose.foundation.lazy.LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            items(AppTheme.entries.size) { idx ->
-                val theme = AppTheme.entries[idx]
-                val isSelected = theme == currentTheme
-                Card(
-                    modifier = Modifier
-                        .width(90.dp)
-                        .clickable { onThemeSelected(theme) },
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (isSelected) theme.primaryLight else MaterialTheme.colorScheme.surface
-                    ),
-                    border = if (isSelected) BorderStroke(2.dp, theme.primary) else null,
-                    elevation = CardDefaults.cardElevation(if (isSelected) 4.dp else 1.dp)
-                ) {
-                    Column(
-                        Modifier.padding(10.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Box(
-                            Modifier.size(40.dp).clip(CircleShape).background(theme.primary),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(theme.emoji, fontSize = 18.sp)
-                        }
-                        Spacer(Modifier.height(6.dp))
-                        Text(theme.label.split(" ").first(), fontSize = 10.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) theme.primaryDark else MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1
-                        )
-                        if (isSelected) {
-                            Icon(Icons.Default.CheckCircle, null,
-                                tint = theme.primary, modifier = Modifier.size(14.dp))
-                        }
-                    }
+        // Festes 4-Spalten-Grid statt horizontal scrollender Liste: bei 10 Themes
+        // war in der LazyRow nur der Beginn sichtbar, ohne Hinweis auf weitere,
+        // wodurch die restlichen Themes praktisch unauffindbar waren.
+        val columns = 4
+        AppTheme.entries.chunked(columns).forEach { rowThemes ->
+            Row(
+                Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                rowThemes.forEach { theme ->
+                    ThemeCard(
+                        theme = theme,
+                        isSelected = theme == currentTheme,
+                        onClick = { onThemeSelected(theme) },
+                        modifier = Modifier.weight(1f)
+                    )
                 }
+                // Letzte Reihe ggf. nicht voll: leere Slots halten die Kartenbreite
+                // konsistent mit den vollen Reihen statt sie zu strecken.
+                repeat(columns - rowThemes.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemeCard(
+    theme: AppTheme,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) theme.primaryLight else MaterialTheme.colorScheme.surface
+        ),
+        border = if (isSelected) BorderStroke(2.dp, theme.primary) else null,
+        elevation = CardDefaults.cardElevation(if (isSelected) 4.dp else 1.dp)
+    ) {
+        Column(
+            Modifier.padding(vertical = 10.dp, horizontal = 4.dp).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                Modifier.size(36.dp).clip(CircleShape).background(theme.primary),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(theme.emoji, fontSize = 16.sp)
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(theme.label.split(" ").first(), fontSize = 10.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                color = if (isSelected) theme.primaryDark else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
+            if (isSelected) {
+                Spacer(Modifier.height(2.dp))
+                Icon(Icons.Default.CheckCircle, null,
+                    tint = theme.primary, modifier = Modifier.size(14.dp))
             }
         }
     }
