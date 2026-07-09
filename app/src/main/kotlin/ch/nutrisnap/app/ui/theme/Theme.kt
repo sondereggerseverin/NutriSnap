@@ -25,21 +25,50 @@ enum class AppTheme(
     val accentLight: Color,
     val background: Color
 ) {
-    // Deine original 10 + 10 neue
-    FOREST_GREEN("Forest Green", "🌿", Color(0xFF2D6A4F), Color(0xFF1B4332), Color(0xFFD8F3DC), Color(0xFFE07A5F), Color(0xFFF2C4BB), Color(0xFFF8F4EF)),
-    OCEAN_BLUE("Ocean Blue", "🌊", Color(0xFF1E6091), Color(0xFF0D3B5E), Color(0xFFD0E8F5), Color(0xFFF4A261), Color(0xFFFDE8D0), Color(0xFFF0F6FB)),
-    SUNSET_ORANGE("Sunset Orange", "🌅", Color(0xFFD4622A), Color(0xFF8B3A10), Color(0xFFFFE0CC), Color(0xFF4ECDC4), Color(0xFFB8F0EC), Color(0xFFFFF8F4)),
-    // ... (die anderen 7 originalen)
-
-    // Neue 10
-    LAVENDER_DUSK("Lavender Dusk", "🌆", Color(0xFF7C3AED), Color(0xFF4C1D95), Color(0xFFDDD6FE), Color(0xFFF472B6), Color(0xFFFCE7F3), Color(0xFFF5F3FF)),
-    MINT_FRESH("Mint Fresh", "🍃", Color(0xFF10B981), Color(0xFF047857), Color(0xFFD1FAE5), Color(0xFF60A5FA), Color(0xFFDBEAFE), Color(0xFFF0FDF4)),
-    // (die restlichen 8 neuen kannst du bei Bedarf haben)
-
-    // ... (vollständiger Code bei nächster Nachricht, wenn du möchtest)
-}
-
- // Rest des Files (toColorScheme, NutriSnapTheme etc.) bleibt gleich        background   = Color(0xFFF9F7FF)
+    FOREST_GREEN(
+        label = "Forest Green", emoji = "🌿",
+        primary      = Color(0xFF2D6A4F),
+        primaryDark  = Color(0xFF1B4332),
+        primaryLight = Color(0xFFD8F3DC),
+        accent       = Color(0xFFE07A5F),
+        accentLight  = Color(0xFFF2C4BB),
+        background   = Color(0xFFF8F4EF)
+    ),
+    OCEAN_BLUE(
+        label = "Ocean Blue", emoji = "🌊",
+        primary      = Color(0xFF1E6091),
+        primaryDark  = Color(0xFF0D3B5E),
+        primaryLight = Color(0xFFD0E8F5),
+        accent       = Color(0xFFF4A261),
+        accentLight  = Color(0xFFFDE8D0),
+        background   = Color(0xFFF0F6FB)
+    ),
+    SUNSET_ORANGE(
+        label = "Sunset Orange", emoji = "🌅",
+        primary      = Color(0xFFD4622A),
+        primaryDark  = Color(0xFF8B3A10),
+        primaryLight = Color(0xFFFFE0CC),
+        accent       = Color(0xFF4ECDC4),
+        accentLight  = Color(0xFFB8F0EC),
+        background   = Color(0xFFFFF8F4)
+    ),
+    LAVENDER_DUSK(
+        label = "Lavender Dusk", emoji = "🌆",
+        primary      = Color(0xFF7C3AED),
+        primaryDark  = Color(0xFF4C1D95),
+        primaryLight = Color(0xFFDDD6FE),
+        accent       = Color(0xFFF472B6),
+        accentLight  = Color(0xFFFCE7F3),
+        background   = Color(0xFFF5F3FF)
+    ),
+    MINT_FRESH(
+        label = "Mint Fresh", emoji = "🍃",
+        primary      = Color(0xFF10B981),
+        primaryDark  = Color(0xFF047857),
+        primaryLight = Color(0xFFD1FAE5),
+        accent       = Color(0xFF60A5FA),
+        accentLight  = Color(0xFFDBEAFE),
+        background   = Color(0xFFF0FDF4)
     ),
     ROSE_GOLD(
         label = "Rose Gold", emoji = "🌸",
@@ -85,15 +114,6 @@ enum class AppTheme(
         accent       = Color(0xFF10B981),
         accentLight  = Color(0xFFD1FAE5),
         background   = Color(0xFFFFF5F5)
-    ),
-    MIDNIGHT_INDIGO(
-        label = "Midnight Indigo", emoji = "🌌",
-        primary      = Color(0xFF3730A3),
-        primaryDark  = Color(0xFF1E1B4B),
-        primaryLight = Color(0xFFE0E7FF),
-        accent       = Color(0xFFFBBF24),
-        accentLight  = Color(0xFFFEF3C7),
-        background   = Color(0xFFF5F5FF)
     );
 
     fun toColorScheme() = lightColorScheme(
