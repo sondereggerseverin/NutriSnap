@@ -72,6 +72,10 @@ object SyncManager {
             )
             return
         }
+        // applianceModel gibt es (noch) nicht in Supabase (UserProfileDto hat kein Feld dafür) -
+        // ohne diesen Erhalt würde jeder Remote-Pull das lokal hinterlegte Gerät auf "" zurücksetzen.
+        // Ist ohnehin geräte-/küchenspezifisch, macht als Cloud-Sync-Feld wenig Sinn.
+        val localApplianceModel = dao.get()?.applianceModel ?: ""
         dao.upsert(
             UserProfileEntity(
                 weightKg = remote.weightKg,
@@ -82,7 +86,8 @@ object SyncManager {
                 carbsGoalG = remote.carbsGoalG,
                 fatGoalG = remote.fatGoalG,
                 activityFactor = remote.activityFactor,
-                sex = runCatching { Sex.valueOf(remote.sex) }.getOrDefault(Sex.UNSPECIFIED).name
+                sex = runCatching { Sex.valueOf(remote.sex) }.getOrDefault(Sex.UNSPECIFIED).name,
+                applianceModel = localApplianceModel
             )
         )
     }
