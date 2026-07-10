@@ -1,6 +1,7 @@
 package ch.nutrisnap.app.ui.screens.recipegen
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -277,6 +278,15 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
 
 // ── Modus-Eingaben ─────────────────────────────────────────────────────────────
 
+private val FREITEXT_QUICK_PROMPTS = listOf(
+    "Schnell (15 Min)" to "Schnelles Gericht, fertig in 15 Minuten",
+    "Proteinreich" to "Proteinreiches Gericht",
+    "Vegan" to "Veganes Gericht",
+    "Low Carb" to "Kohlenhydratarmes Gericht",
+    "Resteverwertung" to "Rezept zur Resteverwertung"
+)
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun FreitextInput(
     input: String,
@@ -294,7 +304,22 @@ private fun FreitextInput(
             minLines = 2, maxLines = 4,
             shape = RoundedCornerShape(12.dp)
         )
-        Spacer(Modifier.height(8.dp))
+        // Vorschläge nur solange das Feld leer ist - danach nicht mehr im Weg.
+        if (input.isBlank()) {
+            Spacer(Modifier.height(10.dp))
+            Text("Ideen zum Start", fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(6.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                FREITEXT_QUICK_PROMPTS.forEach { (label, prompt) ->
+                    SuggestionChip(
+                        onClick = { onInputChange(prompt) },
+                        label = { Text(label, fontSize = 12.sp) }
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
         Button(
             onClick = onGenerate,
             modifier = Modifier.fillMaxWidth(),
@@ -706,7 +731,6 @@ private fun CookingMethod.icon(): androidx.compose.ui.graphics.vector.ImageVecto
     CookingMethod.SMART      -> Icons.Default.Bolt
 }
 
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun CookingMethodSelector(
     selected: CookingMethod,
@@ -723,17 +747,20 @@ private fun CookingMethodSelector(
         Column(Modifier.padding(14.dp)) {
             Text("Zubereitung", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(8.dp))
-            // Chips sizen sich an ihrem eigenen Text statt gleich breit erzwungen zu werden -
-            // sonst wickelt "Dampfgarer/Kombi-Dampfgarer" hässlich über mehrere Zeilen.
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                CookingMethod.entries.forEach { method ->
-                    FilterChip(
-                        selected = selected == method,
-                        onClick = { onSelect(method) },
-                        label = { Text(method.label, fontSize = 13.sp) },
-                        leadingIcon = { Icon(method.icon(), null, Modifier.size(16.dp)) }
-                    )
+            Spacer(Modifier.height(10.dp))
+            // Feste 2×2-Karten statt Chips: verhindert das Zeichen-für-Zeichen-Umbrechen
+            // von langen Labels wie "Dampfgarer/Kombi-Dampfgarer" und gibt gleich große Tap-Ziele.
+            CookingMethod.entries.chunked(2).forEachIndexed { rowIndex, row ->
+                if (rowIndex > 0) Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { method ->
+                        MethodCard(
+                            method = method,
+                            isSelected = selected == method,
+                            onClick = { onSelect(method) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
             if (selected != CookingMethod.STOVETOP) {
@@ -782,6 +809,58 @@ private fun CookingMethodSelector(
             },
             dismissButton = { TextButton(onClick = { showApplianceDialog = false }) { Text("Abbrechen") } }
         )
+    }
+}
+
+/** Gleich große Auswahlkarte für eine Zubereitungsart (ersetzt die zuvor umbrechenden Chips). */
+@Composable
+private fun MethodCard(
+    method: CookingMethod,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer
+        else MaterialTheme.colorScheme.surfaceContainerHighest
+    val contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+        else MaterialTheme.colorScheme.onSurfaceVariant
+
+    Box(modifier) {
+        Surface(
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth().height(72.dp),
+            shape = RoundedCornerShape(14.dp),
+            color = containerColor,
+            border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null
+        ) {
+            Column(
+                Modifier.fillMaxSize().padding(horizontal = 4.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(method.icon(), null, Modifier.size(20.dp), tint = contentColor)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    // "/" ist der einzige natürliche Umbruchpunkt in den Labels - an dieser
+                    // Stelle explizit umbrechen statt der Textengine das Silbentrennen zu überlassen.
+                    method.label.replace("/", "/\n"),
+                    fontSize = 11.sp,
+                    lineHeight = 13.sp,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = contentColor,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+            }
+        }
+        if (isSelected) {
+            Icon(
+                Icons.Default.CheckCircle, null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(16.dp)
+            )
+        }
     }
 }
 
