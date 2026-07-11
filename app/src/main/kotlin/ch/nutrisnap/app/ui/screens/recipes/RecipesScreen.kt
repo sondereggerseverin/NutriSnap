@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -272,7 +273,8 @@ fun RecipesScreen(
                 }
                 shoppingVm.addRecipeIngredients(live.title, names.map { Triple(it, null, null) })
                 selectedRecipe = null
-            }
+            },
+            onUpdateIngredients = { newText -> vm.updateRecipe(live.copy(ingredients = newText)) }
         )
     }
 
@@ -597,12 +599,18 @@ fun RecipeDetailSheet(
     onEdit: () -> Unit,
     onAnalyze: () -> Unit,
     onVerify: () -> Unit = {},
-    onAddToShoppingList: (Recipe) -> Unit = {}
+    onAddToShoppingList: (Recipe) -> Unit = {},
+    onUpdateIngredients: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     var servings   by remember(recipe.id) { mutableStateOf(recipe.servings) }
     var metricMode by remember { mutableStateOf(false) }
     val ratio      = servings.toFloat() / recipe.servings.coerceAtLeast(1).toFloat()
+
+    // ── Zutaten-Bearbeitung ─────────────────────────────────────────────────
+    var ingredientsEditMode by remember(recipe.id) { mutableStateOf(false) }
+    var ingredientLines by remember(recipe.id) { mutableStateOf(recipe.ingredients.lines()) }
+    var scanTargetIdx by remember { mutableStateOf<Int?>(null) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, modifier = Modifier.fillMaxHeight(0.94f)) {
         LazyColumn(contentPadding = PaddingValues(bottom = 32.dp, start = 16.dp, end = 16.dp)) {
@@ -680,27 +688,95 @@ fun RecipeDetailSheet(
                 item { SectionHeader("Beschreibung"); Spacer(Modifier.height(4.dp)); Text(desc, fontSize=14.sp, lineHeight=20.sp); Spacer(Modifier.height(16.dp)) }
             }
 
-            // Ingredients
-            if (recipe.ingredients.isNotBlank()) {
-                item { SectionHeader("Zutaten"); Spacer(Modifier.height(8.dp)) }
-                val rawLines = recipe.ingredients.lines()
-                items(rawLines) { rawLine ->
-                    if (rawLine.isBlank()) { Spacer(Modifier.height(4.dp)); return@items }
-                    val scaled  = if (ratio != 1f) scaleNumbers(rawLine, ratio) else rawLine
-                    val display = if (metricMode) convertToMetric(scaled) else scaled
-                    val isHeader = !display.startsWith("•") && !display.startsWith("-") &&
-                        display.isNotEmpty() && !display[0].isDigit() && !display.startsWith(" ") && display.length > 2
-                    if (isHeader) {
-                        Spacer(Modifier.height(10.dp))
-                        Text(display.trimEnd(':'), fontWeight=FontWeight.SemiBold, fontSize=13.sp, color=MaterialTheme.colorScheme.primary)
-                    } else {
-                        Row(Modifier.fillMaxWidth().padding(vertical=3.dp), verticalAlignment=Alignment.Top) {
-                            Text("•  ", fontSize=14.sp, color=MaterialTheme.colorScheme.secondary)
-                            Text(display.trimStart('•','-',' '), fontSize=14.sp, lineHeight=20.sp, modifier=Modifier.weight(1f))
+            // Ingredients — Header/Toggle immer sichtbar, damit auch Rezepte ohne
+            // bestehende Zutaten über "Bearbeiten" befüllt werden können.
+            run {
+                item {
+                    SectionHeader("Zutaten", trailing = {
+                        TextButton(
+                            onClick = {
+                                if (ingredientsEditMode) {
+                                    val newText = ingredientLines.filter { it.isNotBlank() }.joinToString("\n")
+                                    if (newText != recipe.ingredients) onUpdateIngredients(newText)
+                                }
+                                ingredientsEditMode = !ingredientsEditMode
+                            },
+                            contentPadding = PaddingValues(4.dp)
+                        ) {
+                            Icon(if (ingredientsEditMode) Icons.Default.Check else Icons.Default.Edit, null, Modifier.size(15.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(if (ingredientsEditMode) "Fertig" else "Bearbeiten", fontSize = 12.sp)
+                        }
+                    })
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                if (ingredientsEditMode) {
+                    // ── Editierbare Zeilen: Menge/Name direkt tippbar, Scan + Löschen pro Zeile ──
+                    itemsIndexed(ingredientLines) { idx, line ->
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = line,
+                                onValueChange = { v -> ingredientLines = ingredientLines.toMutableList().also { it[idx] = v } },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            IconButton(onClick = { scanTargetIdx = idx }, Modifier.size(36.dp)) {
+                                Icon(Icons.Default.QrCodeScanner, "Produkt scannen", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                            }
+                            IconButton(
+                                onClick = { ingredientLines = ingredientLines.toMutableList().also { it.removeAt(idx) } },
+                                Modifier.size(36.dp)
+                            ) {
+                                Icon(Icons.Default.DeleteOutline, "Löschen", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                            }
                         }
                     }
+                    item {
+                        Spacer(Modifier.height(4.dp))
+                        OutlinedButton(
+                            onClick = { ingredientLines = ingredientLines + "" },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Add, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Zutat hinzufügen", fontSize = 13.sp)
+                        }
+                        Spacer(Modifier.height(16.dp))
+                    }
+                } else if (recipe.ingredients.isBlank()) {
+                    item {
+                        Text("Noch keine Zutaten – tippe auf „Bearbeiten“, um welche hinzuzufügen.",
+                            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(16.dp))
+                    }
+                } else {
+                    // ── Ansicht ──
+                    val rawLines = recipe.ingredients.lines()
+                    items(rawLines) { rawLine ->
+                        if (rawLine.isBlank()) { Spacer(Modifier.height(4.dp)); return@items }
+                        val scaled  = if (ratio != 1f) scaleNumbers(rawLine, ratio) else rawLine
+                        val display = if (metricMode) convertToMetric(scaled) else scaled
+                        val isHeader = !display.startsWith("•") && !display.startsWith("-") &&
+                            display.isNotEmpty() && !display[0].isDigit() && !display.startsWith(" ") && display.length > 2
+                        if (isHeader) {
+                            Spacer(Modifier.height(10.dp))
+                            Text(display.trimEnd(':'), fontWeight=FontWeight.SemiBold, fontSize=13.sp, color=MaterialTheme.colorScheme.primary)
+                        } else {
+                            Row(Modifier.fillMaxWidth().padding(vertical=3.dp), verticalAlignment=Alignment.Top) {
+                                Text("•  ", fontSize=14.sp, color=MaterialTheme.colorScheme.secondary)
+                                Text(display.trimStart('•','-',' '), fontSize=14.sp, lineHeight=20.sp, modifier=Modifier.weight(1f))
+                            }
+                        }
+                    }
+                    item { Spacer(Modifier.height(16.dp)) }
                 }
-                item { Spacer(Modifier.height(16.dp)) }
             }
 
             // Instructions
@@ -731,6 +807,26 @@ fun RecipeDetailSheet(
                     }
                 }
             }
+        }
+
+        // Barcode/Suche/Manuell für eine einzelne Zutaten-Zeile im Bearbeiten-Modus —
+        // ersetzt die Zeile durch den exakt gescannten Produktnamen (Menge bleibt erhalten),
+        // damit "Neu berechnen" die präzisen Nährwerte findet.
+        scanTargetIdx?.let { idx ->
+            val currentLine = ingredientLines.getOrNull(idx) ?: ""
+            val parsedNameRaw = RecipeNutritionAnalyzer.parseIngredientLine(currentLine)?.name
+            val parsedName = if (!parsedNameRaw.isNullOrBlank()) parsedNameRaw else currentLine
+            IngredientIdentifySheet(
+                ingredientName = parsedName,
+                onDismiss = { scanTargetIdx = null },
+                onFoodSelected = { food ->
+                    val amountG = RecipeNutritionAnalyzer.parseIngredientLine(currentLine)?.amountG?.toInt() ?: 100
+                    ingredientLines = ingredientLines.toMutableList().also {
+                        it[idx] = "${amountG}g ${food.name}"
+                    }
+                    scanTargetIdx = null
+                }
+            )
         }
     }
 }
@@ -931,8 +1027,11 @@ fun AddToDiarySheet(
     }
 }
 
-@Composable private fun SectionHeader(text: String) {
-    Text(text, fontWeight=FontWeight.Bold, fontSize=16.sp)
+@Composable private fun SectionHeader(text: String, trailing: @Composable (() -> Unit)? = null) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceBetween, verticalAlignment=Alignment.CenterVertically) {
+        Text(text, fontWeight=FontWeight.Bold, fontSize=16.sp)
+        trailing?.invoke()
+    }
     HorizontalDivider(Modifier.padding(top=4.dp), thickness=1.dp, color=MaterialTheme.colorScheme.outlineVariant)
 }
 @Composable private fun MetaBadge(text: String) {
