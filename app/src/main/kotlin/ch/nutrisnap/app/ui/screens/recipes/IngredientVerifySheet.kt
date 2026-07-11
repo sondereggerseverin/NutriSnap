@@ -244,7 +244,7 @@ private fun IngredientVerifyRow(
                 )
             }
 
-            // Calories + chevron
+            // Calories + direct scan + chevron
             Column(horizontalAlignment = Alignment.End) {
                 if (state.effectiveCalories > 0f) {
                     Text(
@@ -253,11 +253,18 @@ private fun IngredientVerifyRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Icon(
-                    if (showActions) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    null, Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Direkter Scan-Zugriff — kein Aufklappen nötig für die genaueste Methode
+                    IconButton(onClick = onScan, Modifier.size(26.dp)) {
+                        Icon(Icons.Default.QrCodeScanner, "Produkt scannen", Modifier.size(15.dp),
+                            tint = MaterialTheme.colorScheme.primary)
+                    }
+                    Icon(
+                        if (showActions) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        null, Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
 
@@ -270,16 +277,6 @@ private fun IngredientVerifyRow(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Edit / Scan
-                OutlinedButton(
-                    onClick = { showActions = false; onScan() },
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-                ) {
-                    Icon(Icons.Default.QrCodeScanner, null, Modifier.size(14.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Bearbeiten", fontSize = 12.sp)
-                }
                 // Keep as-is (close actions)
                 OutlinedButton(
                     onClick = { showActions = false },
