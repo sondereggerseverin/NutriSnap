@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.diary
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -40,12 +41,14 @@ import ch.nutrisnap.app.domain.EntryPlausibilityChecker
 import ch.nutrisnap.app.domain.FoodPortionPresets
 import ch.nutrisnap.app.ui.screens.barcode.BarcodeScannerScreen
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
+import ch.nutrisnap.app.ui.theme.MacroColors
+import ch.nutrisnap.app.ui.theme.NutriRadius
+import ch.nutrisnap.app.ui.theme.NutriSpacing
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** Schlaegt anhand der Tageszeit eine Mahlzeit fuer Quick-Add vor. */
 private fun defaultMealForNow(): MealType = when (LocalTime.now().hour) {
     in 5..10  -> MealType.BREAKFAST
     in 11..14 -> MealType.LUNCH
@@ -76,24 +79,28 @@ fun DiaryScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddSheet = true },
-                containerColor = MaterialTheme.colorScheme.primary) {
-                Icon(Icons.Default.Add, "Eintrag hinzufügen",
-                    tint = MaterialTheme.colorScheme.onPrimary)
+            FloatingActionButton(
+                onClick = { showAddSheet = true },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Icon(Icons.Default.Add, "Eintrag hinzufügen")
             }
         }
     ) { padding ->
         LazyColumn(
             Modifier.padding(padding).fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 80.dp)
+            contentPadding = PaddingValues(bottom = 100.dp)
         ) {
             item { DateNavigator(state.selectedDate, vm::prevDay, vm::nextDay) }
             item {
                 MacroBar(
-                    calories = state.totalCalories, goal = state.calorieGoal,
-                    protein  = state.totalProtein,  carbs = state.totalCarbs,
+                    calories = state.totalCalories,
+                    goal = state.calorieGoal,
+                    protein  = state.totalProtein,
+                    carbs = state.totalCarbs,
                     fat      = state.totalFat,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    modifier = Modifier.padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.sm)
                 )
             }
             if (quickAddFavorites.isNotEmpty()) {
@@ -121,8 +128,13 @@ fun DiaryScreen(
             if (state.entries.isEmpty()) {
                 item {
                     EmptyState(
-                        icon    = { Icon(Icons.Default.MenuBook, null, Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        icon = {
+                            Icon(
+                                Icons.Default.MenuBook, null,
+                                modifier = Modifier.size(32.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
                         message = "Noch keine Einträge",
                         sub     = "Tippe auf + um Mahlzeiten zu erfassen"
                     )
@@ -137,9 +149,12 @@ fun DiaryScreen(
                             title  = meal.label(),
                             action = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("$mealKcal kcal", fontSize = 13.sp,
+                                    Text(
+                                        "$mealKcal kcal",
+                                        fontSize = 13.sp,
                                         fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                     IconButton(
                                         onClick = { expandedNutrition = if (expandedNutrition == meal) null else meal },
                                         modifier = Modifier.size(28.dp)
@@ -166,7 +181,7 @@ fun DiaryScreen(
                                 proteinGoal = state.proteinGoal,
                                 fat      = mealEntries.sumOf { it.fat.toDouble() }.toFloat(),
                                 fatGoal  = state.fatGoal,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                                modifier = Modifier.padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs)
                             )
                         }
                     }
@@ -231,11 +246,15 @@ private fun EditEntryDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(entry.foodName, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.titleMedium)
+            Text(
+                entry.foodName,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleMedium
+            )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(NutriSpacing.md)) {
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { amountText = it },
@@ -247,13 +266,15 @@ private fun EditEntryDialog(
                 val amount = amountText.toFloatOrNull() ?: 0f
                 if (amount > 0 && entry.amountGrams > 0) {
                     val factor = amount / entry.amountGrams
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("${(entry.calories * factor).toInt()} kcal",
+                    Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.md)) {
+                        Text(
+                            "${(entry.calories * factor).toInt()} kcal",
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary)
-                        Text("P ${(entry.protein * factor).toInt()}g", fontSize = 12.sp)
-                        Text("K ${(entry.carbs * factor).toInt()}g", fontSize = 12.sp)
-                        Text("F ${(entry.fat * factor).toInt()}g", fontSize = 12.sp)
+                            color = MacroColors.calories
+                        )
+                        Text("P ${(entry.protein * factor).toInt()}g", fontSize = 12.sp, color = MacroColors.protein)
+                        Text("K ${(entry.carbs * factor).toInt()}g", fontSize = 12.sp, color = MacroColors.carbs)
+                        Text("F ${(entry.fat * factor).toInt()}g", fontSize = 12.sp, color = MacroColors.fat)
                     }
                 }
             }
@@ -265,7 +286,7 @@ private fun EditEntryDialog(
             }) { Text("Speichern") }
         },
         dismissButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
                 TextButton(onClick = onDelete) {
                     Text("Löschen", color = MaterialTheme.colorScheme.error)
                 }
@@ -283,8 +304,6 @@ private fun EntryDetailSheet(
     onEdit: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    // Mikronaehrstoffe liegen im FoodItem pro 100g vor, DiaryEntry speichert die
-    // tatsaechlich verzehrte Menge in Gramm -> auf diese Menge skalieren.
     val factor = entry.amountGrams / 100f
     val micros = remember(foodItem, entry.amountGrams) {
         buildMap<String, Float> {
@@ -341,78 +360,112 @@ private fun EntryDetailSheet(
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(horizontal = 16.dp).navigationBarsPadding().padding(bottom = 16.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(entry.foodName, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
-                IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, "Menge bearbeiten") }
+        Column(
+            Modifier
+                .padding(horizontal = NutriSpacing.lg)
+                .navigationBarsPadding()
+                .padding(bottom = NutriSpacing.lg)
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    entry.foodName,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Default.Edit, "Menge bearbeiten")
+                }
             }
             val isRecipe = entry.amountGrams == 0f || entry.foodItemId < 0
-            Text(if (isRecipe) "1 Portion" else "${entry.amountGrams.toInt()} g",
-                fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(12.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                EntryMacroItem("Kalorien", "${entry.calories.toInt()}", "kcal")
-                EntryMacroItem("Protein", "${entry.protein.toInt()}", "g")
-                EntryMacroItem("Kohlenhy.", "${entry.carbs.toInt()}", "g")
-                EntryMacroItem("Fett", "${entry.fat.toInt()}", "g")
+            Text(
+                if (isRecipe) "1 Portion" else "${entry.amountGrams.toInt()} g",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(NutriSpacing.md))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                EntryMacroItem("Kalorien", "${entry.calories.toInt()}", "kcal", MacroColors.calories)
+                EntryMacroItem("Protein", "${entry.protein.toInt()}", "g", MacroColors.protein)
+                EntryMacroItem("Kohlenhy.", "${entry.carbs.toInt()}", "g", MacroColors.carbs)
+                EntryMacroItem("Fett", "${entry.fat.toInt()}", "g", MacroColors.fat)
             }
             if (micros.isNotEmpty()) {
-                HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                HorizontalDivider(Modifier.padding(vertical = NutriSpacing.md))
                 MicronutrientTable(micros, ratio = 1f)
             } else if (!isRecipe) {
-                Spacer(Modifier.height(12.dp))
-                Text("Keine Mikronährstoffe für diesen Eintrag verfügbar.",
-                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(NutriSpacing.md))
+                Text(
+                    "Keine Mikronährstoffe für diesen Eintrag verfügbar.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
 }
 
 @Composable
-private fun EntryMacroItem(label: String, value: String, unit: String) {
+private fun EntryMacroItem(label: String, value: String, unit: String, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
+        Text(
+            value,
+            fontWeight = FontWeight.Bold,
+            fontSize = 18.sp,
+            color = color
+        )
         Text(unit, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
-/**
- * Ein-Tap-Schnellzugriff auf Favoriten direkt im Tagebuch — spart bei häufig
- * gegessenen Dingen den Umweg über Sheet -> Suche -> Auswahl -> Bestätigen.
- * Menge/Mahlzeit werden automatisch vorgeschlagen (Standardportion, Tageszeit);
- * für Anpassungen bleibt der normale "+"-Button/Sheet-Weg.
- */
 @Composable
 private fun QuickAddBar(favorites: List<FoodItem>, onQuickAdd: (FoodItem) -> Unit) {
-    Column(Modifier.padding(top = 4.dp, bottom = 4.dp)) {
+    Column(Modifier.padding(top = NutriSpacing.xs, bottom = NutriSpacing.xs)) {
         Text(
-            "⚡ Schnell hinzufügen", fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+            "\u26A1 Schnell hinzufügen",
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 13.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 6.dp)
+            modifier = Modifier
+                .padding(horizontal = NutriSpacing.lg)
+                .padding(bottom = NutriSpacing.sm)
         )
         Row(
-            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            Modifier
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = NutriSpacing.lg),
+            horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
         ) {
             favorites.take(10).forEach { food ->
                 Column(
                     Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .clip(RoundedCornerShape(NutriRadius.md))
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
                         .clickable { onQuickAdd(food) }
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .padding(horizontal = NutriSpacing.md, vertical = NutriSpacing.sm)
                         .widthIn(max = 110.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        food.name, fontSize = 12.sp, fontWeight = FontWeight.Medium,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                        food.name,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                     Text(
-                        "${food.calories.toInt()} kcal/100g", fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                        "${food.calories.toInt()} kcal/100g",
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                     )
                 }
             }
@@ -423,18 +476,26 @@ private fun QuickAddBar(favorites: List<FoodItem>, onQuickAdd: (FoodItem) -> Uni
 @Composable
 private fun DateNavigator(date: LocalDate, onPrev: () -> Unit, onNext: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = NutriSpacing.sm, vertical = NutriSpacing.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
-        IconButton(onClick = onPrev) { Icon(Icons.Default.ChevronLeft, "Vorheriger Tag") }
+        IconButton(onClick = onPrev) {
+            Icon(Icons.Default.ChevronLeft, "Vorheriger Tag")
+        }
         val label = when (date) {
             LocalDate.now()              -> "Heute"
             LocalDate.now().minusDays(1) -> "Gestern"
             else -> date.format(DateTimeFormatter.ofPattern("EEE, dd. MMM", Locale.GERMAN))
         }
-        Text(label, fontWeight = FontWeight.SemiBold, fontSize = 16.sp,
-            modifier = Modifier.padding(horizontal = 8.dp))
+        Text(
+            label,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 16.sp,
+            modifier = Modifier.padding(horizontal = NutriSpacing.sm)
+        )
         IconButton(onClick = onNext, enabled = date.isBefore(LocalDate.now())) {
             Icon(Icons.Default.ChevronRight, "Nächster Tag")
         }
@@ -458,35 +519,45 @@ private fun DiaryEntryRow(
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             if (value == SwipeToDismissBoxValue.EndToStart) showConfirm = true
-            false // Karte bleibt sichtbar, bis der Dialog bestätigt wurde
+            false
         }
     )
 
     SwipeToDismissBox(
         state = dismissState,
-        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 3.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = NutriSpacing.lg, vertical = 3.dp),
         enableDismissFromStartToEnd = false,
         backgroundContent = {
             Box(
                 Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(NutriRadius.md))
                     .background(MaterialTheme.colorScheme.errorContainer)
-                    .padding(horizontal = 20.dp),
+                    .padding(horizontal = NutriSpacing.xl),
                 contentAlignment = Alignment.CenterEnd
             ) {
-                Icon(Icons.Default.DeleteOutline, "Löschen",
-                    tint = MaterialTheme.colorScheme.onErrorContainer)
+                Icon(
+                    Icons.Default.DeleteOutline, "Löschen",
+                    tint = MaterialTheme.colorScheme.onErrorContainer
+                )
             }
         }
     ) {
         Card(
-            Modifier.fillMaxWidth().clickable { onEdit() },
-            shape  = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            Modifier
+                .fillMaxWidth()
+                .animateContentSize()
+                .clickable { onEdit() },
+            shape  = RoundedCornerShape(NutriRadius.md),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(0.5.dp)
         ) {
-            Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.padding(horizontal = NutriSpacing.md, vertical = NutriSpacing.sm),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Column(Modifier.weight(1f)) {
                     Text(
                         entry.foodName,
@@ -495,22 +566,35 @@ private fun DiaryEntryRow(
                         maxLines   = 1,
                         overflow   = TextOverflow.Ellipsis
                     )
-                    Text(amountLabel, fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        amountLabel,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(NutriSpacing.sm))
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("${entry.calories.toInt()} kcal",
-                        fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.primary)
-                    Text("P ${entry.protein.toInt()}  K ${entry.carbs.toInt()}  F ${entry.fat.toInt()}",
-                        fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "${entry.calories.toInt()} kcal",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                        color = MacroColors.calories
+                    )
+                    Text(
+                        "P ${entry.protein.toInt()}  K ${entry.carbs.toInt()}  F ${entry.fat.toInt()}",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
                 if (dragHandleModifier != null) {
                     Icon(
                         Icons.Default.DragHandle, "Reihenfolge ändern",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.padding(start = 4.dp).size(20.dp).then(dragHandleModifier)
+                        modifier = Modifier
+                            .padding(start = NutriSpacing.xs)
+                            .size(20.dp)
+                            .then(dragHandleModifier)
                     )
                 }
             }
@@ -533,22 +617,13 @@ private fun DiaryEntryRow(
         )
     }
 
-    // Dialog abgebrochen -> Swipe-Zustand zurücksetzen, damit die Karte an Ort bleibt
     LaunchedEffect(showConfirm) {
         if (!showConfirm) dismissState.reset()
     }
 }
 
-// Grobe Zeilenhöhe der DiaryEntryRow (Card-Innenpadding 10dp*2 + ~1-zeiliger Text ~20dp
-// + Subtext ~16dp + Card-Rand-Padding 3dp*2) – Näherungswert für die Drag-Index-Berechnung,
-// exakte Pixelmessung wäre hier unverhältnismäßig aufwändig.
 private const val DIARY_ROW_HEIGHT_DP = 62
 
-/**
- * Rendert die Einträge einer Mahlzeit als Drag-&-Drop-sortierbare Liste (Long-Press auf
- * das Handle-Icon startet das Ziehen). Bewusst als normale Column statt LazyColumn-Items,
- * da pro Mahlzeit nur wenige Einträge anfallen und die Drag-Index-Berechnung dadurch simpel bleibt.
- */
 @Composable
 private fun ReorderableMealEntries(
     entries: List<DiaryEntry>,
@@ -598,8 +673,6 @@ private fun ReorderableMealEntries(
     }
 }
 
-// ── Add Food Bottom Sheet ─────────────────────────────────────────────────────
-
 enum class AddFoodTab { SEARCH, MANUAL }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -618,7 +691,6 @@ fun AddFoodSheet(vm: DiaryViewModel, initialMeal: MealType? = null, autoOpenScan
                     if (food != null) {
                         activeTab = AddFoodTab.SEARCH
                         barcodeStatus = ""
-                        // food wird via searchResults angezeigt — setze direkt als Ergebnis
                         vm.setBarcodeResult(food)
                     } else {
                         barcodeStatus = "Barcode $barcode nicht gefunden"
@@ -631,11 +703,18 @@ fun AddFoodSheet(vm: DiaryViewModel, initialMeal: MealType? = null, autoOpenScan
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(horizontal = 16.dp).navigationBarsPadding()) {
-            Text("Eintrag hinzufügen", fontWeight = FontWeight.Bold, fontSize = 18.sp,
-                modifier = Modifier.padding(bottom = 12.dp))
+        Column(
+            Modifier
+                .padding(horizontal = NutriSpacing.lg)
+                .navigationBarsPadding()
+        ) {
+            Text(
+                "Eintrag hinzufügen",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                modifier = Modifier.padding(bottom = NutriSpacing.md)
+            )
 
-            // Tab-Row: Suche / Manuell
             TabRow(selectedTabIndex = activeTab.ordinal) {
                 Tab(
                     selected = activeTab == AddFoodTab.SEARCH,
@@ -651,7 +730,7 @@ fun AddFoodSheet(vm: DiaryViewModel, initialMeal: MealType? = null, autoOpenScan
                 )
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(NutriSpacing.md))
 
             when (activeTab) {
                 AddFoodTab.SEARCH -> SearchTab(
@@ -670,12 +749,10 @@ fun AddFoodSheet(vm: DiaryViewModel, initialMeal: MealType? = null, autoOpenScan
                 )
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(NutriSpacing.xxxl))
         }
     }
 }
-
-// ── Search Tab (existing logic) ───────────────────────────────────────────────
 
 @Composable
 private fun SearchTab(
@@ -697,45 +774,64 @@ private fun SearchTab(
     val barcodeResult by vm.barcodeResult.collectAsState()
     val favoriteKeys = remember(favorites) { favorites.map { it.favoriteKey() }.toSet() }
 
-    // If barcode found, auto-select it
     LaunchedEffect(barcodeResult) {
         barcodeResult?.let { selectedFood = it; vm.clearBarcodeResult() }
     }
 
     if (selectedFood == null) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
             OutlinedTextField(
-                value = query, onValueChange = { query = it; vm.searchFood(it) },
-                label = { Text("Suchen…") },
+                value = query,
+                onValueChange = { query = it; vm.searchFood(it) },
+                label = { Text("Suchen\u2026") },
                 leadingIcon  = { Icon(Icons.Default.Search, null) },
                 trailingIcon = { if (searching) CircularProgressIndicator(Modifier.size(20.dp)) },
-                modifier = Modifier.weight(1f), singleLine = true
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                shape = RoundedCornerShape(NutriRadius.md)
             )
-            IconButton(onClick = onOpenScanner,
-                modifier = Modifier.align(Alignment.CenterVertically).size(56.dp)) {
-                Icon(Icons.Default.QrCodeScanner, "Barcode",
-                    Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
+            IconButton(
+                onClick = onOpenScanner,
+                modifier = Modifier
+                    .align(Alignment.CenterVertically)
+                    .size(56.dp)
+            ) {
+                Icon(
+                    Icons.Default.QrCodeScanner, "Barcode",
+                    Modifier.size(28.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
             }
         }
 
         if (barcodeStatus.isNotBlank()) {
-            Text(barcodeStatus, fontSize = 13.sp,
+            Text(
+                barcodeStatus,
+                fontSize = 13.sp,
                 color = if ("nicht gefunden" in barcodeStatus)
                     MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = 4.dp))
+                modifier = Modifier.padding(top = NutriSpacing.xs)
+            )
         }
 
         if (query.isBlank() && favorites.isNotEmpty()) {
-            Text("⭐ Favoriten", fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
-                modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+            Text(
+                "\u2B50 Favoriten",
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(top = NutriSpacing.md, bottom = NutriSpacing.xs)
+            )
             LazyColumn(Modifier.heightIn(max = 220.dp)) {
                 items(favorites, key = { it.favoriteKey() }) { food ->
                     FoodResultRow(
                         food     = food,
                         onClick  = { selectedFood = food },
                         leading  = {
-                            Icon(Icons.Default.Star, null, tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp))
+                            Icon(
+                                Icons.Default.Star, null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     )
                     HorizontalDivider()
@@ -744,9 +840,12 @@ private fun SearchTab(
         }
 
         if (results.isEmpty() && query.length > 1 && !searching) {
-            Text("Keine Treffer", fontSize = 13.sp,
+            Text(
+                "Keine Treffer",
+                fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 8.dp))
+                modifier = Modifier.padding(vertical = NutriSpacing.sm)
+            )
         }
 
         LazyColumn(Modifier.heightIn(max = 300.dp)) {
@@ -756,12 +855,15 @@ private fun SearchTab(
                     food     = food,
                     onClick  = { selectedFood = food },
                     trailingAction = {
-                        IconButton(onClick = { vm.toggleFavorite(food) }, modifier = Modifier.size(36.dp)) {
+                        IconButton(
+                            onClick = { vm.toggleFavorite(food) },
+                            modifier = Modifier.size(36.dp)
+                        ) {
                             Icon(
                                 if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                 null,
                                 tint = if (isFav) MaterialTheme.colorScheme.error
-                                       else MaterialTheme.colorScheme.onSurfaceVariant,
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -773,28 +875,40 @@ private fun SearchTab(
     } else {
         val food  = selectedFood!!
         val isFav = food.favoriteKey() in favoriteKeys
-        Row(Modifier.fillMaxWidth(),
+        Row(
+            Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment     = Alignment.Top) {
+            verticalAlignment     = Alignment.Top
+        ) {
             Column(Modifier.weight(1f)) {
-                Text(food.name, fontWeight = FontWeight.Bold, fontSize = 16.sp,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis)
-                food.brand?.let { Text(it, fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                Text(
+                    food.name,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                food.brand?.let {
+                    Text(
+                        it,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             IconButton(onClick = { vm.toggleFavorite(food) }) {
                 Icon(
                     if (isFav) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null,
                     tint = if (isFav) MaterialTheme.colorScheme.error
-                           else MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(NutriSpacing.md))
         val presets = remember(food) { ch.nutrisnap.app.domain.FoodPortionPresets.forFood(food) }
         if (presets.isNotEmpty()) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm),
                 modifier = Modifier.horizontalScroll(rememberScrollState())
             ) {
                 presets.forEach { preset ->
@@ -805,32 +919,40 @@ private fun SearchTab(
                     )
                 }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(NutriSpacing.sm))
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
             OutlinedTextField(
-                value = amountText, onValueChange = { amountText = it },
+                value = amountText,
+                onValueChange = { amountText = it },
                 label = { Text("Menge (g)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.weight(1f), singleLine = true
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                shape = RoundedCornerShape(NutriRadius.md)
             )
             MealPicker(selected = selectedMeal) { selectedMeal = it }
         }
         val grams = amountText.toFloatOrNull() ?: 0f
         if (grams > 0) {
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("${(food.calories * grams / 100f).toInt()} kcal",
+            Spacer(Modifier.height(NutriSpacing.sm))
+            Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.lg)) {
+                Text(
+                    "${(food.calories * grams / 100f).toInt()} kcal",
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary)
-                Text("P ${(food.protein * grams / 100f).toInt()}g", fontSize = 13.sp)
-                Text("K ${(food.carbs * grams / 100f).toInt()}g", fontSize = 13.sp)
-                Text("F ${(food.fat * grams / 100f).toInt()}g", fontSize = 13.sp)
+                    color = MacroColors.calories
+                )
+                Text("P ${(food.protein * grams / 100f).toInt()}g", fontSize = 13.sp, color = MacroColors.protein)
+                Text("K ${(food.carbs * grams / 100f).toInt()}g", fontSize = 13.sp, color = MacroColors.carbs)
+                Text("F ${(food.fat * grams / 100f).toInt()}g", fontSize = 13.sp, color = MacroColors.fat)
             }
         }
-        Spacer(Modifier.height(16.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { selectedFood = null }, Modifier.weight(1f)) {
+        Spacer(Modifier.height(NutriSpacing.lg))
+        Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
+            OutlinedButton(
+                onClick = { selectedFood = null },
+                modifier = Modifier.weight(1f)
+            ) {
                 Text("Zurück")
             }
             Button(
@@ -841,7 +963,8 @@ private fun SearchTab(
                         else { vm.addEntry(food, grams, selectedMeal); onDismiss() }
                     }
                 },
-                modifier = Modifier.weight(1f), enabled = grams > 0
+                modifier = Modifier.weight(1f),
+                enabled = grams > 0
             ) { Text("Hinzufügen") }
         }
         portionWarning?.let { warning ->
@@ -864,8 +987,6 @@ private fun SearchTab(
     }
 }
 
-// ── Manual Entry Tab ──────────────────────────────────────────────────────────
-
 @Composable
 private fun ManualEntryTab(
     initialMeal: MealType? = null,
@@ -885,54 +1006,66 @@ private fun ManualEntryTab(
     val fat     = fatText.toFloatOrNull() ?: 0f
     val isValid = name.isNotBlank() && kcal > 0f
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(NutriSpacing.md)) {
         OutlinedTextField(
             value = name, onValueChange = { name = it },
             label = { Text("Name (z.B. Müesli mit Früchten)") },
-            modifier = Modifier.fillMaxWidth(), singleLine = true
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            shape = RoundedCornerShape(NutriRadius.md)
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
             OutlinedTextField(
                 value = kcalText, onValueChange = { kcalText = it },
                 label = { Text("kcal *") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.weight(1f), singleLine = true
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                shape = RoundedCornerShape(NutriRadius.md)
             )
             MealPicker(selected = selectedMeal) { selectedMeal = it }
         }
 
-        Text("Makros (optional)", fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "Makros (optional)",
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
             OutlinedTextField(
                 value = proteinText, onValueChange = { proteinText = it },
                 label = { Text("Protein g") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.weight(1f), singleLine = true
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                shape = RoundedCornerShape(NutriRadius.md)
             )
             OutlinedTextField(
                 value = carbsText, onValueChange = { carbsText = it },
                 label = { Text("Kohlenhydrate g") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.weight(1f), singleLine = true
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                shape = RoundedCornerShape(NutriRadius.md)
             )
             OutlinedTextField(
                 value = fatText, onValueChange = { fatText = it },
                 label = { Text("Fett g") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.weight(1f), singleLine = true
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                shape = RoundedCornerShape(NutriRadius.md)
             )
         }
 
         if (isValid) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("${ kcal.toInt()} kcal", fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary)
-                if (protein > 0) Text("P ${protein.toInt()}g", fontSize = 12.sp)
-                if (carbs > 0)   Text("K ${carbs.toInt()}g", fontSize = 12.sp)
-                if (fat > 0)     Text("F ${fat.toInt()}g", fontSize = 12.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.lg)) {
+                Text("${kcal.toInt()} kcal", fontWeight = FontWeight.SemiBold, color = MacroColors.calories)
+                if (protein > 0) Text("P ${protein.toInt()}g", fontSize = 12.sp, color = MacroColors.protein)
+                if (carbs > 0)   Text("K ${carbs.toInt()}g", fontSize = 12.sp, color = MacroColors.carbs)
+                if (fat > 0)     Text("F ${fat.toInt()}g", fontSize = 12.sp, color = MacroColors.fat)
             }
         }
 
@@ -948,7 +1081,7 @@ private fun ManualEntryTab(
             enabled  = isValid
         ) {
             Icon(Icons.Default.Add, null, Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(NutriSpacing.sm))
             Text("Manuell hinzufügen")
         }
         manualWarning?.let { warning ->
@@ -970,45 +1103,62 @@ private fun ManualEntryTab(
     }
 }
 
-/**
- * Kompakte Ergebnis-Zeile: Icon links, Titel/Subtitel gestapelt, kcal-Wert +
- * optionale Trailing-Action rechts. Gemeinsam genutzt von Favoriten- und Suchliste.
- */
 @Composable
 private fun FoodResultRow(
     food: FoodItem,
     onClick: () -> Unit,
     leading: @Composable () -> Unit = {
         Box(
-            Modifier.size(32.dp).clip(RoundedCornerShape(8.dp))
+            Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(NutriRadius.sm))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
-            Text(food.name.firstOrNull()?.uppercase() ?: "?", fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                food.name.firstOrNull()?.uppercase() ?: "?",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     },
     trailingAction: (@Composable () -> Unit)? = null
 ) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 6.dp, horizontal = 4.dp),
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = NutriSpacing.sm, horizontal = NutriSpacing.xs),
         verticalAlignment = Alignment.CenterVertically
     ) {
         leading()
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(NutriSpacing.md))
         Column(Modifier.weight(1f)) {
-            Text(food.name, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(food.brand ?: "${food.calories.toInt()} kcal/100g", fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                food.name,
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                food.brand ?: "${food.calories.toInt()} kcal/100g",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
-        Spacer(Modifier.width(8.dp))
-        Text("${food.calories.toInt()} kcal", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(NutriSpacing.sm))
+        Text(
+            "${food.calories.toInt()} kcal",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MacroColors.calories
+        )
         trailingAction?.invoke()
     }
 }
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 @Composable
 private fun MealPicker(selected: MealType, onSelect: (MealType) -> Unit) {

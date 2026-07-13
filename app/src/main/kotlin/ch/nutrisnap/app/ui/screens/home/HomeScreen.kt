@@ -1,8 +1,10 @@
 package ch.nutrisnap.app.ui.screens.home
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -21,10 +23,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import ch.nutrisnap.app.data.model.HealthConnectCache
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.ui.components.MacroRing
-import ch.nutrisnap.app.ui.theme.LocalAppTheme
+import ch.nutrisnap.app.ui.theme.*
 import ch.nutrisnap.app.ui.viewmodel.HealthConnectViewModel
 
 @Composable
@@ -42,15 +43,28 @@ fun HomeScreen(
     var showQuickAdd by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
-        LazyColumnHome(
-            state = state,
-            todayHc = hcState.todayData,
-            hasHcPermission = hcState.hasPermission,
-            onMealClick = { meal -> onNavigateToDiary(meal.type, meal.count == 0) },
-            onMealQuickAdd = { meal -> onNavigateToDiary(meal.type, true) },
-            onLogWeight = { showWeightDialog = true },
-            onOpenHealth = onNavigateToHealth
-        )
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 100.dp)
+        ) {
+            item { HomeHeader(state) }
+            item {
+                MealOverviewGrid(
+                    state.meals,
+                    onClick = { meal -> onNavigateToDiary(meal.type, meal.count == 0) },
+                    onQuickAdd = { meal -> onNavigateToDiary(meal.type, true) }
+                )
+            }
+            item {
+                QuickActionsRow(
+                    onScan = onNavigateToFoodScan,
+                    onRecipeImport = onNavigateToRecipeImport
+                )
+            }
+            item { HealthCard(hcState.todayData, hcState.hasPermission, onNavigateToHealth) }
+            item { StreakCard(state.streak) }
+            item { WeightQuickCard(state.lastWeightKg, state.previousWeightKg) { showWeightDialog = true } }
+        }
 
         QuickAddFab(
             expanded = showQuickAdd,
@@ -58,7 +72,9 @@ fun HomeScreen(
             onAddFood = { showQuickAdd = false; onNavigateToDiary(null, true) },
             onScanFood = { showQuickAdd = false; onNavigateToFoodScan() },
             onImportRecipe = { showQuickAdd = false; onNavigateToRecipeImport() },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(NutriSpacing.lg)
         )
     }
 
@@ -70,10 +86,6 @@ fun HomeScreen(
         )
     }
 }
-
-// ── Quick-add speed-dial FAB ───────────────────────────────────────────────────
-// Bündelt die häufigsten Aktionen (Essen loggen, scannen, Rezept-Import) direkt
-// auf dem Home-Screen, statt sie unter "Mehr" zu verstecken.
 
 @Composable
 private fun QuickAddFab(
@@ -87,14 +99,21 @@ private fun QuickAddFab(
     Column(modifier, horizontalAlignment = Alignment.End) {
         if (expanded) {
             QuickAddAction("Rezept importieren", Icons.Default.Link, onImportRecipe)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(NutriSpacing.sm))
             QuickAddAction("Essen scannen", Icons.Default.PhotoCamera, onScanFood)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(NutriSpacing.sm))
             QuickAddAction("Essen hinzufügen", Icons.Default.Restaurant, onAddFood)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(NutriSpacing.md))
         }
-        FloatingActionButton(onClick = onToggle) {
-            Icon(if (expanded) Icons.Default.Close else Icons.Default.Add, "Schnellaktionen")
+        FloatingActionButton(
+            onClick = onToggle,
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary
+        ) {
+            Icon(
+                if (expanded) Icons.Default.Close else Icons.Default.Add,
+                "Schnellaktionen"
+            )
         }
     }
 }
@@ -103,108 +122,162 @@ private fun QuickAddFab(
 private fun QuickAddAction(label: String, icon: ImageVector, onClick: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Card(
-            shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            shape = RoundedCornerShape(NutriRadius.sm),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(4.dp)
         ) {
-            Text(label, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+            Text(
+                label,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(horizontal = NutriSpacing.md, vertical = NutriSpacing.sm)
+            )
         }
-        Spacer(Modifier.width(8.dp))
-        SmallFloatingActionButton(onClick = onClick) { Icon(icon, label) }
+        Spacer(Modifier.width(NutriSpacing.sm))
+        SmallFloatingActionButton(
+            onClick = onClick,
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ) {
+            Icon(icon, label, modifier = Modifier.size(18.dp))
+        }
     }
 }
 
 @Composable
-private fun LazyColumnHome(
-    state: HomeUiState,
-    todayHc: HealthConnectCache?,
-    hasHcPermission: Boolean,
-    onMealClick: (MealOverview) -> Unit,
-    onMealQuickAdd: (MealOverview) -> Unit,
-    onLogWeight: () -> Unit,
-    onOpenHealth: () -> Unit
-) {
-    androidx.compose.foundation.lazy.LazyColumn(
-        Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 24.dp)
+private fun QuickActionsRow(onScan: () -> Unit, onRecipeImport: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
     ) {
-        item { HomeHeader(state) }
-        item { MealOverviewGrid(state.meals, onClick = onMealClick, onQuickAdd = onMealQuickAdd) }
-        item { HealthCard(todayHc, hasHcPermission, onOpenHealth) }
-        item { StreakCard(state.streak) }
-        item { WeightQuickCard(state.lastWeightKg, state.previousWeightKg, onLogWeight) }
+        QuickActionCard(
+            icon = Icons.Default.QrCodeScanner,
+            label = "Scannen",
+            color = MacroColors.protein,
+            onClick = onScan,
+            modifier = Modifier.weight(1f)
+        )
+        QuickActionCard(
+            icon = Icons.Default.Link,
+            label = "Rezept-Import",
+            color = MacroColors.carbs,
+            onClick = onRecipeImport,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
-// ── Health Connect summary card ───────────────────────────────────────────────
+@Composable
+private fun QuickActionCard(
+    icon: ImageVector,
+    label: String,
+    color: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(NutriRadius.md),
+        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f))
+    ) {
+        Row(
+            Modifier.padding(NutriSpacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
+        ) {
+            Icon(
+                icon, null,
+                tint = color,
+                modifier = Modifier.size(20.dp)
+            )
+            Text(
+                label,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = color
+            )
+        }
+    }
+}
 
 @Composable
 private fun HealthCard(
-    data: HealthConnectCache?,
+    data: ch.nutrisnap.app.data.model.HealthConnectCache?,
     hasPermission: Boolean,
     onOpenHealth: () -> Unit
 ) {
     Card(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs)
             .clickable(onClick = onOpenHealth),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(NutriRadius.lg),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(1.dp)
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(NutriSpacing.lg)) {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Favorite, null,
-                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Health Connect", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Icon(
+                        Icons.Default.Favorite, null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(NutriSpacing.sm))
+                    Text(
+                        "Health Connect",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp
+                    )
                 }
-                Icon(Icons.Default.ChevronRight, null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                Icon(
+                    Icons.Default.ChevronRight, null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(NutriSpacing.md))
 
             if (!hasPermission || data == null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Info, null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Tippe um Health Connect zu verbinden",
-                        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(
+                        Icons.Default.Info, null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(NutriSpacing.sm))
+                    Text(
+                        "Tippe um Health Connect zu verbinden",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             } else {
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceAround
                 ) {
+                    HealthStatItem(icon = "\uD83D\uDC63", value = "%,d".format(data.steps), label = "Schritte")
                     HealthStatItem(
-                        icon = "👟",
-                        value = "%,d".format(data.steps),
-                        label = "Schritte"
-                    )
-                    HealthStatItem(
-                        icon = "🔥",
+                        icon = "\uD83D\uDD25",
                         value = data.activeCaloriesKcal?.let { "${it.toInt()} kcal" } ?: "–",
                         label = "Verbrannt"
                     )
                     if (data.sleepMinutes > 0) {
                         val h = data.sleepMinutes / 60
                         val m = data.sleepMinutes % 60
-                        HealthStatItem(
-                            icon = "😴",
-                            value = "${h}h ${m}m",
-                            label = "Schlaf"
-                        )
+                        HealthStatItem(icon = "\uD83D\uDE34", value = "${h}h ${m}m", label = "Schlaf")
                     }
                     if (data.weightKg != null) {
                         HealthStatItem(
-                            icon = "⚖️",
+                            icon = "\u2696\uFE0F",
                             value = "%.1f kg".format(data.weightKg),
                             label = "Gewicht"
                         )
@@ -218,80 +291,113 @@ private fun HealthCard(
 @Composable
 private fun HealthStatItem(icon: String, value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(icon, fontSize = 22.sp)
+        Text(icon, fontSize = 20.sp)
         Spacer(Modifier.height(2.dp))
-        Text(value, fontWeight = FontWeight.Bold, fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.primary)
-        Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            value,
+            fontWeight = FontWeight.Bold,
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            label,
+            fontSize = 10.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
-// ── Header with calorie ring + macro bars ─────────────────────────────────────
-
 @Composable
 private fun HomeHeader(state: HomeUiState) {
-    // Feste, mode-unabhängige Theme-Farben statt colorScheme.primary/onPrimaryContainer:
-    // Diese Material3-Rollen vertauschen ihre Helligkeit zwischen Light- und Dark-Scheme
-    // (siehe Theme.kt), wodurch der Gradient im Dark-Mode fast einfarbig hell würde und
-    // die fest weiße Schrift dieses Headers unlesbar machte.
     val appTheme = LocalAppTheme.current
     Column(
         Modifier
             .fillMaxWidth()
             .background(
-                Brush.linearGradient(
+                Brush.verticalGradient(
                     listOf(appTheme.primary, appTheme.primaryDark)
                 )
             )
-            .padding(20.dp, 24.dp, 20.dp, 28.dp)
+            .padding(horizontal = NutriSpacing.xl, vertical = NutriSpacing.xxl)
+            .statusBarsPadding()
     ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
             Column {
-                Text("${state.greeting} 👋", fontSize = 13.sp, color = Color.White.copy(alpha = 0.85f))
-                Text("Dein Tag im Überblick", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(
+                    "${state.greeting} \uD83D\uDC4B",
+                    fontSize = 14.sp,
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    "Dein Tag im Überblick",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
                 if (state.isAdaptiveTarget) {
+                    Spacer(Modifier.height(NutriSpacing.xs))
                     Text(
-                        "🎯 Adaptives Ziel · ${state.tdeeConfidence}% Konfidenz",
-                        fontSize = 11.sp, color = Color.White.copy(alpha = 0.75f)
+                        "\uD83C\uDFAF Adaptives Ziel \u00B7 ${state.tdeeConfidence}% Konfidenz",
+                        fontSize = 12.sp,
+                        color = Color.White.copy(alpha = 0.75f)
                     )
                 }
             }
             StreakBadge(state.streak)
         }
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(NutriSpacing.xxl))
 
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(NutriSpacing.xl)
+        ) {
             MacroRing(
-                eaten = state.totalCalories, goal = state.adjustedGoal,
-                size = 110.dp, strokeWidth = 9.dp,
-                trackColor = Color.White.copy(alpha = 0.25f),
+                eaten = state.totalCalories,
+                goal = state.adjustedGoal,
+                size = 120.dp,
+                strokeWidth = 10.dp,
+                trackColor = Color.White.copy(alpha = 0.2f),
                 progressColor = Color.White,
                 overflowColor = Color(0xFFFFD67A)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         "${state.remaining.toInt()}",
-                        fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
                     )
-                    Text("kcal übrig", fontSize = 10.sp, color = Color.White.copy(alpha = 0.8f))
+                    Text(
+                        "kcal übrig",
+                        fontSize = 11.sp,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
                 }
             }
 
             Column(Modifier.weight(1f)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
                     LabeledValue("${state.totalCalories.toInt()}", "gegessen")
                     if (state.burnedKcal > 0f) {
                         LabeledValue("+${state.burnedKcal.toInt()}", "aktiv")
                     }
                     LabeledValue("${state.adjustedGoal.toInt()}", "Ziel")
                 }
-                Spacer(Modifier.height(10.dp))
-                WhiteMacroBar("Protein",  state.totalProtein, state.proteinGoal)
-                Spacer(Modifier.height(6.dp))
-                WhiteMacroBar("Kohlenh.", state.totalCarbs,   state.carbsGoal)
-                Spacer(Modifier.height(6.dp))
-                WhiteMacroBar("Fett",     state.totalFat,     state.fatGoal)
+                Spacer(Modifier.height(NutriSpacing.md))
+                WhiteMacroBar("Protein", state.totalProtein, state.proteinGoal)
+                Spacer(Modifier.height(NutriSpacing.sm))
+                WhiteMacroBar("Kohlenh.", state.totalCarbs, state.carbsGoal)
+                Spacer(Modifier.height(NutriSpacing.sm))
+                WhiteMacroBar("Fett", state.totalFat, state.fatGoal)
             }
         }
     }
@@ -300,8 +406,17 @@ private fun HomeHeader(state: HomeUiState) {
 @Composable
 private fun LabeledValue(value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-        Text(label, fontSize = 10.sp, color = Color.White.copy(alpha = 0.7f))
+        Text(
+            value,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White
+        )
+        Text(
+            label,
+            fontSize = 10.sp,
+            color = Color.White.copy(alpha = 0.7f)
+        )
     }
 }
 
@@ -309,13 +424,37 @@ private fun LabeledValue(value: String, label: String) {
 private fun WhiteMacroBar(label: String, value: Float, goal: Float) {
     val pct = (value / goal.coerceAtLeast(1f)).coerceIn(0f, 1f)
     Column {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label, fontSize = 11.sp, color = Color.White.copy(alpha = 0.8f))
-            Text("${value.toInt()}g", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                label,
+                fontSize = 11.sp,
+                color = Color.White.copy(alpha = 0.8f)
+            )
+            Text(
+                "${value.toInt()}g",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White
+            )
         }
-        Spacer(Modifier.height(2.dp))
-        Box(Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.25f))) {
-            Box(Modifier.fillMaxWidth(pct).fillMaxHeight().clip(RoundedCornerShape(4.dp)).background(Color.White))
+        Spacer(Modifier.height(3.dp))
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(Color.White.copy(alpha = 0.2f))
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth(pct)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Color.White)
+            )
         }
     }
 }
@@ -325,143 +464,214 @@ private fun StreakBadge(streak: Int) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color.White.copy(alpha = 0.22f))
-            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(NutriRadius.xxl))
+            .background(Color.White.copy(alpha = 0.2f))
+            .padding(horizontal = NutriSpacing.md, vertical = NutriSpacing.xs)
     ) {
-        Text("🔥", fontSize = 16.sp)
-        Spacer(Modifier.width(4.dp))
-        Text("$streak", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("\uD83D\uDD25", fontSize = 16.sp)
+        Spacer(Modifier.width(NutriSpacing.xs))
+        Text(
+            "$streak",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White
+        )
     }
 }
 
-// ── Meal overview grid ─────────────────────────────────────────────────────────
-
 @Composable
-private fun MealOverviewGrid(meals: List<MealOverview>, onClick: (MealOverview) -> Unit, onQuickAdd: (MealOverview) -> Unit) {
-    Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+private fun MealOverviewGrid(
+    meals: List<MealOverview>,
+    onClick: (MealOverview) -> Unit,
+    onQuickAdd: (MealOverview) -> Unit
+) {
+    Column(
+        Modifier.padding(
+            horizontal = NutriSpacing.lg,
+            vertical = NutriSpacing.md
+        ),
+        verticalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
+    ) {
         for (rowMeals in meals.chunked(2)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
+            ) {
                 rowMeals.forEach { meal ->
-                    Box(Modifier.weight(1f)) {
-                        Card(
-                            modifier = Modifier.fillMaxWidth().clickable { onClick(meal) },
-                            shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(1.dp)
-                        ) {
-                            Column(Modifier.padding(14.dp)) {
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .animateContentSize()
+                            .clickable { onClick(meal) },
+                        shape = RoundedCornerShape(NutriRadius.lg),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(1.dp)
+                    ) {
+                        Box {
+                            Column(Modifier.padding(NutriSpacing.lg)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(
-                                        Modifier.size(28.dp).clip(RoundedCornerShape(8.dp))
-                                            .background(meal.color.copy(alpha = 0.15f)),
+                                        Modifier
+                                            .size(36.dp)
+                                            .clip(RoundedCornerShape(NutriRadius.sm))
+                                            .background(meal.color.copy(alpha = 0.12f)),
                                         contentAlignment = Alignment.Center
-                                    ) { Text(meal.icon, fontSize = 14.sp) }
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(meal.label, fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    ) {
+                                        Text(meal.icon, fontSize = 18.sp)
+                                    }
+                                    Spacer(Modifier.width(NutriSpacing.sm))
+                                    Text(
+                                        meal.label,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
-                                Spacer(Modifier.height(6.dp))
+                                Spacer(Modifier.height(NutriSpacing.sm))
                                 Text(
                                     "${meal.kcal.toInt()} kcal",
-                                    fontSize = 18.sp, fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.ExtraBold,
                                     color = if (meal.count > 0) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.outline
+                                    else MaterialTheme.colorScheme.outline
                                 )
                                 Text(
-                                    "${meal.count} Einträge",
-                                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    "${meal.count} ${if (meal.count == 1) "Eintrag" else "Einträge"}",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            // Quick-Add button
+                            Box(
+                                Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(NutriSpacing.sm)
+                                    .size(24.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary)
+                                    .clickable { onQuickAdd(meal) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    "Zu ${meal.label} hinzufügen",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(14.dp)
                                 )
                             }
                         }
-                        // Direkter Quick-Add: Karten-Klick öffnet Add-Sheet nur bei leerer Mahlzeit
-                        // (siehe onMealClick), dieser Button aber immer — für schnelles Nachtragen
-                        // auch wenn schon Einträge existieren.
-                        Box(
-                            Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(6.dp)
-                                .size(22.dp)
-                                .clip(CircleShape)
-                                .background(meal.color)
-                                .clickable { onQuickAdd(meal) },
-                            contentAlignment = Alignment.Center
-                        ) { Icon(Icons.Default.Add, "Zu ${meal.label} hinzufügen", tint = Color.White, modifier = Modifier.size(14.dp)) }
                     }
                 }
                 if (rowMeals.size == 1) Spacer(Modifier.weight(1f))
             }
-            Spacer(Modifier.height(10.dp))
         }
     }
 }
-
-// ── Streak card ───────────────────────────────────────────────────────────────
 
 @Composable
 private fun StreakCard(streak: Int) {
     if (streak <= 0) return
     Card(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs),
+        shape = RoundedCornerShape(NutriRadius.lg),
+        colors = CardDefaults.cardColors(containerColor = MacroColors.fat.copy(alpha = 0.1f))
     ) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("🔥", fontSize = 32.sp)
-            Spacer(Modifier.width(14.dp))
+        Row(
+            Modifier.padding(NutriSpacing.lg),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(NutriRadius.md))
+                    .background(MacroColors.fat.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("\uD83D\uDD25", fontSize = 24.sp)
+            }
+            Spacer(Modifier.width(NutriSpacing.lg))
             Column {
-                Text("$streak-Tage-Streak!", fontWeight = FontWeight.Bold, fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer)
-                Text("Du bist auf einem guten Weg. Weiter so!", fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f))
+                Text(
+                    "$streak-Tage-Streak!",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    "Du bist auf einem guten Weg. Weiter so!",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
 }
 
-// ── Weight quick-entry card ───────────────────────────────────────────────────
-
 @Composable
-private fun WeightQuickCard(lastWeight: Float?, previousWeight: Float?, onLogWeight: () -> Unit) {
+private fun WeightQuickCard(
+    lastWeight: Float?,
+    previousWeight: Float?,
+    onLogWeight: () -> Unit
+) {
     Card(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(16.dp),
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs),
+        shape = RoundedCornerShape(NutriRadius.lg),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(1.dp)
     ) {
         Row(
-            Modifier.padding(16.dp).fillMaxWidth(),
+            Modifier
+                .padding(NutriSpacing.lg)
+                .fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("Aktuelles Gewicht", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                Text(
+                    "Aktuelles Gewicht",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp
+                )
+                Spacer(Modifier.height(NutriSpacing.xs))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        lastWeight?.let { "%.1f kg".format(it) } ?: "-",
-                        fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary
+                        lastWeight?.let { "%.1f kg".format(it) } ?: "–",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
                     )
                     val delta = if (lastWeight != null && previousWeight != null) lastWeight - previousWeight else null
                     if (delta != null && kotlin.math.abs(delta) >= 0.1f) {
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(NutriSpacing.sm))
                         val isUp = delta > 0
                         Text(
-                            "${if (isUp) "↑" else "↓"} %.1f kg".format(kotlin.math.abs(delta)),
-                            fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                            color = if (isUp) Color(0xFFE05555) else Color(0xFF2D7D46)
+                            "${if (isUp) "\u2191" else "\u2193"} %.1f kg".format(kotlin.math.abs(delta)),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isUp) MaterialTheme.colorScheme.error else MacroColors.calories
                         )
                     }
                 }
             }
-            FilledTonalButton(onClick = onLogWeight) { Text("Eintragen") }
+            FilledTonalButton(onClick = onLogWeight) {
+                Icon(Icons.Default.Edit, null, Modifier.size(16.dp))
+                Spacer(Modifier.width(NutriSpacing.xs))
+                Text("Eintragen")
+            }
         }
     }
 }
 
-// ── Weight entry dialog ───────────────────────────────────────────────────────
-
 @Composable
-private fun WeightEntryDialog(currentWeight: Float?, onConfirm: (Float) -> Unit, onDismiss: () -> Unit) {
+private fun WeightEntryDialog(
+    currentWeight: Float?,
+    onConfirm: (Float) -> Unit,
+    onDismiss: () -> Unit
+) {
     var text by remember { mutableStateOf(currentWeight?.let { "%.1f".format(it) } ?: "") }
 
     AlertDialog(
@@ -469,10 +679,12 @@ private fun WeightEntryDialog(currentWeight: Float?, onConfirm: (Float) -> Unit,
         title = { Text("Gewicht eintragen") },
         text = {
             OutlinedTextField(
-                value = text, onValueChange = { text = it },
+                value = text,
+                onValueChange = { text = it },
                 label = { Text("Gewicht (kg)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true, modifier = Modifier.fillMaxWidth()
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
             )
         },
         confirmButton = {
@@ -481,6 +693,8 @@ private fun WeightEntryDialog(currentWeight: Float?, onConfirm: (Float) -> Unit,
                 if (v != null && v > 0f) onConfirm(v)
             }) { Text("Speichern") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } }
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Abbrechen") }
+        }
     )
 }

@@ -1,22 +1,29 @@
 package ch.nutrisnap.app.ui.screens.stats
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.repository.DiaryRepository
 import ch.nutrisnap.app.data.repository.UserProfileRepository
+import ch.nutrisnap.app.ui.theme.MacroColors
+import ch.nutrisnap.app.ui.theme.NutriRadius
+import ch.nutrisnap.app.ui.theme.NutriSpacing
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -24,19 +31,6 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
-
-/**
- * NEU: Wochenstatistik-Screen (von Cronometer inspiriert).
- * Zeigt Kalorien-Balkendiagramm der letzten 7 Tage.
- *
- * KEINE externe Chart-Library nötig – reines Compose Canvas.
- *
- * EINBINDEN in Navigation:
- *   composable("stats") {
- *       val vm: WeeklyStatsViewModel = viewModel()
- *       WeeklyStatsScreen(viewModel = vm)
- *   }
- */
 
 data class DailyStats(
     val date: LocalDate,
@@ -93,7 +87,7 @@ fun WeeklyStatsScreen(viewModel: WeeklyStatsViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(NutriSpacing.lg)
     ) {
         Text(
             "Wochenübersicht",
@@ -101,33 +95,38 @@ fun WeeklyStatsScreen(viewModel: WeeklyStatsViewModel) {
             fontWeight = FontWeight.Bold
         )
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(NutriSpacing.xxl))
 
-        // Durchschnitt-Karte
         if (weeklyData.isNotEmpty()) {
             val avgCalories = weeklyData.filter { it.calories > 0 }.let {
                 if (it.isEmpty()) 0f else it.sumOf { d -> d.calories.toDouble() }.toFloat() / it.size
             }
             SummaryCard(avgCalories = avgCalories, goalCalories = calorieGoal)
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(NutriSpacing.lg))
         }
 
-        // Balkendiagramm
-        Text("Kalorien (letzte 7 Tage)", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(8.dp))
+        Text(
+            "Kalorien (letzte 7 Tage)",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(Modifier.height(NutriSpacing.sm))
         CaloriesBarChart(
             data = weeklyData,
             goalCalories = calorieGoal,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp)
+                .height(220.dp)
         )
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(NutriSpacing.xxl))
 
-        // Makro-Zusammenfassung Tabelle
-        Text("Makronährstoffe (Ø pro Tag)", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(8.dp))
+        Text(
+            "Makronährstoffe (\u00D8 pro Tag)",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(Modifier.height(NutriSpacing.sm))
         MacroSummaryTable(weeklyData = weeklyData)
     }
 }
@@ -140,7 +139,6 @@ private fun CaloriesBarChart(
 ) {
     val barColor = MaterialTheme.colorScheme.primary
     val goalColor = MaterialTheme.colorScheme.error
-    val textColor = MaterialTheme.colorScheme.onSurface
 
     Canvas(modifier = modifier) {
         if (data.isEmpty()) return@Canvas
@@ -173,7 +171,10 @@ private fun CaloriesBarChart(
     }
 
     // Wochentag-Labels
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
         data.forEach { day ->
             Text(
                 text = day.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.GERMAN),
@@ -187,39 +188,43 @@ private fun CaloriesBarChart(
 
 @Composable
 private fun SummaryCard(avgCalories: Float, goalCalories: Float) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(NutriRadius.lg),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(1.dp)
+    ) {
         Row(
-            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            modifier = Modifier
+                .padding(NutriSpacing.lg)
+                .fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Ø Kalorien", style = MaterialTheme.typography.labelSmall)
-                Text(
-                    "${avgCalories.toInt()} kcal",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Ziel", style = MaterialTheme.typography.labelSmall)
-                Text(
-                    "${goalCalories.toInt()} kcal",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                val diff = avgCalories - goalCalories
-                Text("Differenz", style = MaterialTheme.typography.labelSmall)
-                Text(
-                    "${if (diff >= 0) "+" else ""}${diff.toInt()} kcal",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = if (diff > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
-                )
-            }
+            SummaryItem("\u00D8 Kalorien", "${avgCalories.toInt()} kcal", MaterialTheme.colorScheme.onSurface)
+            SummaryItem("Ziel", "${goalCalories.toInt()} kcal", MacroColors.calories)
+            SummaryItem(
+                "Differenz",
+                "${if (avgCalories - goalCalories >= 0) "+" else ""}${(avgCalories - goalCalories).toInt()} kcal",
+                if (avgCalories > goalCalories) MaterialTheme.colorScheme.error else MacroColors.calories
+            )
         }
+    }
+}
+
+@Composable
+private fun SummaryItem(label: String, value: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = color
+        )
     }
 }
 
@@ -231,17 +236,35 @@ private fun MacroSummaryTable(weeklyData: List<DailyStats>) {
     val avgCarbs = activeDays.sumOf { it.carbs.toDouble() }.toFloat() / count
     val avgFat = activeDays.sumOf { it.fat.toDouble() }.toFloat() / count
 
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-        MacroChip("🥩 Protein", "${avgProtein.toInt()}g", MaterialTheme.colorScheme.primary)
-        MacroChip("🍞 Kohlenhydrate", "${avgCarbs.toInt()}g", MaterialTheme.colorScheme.secondary)
-        MacroChip("🧈 Fett", "${avgFat.toInt()}g", MaterialTheme.colorScheme.tertiary)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        MacroStat("\uD83E\uDD69 Protein", "${avgProtein.toInt()}g", MacroColors.protein)
+        MacroStat("\uD83C\uDF5E Kohlenhydrate", "${avgCarbs.toInt()}g", MacroColors.carbs)
+        MacroStat("\uD83E\uDDC8 Fett", "${avgFat.toInt()}g", MacroColors.fat)
     }
 }
 
 @Composable
-private fun MacroChip(label: String, value: String, color: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, style = MaterialTheme.typography.labelSmall)
-        Text(value, style = MaterialTheme.typography.titleMedium, color = color, fontWeight = FontWeight.Bold)
+private fun MacroStat(label: String, value: String, color: Color) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(NutriRadius.sm))
+            .background(color.copy(alpha = 0.1f))
+            .padding(horizontal = NutriSpacing.md, vertical = NutriSpacing.sm)
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = color.copy(alpha = 0.8f)
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.titleMedium,
+            color = color,
+            fontWeight = FontWeight.Bold
+        )
     }
 }

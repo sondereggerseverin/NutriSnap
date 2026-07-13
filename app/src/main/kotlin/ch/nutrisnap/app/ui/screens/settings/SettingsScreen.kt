@@ -28,23 +28,26 @@ import ch.nutrisnap.app.data.repository.Sex
 import ch.nutrisnap.app.data.repository.UserProfile
 import ch.nutrisnap.app.health.HealthConnectManager
 import ch.nutrisnap.app.health.HealthConnectStatus
+import ch.nutrisnap.app.ui.theme.MacroColors
+import ch.nutrisnap.app.ui.theme.NutriRadius
+import ch.nutrisnap.app.ui.theme.NutriSpacing
 import kotlinx.coroutines.launch
 import androidx.datastore.preferences.core.edit
 import ch.nutrisnap.app.ui.theme.AppTheme
 import ch.nutrisnap.app.ui.theme.KEY_APP_THEME
 
 enum class FitnessGoal(val label: String, val emoji: String, val desc: String) {
-    LOSE_WEIGHT("Abnehmen",        "🔥", "–500 kcal vom TDEE · mehr Protein"),
-    MAINTAIN(   "Halten",          "⚖️", "TDEE als Ziel · ausgewogene Makros"),
-    BUILD_MUSCLE("Muskeln",        "💪", "+250 kcal über TDEE · viel Protein"),
-    GAIN_WEIGHT( "Zunehmen",       "📈", "+500 kcal über TDEE"),
-    SPORT(       "Sport & Leistung","🏃", "TDEE+300 · hohe Kohlenhydrate"),
+    LOSE_WEIGHT("Abnehmen",        "\uD83D\uDD25", "–500 kcal vom TDEE · mehr Protein"),
+    MAINTAIN(   "Halten",          "\u2696\uFE0F", "TDEE als Ziel · ausgewogene Makros"),
+    BUILD_MUSCLE("Muskeln",        "\uD83D\uDCAA", "+250 kcal über TDEE · viel Protein"),
+    GAIN_WEIGHT( "Zunehmen",       "\uD83D\uDCC8", "+500 kcal über TDEE"),
+    SPORT(       "Sport & Leistung","\uD83C\uDFC3", "TDEE+300 · hohe Kohlenhydrate"),
 }
 
 private fun computeGoals(
     weightKg: Float, heightCm: Int, ageYears: Int,
     activityFactor: Float, goal: FitnessGoal, sex: Sex
-): Triple<Int, Float, Float> {   // kcal, protein, fat (carbs = rest)
+): Triple<Int, Float, Float> {
     if (weightKg <= 0 || heightCm <= 0 || ageYears <= 0) return Triple(2000, 120f, 65f)
     val base = 10f * weightKg + 6.25f * heightCm - 5f * ageYears
     val bmr  = when (sex) {
@@ -102,14 +105,12 @@ fun SettingsScreen(
     var selectedGoal by remember { mutableStateOf(FitnessGoal.MAINTAIN) }
     var showSaved   by remember { mutableStateOf(false) }
 
-    // Theme selection
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val prefs by context.notifDataStore.data.collectAsState(initial = null)
     val currentThemeName = prefs?.get(ch.nutrisnap.app.ui.theme.KEY_APP_THEME) ?: AppTheme.FOREST_GREEN.name
     val currentTheme = runCatching { AppTheme.valueOf(currentThemeName) }.getOrDefault(AppTheme.FOREST_GREEN)
 
-    // Auto-recalculate when body data or goal changes
     fun applyGoal() {
         val w = weightText.toFloatOrNull() ?: return
         val h = heightText.toIntOrNull()   ?: return
@@ -126,14 +127,13 @@ fun SettingsScreen(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.lg),
+        verticalArrangement = Arrangement.spacedBy(NutriSpacing.md)
     ) {
-        Text("Einstellungen", fontWeight = FontWeight.Bold, fontSize = 22.sp)
+        Text("Einstellungen", fontWeight = FontWeight.Bold, fontSize = 24.sp)
 
         // Theme Picker
         SettingsCard(title = "App-Design", icon = Icons.Default.Palette) {
-            Spacer(Modifier.height(4.dp))
             ThemePickerSection(
                 currentTheme = currentTheme,
                 onThemeSelected = { theme ->
@@ -144,76 +144,79 @@ fun SettingsScreen(
                     }
                 }
             )
-            Spacer(Modifier.height(4.dp))
         }
 
         // Feature-Shortcuts
         SettingsCard(title = "Features", icon = Icons.Default.Apps) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
                 OutlinedButton(onClick = onNavigateToStats, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.BarChart, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp)); Text("Statistik", fontSize = 12.sp)
+                    Spacer(Modifier.width(NutriSpacing.xs)); Text("Statistik", fontSize = 12.sp)
                 }
                 OutlinedButton(onClick = onNavigateToNotifSettings, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.Notifications, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp)); Text("Reminder", fontSize = 12.sp)
+                    Spacer(Modifier.width(NutriSpacing.xs)); Text("Reminder", fontSize = 12.sp)
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
                 OutlinedButton(onClick = onNavigateToMealOrder, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.DragHandle, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp)); Text("Reihenfolge", fontSize = 12.sp)
+                    Spacer(Modifier.width(NutriSpacing.xs)); Text("Reihenfolge", fontSize = 12.sp)
                 }
                 OutlinedButton(onClick = onNavigateToShoppingList, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.ShoppingCart, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp)); Text("Einkaufsliste", fontSize = 12.sp)
+                    Spacer(Modifier.width(NutriSpacing.xs)); Text("Einkaufsliste", fontSize = 12.sp)
                 }
             }
         }
 
-        // ── Daten & mehr ──────────────────────────────────────────────────────
+        // Daten & mehr
         SettingsCard(title = "Daten & mehr", icon = Icons.Default.Storage) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
                 OutlinedButton(onClick = onNavigateToCustomFoods, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.Restaurant, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp)); Text("Eigene", fontSize = 12.sp)
+                    Spacer(Modifier.width(NutriSpacing.xs)); Text("Eigene", fontSize = 12.sp)
                 }
                 OutlinedButton(onClick = onNavigateToMealTemplates, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.Bookmark, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp)); Text("Vorlagen", fontSize = 12.sp)
+                    Spacer(Modifier.width(NutriSpacing.xs)); Text("Vorlagen", fontSize = 12.sp)
                 }
             }
             Button(onClick = onNavigateToExport, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.Download, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp)); Text("Daten exportieren (CSV)")
+                Spacer(Modifier.width(NutriSpacing.sm)); Text("Daten exportieren (CSV)")
             }
             OutlinedButton(onClick = onNavigateToYazioImport, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.UploadFile, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp)); Text("Yazio-Daten importieren")
+                Spacer(Modifier.width(NutriSpacing.sm)); Text("Yazio-Daten importieren")
             }
             Button(onClick = onNavigateToScan, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.QrCodeScanner, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp)); Text("Scannen (Barcode, Foto, Etikett)")
+                Spacer(Modifier.width(NutriSpacing.sm)); Text("Scannen (Barcode, Foto, Etikett)")
             }
         }
 
-        // ── Ziel-Auswahl ──────────────────────────────────────────────────────
+        // Ziel-Auswahl
         SettingsCard(title = "Mein Ziel", icon = Icons.Default.Flag) {
-            Text("Was möchtest du erreichen?", fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(4.dp))
-            // 2x3 grid of goal chips
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "Was möchtest du erreichen?",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(NutriSpacing.sm))
+            Column(verticalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
                 FitnessGoal.entries.chunked(2).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
                         row.forEach { goal ->
                             val selected = goal == selectedGoal
                             FilterChip(
                                 selected = selected,
                                 onClick  = { selectedGoal = goal; applyGoal() },
                                 label = {
-                                    Row(verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(NutriSpacing.xs)
+                                    ) {
                                         Text(goal.emoji, fontSize = 14.sp)
                                         Text(goal.label, fontSize = 12.sp)
                                     }
@@ -229,22 +232,32 @@ fun SettingsScreen(
                     }
                 }
             }
-            Text(selectedGoal.desc, fontSize = 11.sp,
+            Text(
+                selectedGoal.desc,
+                fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = 4.dp))
+                modifier = Modifier.padding(top = NutriSpacing.xs)
+            )
         }
 
         // Health Connect
         HealthConnectCard()
 
-        // Samsung Health Data SDK (Tier 0 — direct read, bypasses Health Connect)
+        // Samsung Health Data SDK
         SamsungHealthCard()
 
-        // ── Körperdaten ───────────────────────────────────────────────────────
+        // Körperdaten
         SettingsCard(title = "Körperdaten", icon = Icons.Default.Person) {
-            Text("Geschlecht", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Text(
+                "Geschlecht",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(NutriSpacing.xs))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm),
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 val sexOptions = listOf(Sex.FEMALE to "Weiblich", Sex.MALE to "Männlich", Sex.UNSPECIFIED to "Keine Angabe")
                 sexOptions.forEach { (option, label) ->
                     FilterChip(
@@ -255,7 +268,7 @@ fun SettingsScreen(
                     )
                 }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(NutriSpacing.sm))
             GoalField("Gewicht (kg)",  weightText, KeyboardType.Number) {
                 weightText = it; applyGoal()
             }
@@ -267,33 +280,41 @@ fun SettingsScreen(
             }
         }
 
-        // ── Ernährungsziele (auto-filled) ─────────────────────────────────────
+        // Ernährungsziele
         SettingsCard(title = "Ernährungsziele", icon = Icons.Default.TrackChanges) {
-            Text("Automatisch berechnet – du kannst auch manuell anpassen.",
-                fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(4.dp))
+            Text(
+                "Automatisch berechnet – du kannst auch manuell anpassen.",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(NutriSpacing.xs))
             GoalField("Kalorienziel (kcal)",  calorieText, KeyboardType.Number) { calorieText = it }
             GoalField("Proteinziel (g)",      proteinText, KeyboardType.Number) { proteinText = it }
             GoalField("Kohlenhydratziel (g)", carbsText,   KeyboardType.Number) { carbsText   = it }
             GoalField("Fettziel (g)",         fatText,     KeyboardType.Number) { fatText     = it }
         }
 
-        // ── Aktivitätslevel ───────────────────────────────────────────────────
+        // Aktivitätslevel
         SettingsCard(title = "Aktivitätslevel", icon = Icons.Default.DirectionsRun) {
             ActivitySlider(value = activity) { activity = it; applyGoal() }
         }
 
-        // ── Küchengerät (für KI-Rezepte) ───────────────────────────────────────
+        // Küchengerät
         SettingsCard(title = "Backofen / Dampfgarer", icon = Icons.Default.Kitchen) {
-            Text("Optional: Modell hinterlegen, damit KI-Rezepte für Ofen/Dampfgarer echte Programme, Temperaturen und Zeiten deines Geräts nutzen.",
-                fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(4.dp))
-            GoalField("Gerätemodell (z.B. V-ZUG Combi-Steam SL CSTSLc)", applianceModelText, KeyboardType.Text) {
-                applianceModelText = it
-            }
+            Text(
+                "Optional: Modell hinterlegen, damit KI-Rezepte für Ofen/Dampfgarer echte Programme, Temperaturen und Zeiten deines Geräts nutzen.",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(NutriSpacing.xs))
+            GoalField(
+                "Gerätemodell (z.B. V-ZUG Combi-Steam SL CSTSLc)",
+                applianceModelText,
+                KeyboardType.Text
+            ) { applianceModelText = it }
         }
 
-        // ── TDEE Preview ──────────────────────────────────────────────────────
+        // TDEE Preview
         val previewProfile = UserProfile(
             weightKg       = weightText.toFloatOrNull() ?: profile.weightKg,
             heightCm       = heightText.toIntOrNull()   ?: profile.heightCm,
@@ -302,18 +323,35 @@ fun SettingsScreen(
             sex            = sex
         )
         previewProfile.computedTdee()?.let { tdee ->
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                Row(Modifier.fillMaxWidth().padding(14.dp),
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                shape = RoundedCornerShape(NutriRadius.lg)
+            ) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(NutriSpacing.lg),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically) {
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Column {
-                        Text("Dein Grundumsatz (TDEE)", fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer)
-                        Text("Basis für die Zielberechnung", fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                        Text(
+                            "Dein Grundumsatz (TDEE)",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            "Basis für die Zielberechnung",
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        )
                     }
-                    Text("${tdee.toInt()} kcal", fontWeight = FontWeight.Bold, fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        "${tdee.toInt()} kcal",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
         }
@@ -334,20 +372,24 @@ fun SettingsScreen(
                 ))
                 showSaved = true
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(NutriRadius.md)
         ) {
             Icon(Icons.Default.Save, null, Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(NutriSpacing.sm))
             Text("Speichern")
         }
 
         if (showSaved) {
             LaunchedEffect(Unit) { kotlinx.coroutines.delay(2000); showSaved = false }
-            Text("✓ Gespeichert", color = MaterialTheme.colorScheme.primary,
+            Text(
+                "\u2713 Gespeichert",
+                color = MacroColors.calories,
                 fontWeight = FontWeight.Medium,
-                modifier = Modifier.align(Alignment.CenterHorizontally))
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
         }
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(NutriSpacing.xxxl))
     }
 }
 
@@ -357,14 +399,25 @@ fun SettingsCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Card(Modifier.fillMaxWidth(),
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(NutriRadius.lg),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(2.dp)
+        elevation = CardDefaults.cardElevation(1.dp)
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(icon, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+        Column(
+            Modifier.padding(NutriSpacing.lg),
+            verticalArrangement = Arrangement.spacedBy(NutriSpacing.md)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
+            ) {
+                Icon(
+                    icon, null,
+                    Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
                 Text(title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
             }
             content()
@@ -373,11 +426,21 @@ fun SettingsCard(
 }
 
 @Composable
-fun GoalField(label: String, value: String, keyboardType: KeyboardType = KeyboardType.Number,
-              onValueChange: (String) -> Unit) {
-    OutlinedTextField(value = value, onValueChange = onValueChange, label = { Text(label) },
+fun GoalField(
+    label: String,
+    value: String,
+    keyboardType: KeyboardType = KeyboardType.Number,
+    onValueChange: (String) -> Unit
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-        modifier = Modifier.fillMaxWidth(), singleLine = true)
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        shape = RoundedCornerShape(NutriRadius.md)
+    )
 }
 
 @Composable
@@ -390,18 +453,28 @@ fun ActivitySlider(value: Float, onValueChange: (Float) -> Unit) {
         1.9f   to "Extrem aktiv (2x täglich)"
     )
     val currentLabel = levels.minByOrNull { kotlin.math.abs(it.first - value) }?.second ?: ""
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(currentLabel, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Slider(value = value, onValueChange = onValueChange,
-            valueRange = 1.2f..1.9f, steps = 3, modifier = Modifier.fillMaxWidth())
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Sitzend",    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Column(verticalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
+        Text(
+            currentLabel,
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = 1.2f..1.9f,
+            steps = 3,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("Sitzend", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("Sehr aktiv", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
-
-// ── Health Connect Card ────────────────────────────────────────────────────────
 
 @Composable
 fun HealthConnectCard() {
@@ -438,7 +511,7 @@ fun HealthConnectCard() {
                 )
             }
             HealthConnectStatus.NEEDS_UPDATE -> {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
                     Text(
                         "Health Connect muss aktualisiert werden.",
                         fontSize = 13.sp,
@@ -449,7 +522,7 @@ fun HealthConnectCard() {
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Default.Launch, null, Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.width(NutriSpacing.sm))
                         Text("Im Play Store aktualisieren")
                     }
                 }
@@ -463,14 +536,14 @@ fun HealthConnectCard() {
                     Column(Modifier.weight(1f)) {
                         Text(
                             text = when (permissionsGranted) {
-                                true  -> "✓ Verbunden"
+                                true  -> "\u2713 Verbunden"
                                 false -> "Nicht verbunden"
-                                null  -> "Wird geprüft…"
+                                null  -> "Wird geprüft\u2026"
                             },
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium,
                             color = when (permissionsGranted) {
-                                true  -> Color(0xFF2E7D32)
+                                true  -> MacroColors.calories
                                 else  -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
                         )
@@ -491,7 +564,8 @@ fun HealthConnectCard() {
                         ) {
                             if (isLoading) {
                                 CircularProgressIndicator(
-                                    Modifier.size(16.dp), strokeWidth = 2.dp,
+                                    Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
                                     color = MaterialTheme.colorScheme.onPrimary
                                 )
                             } else {
@@ -516,8 +590,6 @@ fun HealthConnectCard() {
     }
 }
 
-// ── Samsung Health Data SDK Card ───────────────────────────────────────────────
-
 @Composable
 fun SamsungHealthCard() {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -535,7 +607,7 @@ fun SamsungHealthCard() {
         }
     }
 
-    if (!supported) return // Android < 10: silently hide, Health Connect card covers this device.
+    if (!supported) return
 
     SettingsCard(title = "Samsung Health Data SDK", icon = Icons.Default.Favorite) {
         Row(
@@ -546,14 +618,14 @@ fun SamsungHealthCard() {
             Column(Modifier.weight(1f)) {
                 Text(
                     text = when (permissionsGranted) {
-                        true  -> "✓ Verbunden (direkte Aktivkalorien)"
+                        true  -> "\u2713 Verbunden (direkte Aktivkalorien)"
                         false -> "Nicht verbunden"
-                        null  -> "Wird geprüft…"
+                        null  -> "Wird geprüft\u2026"
                     },
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = when (permissionsGranted) {
-                        true  -> Color(0xFF2E7D32)
+                        true  -> MacroColors.calories
                         else  -> MaterialTheme.colorScheme.onSurfaceVariant
                     }
                 )
@@ -582,7 +654,8 @@ fun SamsungHealthCard() {
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(
-                            Modifier.size(16.dp), strokeWidth = 2.dp,
+                            Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
                             color = MaterialTheme.colorScheme.onPrimary
                         )
                     } else {
@@ -607,30 +680,21 @@ fun ThemePickerSection(
     currentTheme: AppTheme,
     onThemeSelected: (AppTheme) -> Unit
 ) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        Text("App-Design", fontWeight = FontWeight.Bold, fontSize = 15.sp,
-            modifier = Modifier.padding(bottom = 10.dp))
-        // Festes 4-Spalten-Grid statt horizontal scrollender Liste: bei 10 Themes
-        // war in der LazyRow nur der Beginn sichtbar, ohne Hinweis auf weitere,
-        // wodurch die restlichen Themes praktisch unauffindbar waren.
-        val columns = 4
-        AppTheme.entries.chunked(columns).forEach { rowThemes ->
-            Row(
-                Modifier.fillMaxWidth().padding(bottom = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                rowThemes.forEach { theme ->
-                    ThemeCard(
-                        theme = theme,
-                        isSelected = theme == currentTheme,
-                        onClick = { onThemeSelected(theme) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                // Letzte Reihe ggf. nicht voll: leere Slots halten die Kartenbreite
-                // konsistent mit den vollen Reihen statt sie zu strecken.
-                repeat(columns - rowThemes.size) { Spacer(Modifier.weight(1f)) }
+    val columns = 4
+    AppTheme.entries.chunked(columns).forEach { rowThemes ->
+        Row(
+            Modifier.fillMaxWidth().padding(bottom = NutriSpacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
+        ) {
+            rowThemes.forEach { theme ->
+                ThemeCard(
+                    theme = theme,
+                    isSelected = theme == currentTheme,
+                    onClick = { onThemeSelected(theme) },
+                    modifier = Modifier.weight(1f)
+                )
             }
+            repeat(columns - rowThemes.size) { Spacer(Modifier.weight(1f)) }
         }
     }
 }
@@ -644,34 +708,36 @@ private fun ThemeCard(
 ) {
     Card(
         modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(NutriRadius.md),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) theme.primaryLight else MaterialTheme.colorScheme.surface
         ),
-        border = if (isSelected) BorderStroke(2.dp, theme.primary) else null,
-        elevation = CardDefaults.cardElevation(if (isSelected) 4.dp else 1.dp)
+        border = if (isSelected) BorderStroke(2.dp, theme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        elevation = CardDefaults.cardElevation(if (isSelected) 4.dp else 0.dp)
     ) {
         Column(
-            Modifier.padding(vertical = 10.dp, horizontal = 4.dp).fillMaxWidth(),
+            Modifier
+                .padding(vertical = NutriSpacing.sm, horizontal = NutriSpacing.xs)
+                .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
-                Modifier.size(36.dp).clip(CircleShape).background(theme.primary),
+                Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(theme.primary),
                 contentAlignment = Alignment.Center
             ) {
-                Text(theme.emoji, fontSize = 16.sp)
+                Text(theme.emoji, fontSize = 14.sp)
             }
-            Spacer(Modifier.height(6.dp))
-            Text(theme.label.split(" ").first(), fontSize = 10.sp,
+            Spacer(Modifier.height(NutriSpacing.xs))
+            Text(
+                theme.label.split(" ").first(),
+                fontSize = 10.sp,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                 color = if (isSelected) theme.primaryDark else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
-            if (isSelected) {
-                Spacer(Modifier.height(2.dp))
-                Icon(Icons.Default.CheckCircle, null,
-                    tint = theme.primary, modifier = Modifier.size(14.dp))
-            }
         }
     }
 }

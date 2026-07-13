@@ -15,10 +15,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/**
- * Circular progress ring showing [eaten] vs [goal], with arbitrary
- * center content (e.g. "X kcal übrig").
- */
 @Composable
 fun MacroRing(
     eaten:         Float,
@@ -39,7 +35,10 @@ fun MacroRing(
         Canvas(modifier = Modifier.size(size)) {
             val strokePx = strokeWidth.toPx()
             val diameter = this.size.minDimension - strokePx
-            val topLeft  = Offset((this.size.width - diameter) / 2f, (this.size.height - diameter) / 2f)
+            val topLeft  = Offset(
+                (this.size.width - diameter) / 2f,
+                (this.size.height - diameter) / 2f
+            )
             val arcSize  = Size(diameter, diameter)
 
             // Track
