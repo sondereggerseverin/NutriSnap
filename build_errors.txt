@@ -1,4 +1,4 @@
-# Build errors - run 491
+# Build errors - run 492
 
 ## Error lines
 ```
@@ -65,23 +65,23 @@ WARNING: D8: An error occurred when parsing kotlin metadata. This normally happe
 WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
 WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
 WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
+WARNING: D8: An error occurred when parsing kotlin metadata. This normally happens when using a newer version of kotlin than the kotlin version released when this version of R8 was created. To find compatible kotlin versions, please see: https://developer.android.com/studio/build/kotlin-d8-r8-versions
 Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libbarhopper_v3.so, libdatastore_shared_counter.so, libimage_processing_util_jni.so. Run with --info option to learn more.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/components/Charts.kt:119:5 Unresolved reference 'Canvas'.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/components/Charts.kt:120:17 Unresolved reference 'size'.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/components/Charts.kt:121:17 Unresolved reference 'size'.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/components/Charts.kt:130:13 Unresolved reference 'drawLine'.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/components/Charts.kt:134:36 Unresolved reference 'toPx'.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/components/Charts.kt:142:13 Unresolved reference 'drawCircle'.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/components/Charts.kt:144:43 Unresolved reference 'toPx'.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/components/Charts.kt:144:60 Unresolved reference 'toPx'.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/components/Charts.kt:146:68 Unresolved reference 'toPx'.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/components/Components.kt:35:48 Unresolved reference 'defaultCardElevation'.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/diary/DiaryScreen.kt:416:79 Unresolved reference 'Color'.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/scan/ScanChooserScreen.kt:96:22 Unresolved reference 'clip'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/scan/ScanChooserScreen.kt:98:22 Unresolved reference 'background'.
 > Task :app:compileDebugKotlin FAILED
    > Compilation error. See log for more details
 Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilation error. See log for more details
-BUILD FAILED in 4m 30s
+BUILD FAILED in 4m 38s
 ```
 
 ## Last 150 lines
@@ -234,6 +234,6 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilat
 	... 2 more
 
 
-BUILD FAILED in 4m 30s
+BUILD FAILED in 4m 38s
 31 actionable tasks: 31 executed
 ```
