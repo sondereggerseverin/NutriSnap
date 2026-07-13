@@ -477,10 +477,11 @@ object RecipeNutritionAnalyzer {
     )
 
     /**
-     * Asks Groq to estimate per-100g macros for a batch of ingredient names that
+     * Asks LLM to estimate per-100g macros for a batch of ingredient names that
      * neither the local DB nor OpenFoodFacts could resolve. One request covers
      * the whole batch, returning a JSON object keyed by ingredient name so
      * results can be matched back up regardless of response order.
+     * Uses Gemini (primary) with Groq fallback.
      */
     private fun estimateViaAi(names: List<String>, apiKey: String): Map<String, AiNutritionEntry>? {
         val distinctNames = names.distinct().take(25) // sane upper bound per recipe
@@ -503,13 +504,32 @@ object RecipeNutritionAnalyzer {
             return zeros for all four values for that item — do not omit it.
         """.trimIndent()
 
+        val userMessage = "Ingredients:\n$listText"
+
+        // Primary: Gemini
+        if (GeminiService.isAvailable()) {
+            val geminiResult = kotlinx.coroutines.runBlocking {
+                GeminiService.generateText(
+                    prompt = userMessage,
+                    systemPrompt = systemPrompt,
+                    temperature = 0.2,
+                    maxTokens = 1200
+                )
+            }
+            if (geminiResult.isSuccess) {
+                val parsed = parseAiResponse(geminiResult.getOrThrow())
+                if (parsed != null) return parsed
+            }
+        }
+
+        // Fallback: Groq
         val payload = JSONObject().apply {
             put("model", "llama-3.1-8b-instant")
             put("temperature", 0.2)
             put("max_tokens", 1200)
             put("messages", JSONArray().apply {
                 put(JSONObject().apply { put("role", "system"); put("content", systemPrompt) })
-                put(JSONObject().apply { put("role", "user"); put("content", "Ingredients:\n$listText") })
+                put(JSONObject().apply { put("role", "user"); put("content", userMessage) })
             })
         }
 
@@ -530,11 +550,14 @@ object RecipeNutritionAnalyzer {
             ?.optJSONObject("message")?.optString("content")
             ?: return null
 
-        // Strip potential markdown code fences before parsing
+        return parseAiResponse(content)
+    }
+
+    private fun parseAiResponse(content: String): Map<String, AiNutritionEntry>? {
         val jsonText = content.trim()
             .removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
 
-        val items = JSONObject(jsonText).optJSONArray("items") ?: return null
+        val items = try { JSONObject(jsonText).optJSONArray("items") } catch (_: Exception) { null } ?: return null
         val map = mutableMapOf<String, AiNutritionEntry>()
         for (i in 0 until items.length()) {
             val obj  = items.getJSONObject(i)

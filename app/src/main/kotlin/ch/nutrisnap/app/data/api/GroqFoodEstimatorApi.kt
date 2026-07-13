@@ -4,7 +4,9 @@ import android.util.Log
 import ch.nutrisnap.app.BuildConfig
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.FoodSource
+import ch.nutrisnap.app.domain.GeminiService
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -17,7 +19,8 @@ import java.util.concurrent.TimeUnit
  * Letzter Fallback für die Lebensmittelsuche: wenn OpenFoodFacts (nur Markenprodukte
  * mit Barcode), USDA (nur Englisch) und die Schweizer Nährwertdatenbank kein Ergebnis
  * liefern — was bei einfachen deutschen Grundnahrungsmitteln ("Apfel", "Reis", "Ei")
- * häufig vorkommt — schätzt Groq/Llama die Standard-Nährwerte pro 100g.
+ * häufig vorkommt — schätzt das LLM die Standard-Nährwerte pro 100g.
+ * Nutzt primär Gemini (besseres Free-Tier), Fallback auf Groq/Llama.
  * Ergebnis ist klar als Schätzung markiert (Marke "KI-geschätzt") und wird NICHT
  * in die lokale DB gecacht, da es keine verifizierte Quelle ist.
  */
@@ -30,9 +33,6 @@ object GroqFoodEstimatorApi {
         .build()
 
     suspend fun estimate(query: String): FoodItem? = withContext(Dispatchers.IO) {
-        val apiKey = BuildConfig.GROQ_API_KEY
-        if (apiKey.isBlank()) return@withContext null
-
         runCatching {
             val prompt = """
                 Gib die durchschnittlichen Nährwerte pro 100g für das deutsche Lebensmittel
@@ -42,6 +42,25 @@ object GroqFoodEstimatorApi {
                  "fiber":0.0, "sugar":0.0, "salt":0.0}
                 Falls "$query" kein plausibles Lebensmittel ist, antworte mit {}
             """.trimIndent()
+
+            // Primary: Gemini
+            if (GeminiService.isAvailable()) {
+                val geminiResult = runBlocking {
+                    GeminiService.generateText(prompt = prompt, temperature = 0.2, maxTokens = 300)
+                }
+                if (geminiResult.isSuccess) {
+                    val content = geminiResult.getOrThrow()
+                        .trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+                    val data = JSONObject(content)
+                    if (data.has("calories")) {
+                        return@withContext buildFoodItem(data, query)
+                    }
+                }
+            }
+
+            // Fallback: Groq
+            val apiKey = BuildConfig.GROQ_API_KEY
+            if (apiKey.isBlank()) return@withContext null
 
             val requestJson = JSONObject().apply {
                 put("model", "llama-3.3-70b-versatile")
@@ -73,22 +92,26 @@ object GroqFoodEstimatorApi {
             val data = JSONObject(content)
             if (!data.has("calories")) return@withContext null
 
-            FoodItem(
-                name = data.optString("name", query).ifBlank { query },
-                brand = "KI-geschätzt",
-                calories = data.optDouble("calories", 0.0).toFloat(),
-                protein  = data.optDouble("protein", 0.0).toFloat(),
-                carbs    = data.optDouble("carbs", 0.0).toFloat(),
-                fat      = data.optDouble("fat", 0.0).toFloat(),
-                fiber    = data.optDouble("fiber", 0.0).toFloat().takeIf { it > 0f },
-                sugar    = data.optDouble("sugar", 0.0).toFloat().takeIf { it > 0f },
-                salt     = data.optDouble("salt", 0.0).toFloat().takeIf { it > 0f },
-                servingSize = 100f,
-                servingUnit = "g",
-                source = FoodSource.MANUAL,
-                completenessScore = 20 // niedrig gewichtet — nur Fallback, keine verifizierte Quelle
-            )
+            buildFoodItem(data, query)
         }.onFailure { e -> Log.w(TAG, "Schätzung für \"$query\" fehlgeschlagen: ${e.message}") }
             .getOrNull()
+    }
+
+    private fun buildFoodItem(data: JSONObject, query: String): FoodItem {
+        return FoodItem(
+            name = data.optString("name", query).ifBlank { query },
+            brand = "KI-geschätzt",
+            calories = data.optDouble("calories", 0.0).toFloat(),
+            protein  = data.optDouble("protein", 0.0).toFloat(),
+            carbs    = data.optDouble("carbs", 0.0).toFloat(),
+            fat      = data.optDouble("fat", 0.0).toFloat(),
+            fiber    = data.optDouble("fiber", 0.0).toFloat().takeIf { it > 0f },
+            sugar    = data.optDouble("sugar", 0.0).toFloat().takeIf { it > 0f },
+            salt     = data.optDouble("salt", 0.0).toFloat().takeIf { it > 0f },
+            servingSize = 100f,
+            servingUnit = "g",
+            source = FoodSource.MANUAL,
+            completenessScore = 20 // niedrig gewichtet — nur Fallback, keine verifizierte Quelle
+        )
     }
 }

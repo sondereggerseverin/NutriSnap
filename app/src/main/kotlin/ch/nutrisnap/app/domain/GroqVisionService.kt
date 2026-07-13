@@ -136,6 +136,23 @@ Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
     }
 
     private fun callVisionRaw(prompt: String, base64Jpeg: String): Result<String> {
+        // Primary: Gemini (besseres Free-Tier,1M Context)
+        if (GeminiService.isAvailable()) {
+            val geminiResult = GeminiService.generateVision(
+                prompt = prompt,
+                base64Jpeg = base64Jpeg,
+                temperature = 0.3,
+                maxTokens = 1000
+            )
+            if (geminiResult.isSuccess) return geminiResult
+            // Fallback to Groq if Gemini fails
+        }
+
+        // Fallback: Groq
+        return callGroqVision(prompt, base64Jpeg)
+    }
+
+    private fun callGroqVision(prompt: String, base64Jpeg: String): Result<String> {
         return try {
             val apiKey = BuildConfig.GROQ_API_KEY
             if (apiKey.isBlank()) return Result.failure(Exception(

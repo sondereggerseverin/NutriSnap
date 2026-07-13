@@ -20,6 +20,8 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "GROQ_API_KEY",
             "\"${System.getenv("GROQ_API_KEY") ?: ""}\""  )
+        buildConfigField("String", "GEMINI_API_KEY",
+            "\"${System.getenv("GEMINI_API_KEY") ?: ""}\""  )
         buildConfigField("String", "ZENMUX_API_KEY",
             "\"${System.getenv("ZENMUX_API_KEY") ?: ""}\""  )
         buildConfigField("String", "USDA_API_KEY",

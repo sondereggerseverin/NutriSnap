@@ -640,12 +640,12 @@ fun RecipeDetailSheet(
                     Column(Modifier.padding(12.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceBetween, verticalAlignment=Alignment.CenterVertically) {
                             Text("Portionen", fontWeight=FontWeight.SemiBold, fontSize=14.sp)
-                            Row(verticalAlignment=Alignment.CenterVertically, horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                                IconButton(onClick={if(servings>1)servings--}, Modifier.size(32.dp)) { Icon(Icons.Default.Remove,"-",Modifier.size(16.dp)) }
+                            Row(verticalAlignment=Alignment.CenterVertically, horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                                IconButton(onClick={if(servings>1)servings--}, Modifier.size(36.dp)) { Icon(Icons.Default.Remove,"-",Modifier.size(18.dp)) }
                                 Text("$servings", fontWeight=FontWeight.Bold, fontSize=18.sp,
-                                    modifier=Modifier.widthIn(min=28.dp),
+                                    modifier=Modifier.widthIn(min=32.dp),
                                     style=LocalTextStyle.current.copy(textAlign=TextAlign.Center))
-                                IconButton(onClick={servings++}, Modifier.size(32.dp)) { Icon(Icons.Default.Add,"+",Modifier.size(16.dp)) }
+                                IconButton(onClick={servings++}, Modifier.size(36.dp)) { Icon(Icons.Default.Add,"+",Modifier.size(18.dp)) }
                             }
                         }
                         Row(Modifier.fillMaxWidth().padding(top=8.dp), horizontalArrangement=Arrangement.SpaceBetween, verticalAlignment=Alignment.CenterVertically) {

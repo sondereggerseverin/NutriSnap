@@ -489,7 +489,28 @@ $JSON_SCHEMA_HINT
 
     private fun Float.roundToIntSafe(): Int = this.coerceAtLeast(0f).let { Math.round(it) }
 
-    /** Führt den eigentlichen Groq-Call aus und liefert den bereinigten JSON-String zurück. */
+    /** Führt den LLM-Call aus: primär Gemini, Fallback Groq. */
+    private fun callLlm(prompt: String, maxTokens: Int = 3000): Result<String> {
+        // Primary: Gemini
+        if (GeminiService.isAvailable()) {
+            val geminiResult = kotlinx.coroutines.runBlocking {
+                GeminiService.generateText(
+                    prompt = prompt,
+                    temperature = 0.7,
+                    maxTokens = maxTokens
+                )
+            }
+            if (geminiResult.isSuccess) {
+                val cleaned = geminiResult.getOrThrow().trim()
+                    .removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+                return Result.success(cleaned)
+            }
+        }
+
+        // Fallback: Groq
+        return callGroq(prompt, maxTokens)
+    }
+
     private fun callGroq(prompt: String, maxTokens: Int = 3000): Result<String> {
         return try {
             val apiKey = BuildConfig.GROQ_API_KEY
@@ -537,8 +558,8 @@ $JSON_SCHEMA_HINT
     }
 
     private fun tryProvider(prompt: String): Result<GeneratedRecipe> =
-        callGroq(prompt, maxTokens = 2000).mapCatching { json.decodeFromString<GeneratedRecipe>(it) }
+        callLlm(prompt, maxTokens = 2000).mapCatching { json.decodeFromString<GeneratedRecipe>(it) }
 
     private fun tryDayPlanProvider(prompt: String): Result<DayPlan> =
-        callGroq(prompt, maxTokens = 3000).mapCatching { json.decodeFromString<DayPlan>(it) }
+        callLlm(prompt, maxTokens = 3000).mapCatching { json.decodeFromString<DayPlan>(it) }
 }

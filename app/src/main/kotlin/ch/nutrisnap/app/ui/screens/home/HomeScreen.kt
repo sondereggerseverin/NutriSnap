@@ -546,7 +546,7 @@ private fun MealOverviewGrid(
                                 Modifier
                                     .align(Alignment.TopEnd)
                                     .padding(NutriSpacing.sm)
-                                    .size(24.dp)
+                                    .size(30.dp)
                                     .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.primary)
                                     .clickable { onQuickAdd(meal) },
@@ -556,7 +556,7 @@ private fun MealOverviewGrid(
                                     Icons.Default.Add,
                                     "Zu ${meal.label} hinzufügen",
                                     tint = Color.White,
-                                    modifier = Modifier.size(14.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         }

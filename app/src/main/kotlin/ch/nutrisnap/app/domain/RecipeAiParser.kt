@@ -2,6 +2,7 @@ package ch.nutrisnap.app.domain
 
 import ch.nutrisnap.app.data.model.Recipe
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -47,7 +48,7 @@ object RecipeAiParser {
         apiKey:    String
     ): Recipe = withContext(Dispatchers.IO) {
         val cleaned  = cleanCaption(caption)
-        val aiResult = runCatching { callGroq(cleaned, apiKey) }.getOrNull()
+        val aiResult = runCatching { callLlm(cleaned, apiKey) }.getOrNull()
         aiResult ?: fallbackParse(cleaned, sourceUrl, platform, imageUrl)
     }
 
@@ -99,7 +100,71 @@ object RecipeAiParser {
         }?.take(80) ?: fallback
     }
 
-    // ── Groq call ──────────────────────────────────────────────────────────────
+    // ── LLM call ──────────────────────────────────────────────────────────────
+
+    private fun callLlm(caption: String, apiKey: String): Recipe {
+        val systemPrompt = """
+You are a recipe extraction assistant. Extract structured recipe data from social media captions.
+Respond ONLY with valid JSON matching this exact schema — no markdown, no explanation:
+{
+  "title": "Clean recipe dish name (string)",
+  "description": "1-2 sentence description of the dish (string)",
+  "servings": 4,
+  "calories_per_serving": 548,
+  "protein_g": 51,
+  "carbs_g": 52,
+  "fat_g": 17,
+  "prep_time_minutes": null,
+  "ingredient_sections": [
+    {
+      "section_name": "Chipotle Chicken Marinade",
+      "items": ["1200g Raw Boneless Chicken Thighs", "2.5 Tsp Salt"]
+    }
+  ],
+  "instructions": "Step-by-step instructions as a single string. Use \\n between steps.",
+  "tags": "meal-prep,chicken,high-protein"
+}
+Rules:
+- title: Extract the DISH NAME ONLY. Rules in priority order:
+  1. If caption contains a line that IS clearly a food/dish name (e.g. "High Protein Pasta Salad", "Butter Chicken Burritos"), use that
+  2. If caption starts with descriptive text ("Wirklich ausgezeichnet...", "This is amazing..."), look for a dish name LATER in the caption near the ingredient list
+  3. NEVER use: likes/comments counts, usernames, dates, hashtags, promotional text, generic phrases like "Check this out"
+  4. If truly no dish name exists, construct one from the main ingredients (e.g. "Pasta Salat mit Thunfisch")
+- servings: extract the number of PORTIONS/SERVINGS this recipe makes. Look for "Makes X", "Ergibt X", "für X Personen", "X Portionen". If the caption says "Per Burrito" or "Per Serving" that means 1 serving in the macros. Default to 1 if unclear, NOT a random number.
+- ingredient_sections: group by section headers (e.g. "Marinade", "Sauce", "Topping"). Items separated by "-", "•", "*", or newlines. If no sections, use one section named "".
+- CRITICAL: Each ingredient item must be ONE ingredient only (e.g. "200g Hähnchenbrust"), NOT a full sentence or instruction.
+- calories_per_serving / protein_g / carbs_g / fat_g: extract PER SERVING values if mentioned, else null
+- instructions: numbered steps only, no ingredient lists. null if not present.
+- tags: comma-separated, max 5, lowercase
+- All numeric fields must be numbers (not strings), null if unknown
+- Ignore: "Comment X for...", "DM me for...", "Link in bio", hashtags, storage/heating tips unless they are actual steps
+        """.trimIndent()
+
+        val userMessage = "Extract recipe from this caption:\n\n$caption"
+
+        // Primary: Gemini (besseres Free-Tier,1M Context)
+        if (GeminiService.isAvailable()) {
+            val geminiResult = runCatching {
+                val response = kotlinx.coroutines.runBlocking {
+                    GeminiService.generateText(
+                        prompt = userMessage,
+                        systemPrompt = systemPrompt,
+                        temperature = 0.1,
+                        maxTokens = 2000
+                    )
+                }
+                val content = response.getOrThrow()
+                    .trim()
+                    .removePrefix("```json").removePrefix("```").removeSuffix("```")
+                    .trim()
+                parseLlmJson(JSONObject(content))
+            }
+            if (geminiResult.isSuccess) return geminiResult.getOrThrow()
+        }
+
+        // Fallback: Groq
+        return callGroq(caption, apiKey)
+    }
 
     private fun callGroq(caption: String, apiKey: String): Recipe {
         val systemPrompt = """
@@ -173,10 +238,10 @@ Rules:
             .removePrefix("```json").removePrefix("```").removeSuffix("```")
             .trim()
 
-        return parseGroqJson(JSONObject(content))
+        return parseLlmJson(JSONObject(content))
     }
 
-    private fun parseGroqJson(j: JSONObject): Recipe {
+    private fun parseLlmJson(j: JSONObject): Recipe {
         // Build ingredients string from sections
         val sectionsArr = j.optJSONArray("ingredient_sections")
         val ingredients = buildString {

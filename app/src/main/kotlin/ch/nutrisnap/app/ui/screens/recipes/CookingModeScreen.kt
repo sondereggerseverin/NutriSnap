@@ -134,16 +134,17 @@ fun CookingModeScreen(recipe: Recipe, onBack: () -> Unit) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             OutlinedIconButton(
                                 onClick = { if (servings > 1) servings-- },
-                                enabled = servings > 1
-                            ) { Icon(Icons.Default.Remove, "Weniger Portionen") }
+                                enabled = servings > 1,
+                                modifier = Modifier.size(40.dp)
+                            ) { Icon(Icons.Default.Remove, "Weniger Portionen", modifier = Modifier.size(20.dp)) }
                             Text(
                                 "$servings",
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 16.dp)
                             )
-                            OutlinedIconButton(onClick = { servings++ }) {
-                                Icon(Icons.Default.Add, "Mehr Portionen")
+                            OutlinedIconButton(onClick = { servings++ }, modifier = Modifier.size(40.dp)) {
+                                Icon(Icons.Default.Add, "Mehr Portionen", modifier = Modifier.size(20.dp))
                             }
                         }
                     }

@@ -1,4 +1,4 @@
-name: Build APK
+﻿name: Build APK
 on:
   push:
     branches: [ main ]
@@ -27,6 +27,8 @@ jobs:
       - name: Build Debug APK
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ZENMUX_API_KEY: ${{ secrets.ZENMUX_API_KEY }}
           USDA_API_KEY: ${{ secrets.USDA_API_KEY }}
           NUTRITIONIX_APP_ID: ${{ secrets.NUTRITIONIX_APP_ID }}
           NUTRITIONIX_API_KEY: ${{ secrets.NUTRITIONIX_API_KEY }}

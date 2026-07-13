@@ -526,13 +526,13 @@ private fun TagesplanInput(
         Text("Anzahl Mahlzeiten", fontWeight = FontWeight.Medium, fontSize = 13.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(6.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(verticalAlignment=Alignment.CenterVertically, horizontalArrangement=Arrangement.spacedBy(16.dp)) {
             FilledTonalIconButton(
                 onClick = { vm.setDayPlanMealCount(state.dayPlanMealCount - 1) },
                 enabled = state.dayPlanMealCount > 2
             ) { Icon(Icons.Default.Remove, null) }
             Text("${state.dayPlanMealCount}", fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                modifier = Modifier.width(24.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                modifier = Modifier.width(28.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             FilledTonalIconButton(
                 onClick = { vm.setDayPlanMealCount(state.dayPlanMealCount + 1) },
                 enabled = state.dayPlanMealCount < 6
@@ -1164,14 +1164,14 @@ private fun AddToDiarySheet(
 
             Text("Portionen", fontWeight = FontWeight.Medium)
             Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(verticalAlignment=Alignment.CenterVertically,
+                horizontalArrangement=Arrangement.spacedBy(16.dp)) {
                 FilledTonalIconButton(
                     onClick = { if (servings > 1) servings-- },
                     enabled = servings > 1
                 ) { Icon(Icons.Default.Remove, null) }
                 Text("$servings", fontSize = 22.sp, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.width(32.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    modifier = Modifier.width(36.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 FilledTonalIconButton(onClick = { if (servings < 10) servings++ }) {
                     Icon(Icons.Default.Add, null)
                 }

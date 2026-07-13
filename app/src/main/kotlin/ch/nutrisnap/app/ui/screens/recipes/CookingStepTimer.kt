@@ -119,12 +119,12 @@ fun CookingStepTimer(state: StepTimerState) {
                     OutlinedIconButton(onClick = {
                         val newVal = (state.totalSeconds - 60).coerceAtLeast(5)
                         state.totalSeconds = newVal; state.remainingSeconds = newVal
-                    }) { Icon(Icons.Default.Remove, "1 Min weniger") }
+                    }, modifier = Modifier.size(40.dp)) { Icon(Icons.Default.Remove, "1 Min weniger", modifier = Modifier.size(20.dp)) }
                     Spacer(Modifier.width(16.dp))
                     OutlinedIconButton(onClick = {
                         val newVal = state.totalSeconds + 60
                         state.totalSeconds = newVal; state.remainingSeconds = newVal
-                    }) { Icon(Icons.Default.Add, "1 Min mehr") }
+                    }, modifier = Modifier.size(40.dp)) { Icon(Icons.Default.Add, "1 Min mehr", modifier = Modifier.size(20.dp)) }
                 }
                 Spacer(Modifier.height(12.dp))
             }
