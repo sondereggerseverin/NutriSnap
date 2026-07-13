@@ -32,6 +32,8 @@ import ch.nutrisnap.app.ui.viewmodel.HealthConnectViewModel
 fun HomeScreen(
     vm: HomeViewModel = viewModel(),
     hcVm: HealthConnectViewModel = viewModel(),
+    quickAddExpanded: Boolean = false,
+    onQuickAddDismiss: () -> Unit = {},
     onNavigateToDiary: (meal: MealType?, autoOpenAdd: Boolean) -> Unit = { _, _ -> },
     onNavigateToHealth: () -> Unit = {},
     onNavigateToFoodScan: () -> Unit = {},
@@ -40,7 +42,6 @@ fun HomeScreen(
     val state by vm.uiState.collectAsState()
     val hcState by hcVm.uiState.collectAsState()
     var showWeightDialog by remember { mutableStateOf(false) }
-    var showQuickAdd by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
@@ -61,21 +62,22 @@ fun HomeScreen(
                     onRecipeImport = onNavigateToRecipeImport
                 )
             }
-            item { HealthCard(hcState.todayData, hcState.hasPermission, onNavigateToHealth) }
+            item { HealthCard(hcState.todayData, hcState.hasPermission, onNavigateToHealth) { showWeightDialog = true } }
             item { StreakCard(state.streak) }
-            item { WeightQuickCard(state.lastWeightKg, state.previousWeightKg) { showWeightDialog = true } }
         }
 
-        QuickAddFab(
-            expanded = showQuickAdd,
-            onToggle = { showQuickAdd = !showQuickAdd },
-            onAddFood = { showQuickAdd = false; onNavigateToDiary(null, true) },
-            onScanFood = { showQuickAdd = false; onNavigateToFoodScan() },
-            onImportRecipe = { showQuickAdd = false; onNavigateToRecipeImport() },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(NutriSpacing.lg)
-        )
+        // Quick Add Menu - shown when centered FAB is pressed
+        if (quickAddExpanded) {
+            QuickAddMenu(
+                onAddFood = { onQuickAddDismiss(); onNavigateToDiary(null, true) },
+                onScanFood = { onQuickAddDismiss(); onNavigateToFoodScan() },
+                onImportRecipe = { onQuickAddDismiss(); onNavigateToRecipeImport() },
+                onDismiss = onQuickAddDismiss,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 80.dp)
+            )
+        }
     }
 
     if (showWeightDialog) {
@@ -88,33 +90,21 @@ fun HomeScreen(
 }
 
 @Composable
-private fun QuickAddFab(
-    expanded: Boolean,
-    onToggle: () -> Unit,
+private fun QuickAddMenu(
     onAddFood: () -> Unit,
     onScanFood: () -> Unit,
     onImportRecipe: () -> Unit,
+    onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier, horizontalAlignment = Alignment.End) {
-        if (expanded) {
-            QuickAddAction("Rezept importieren", Icons.Default.Link, onImportRecipe)
-            Spacer(Modifier.height(NutriSpacing.sm))
-            QuickAddAction("Essen scannen", Icons.Default.PhotoCamera, onScanFood)
-            Spacer(Modifier.height(NutriSpacing.sm))
-            QuickAddAction("Essen hinzufügen", Icons.Default.Restaurant, onAddFood)
-            Spacer(Modifier.height(NutriSpacing.md))
-        }
-        FloatingActionButton(
-            onClick = onToggle,
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary
-        ) {
-            Icon(
-                if (expanded) Icons.Default.Close else Icons.Default.Add,
-                "Schnellaktionen"
-            )
-        }
+    Column(
+        modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
+    ) {
+        QuickAddAction("Rezept importieren", Icons.Default.Link, onImportRecipe)
+        QuickAddAction("Essen scannen", Icons.Default.PhotoCamera, onScanFood)
+        QuickAddAction("Essen hinzufügen", Icons.Default.Restaurant, onAddFood)
     }
 }
 
@@ -206,7 +196,8 @@ private fun QuickActionCard(
 private fun HealthCard(
     data: ch.nutrisnap.app.data.model.HealthConnectCache?,
     hasPermission: Boolean,
-    onOpenHealth: () -> Unit
+    onOpenHealth: () -> Unit,
+    onEditWeight: () -> Unit = {}
 ) {
     Card(
         Modifier
@@ -276,12 +267,42 @@ private fun HealthCard(
                         HealthStatItem(icon = "\uD83D\uDE34", value = "${h}h ${m}m", label = "Schlaf")
                     }
                     if (data.weightKg != null) {
-                        HealthStatItem(
-                            icon = "\u2696\uFE0F",
-                            value = "%.1f kg".format(data.weightKg),
-                            label = "Gewicht"
-                        )
+                        Box {
+                            HealthStatItem(
+                                icon = "\u2696\uFE0F",
+                                value = "%.1f kg".format(data.weightKg),
+                                label = "Gewicht"
+                            )
+                            // Edit icon for manual weight correction
+                            Icon(
+                                Icons.Default.Edit, "Gewicht bearbeiten",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .size(12.dp)
+                                    .clickable { onEditWeight() }
+                            )
+                        }
                     }
+                }
+                // Auto-sync hint
+                Spacer(Modifier.height(NutriSpacing.sm))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Sync, null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.size(10.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        "Automatisch synchronisiert via Health Connect",
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
                 }
             }
         }
@@ -604,63 +625,6 @@ private fun StreakCard(streak: Int) {
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun WeightQuickCard(
-    lastWeight: Float?,
-    previousWeight: Float?,
-    onLogWeight: () -> Unit
-) {
-    Card(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs),
-        shape = RoundedCornerShape(NutriRadius.lg),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(1.dp)
-    ) {
-        Row(
-            Modifier
-                .padding(NutriSpacing.lg)
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    "Aktuelles Gewicht",
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp
-                )
-                Spacer(Modifier.height(NutriSpacing.xs))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        lastWeight?.let { "%.1f kg".format(it) } ?: "–",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    val delta = if (lastWeight != null && previousWeight != null) lastWeight - previousWeight else null
-                    if (delta != null && kotlin.math.abs(delta) >= 0.1f) {
-                        Spacer(Modifier.width(NutriSpacing.sm))
-                        val isUp = delta > 0
-                        Text(
-                            "${if (isUp) "\u2191" else "\u2193"} %.1f kg".format(kotlin.math.abs(delta)),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (isUp) MaterialTheme.colorScheme.error else MacroColors.calories
-                        )
-                    }
-                }
-            }
-            FilledTonalButton(onClick = onLogWeight) {
-                Icon(Icons.Default.Edit, null, Modifier.size(16.dp))
-                Spacer(Modifier.width(NutriSpacing.xs))
-                Text("Eintragen")
             }
         }
     }

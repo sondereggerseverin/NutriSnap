@@ -14,12 +14,16 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -248,6 +252,8 @@ fun MainScaffold(
     val backEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backEntry?.destination?.route
 
+    var showQuickAdd by remember { mutableStateOf(false) }
+
     LaunchedEffect(sharedUrl, sharedBatchUrls) {
         if (!sharedUrl.isNullOrBlank() || sharedBatchUrls.isNotEmpty()) {
             navController.navigate(Screen.Recipes.route) {
@@ -258,11 +264,36 @@ fun MainScaffold(
     }
 
     Scaffold(bottomBar = {
-        NavigationBar {
-            bottomNavItems.forEach { screen ->
+        NavigationBar(
+            tonalElevation = NavigationBarDefaults.Elevation
+        ) {
+            bottomNavItems.forEachIndexed { index, screen ->
+                if (index == 2) {
+                    // Center: Elevated FAB as 3rd tab item
+                    NavigationBarItem(
+                        selected = false,
+                        onClick = { showQuickAdd = !showQuickAdd },
+                        icon = {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(48.dp),
+                                elevation = NavigationBarDefaults.Elevation
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        if (showQuickAdd) Icons.Default.Close else Icons.Default.Add,
+                                        contentDescription = "Schnellaktionen",
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+                        },
+                        label = { Text("") }
+                    )
+                }
                 NavigationBarItem(
-                    // "diary" hat optionale Query-Argumente (?meal=...&open=...), daher reicht ein
-                    // Prefix-Vergleich statt exakter Gleichheit, sonst bleibt der Tab unselektiert.
                     selected = currentRoute == screen.route ||
                         currentRoute?.startsWith("${screen.route}?") == true,
                     onClick = {
@@ -289,6 +320,8 @@ fun MainScaffold(
             ) {
                 HomeScreen(
                     hcVm = hcVm,
+                    quickAddExpanded = showQuickAdd,
+                    onQuickAddDismiss = { showQuickAdd = false },
                     onNavigateToDiary = { meal, autoOpenAdd ->
                         val route = if (meal != null) "diary?meal=${meal.name}&open=$autoOpenAdd" else "diary?open=$autoOpenAdd"
                         navController.navigate(route) {

@@ -67,6 +67,32 @@ private fun scaleNumbers(line: String, ratio: Float): String {
     }
 }
 
+// ── Structured ingredient parsing ─────────────────────────────────────────────
+private data class ParsedIngredient(val amount: String, val unit: String, val name: String)
+private val INGREDIENT_UNITS = listOf("g", "ml", "kg", "l", "tsp", "tbsp", "EL", "TL", "Stück", "Prise", "Bund", "Dose", "Packung", "Scheibe", "Zehe")
+private val INGREDIENT_AMOUNT_REGEX = Regex("""^(\d+(?:[.,]\d+)?)\s*(g|ml|kg|l|tsp|tbsp|EL|TL|[Ss]tück|[Pp]rize|[Bb]und|[Dd]ose|[Pp]ackung|[Ss]cheibe|[Zz]eh)?\s+(.+)""")
+
+private fun parseIngredientLine(line: String): ParsedIngredient {
+    val trimmed = line.trimStart('•', '-', ' ')
+    val m = INGREDIENT_AMOUNT_REGEX.find(trimmed)
+    return if (m != null) {
+        ParsedIngredient(
+            amount = m.groupValues[1].replace(',', '.'),
+            unit = m.groupValues[2].ifBlank { "g" },
+            name = m.groupValues[3]
+        )
+    } else {
+        ParsedIngredient(amount = "", unit = "g", name = trimmed)
+    }
+}
+
+private fun joinIngredientLine(parsed: ParsedIngredient): String {
+    val amt = parsed.amount.trim()
+    val unit = parsed.unit.trim()
+    val name = parsed.name.trim()
+    return if (amt.isNotBlank()) "$amt $unit $name" else name
+}
+
 // ── Screen ────────────────────────────────────────────────────────────────────
 private fun Recipe.isIncomplete(): Boolean =
     (title == "Rezept" || title.startsWith("Rezept von")) && imageUrl.isNullOrBlank() && totalCalories == null
@@ -442,19 +468,43 @@ fun ImportSheet(prefillUrl: String, isLoading: Boolean, error: String?,
     var showManual by remember(openAtManualCaption) { mutableStateOf(openAtManualCaption) }
     var manualTitle by remember { mutableStateOf("") }; var manualCaption by remember { mutableStateOf("") }
     val isInstagram = "instagram.com" in url || "instagr.am" in url
-    // Jeder Fehler bei einem Instagram-Link -> sofort Caption-Fallback anbieten,
-    // nicht nur wenn der ViewModel-State exakt "instagramBlocked" meldet.
     LaunchedEffect(error) {
         if (error != null && isInstagram) showManual = true
     }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal=16.dp).navigationBarsPadding().padding(bottom=8.dp)) {
             if (!showManual) {
-                Text("Rezept importieren", fontWeight=FontWeight.Bold, fontSize=18.sp)
+                Text("Rezept importieren", fontWeight=FontWeight.Bold, fontSize=20.sp)
                 Spacer(Modifier.height(4.dp))
-                Text("Instagram-, TikTok- oder Webseiten-Link", fontSize=13.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(value=url, onValueChange={url=it}, label={Text("URL")},
+                Text("Instagram, TikTok oder Webseite", fontSize=13.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(16.dp))
+
+                // Instagram-specific import button
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Column(
+                        Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Default.CameraAlt, null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text("Rezepte aus Instagram importieren", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text("Link kopieren und unten einfügen", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+
+                OutlinedTextField(value=url, onValueChange={url=it}, label={Text("URL einfügen")},
                     leadingIcon={Icon(Icons.Default.Link,null)}, modifier=Modifier.fillMaxWidth(), singleLine=true, isError=error!=null)
                 if (error != null) Text(error, color=MaterialTheme.colorScheme.error, fontSize=13.sp, modifier=Modifier.padding(top=4.dp))
                 Spacer(Modifier.height(12.dp))
@@ -508,15 +558,41 @@ fun BatchImportSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal = 16.dp).navigationBarsPadding().padding(bottom = 8.dp)) {
-            Text("Mehrere Rezepte importieren", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text("Rezepte importieren", fontWeight = FontWeight.Bold, fontSize = 20.sp)
             Spacer(Modifier.height(4.dp))
-            Text("Links (ein oder mehrere pro Zeile) einfügen, z.B. aus Notizen-App",
+            Text("Mehrere Links auf einmal importieren",
                 fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(16.dp))
+
+            // Instagram multi-import card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+                )
+            ) {
+                Row(
+                    Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.PlaylistAdd, null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Mehrere Rezepte auf einmal", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text("Links aus Zwischenablage einfügen", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
             Spacer(Modifier.height(12.dp))
 
             OutlinedTextField(
                 value = pasteText, onValueChange = { pasteText = it },
-                label = { Text("Links einfügen") },
+                label = { Text("Links einfügen (ein pro Zeile)") },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp), maxLines = 8
             )
             Spacer(Modifier.height(8.dp))
@@ -534,11 +610,36 @@ fun BatchImportSheet(
 
             if (state.items.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
-                Text(
-                    "${state.doneCount}/${state.items.size} importiert",
-                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(4.dp))
+
+                // Progress bar
+                val progress = if (state.items.isNotEmpty()) state.doneCount.toFloat() / state.items.size else 0f
+                Column {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            "${state.doneCount}/${state.items.size} importiert",
+                            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (state.isRunning) {
+                            Text(
+                                "Analysiere ${state.items.size} Rezepte…",
+                                fontSize = 12.sp, color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+
                 LazyColumn(Modifier.fillMaxWidth().heightIn(max = 280.dp)) {
                     items(state.items, key = { it.url }) { item ->
                         Row(
@@ -548,15 +649,16 @@ fun BatchImportSheet(
                             val (icon, tint) = when (item.status) {
                                 BatchStatus.PENDING -> Icons.Default.Schedule to MaterialTheme.colorScheme.onSurfaceVariant
                                 BatchStatus.RUNNING  -> Icons.Default.Sync      to MaterialTheme.colorScheme.primary
-                                BatchStatus.DONE     -> Icons.Default.CheckCircle to MaterialTheme.colorScheme.primary
+                                BatchStatus.DONE     -> Icons.Default.CheckCircle to MacroColors.calories
                                 BatchStatus.ERROR    -> Icons.Default.Error     to MaterialTheme.colorScheme.error
                             }
                             Icon(icon, null, Modifier.size(18.dp), tint = tint)
                             Spacer(Modifier.width(8.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(
-                                    item.resultTitle ?: item.url,
-                                    fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+                                    item.resultTitle ?: item.url.take(50),
+                                    fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                    fontWeight = if (item.status == BatchStatus.DONE) FontWeight.SemiBold else FontWeight.Normal
                                 )
                                 if (item.error != null) {
                                     Text(item.error, fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
@@ -712,29 +814,103 @@ fun RecipeDetailSheet(
                 }
 
                 if (ingredientsEditMode) {
-                    // ── Editierbare Zeilen: Menge/Name direkt tippbar, Scan + Löschen pro Zeile ──
+                    // ── Strukturierte Zutaten-Bearbeitung: Zahl + Einheit + Name ──
                     itemsIndexed(ingredientLines) { idx, line ->
-                        Row(
-                            Modifier.fillMaxWidth().padding(vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        val parsed = remember(line) { parseIngredientLine(line) }
+                        var amount by remember(line) { mutableStateOf(parsed.amount) }
+                        var selectedUnit by remember(line) { mutableStateOf(parsed.unit) }
+                        var name by remember(line) { mutableStateOf(parsed.name) }
+                        var unitExpanded by remember { mutableStateOf(false) }
+
+                        Column(
+                            Modifier.fillMaxWidth().padding(vertical = 4.dp)
                         ) {
-                            OutlinedTextField(
-                                value = line,
-                                onValueChange = { v -> ingredientLines = ingredientLines.toMutableList().also { it[idx] = v } },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true,
-                                textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
-                                shape = RoundedCornerShape(8.dp)
-                            )
-                            IconButton(onClick = { scanTargetIdx = idx }, Modifier.size(36.dp)) {
-                                Icon(Icons.Default.QrCodeScanner, "Produkt scannen", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-                            }
-                            IconButton(
-                                onClick = { ingredientLines = ingredientLines.toMutableList().also { it.removeAt(idx) } },
-                                Modifier.size(36.dp)
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(Icons.Default.DeleteOutline, "Löschen", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                                // Amount field
+                                OutlinedTextField(
+                                    value = amount,
+                                    onValueChange = { v ->
+                                        amount = v
+                                        ingredientLines = ingredientLines.toMutableList().also {
+                                            it[idx] = joinIngredientLine(ParsedIngredient(v, selectedUnit, name))
+                                        }
+                                    },
+                                    modifier = Modifier.width(70.dp),
+                                    singleLine = true,
+                                    textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    placeholder = { Text("Menge", fontSize = 11.sp) },
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+
+                                // Unit dropdown
+                                Box {
+                                    OutlinedTextField(
+                                        value = selectedUnit,
+                                        onValueChange = {},
+                                        readOnly = true,
+                                        modifier = Modifier.width(70.dp).clickable { unitExpanded = true },
+                                        singleLine = true,
+                                        textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                                        trailingIcon = {
+                                            Icon(Icons.Default.ArrowDropDown, null, Modifier.size(16.dp))
+                                        },
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    DropdownMenu(
+                                        expanded = unitExpanded,
+                                        onDismissRequest = { unitExpanded = false }
+                                    ) {
+                                        INGREDIENT_UNITS.forEach { unit ->
+                                            DropdownMenuItem(
+                                                text = { Text(unit, fontSize = 13.sp) },
+                                                onClick = {
+                                                    selectedUnit = unit
+                                                    unitExpanded = false
+                                                    ingredientLines = ingredientLines.toMutableList().also {
+                                                        it[idx] = joinIngredientLine(ParsedIngredient(amount, unit, name))
+                                                    }
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Name field
+                                OutlinedTextField(
+                                    value = name,
+                                    onValueChange = { v ->
+                                        name = v
+                                        ingredientLines = ingredientLines.toMutableList().also {
+                                            it[idx] = joinIngredientLine(ParsedIngredient(amount, selectedUnit, v))
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    singleLine = true,
+                                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                                    placeholder = { Text("Zutat", fontSize = 11.sp) },
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                            }
+
+                            // Action row: scan + delete
+                            Row(
+                                Modifier.fillMaxWidth().padding(top = 2.dp),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                IconButton(onClick = { scanTargetIdx = idx }, Modifier.size(32.dp)) {
+                                    Icon(Icons.Default.QrCodeScanner, "Produkt scannen", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                }
+                                IconButton(
+                                    onClick = { ingredientLines = ingredientLines.toMutableList().also { it.removeAt(idx) } },
+                                    Modifier.size(32.dp)
+                                ) {
+                                    Icon(Icons.Default.DeleteOutline, "Löschen", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                                }
                             }
                         }
                     }
@@ -757,7 +933,7 @@ fun RecipeDetailSheet(
                         Spacer(Modifier.height(16.dp))
                     }
                 } else {
-                    // ── Ansicht ──
+                    // ── Ansicht mit Status-Icons ──
                     val rawLines = recipe.ingredients.lines()
                     items(rawLines) { rawLine ->
                         if (rawLine.isBlank()) { Spacer(Modifier.height(4.dp)); return@items }
@@ -770,7 +946,16 @@ fun RecipeDetailSheet(
                             Text(display.trimEnd(':'), fontWeight=FontWeight.SemiBold, fontSize=13.sp, color=MaterialTheme.colorScheme.primary)
                         } else {
                             Row(Modifier.fillMaxWidth().padding(vertical=3.dp), verticalAlignment=Alignment.Top) {
-                                Text("•  ", fontSize=14.sp, color=MaterialTheme.colorScheme.secondary)
+                                // Status icon: green check if has amount, red question if not
+                                val parsed = parseIngredientLine(display)
+                                val hasAmount = parsed.amount.isNotBlank() && parsed.amount.toFloatOrNull() != null
+                                Icon(
+                                    if (hasAmount) Icons.Default.CheckCircle else Icons.Default.HelpOutline,
+                                    null,
+                                    tint = if (hasAmount) MacroColors.calories else MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(16.dp).padding(top = 2.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
                                 Text(display.trimStart('•','-',' '), fontSize=14.sp, lineHeight=20.sp, modifier=Modifier.weight(1f))
                             }
                         }
