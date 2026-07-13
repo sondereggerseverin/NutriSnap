@@ -278,7 +278,7 @@ fun MainScaffold(
                                 shape = CircleShape,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(48.dp),
-                                elevation = NavigationBarDefaults.Elevation
+                                shadowElevation = NavigationBarDefaults.Elevation
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
@@ -292,19 +292,20 @@ fun MainScaffold(
                         },
                         label = { Text("") }
                     )
+                } else {
+                    NavigationBarItem(
+                        selected = currentRoute == screen.route ||
+                            currentRoute?.startsWith("${screen.route}?") == true,
+                        onClick = {
+                            navController.navigate(screen.route) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true; restoreState = true
+                            }
+                        },
+                        icon = { Icon(screen.icon, contentDescription = screen.label) },
+                        label = { Text(screen.label, maxLines = 1) }
+                    )
                 }
-                NavigationBarItem(
-                    selected = currentRoute == screen.route ||
-                        currentRoute?.startsWith("${screen.route}?") == true,
-                    onClick = {
-                        navController.navigate(screen.route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true; restoreState = true
-                        }
-                    },
-                    icon = { Icon(screen.icon, contentDescription = screen.label) },
-                    label = { Text(screen.label, maxLines = 1) }
-                )
             }
         }
     }) { innerPadding ->

@@ -38,6 +38,7 @@ import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import ch.nutrisnap.app.domain.UrlExtractor
 import ch.nutrisnap.app.ui.components.EmptyState
 import ch.nutrisnap.app.ui.components.MicronutrientTable
+import ch.nutrisnap.app.ui.theme.MacroColors
 import coil.compose.AsyncImage
 
 // ── Unit conversions ──────────────────────────────────────────────────────────
