@@ -3,6 +3,7 @@ package ch.nutrisnap.app.ui.screens.home
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -68,6 +69,18 @@ fun HomeScreen(
 
         // Quick Add Menu - shown when centered FAB is pressed
         if (quickAddExpanded) {
+            // Scrim: dimmt den Hintergrund und schließt das Menü bei Tap daneben.
+            // Vorher fehlte das, wodurch das Menü unverbunden über den Karten
+            // dahinter zu schweben schien.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() }
+                    ) { onQuickAddDismiss() }
+            )
             QuickAddMenu(
                 onAddFood = { onQuickAddDismiss(); onNavigateToDiary(null, true) },
                 onScanFood = { onQuickAddDismiss(); onNavigateToFoodScan() },
@@ -529,7 +542,12 @@ private fun MealOverviewGrid(
                         elevation = CardDefaults.cardElevation(1.dp)
                     ) {
                         Box {
-                            Column(Modifier.padding(NutriSpacing.lg)) {
+                            Column(Modifier.padding(
+                                start = NutriSpacing.lg,
+                                top = NutriSpacing.lg,
+                                bottom = NutriSpacing.lg,
+                                end = 40.dp // Platz für Quick-Add-Kreis, verhindert Überlappung mit Titel
+                            )) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(
                                         Modifier
@@ -545,6 +563,8 @@ private fun MealOverviewGrid(
                                         meal.label,
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
