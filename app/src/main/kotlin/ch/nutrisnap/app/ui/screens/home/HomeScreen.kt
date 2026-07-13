@@ -1,6 +1,5 @@
 package ch.nutrisnap.app.ui.screens.home
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -519,92 +518,92 @@ private fun MealOverviewGrid(
     onClick: (MealOverview) -> Unit,
     onQuickAdd: (MealOverview) -> Unit
 ) {
-    Column(
-        Modifier.padding(
-            horizontal = NutriSpacing.lg,
-            vertical = NutriSpacing.md
-        ),
-        verticalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.md),
+        shape = RoundedCornerShape(NutriRadius.lg),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(1.dp)
     ) {
-        for (rowMeals in meals.chunked(2)) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
-            ) {
-                rowMeals.forEach { meal ->
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .animateContentSize()
-                            .clickable { onClick(meal) },
-                        shape = RoundedCornerShape(NutriRadius.lg),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(1.dp)
-                    ) {
-                        Box {
-                            Column(Modifier.padding(
-                                start = NutriSpacing.lg,
-                                top = NutriSpacing.lg,
-                                bottom = NutriSpacing.lg,
-                                end = 40.dp // Platz für Quick-Add-Kreis, verhindert Überlappung mit Titel
-                            )) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        Modifier
-                                            .size(36.dp)
-                                            .clip(RoundedCornerShape(NutriRadius.sm))
-                                            .background(meal.color.copy(alpha = 0.12f)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(meal.icon, fontSize = 18.sp)
-                                    }
-                                    Spacer(Modifier.width(NutriSpacing.sm))
-                                    Text(
-                                        meal.label,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        maxLines = 1,
-                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Spacer(Modifier.height(NutriSpacing.sm))
-                                Text(
-                                    "${meal.kcal.toInt()} kcal",
-                                    fontSize = 22.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = if (meal.count > 0) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.outline
-                                )
-                                Text(
-                                    "${meal.count} ${if (meal.count == 1) "Eintrag" else "Einträge"}",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            // Quick-Add button
-                            Box(
-                                Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(NutriSpacing.sm)
-                                    .size(30.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary)
-                                    .clickable { onQuickAdd(meal) },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.Add,
-                                    "Zu ${meal.label} hinzufügen",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    }
+        Column {
+            meals.forEachIndexed { index, meal ->
+                MealRow(
+                    meal = meal,
+                    onClick = { onClick(meal) },
+                    onQuickAdd = { onQuickAdd(meal) }
+                )
+                if (index != meals.lastIndex) {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                    )
                 }
-                if (rowMeals.size == 1) Spacer(Modifier.weight(1f))
             }
+        }
+    }
+}
+
+// Kompakte Listenzeile statt Grid-Karte mit überlagertem "+": alle Elemente
+// liegen im selben Row-Layout (wie bei Yazio), dadurch kann nichts mehr
+// überlappen und der Bildschirm braucht weniger Höhe pro Mahlzeit.
+@Composable
+private fun MealRow(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.md),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(NutriRadius.sm))
+                .background(meal.color.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(meal.icon, fontSize = 20.sp)
+        }
+        Spacer(Modifier.width(NutriSpacing.md))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    meal.label,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.width(2.dp))
+                Icon(
+                    Icons.Default.ChevronRight, null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.height(2.dp))
+            Text(
+                "${meal.kcal.toInt()} kcal · ${meal.count} ${if (meal.count == 1) "Eintrag" else "Einträge"}",
+                fontSize = 12.sp,
+                color = if (meal.count > 0) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.width(NutriSpacing.sm))
+        Box(
+            Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary)
+                .clickable(onClick = onQuickAdd),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.Add,
+                "Zu ${meal.label} hinzufügen",
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
