@@ -32,7 +32,7 @@ fun MacroBar(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(NutriRadius.lg),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultCardElevation())
+        elevation = CardDefaults.cardElevation(1.dp)
     ) {
         Column(Modifier.padding(NutriSpacing.lg)) {
             Row(
