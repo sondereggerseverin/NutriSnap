@@ -27,6 +27,22 @@ interface DiaryDao {
     """)
     fun getWeeklySummary(fromDate: String): Flow<List<DailySummary>>
 
+    // Trotz des Namens von getWeeklySummary auch fuer Monats-/Kalenderansicht nutzbar,
+    // aber ohne obere Grenze — bei alten Konten mit viel Historie unnoetig teuer.
+    // Deshalb bounded Variante mit fromDate UND toDate fuer beliebige Zeitraeume.
+    @Query("""
+        SELECT dateStr, 
+               SUM(calories) as calories, 
+               SUM(protein) as protein,
+               SUM(carbs) as carbs,
+               SUM(fat) as fat
+        FROM diary_entries 
+        WHERE dateStr BETWEEN :fromDate AND :toDate
+        GROUP BY dateStr 
+        ORDER BY dateStr ASC
+    """)
+    fun getSummaryBetween(fromDate: String, toDate: String): Flow<List<DailySummary>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entry: DiaryEntry): Long
 

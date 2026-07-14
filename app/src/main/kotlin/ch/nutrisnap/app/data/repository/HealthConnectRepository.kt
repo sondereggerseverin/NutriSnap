@@ -43,6 +43,58 @@ class HealthConnectRepository(
     fun getLast7Days(): Flow<List<HealthConnectCache>> = dao.getLast7Days()
     fun getLast30Days(): Flow<List<HealthConnectCache>> = dao.getLast30Days()
 
+    /** Beliebiger Zeitraum aus dem lokalen Cache (Tages-/Wochen-/Monatsansicht, Kalender). */
+    fun getRange(from: LocalDate, to: LocalDate): Flow<List<HealthConnectCache>> =
+        dao.getRange(from, to)
+
+    /**
+     * Stellt sicher, dass [from]..[to] im Cache vorhanden ist, bevor die UI ihn liest.
+     * Fragt Health Connect nur für Tage ab, die noch fehlen oder nur mit steps == 0
+     * gecached sind (gleiche Heuristik wie [syncHistorical]). Braucht für Tage älter
+     * als 30 Tage die PERMISSION_READ_HEALTH_DATA_HISTORY-Berechtigung — ohne sie
+     * liefert Health Connect für diese Tage einfach nichts zurück (kein Crash).
+     */
+    suspend fun ensureRangeSynced(from: LocalDate, to: LocalDate): Result<Int> = runCatching {
+        val today = LocalDate.now()
+        val cappedTo = if (to.isAfter(today)) today else to
+        if (from.isAfter(cappedTo)) return@runCatching 0
+
+        val bmr = currentBmr()
+        val cached = dao.getRangeOnce(from, cappedTo).associateBy { it.date }
+        val missingDays = generateSequence(from) { d -> d.plusDays(1) }
+            .takeWhile { !it.isAfter(cappedTo) }
+            .filter { it == today || cached[it] == null || cached[it]!!.steps == 0L }
+            .toList()
+        if (missingDays.isEmpty()) return@runCatching 0
+
+        val weightFrom = from.atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val weightTo = cappedTo.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val weightMap = runCatching { manager.getWeightForRange(weightFrom, weightTo) }
+            .getOrDefault(emptyMap())
+
+        var synced = 0
+        for (date in missingDays) {
+            val steps = runCatching { manager.getStepsForDay(date) }.getOrDefault(0L)
+            val calories = samsungActiveCalories(date)
+                ?: runCatching { manager.getActiveCaloriesForDay(date, bmr) }.getOrDefault(null)
+            val sleep = runCatching { manager.getSleepForNight(date) }.getOrDefault(0L)
+            val weight = weightMap[date] ?: cached[date]?.weightKg
+
+            dao.insertOrUpdate(
+                HealthConnectCache(
+                    date = date,
+                    steps = steps,
+                    activeCaloriesKcal = calories,
+                    weightKg = weight,
+                    sleepMinutes = sleep,
+                    avgHeartRateBpm = cached[date]?.avgHeartRateBpm
+                )
+            )
+            synced++
+        }
+        synced
+    }
+
     // Used as a fallback: Samsung Health often writes TotalCaloriesBurnedRecord to
     // Health Connect but never writes ActiveCaloriesBurnedRecord. Subtracting a
     // prorated BMR from the total gives a usable "active calories" estimate.
@@ -85,7 +137,9 @@ class HealthConnectRepository(
                 avgHeartRateBpm = heartRate.await()
             )
             dao.insertOrUpdate(cache)
-            dao.deleteOlderThan(LocalDate.now().minusDays(30))
+            // War vorher 30 Tage — der Cache ist jetzt auch die Datenquelle fuer die
+            // Monats-/Kalenderansicht in der Analyse, daher deutlich laenger behalten.
+            dao.deleteOlderThan(LocalDate.now().minusDays(400))
             cache
         }
     }

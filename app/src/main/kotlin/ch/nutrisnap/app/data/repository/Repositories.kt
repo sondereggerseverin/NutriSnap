@@ -45,6 +45,10 @@ class DiaryRepository(db: NutriDatabase) {
     fun getWeeklySummary(from: LocalDate): Flow<List<ch.nutrisnap.app.data.db.DailySummary>> =
         dao.getWeeklySummary(from.toString())
 
+    /** Fuer Tages-/Wochen-/Monats-/Kalenderansicht in der Analyse: begrenzter Zeitraum. */
+    fun getSummaryBetween(from: LocalDate, to: LocalDate): Flow<List<ch.nutrisnap.app.data.db.DailySummary>> =
+        dao.getSummaryBetween(from.toString(), to.toString())
+
     /** Fuer Quick-Add: nach dem Insert den vollen Eintrag laden (fuer Undo-Snackbar). */
     suspend fun getById(id: Long): DiaryEntry? = dao.getById(id)
 
