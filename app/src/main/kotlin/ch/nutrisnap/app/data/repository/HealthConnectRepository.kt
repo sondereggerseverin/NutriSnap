@@ -188,6 +188,8 @@ class HealthConnectRepository(
 
     suspend fun hasPermissions(): Boolean = manager.hasAllPermissions()
 
+    suspend fun hasHistoryPermission(): Boolean = manager.hasHistoryPermission()
+
     suspend fun hasSamsungHealthPermissions(): Boolean =
         samsungHealthManager?.hasPermissions() ?: false
 

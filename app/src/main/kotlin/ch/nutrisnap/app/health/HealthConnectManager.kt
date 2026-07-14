@@ -56,6 +56,12 @@ class HealthConnectManager(context: Context) {
             HealthPermission.getReadPermission(ExerciseSessionRecord::class),
         )
 
+        // Ohne diese Permission liefert Health Connect nur die letzten 30 Tage zurück.
+        // Bewusst NICHT in REQUIRED_PERMISSIONS gebündelt, sondern separat im Analyse-Tab
+        // angefragt (nur wenn der Nutzer per Kalender/Monat weiter als 30 Tage zurückgeht),
+        // damit der normale "Health Connect verbinden"-Flow nicht davon abhängt.
+        val HISTORY_PERMISSION = HealthPermission.PERMISSION_READ_HEALTH_DATA_HISTORY
+
         fun getStatus(context: Context): HealthConnectStatus = when (
             HealthConnectClient.getSdkStatus(context)
         ) {
@@ -80,6 +86,10 @@ class HealthConnectManager(context: Context) {
 
     suspend fun hasAllPermissions(): Boolean =
         checkPermissions().containsAll(REQUIRED_PERMISSIONS)
+
+    /** True, wenn Health Connect auch Daten älter als 30 Tage zurückgeben darf. */
+    suspend fun hasHistoryPermission(): Boolean =
+        checkPermissions().contains(HISTORY_PERMISSION)
 
     /** Steps for a specific day */
     suspend fun getStepsForDay(date: LocalDate): Long {

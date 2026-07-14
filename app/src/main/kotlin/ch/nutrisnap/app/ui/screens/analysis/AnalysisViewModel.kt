@@ -66,7 +66,11 @@ data class AnalysisUiState(
     val totalActivityCalories:  Int = 0,
     val weightStart:            Float? = null,
     val weightEnd:              Float? = null,
-    val isSyncingHistory:       Boolean = false
+    val isSyncingHistory:       Boolean = false,
+    val hasHistoryPermission:        Boolean = false,
+    // true, wenn der sichtbare Zeitraum > 30 Tage zurückliegt und die History-Permission
+    // noch fehlt -> Health Connect liefert fuer diese Tage sonst einfach nichts zurueck.
+    val showHistoryPermissionPrompt: Boolean = false
 )
 
 private val dayFormatter   = DateTimeFormatter.ofPattern("EEEE, d. MMMM", Locale.GERMAN)
@@ -93,8 +97,16 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
 
     private var collectJob: Job? = null
 
+    /** Fuer den PermissionController-Launcher im Screen. */
+    val historyPermissionSet: Set<String> = setOf(HealthConnectManager.HISTORY_PERMISSION)
+
     init {
         loadRange(AnalysisPeriod.WOCHE, LocalDate.now())
+    }
+
+    /** Nach Rueckkehr vom History-Permission-Dialog: Status neu pruefen und Range neu laden. */
+    fun onHistoryPermissionResult() {
+        loadRange(_uiState.value.period, _uiState.value.anchorDate)
     }
 
     fun selectPeriod(period: AnalysisPeriod) {
@@ -179,6 +191,9 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
         collectJob = viewModelScope.launch {
+            val hasHistory = healthRepo.hasHistoryPermission()
+            // ensureRangeSynced holt trotzdem alles Erreichbare - ohne History-Permission
+            // liefert Health Connect fuer Tage > 30 Tage einfach nichts, kein Fehler.
             healthRepo.ensureRangeSynced(range.from, range.to)
             val streak = statsRepo.calculateStreak()
 
@@ -188,7 +203,7 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
                 weightRepo.getAll(),
                 profileRepo.get()
             ) { summaries, hcCache, weightEntries, profile ->
-                buildState(period, range, summaries, hcCache, weightEntries, profile, streak)
+                buildState(period, range, summaries, hcCache, weightEntries, profile, streak, hasHistory)
             }.collect { state -> _uiState.value = state }
         }
     }
@@ -200,7 +215,8 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
         hcCache:       List<HealthConnectCache>,
         weightEntries: List<WeightEntry>,
         profile:       UserProfile,
-        streak:        Int
+        streak:        Int,
+        hasHistory:    Boolean
     ): AnalysisUiState {
         val summaryByDate     = summaries.associateBy { it.dateStr }
         val hcByDate           = hcCache.associateBy { it.date }
@@ -260,7 +276,9 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
             totalActivityCalories  = days.sumOf { it.activityCalories.toDouble() }.toInt(),
             weightStart            = weightPoints.firstOrNull()?.weightKg,
             weightEnd              = weightPoints.lastOrNull()?.weightKg,
-            isSyncingHistory       = false
+            isSyncingHistory       = false,
+            hasHistoryPermission        = hasHistory,
+            showHistoryPermissionPrompt = !hasHistory && range.from.isBefore(LocalDate.now().minusDays(29))
         )
     }
 }

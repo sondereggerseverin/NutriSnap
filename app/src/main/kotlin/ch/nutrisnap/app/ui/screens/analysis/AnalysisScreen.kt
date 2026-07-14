@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.analysis
 
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,15 +10,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.ui.components.BarChart
 import ch.nutrisnap.app.ui.components.LineChart
@@ -32,6 +36,10 @@ import java.time.ZoneOffset
 fun AnalysisScreen(vm: AnalysisViewModel = viewModel()) {
     val state by vm.uiState.collectAsState()
     var showDatePicker by remember { mutableStateOf(false) }
+
+    val historyPermissionLauncher = rememberLauncherForActivityResult(
+        contract = PermissionController.createRequestPermissionResultContract()
+    ) { vm.onHistoryPermissionResult() }
 
     if (showDatePicker) {
         AnalysisDatePickerDialog(
@@ -82,6 +90,14 @@ fun AnalysisScreen(vm: AnalysisViewModel = viewModel()) {
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+        }
+
+        if (state.showHistoryPermissionPrompt) {
+            item {
+                HistoryPermissionBanner {
+                    historyPermissionLauncher.launch(vm.historyPermissionSet)
                 }
             }
         }
@@ -229,6 +245,47 @@ private fun AnalysisDatePickerDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } }
     ) {
         DatePicker(state = pickerState)
+    }
+}
+
+@Composable
+private fun HistoryPermissionBanner(onGrant: () -> Unit) {
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(NutriRadius.lg),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+        )
+    ) {
+        Row(
+            Modifier.padding(NutriSpacing.lg),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Filled.History,
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+                tint = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Spacer(Modifier.width(NutriSpacing.md))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Mehr Verlauf anzeigen",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Ohne zus\u00E4tzliche Berechtigung zeigt Health Connect nur die letzten 30 Tage. Erlaube den Zugriff, um Aktivit\u00E4tskalorien und Gewicht auch f\u00FCr \u00E4ltere Zeitr\u00E4ume zu sehen.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(NutriSpacing.sm))
+                TextButton(onClick = onGrant, contentPadding = PaddingValues(0.dp)) {
+                    Text("Zugriff erlauben", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
     }
 }
 
