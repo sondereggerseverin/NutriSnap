@@ -2,7 +2,6 @@ package ch.nutrisnap.app.ui.screens.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -32,8 +31,6 @@ import ch.nutrisnap.app.ui.viewmodel.HealthConnectViewModel
 fun HomeScreen(
     vm: HomeViewModel = viewModel(),
     hcVm: HealthConnectViewModel = viewModel(),
-    quickAddExpanded: Boolean = false,
-    onQuickAddDismiss: () -> Unit = {},
     onNavigateToDiary: (meal: MealType?, autoOpenAdd: Boolean) -> Unit = { _, _ -> },
     onNavigateToHealth: () -> Unit = {},
     onNavigateToFoodScan: () -> Unit = {},
@@ -65,31 +62,6 @@ fun HomeScreen(
             item { HealthCard(hcState.todayData, hcState.hasPermission, onNavigateToHealth) { showWeightDialog = true } }
             item { StreakCard(state.streak) }
         }
-
-        // Quick Add Menu - shown when centered FAB is pressed
-        if (quickAddExpanded) {
-            // Scrim: dimmt den Hintergrund und schließt das Menü bei Tap daneben.
-            // Vorher fehlte das, wodurch das Menü unverbunden über den Karten
-            // dahinter zu schweben schien.
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.4f))
-                    .clickable(
-                        indication = null,
-                        interactionSource = remember { MutableInteractionSource() }
-                    ) { onQuickAddDismiss() }
-            )
-            QuickAddMenu(
-                onAddFood = { onQuickAddDismiss(); onNavigateToDiary(null, true) },
-                onScanFood = { onQuickAddDismiss(); onNavigateToFoodScan() },
-                onImportRecipe = { onQuickAddDismiss(); onNavigateToRecipeImport() },
-                onDismiss = onQuickAddDismiss,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 80.dp)
-            )
-        }
     }
 
     if (showWeightDialog) {
@@ -98,51 +70,6 @@ fun HomeScreen(
             onConfirm = { kg -> vm.logWeight(kg); showWeightDialog = false },
             onDismiss = { showWeightDialog = false }
         )
-    }
-}
-
-@Composable
-private fun QuickAddMenu(
-    onAddFood: () -> Unit,
-    onScanFood: () -> Unit,
-    onImportRecipe: () -> Unit,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
-    ) {
-        QuickAddAction("Rezept importieren", Icons.Default.Link, onImportRecipe)
-        QuickAddAction("Essen scannen", Icons.Default.PhotoCamera, onScanFood)
-        QuickAddAction("Essen hinzufügen", Icons.Default.Restaurant, onAddFood)
-    }
-}
-
-@Composable
-private fun QuickAddAction(label: String, icon: ImageVector, onClick: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Card(
-            shape = RoundedCornerShape(NutriRadius.sm),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(4.dp)
-        ) {
-            Text(
-                label,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(horizontal = NutriSpacing.md, vertical = NutriSpacing.sm)
-            )
-        }
-        Spacer(Modifier.width(NutriSpacing.sm))
-        SmallFloatingActionButton(
-            onClick = onClick,
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        ) {
-            Icon(icon, label, modifier = Modifier.size(18.dp))
-        }
     }
 }
 
@@ -431,6 +358,8 @@ private fun HomeHeader(state: HomeUiState) {
                 WhiteMacroBar("Kohlenh.", state.totalCarbs, state.carbsGoal)
                 Spacer(Modifier.height(NutriSpacing.sm))
                 WhiteMacroBar("Fett", state.totalFat, state.fatGoal)
+                Spacer(Modifier.height(NutriSpacing.sm))
+                WhiteMacroBar("Ballaststoffe", state.totalFiber, state.fiberGoal)
             }
         }
     }

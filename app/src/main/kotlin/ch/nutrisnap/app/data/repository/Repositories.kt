@@ -60,7 +60,8 @@ class DiaryRepository(db: NutriDatabase) {
                 calories    = food.calories * f,
                 protein     = food.protein  * f,
                 carbs       = food.carbs    * f,
-                fat         = food.fat      * f
+                fat         = food.fat      * f,
+                fiber       = (food.fiber ?: 0f) * f
             )
         )
         dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }
@@ -85,6 +86,7 @@ class DiaryRepository(db: NutriDatabase) {
         val protein     = (recipe.proteinPerServing ?: 0f) * servingsFactor
         val carbs       = (recipe.carbsPerServing   ?: 0f) * servingsFactor
         val fat         = (recipe.fatPerServing     ?: 0f) * servingsFactor
+        val fiber       = (recipe.fiberPerServing   ?: 0f) * servingsFactor
 
         val id = dao.insert(
             DiaryEntry(
@@ -96,7 +98,8 @@ class DiaryRepository(db: NutriDatabase) {
                 calories    = calories,
                 protein     = protein,
                 carbs       = carbs,
-                fat         = fat
+                fat         = fat,
+                fiber       = fiber
             )
         )
         dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }

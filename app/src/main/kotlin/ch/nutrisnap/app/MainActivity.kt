@@ -14,7 +14,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -252,8 +251,6 @@ fun MainScaffold(
     val backEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backEntry?.destination?.route
 
-    var showQuickAdd by remember { mutableStateOf(false) }
-
     LaunchedEffect(sharedUrl, sharedBatchUrls) {
         if (!sharedUrl.isNullOrBlank() || sharedBatchUrls.isNotEmpty()) {
             navController.navigate(Screen.Recipes.route) {
@@ -267,45 +264,19 @@ fun MainScaffold(
         NavigationBar(
             tonalElevation = NavigationBarDefaults.Elevation
         ) {
-            bottomNavItems.forEachIndexed { index, screen ->
-                if (index == 2) {
-                    // Center: Elevated FAB as 3rd tab item
-                    NavigationBarItem(
-                        selected = false,
-                        onClick = { showQuickAdd = !showQuickAdd },
-                        icon = {
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(48.dp),
-                                shadowElevation = NavigationBarDefaults.Elevation
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        if (showQuickAdd) Icons.Default.Close else Icons.Default.Add,
-                                        contentDescription = "Schnellaktionen",
-                                        tint = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                }
-                            }
-                        },
-                        label = { Text("") }
-                    )
-                } else {
-                    NavigationBarItem(
-                        selected = currentRoute == screen.route ||
-                            currentRoute?.startsWith("${screen.route}?") == true,
-                        onClick = {
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true; restoreState = true
-                            }
-                        },
-                        icon = { Icon(screen.icon, contentDescription = screen.label) },
-                        label = { Text(screen.label, maxLines = 1) }
-                    )
-                }
+            bottomNavItems.forEach { screen ->
+                NavigationBarItem(
+                    selected = currentRoute == screen.route ||
+                        currentRoute?.startsWith("${screen.route}?") == true,
+                    onClick = {
+                        navController.navigate(screen.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true; restoreState = true
+                        }
+                    },
+                    icon = { Icon(screen.icon, contentDescription = screen.label) },
+                    label = { Text(screen.label, maxLines = 1) }
+                )
             }
         }
     }) { innerPadding ->
@@ -321,8 +292,6 @@ fun MainScaffold(
             ) {
                 HomeScreen(
                     hcVm = hcVm,
-                    quickAddExpanded = showQuickAdd,
-                    onQuickAddDismiss = { showQuickAdd = false },
                     onNavigateToDiary = { meal, autoOpenAdd ->
                         val route = if (meal != null) "diary?meal=${meal.name}&open=$autoOpenAdd" else "diary?open=$autoOpenAdd"
                         navController.navigate(route) {

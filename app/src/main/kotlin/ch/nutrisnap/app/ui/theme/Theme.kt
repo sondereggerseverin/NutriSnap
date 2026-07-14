@@ -96,9 +96,9 @@ enum class AppTheme(
     ),
     MINT_FRESH(
         label = "Mint Fresh", emoji = "\uD83C\uDF43",
-        primary      = Color(0xFF059669),
-        primaryDark  = Color(0xFF047857),
-        primaryLight = Color(0xFFD1FAE5),
+        primary      = Color(0xFF2DD4BF),
+        primaryDark  = Color(0xFF0F9B8E),
+        primaryLight = Color(0xFFD9FBF0),
         accent       = Color(0xFF0EA5E9),
         accentLight  = Color(0xFFE0F2FE),
         background   = Color(0xFFECFDF5)

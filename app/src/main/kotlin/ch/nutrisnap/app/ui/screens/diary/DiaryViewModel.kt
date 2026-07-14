@@ -145,7 +145,8 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
                     calories = newValue,
                     protein  = entry.protein * ratio,
                     carbs    = entry.carbs   * ratio,
-                    fat      = entry.fat     * ratio
+                    fat      = entry.fat     * ratio,
+                    fiber    = entry.fiber   * ratio
                 ))
             } else {
                 val factor = newValue / entry.amountGrams
@@ -154,7 +155,8 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
                     calories    = entry.calories * factor,
                     protein     = entry.protein  * factor,
                     carbs       = entry.carbs    * factor,
-                    fat         = entry.fat      * factor
+                    fat         = entry.fat      * factor,
+                    fiber       = entry.fiber    * factor
                 ))
             }
         }
