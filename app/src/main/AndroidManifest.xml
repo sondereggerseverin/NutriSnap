@@ -27,6 +27,10 @@
     <uses-permission android:name="android.permission.health.READ_HEART_RATE"/>
     <!-- FIX: fehlte – wird von HealthConnectManager.REQUIRED_PERMISSIONS benötigt -->
     <uses-permission android:name="android.permission.health.READ_EXERCISE"/>
+    <!-- Optional, separat angefragt (nicht Teil von REQUIRED_PERMISSIONS): ohne diese
+         Berechtigung liefert Health Connect fuer Analyse-Monats-/Kalenderansicht nur
+         Daten der letzten 30 Tage zurueck. -->
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY"/>
 
     <!-- Required so Android resolves the Health Connect app -->
     <queries>
