@@ -76,18 +76,11 @@ fun DiaryScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val quickAddFavorites by vm.favorites.collectAsState()
+    val recipesVm: ch.nutrisnap.app.ui.screens.recipes.RecipesViewModel = viewModel()
+    val recipesState by recipesVm.uiState.collectAsState()
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddSheet = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Icon(Icons.Default.Add, "Eintrag hinzufügen")
-            }
-        }
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         LazyColumn(
             Modifier.padding(padding).fillMaxSize(),
@@ -121,6 +114,23 @@ fun DiaryScreen(
                                     )
                                     if (result == SnackbarResult.ActionPerformed) vm.deleteEntry(entry)
                                 }
+                            }
+                        }
+                    )
+                }
+            }
+            if (recipesState.recipes.isNotEmpty()) {
+                item {
+                    RecipeQuickAddBar(
+                        recipes = recipesState.recipes,
+                        onQuickAdd = { recipe ->
+                            val meal = defaultMealForNow()
+                            vm.addRecipeAsMeal(recipe, 1f, meal)
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    message = "\"${recipe.title}\" hinzugefügt",
+                                    duration = SnackbarDuration.Short
+                                )
                             }
                         }
                     )
@@ -424,6 +434,55 @@ private fun EntryMacroItem(label: String, value: String, unit: String, color: Co
         )
         Text(unit, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun RecipeQuickAddBar(recipes: List<Recipe>, onQuickAdd: (Recipe) -> Unit) {
+    Column(Modifier.padding(top = NutriSpacing.xs, bottom = NutriSpacing.xs)) {
+        Text(
+            "\uD83C\uDF73 Rezepte",
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .padding(horizontal = NutriSpacing.lg)
+                .padding(bottom = NutriSpacing.sm)
+        )
+        Row(
+            Modifier
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = NutriSpacing.lg),
+            horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
+        ) {
+            recipes.take(10).forEach { recipe ->
+                Column(
+                    Modifier
+                        .clip(RoundedCornerShape(NutriRadius.md))
+                        .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f))
+                        .clickable { onQuickAdd(recipe) }
+                        .padding(horizontal = NutriSpacing.md, vertical = NutriSpacing.sm)
+                        .widthIn(max = 110.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        recipe.title,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    recipe.totalCalories?.let { kcal ->
+                        Text(
+                            "${kcal.toInt()} kcal/Port.",
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
