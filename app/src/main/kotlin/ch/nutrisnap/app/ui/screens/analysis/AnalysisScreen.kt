@@ -417,7 +417,8 @@ private fun MacroCard(state: AnalysisUiState) {
 @Composable
 private fun WeightCard(state: AnalysisUiState) {
     AnalysisCard(title = "Gewichtsverlauf") {
-        val weightValues = state.days.mapNotNull { it.weightKg }
+        val weightPoints = state.days.filter { it.weightKg != null }
+        val weightValues = weightPoints.mapNotNull { it.weightKg }
         if (weightValues.isEmpty()) {
             Text(
                 "Noch keine Gewichtsdaten f\u00FCr diesen Zeitraum \u2013 trag dein Gewicht auf der Startseite ein oder verbinde Health Connect.",
@@ -425,7 +426,28 @@ private fun WeightCard(state: AnalysisUiState) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
-            LineChart(values = weightValues)
+            val dateFormatter = java.time.format.DateTimeFormatter.ofPattern("dd.MM.")
+            // Bis zu 4 gleichmäßig verteilte Datumslabels (erste, Mitte(n), letzte)
+            val labelCount = minOf(4, weightPoints.size)
+            val xLabels = if (labelCount <= 1) {
+                listOf(weightPoints.last().date.format(dateFormatter))
+            } else {
+                (0 until labelCount).map { i ->
+                    val idx = i * (weightPoints.size - 1) / (labelCount - 1)
+                    weightPoints[idx].date.format(dateFormatter)
+                }
+            }
+            Text(
+                "Zeitraum: ${weightPoints.first().date.format(dateFormatter)} \u2013 ${weightPoints.last().date.format(dateFormatter)} \u00B7 ${weightValues.size} Messungen",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(NutriSpacing.xs))
+            LineChart(
+                values = weightValues,
+                xLabels = xLabels,
+                valueFormatter = { "%.1f kg".format(it) }
+            )
             Spacer(Modifier.height(NutriSpacing.md))
             Row(
                 Modifier.fillMaxWidth(),

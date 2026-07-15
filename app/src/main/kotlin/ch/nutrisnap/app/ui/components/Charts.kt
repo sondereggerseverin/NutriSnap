@@ -7,8 +7,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -97,7 +100,9 @@ fun LineChart(
     values:      List<Float>,
     modifier:    Modifier = Modifier,
     chartHeight: Dp = 100.dp,
-    lineColor:   Color = MaterialTheme.colorScheme.primary
+    lineColor:   Color = MaterialTheme.colorScheme.primary,
+    xLabels:     List<String> = emptyList(),
+    valueFormatter: (Float) -> String = { "%.1f".format(it) }
 ) {
     if (values.size < 2) {
         Box(
@@ -117,35 +122,82 @@ fun LineChart(
     val max   = (values.maxOrNull() ?: 1f) + 0.5f
     val range = (max - min).coerceAtLeast(0.1f)
 
-    Canvas(modifier = modifier.fillMaxWidth().height(chartHeight)) {
-        val w = size.width
-        val h = size.height
-        val stepX = if (values.size > 1) w / (values.size - 1) else 0f
+    val axisLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val gridColor       = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f)
+    val yAxisWidth       = 38.dp
 
-        val points = values.mapIndexed { i, v ->
-            Offset(x = i * stepX, y = h - ((v - min) / range) * h)
+    Column(modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().height(chartHeight)) {
+            // Y-axis labels (max / min)
+            Column(
+                Modifier.width(yAxisWidth).fillMaxHeight(),
+                horizontalAlignment = Alignment.End
+            ) {
+                Text(valueFormatter(max), fontSize = 10.sp, color = axisLabelColor)
+                Spacer(Modifier.weight(1f))
+                Text(valueFormatter(min), fontSize = 10.sp, color = axisLabelColor)
+            }
+            Spacer(Modifier.width(NutriSpacing.xs))
+            Canvas(Modifier.weight(1f).fillMaxHeight()) {
+                val w = size.width
+                val h = size.height
+                val stepX = if (values.size > 1) w / (values.size - 1) else 0f
+
+                // Horizontal gridlines (top, middle, bottom)
+                for (frac in listOf(0f, 0.5f, 1f)) {
+                    val y = h * frac
+                    drawLine(
+                        color = gridColor,
+                        start = Offset(0f, y),
+                        end   = Offset(w, y),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                }
+
+                val points = values.mapIndexed { i, v ->
+                    Offset(x = i * stepX, y = h - ((v - min) / range) * h)
+                }
+
+                // Draw line segments
+                for (i in 0 until points.size - 1) {
+                    drawLine(
+                        color = lineColor,
+                        start = points[i],
+                        end   = points[i + 1],
+                        strokeWidth = 3.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                }
+
+                // Draw data points - all visible, last one highlighted
+                points.forEachIndexed { i, p ->
+                    val isLast = i == points.size - 1
+                    drawCircle(
+                        color  = lineColor,
+                        radius = if (isLast) 6.dp.toPx() else 3.dp.toPx(),
+                        center = p,
+                        style  = if (isLast) Fill else Stroke(width = 2.dp.toPx())
+                    )
+                }
+            }
         }
-
-        // Draw line segments
-        for (i in 0 until points.size - 1) {
-            drawLine(
-                color = lineColor,
-                start = points[i],
-                end   = points[i + 1],
-                strokeWidth = 3.dp.toPx(),
-                cap = StrokeCap.Round
-            )
-        }
-
-        // Draw data points
-        points.forEachIndexed { i, p ->
-            val isLast = i == points.size - 1
-            drawCircle(
-                color  = if (isLast) lineColor else Color.Transparent,
-                radius = if (isLast) 6.dp.toPx() else 4.dp.toPx(),
-                center = p,
-                style  = if (isLast) Fill else Stroke(width = 2.dp.toPx())
-            )
+        if (xLabels.isNotEmpty()) {
+            Spacer(Modifier.height(NutriSpacing.xs))
+            Row(Modifier.fillMaxWidth().padding(start = yAxisWidth + NutriSpacing.xs)) {
+                xLabels.forEachIndexed { i, label ->
+                    Text(
+                        label,
+                        fontSize = 10.sp,
+                        color = axisLabelColor,
+                        modifier = Modifier.weight(1f),
+                        textAlign = when (i) {
+                            0 -> androidx.compose.ui.text.style.TextAlign.Start
+                            xLabels.size - 1 -> androidx.compose.ui.text.style.TextAlign.End
+                            else -> androidx.compose.ui.text.style.TextAlign.Center
+                        }
+                    )
+                }
+            }
         }
     }
 }
