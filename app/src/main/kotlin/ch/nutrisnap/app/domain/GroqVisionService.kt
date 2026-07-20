@@ -57,7 +57,7 @@ class GroqVisionService {
     companion object {
         // Aktuelles Groq Vision-Modell (Stand 2026, siehe console.groq.com/docs/vision).
         // Falls Groq dieses Modell dereinst deprecated: hier zentral austauschen.
-        private const val VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+        private const val VISION_MODEL = "qwen/qwen3.6-27b"
         private const val MAX_DIMENSION = 1024 // Px – haelt Base64-Payload unter Groq's 4MB-Limit
     }
 
@@ -174,6 +174,7 @@ Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
                 put("model", VISION_MODEL)
                 put("temperature", 0.3)
                 put("max_completion_tokens", 1000)
+                put("reasoning_effort", "none")
                 put("response_format", JSONObject().apply { put("type", "json_object") })
                 put("messages", JSONArray().apply {
                     put(JSONObject().apply {
