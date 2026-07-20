@@ -63,9 +63,10 @@ object GroqFoodEstimatorApi {
             if (apiKey.isBlank()) return@withContext null
 
             val requestJson = JSONObject().apply {
-                put("model", "llama-3.3-70b-versatile")
+                put("model", "openai/gpt-oss-120b")
                 put("temperature", 0.2)
                 put("max_tokens", 300)
+                put("reasoning_effort", "low")
                 put("messages", org.json.JSONArray().apply {
                     put(JSONObject().apply { put("role", "user"); put("content", prompt) })
                 })
