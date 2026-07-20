@@ -519,9 +519,10 @@ $JSON_SCHEMA_HINT
             ))
 
             val requestJson = JSONObject().apply {
-                put("model", "llama-3.3-70b-versatile")
+                put("model", "openai/gpt-oss-120b")
                 put("temperature", 0.7)
                 put("max_tokens", maxTokens)
+                put("reasoning_effort", "low")
                 put("messages", org.json.JSONArray().apply {
                     put(JSONObject().apply {
                         put("role", "user")
