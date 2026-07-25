@@ -63,7 +63,7 @@ interface UserProfileDao {
         GeneratedRecipeEntity::class,
         ShoppingListItem::class
     ],
-    version = 16,
+    version = 17,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -279,6 +279,22 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // Phase 10: erweiterte Nährwert-Aufschlüsselung (Ballaststoffe/Zucker/
+        // gesättigte Fettsäuren/Salz/Natrium) auf diary_entries und recipes,
+        // damit Detailseite und Tagebuch dieselbe Tiefe wie Yazio zeigen können.
+        private val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE diary_entries ADD COLUMN sugar REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE diary_entries ADD COLUMN saturatedFat REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE diary_entries ADD COLUMN salt REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE diary_entries ADD COLUMN sodium REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE recipes ADD COLUMN sugarPerServing REAL")
+                db.execSQL("ALTER TABLE recipes ADD COLUMN saturatedFatPerServing REAL")
+                db.execSQL("ALTER TABLE recipes ADD COLUMN saltPerServing REAL")
+                db.execSQL("ALTER TABLE recipes ADD COLUMN sodiumPerServing REAL")
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -290,7 +306,8 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
                         MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
                         MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
-                        MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16
+                        MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16,
+                        MIGRATION_16_17
                     )
                     .build()
                     .also { INSTANCE = it }
