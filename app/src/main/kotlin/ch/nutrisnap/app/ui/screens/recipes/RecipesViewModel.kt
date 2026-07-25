@@ -234,6 +234,18 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Importiert ein von Claude (Chat) geteiltes Rezept-JSON direkt, ohne Zwischenschritt.
+     * Wird still ignoriert, falls der Text kein erkennbares Rezept-JSON ist.
+     */
+    fun importFromSharedJson(json: String) {
+        val recipe = ch.nutrisnap.app.domain.RecipeJsonImport.tryParse(json) ?: return
+        viewModelScope.launch {
+            val saved = recipe.copy(id = repo.saveRecipe(recipe))
+            _importState.update { it.copy(lastImport = saved) }
+        }
+    }
+
     fun saveManualRecipe(url: String, title: String?, caption: String) {
         viewModelScope.launch {
             val cleaned = RecipeAiParser.cleanCaption(caption)
