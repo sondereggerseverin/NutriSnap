@@ -84,6 +84,7 @@ val bottomNavItems = listOf(
 class MainActivity : ComponentActivity() {
     private var sharedUrl: String? = null
     private var sharedBatchUrls: List<String> = emptyList()
+    private var sharedRecipeJson: String? = null
 
     private val notifPermLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -102,8 +103,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val extractedUrls = extractSharedUrls(intent)
-        if (extractedUrls.size > 1) sharedBatchUrls = extractedUrls else sharedUrl = extractedUrls.firstOrNull()
+        sharedRecipeJson = extractSharedRecipeJson(intent)
+        if (sharedRecipeJson == null) {
+            val extractedUrls = extractSharedUrls(intent)
+            if (extractedUrls.size > 1) sharedBatchUrls = extractedUrls else sharedUrl = extractedUrls.firstOrNull()
+        }
         NotificationHelper.createChannels(this)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -131,6 +135,7 @@ class MainActivity : ComponentActivity() {
                         MainScaffold(
                             sharedUrl = sharedUrl,
                             sharedBatchUrls = sharedBatchUrls,
+                            sharedRecipeJson = sharedRecipeJson,
                             hcVm = hcVm2,
                             onRequestHealthPermission = {
                                 healthConnectPermLauncher.launch(HealthConnectManager.REQUIRED_PERMISSIONS)
@@ -182,6 +187,7 @@ class MainActivity : ComponentActivity() {
                                 MainScaffold(
                                     sharedUrl = sharedUrl,
                                     sharedBatchUrls = sharedBatchUrls,
+                                    sharedRecipeJson = sharedRecipeJson,
                                     hcVm = hcVm,
                                     onRequestHealthPermission = {
                                         healthConnectPermLauncher.launch(
@@ -199,9 +205,38 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        val recipeJson = extractSharedRecipeJson(intent)
+        if (recipeJson != null) {
+            sharedRecipeJson = recipeJson
+            sharedUrl = null; sharedBatchUrls = emptyList()
+            return
+        }
+        sharedRecipeJson = null
         val extractedUrls = extractSharedUrls(intent)
         if (extractedUrls.size > 1) { sharedBatchUrls = extractedUrls; sharedUrl = null }
         else { sharedUrl = extractedUrls.firstOrNull(); sharedBatchUrls = emptyList() }
+    }
+
+    /**
+     * Erkennt ein von Claude (Chat) geteiltes Rezept-JSON (Text markieren -> Teilen, oder
+     * Teilen einer heruntergeladenen .json-Datei). Gibt null zurueck fuer alles andere
+     * (z.B. normale Insta/TikTok/Web-Links), damit die bestehende Link-Erkennung unveraendert
+     * weiterlaeuft.
+     */
+    private fun extractSharedRecipeJson(intent: Intent?): String? {
+        if (intent == null) return null
+        val text = when {
+            intent.action == Intent.ACTION_SEND && intent.type == "text/plain" ->
+                intent.getStringExtra(Intent.EXTRA_TEXT)
+            intent.action == Intent.ACTION_SEND && intent.type == "application/json" -> {
+                val uri = intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)
+                uri?.let { u -> runCatching {
+                    contentResolver.openInputStream(u)?.use { it.reader().readText() }
+                }.getOrNull() }
+            }
+            else -> null
+        } ?: return null
+        return text.takeIf { ch.nutrisnap.app.domain.RecipeJsonImport.tryParse(it) != null }
     }
 
     /**
@@ -244,6 +279,7 @@ private val popExit   = slideOutHorizontally(tween(280)) { it / 4 } + fadeOut(tw
 fun MainScaffold(
     sharedUrl: String?,
     sharedBatchUrls: List<String> = emptyList(),
+    sharedRecipeJson: String? = null,
     hcVm: HealthConnectViewModel,
     onRequestHealthPermission: () -> Unit
 ) {
@@ -251,8 +287,8 @@ fun MainScaffold(
     val backEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backEntry?.destination?.route
 
-    LaunchedEffect(sharedUrl, sharedBatchUrls) {
-        if (!sharedUrl.isNullOrBlank() || sharedBatchUrls.isNotEmpty()) {
+    LaunchedEffect(sharedUrl, sharedBatchUrls, sharedRecipeJson) {
+        if (!sharedUrl.isNullOrBlank() || sharedBatchUrls.isNotEmpty() || !sharedRecipeJson.isNullOrBlank()) {
             navController.navigate(Screen.Recipes.route) {
                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                 launchSingleTop = true; restoreState = true
@@ -328,7 +364,7 @@ fun MainScaffold(
                 Screen.Recipes.route,
                 enterTransition = { tabEnter }, exitTransition = { tabExit },
                 popEnterTransition = { tabEnter }, popExitTransition = { tabExit }
-            ) { RecipesHubScreen(sharedUrl = sharedUrl, sharedBatchUrls = sharedBatchUrls) }
+            ) { RecipesHubScreen(sharedUrl = sharedUrl, sharedBatchUrls = sharedBatchUrls, sharedRecipeJson = sharedRecipeJson) }
             composable(
                 Screen.Analysis.route,
                 enterTransition = { tabEnter }, exitTransition = { tabExit },

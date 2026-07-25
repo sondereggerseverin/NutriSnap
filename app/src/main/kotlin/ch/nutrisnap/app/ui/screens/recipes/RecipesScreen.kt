@@ -104,7 +104,8 @@ fun RecipesScreen(
     diaryVm: ch.nutrisnap.app.ui.screens.diary.DiaryViewModel = viewModel(),
     shoppingVm: ch.nutrisnap.app.ui.screens.shopping.ShoppingListViewModel = viewModel(),
     sharedUrl: String? = null,
-    sharedBatchUrls: List<String> = emptyList()
+    sharedBatchUrls: List<String> = emptyList(),
+    sharedRecipeJson: String? = null
 ) {
     val state by vm.uiState.collectAsState()
     var showImportSheet   by remember { mutableStateOf(false) }
@@ -117,6 +118,7 @@ fun RecipesScreen(
     val batchState by vm.batchState.collectAsState()
 
     LaunchedEffect(sharedUrl) { if (!sharedUrl.isNullOrBlank()) showImportSheet = true }
+    LaunchedEffect(sharedRecipeJson) { if (!sharedRecipeJson.isNullOrBlank()) vm.importFromSharedJson(sharedRecipeJson) }
     LaunchedEffect(state.instagramBlocked) { if (state.instagramBlocked) showImportSheet = true }
     LaunchedEffect(sharedBatchUrls) {
         if (sharedBatchUrls.isNotEmpty()) { vm.addBatchUrls(sharedBatchUrls); showBatchSheet = true }
