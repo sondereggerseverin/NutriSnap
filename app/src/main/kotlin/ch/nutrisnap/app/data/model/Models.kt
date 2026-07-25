@@ -21,7 +21,11 @@ data class DiaryEntry(
     val carbs: Float,
     val fat: Float,
     @ColumnInfo(defaultValue = "0") val sortOrder: Int = 0,
-    @ColumnInfo(defaultValue = "0") val fiber: Float = 0f
+    @ColumnInfo(defaultValue = "0") val fiber: Float = 0f,
+    @ColumnInfo(defaultValue = "0") val sugar: Float = 0f,
+    @ColumnInfo(defaultValue = "0") val saturatedFat: Float = 0f,
+    @ColumnInfo(defaultValue = "0") val salt: Float = 0f,
+    @ColumnInfo(defaultValue = "0") val sodium: Float = 0f
 )
 
 enum class MealType { BREAKFAST, LUNCH, DINNER, SNACK }
@@ -62,6 +66,10 @@ data class Recipe(
     val carbsPerServing: Float? = null,
     val fatPerServing: Float? = null,
     val fiberPerServing: Float? = null,
+    val sugarPerServing: Float? = null,
+    val saturatedFatPerServing: Float? = null,
+    val saltPerServing: Float? = null,
+    val sodiumPerServing: Float? = null,
     val servings: Int = 1,
     val prepTimeMinutes: Int? = null,
     val tags: String = "",          // Komma-separierte DietTag-Namen
