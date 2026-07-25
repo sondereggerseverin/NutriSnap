@@ -200,6 +200,16 @@ val MICRO_META: Map<String, Triple<String, String, Float>> = mapOf(
     "tin" to Triple("Zinn", "mg", 1000f),
     "vanadium" to Triple("Vanadium", "µg", 1_000_000f)
 )
+/** EU-Referenzmenge (NRV) je Nährstoff in Gramm (bereits in Gramm-Basis wie MICRO-Werte selbst). */
+private val NRV_REFERENCE: Map<String, Float> = mapOf(
+    "vitaminA" to 0.0008f, "vitaminB1" to 0.0011f, "vitaminB2" to 0.0014f, "vitaminB3" to 0.016f,
+    "vitaminB5" to 0.006f, "vitaminB6" to 0.0014f, "vitaminB7" to 0.00005f, "vitaminB11" to 0.0002f,
+    "vitaminB12" to 0.0000025f, "vitaminC" to 0.08f, "vitaminD" to 0.000005f, "vitaminE" to 0.012f,
+    "vitaminK" to 0.000075f,
+    "potassium" to 2f, "calcium" to 0.8f, "iron" to 0.014f, "magnesium" to 0.375f, "zinc" to 0.01f,
+    "phosphorus" to 0.7f, "copper" to 0.001f, "manganese" to 0.002f, "iodine" to 0.00015f,
+    "selenium" to 0.000055f, "chloride" to 0.8f
+)
 private val MICRO_OTHER = listOf("fiber","sugar","saturatedFat","monoFat","polyFat","transFat","alcohol","cholesterol","salt","sodium","water")
 private val MICRO_VITAMINS = listOf("vitaminA","vitaminB1","vitaminB2","vitaminB3","vitaminB5","vitaminB6","vitaminB7","vitaminB11","vitaminB12","vitaminC","vitaminD","vitaminE","vitaminK")
 private val MICRO_MINERALS = listOf("potassium","calcium","iron","magnesium","zinc","phosphorus","copper","manganese","fluoride","iodine","selenium","chromium","molybdenum","chloride","choline","arsenic","boron","cobalt","rubidium","silicon","sulfur","tin","vanadium")
@@ -230,9 +240,14 @@ fun MicronutrientTable(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(label, fontSize = 12.sp, color = subColor)
-                            val display = value * ratio * factor
+                            val grams = value * ratio
+                            val display = grams * factor
                             val formatted = if (display in 0.01f..0.99f) "< 1" else display.toInt().toString()
-                            Text("$formatted $unit", fontSize = 12.sp, color = subColor)
+                            val nrvPct = NRV_REFERENCE[key]?.let { ref -> ((grams / ref) * 100f).toInt() }
+                            Text(
+                                "$formatted $unit" + (nrvPct?.let { "  ·  $it% NRV" } ?: ""),
+                                fontSize = 12.sp, color = subColor
+                            )
                         }
                     }
                 }
