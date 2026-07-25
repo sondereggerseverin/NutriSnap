@@ -1039,6 +1039,12 @@ private fun NutritionAnalysisCard(
     val protPerServ = result?.proteinPerServing ?: recipe.proteinPerServing
     val carbPerServ = result?.carbsPerServing   ?: recipe.carbsPerServing
     val fatPerServ  = result?.fatPerServing     ?: recipe.fatPerServing
+    val servDiv = recipe.servings.coerceAtLeast(1)
+    val fiberPerServ  = result?.totalMicros?.get("fiber")?.let { it / servDiv } ?: recipe.fiberPerServing
+    val sugarPerServ  = result?.totalMicros?.get("sugar")?.let { it / servDiv } ?: recipe.sugarPerServing
+    val satFatPerServ = result?.totalMicros?.get("saturatedFat")?.let { it / servDiv } ?: recipe.saturatedFatPerServing
+    val saltPerServ   = result?.totalMicros?.get("salt")?.let { it / servDiv } ?: recipe.saltPerServing
+    val sodiumPerServ = result?.totalMicros?.get("sodium")?.let { it / servDiv } ?: recipe.sodiumPerServing
 
     val hasMacros = calsPerServ != null || protPerServ != null
 
@@ -1076,6 +1082,24 @@ private fun NutritionAnalysisCard(
                     protPerServ?.let { MacroItem("Protein",  "${(it*ratio).toInt()}", "g") }
                     carbPerServ?.let { MacroItem("Kohlenhy.", "${(it*ratio).toInt()}", "g") }
                     fatPerServ?.let  { MacroItem("Fett",     "${(it*ratio).toInt()}", "g") }
+                }
+                if (fiberPerServ != null || sugarPerServ != null || satFatPerServ != null || saltPerServ != null) {
+                    Spacer(Modifier.height(6.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f))
+                    Spacer(Modifier.height(6.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        fiberPerServ?.let {
+                            SubNutrientRow("Ballaststoffe", "${(it * ratio).toInt()} g",
+                                highlight = true)
+                        }
+                        sugarPerServ?.let { SubNutrientRow("davon Zucker", "${(it * ratio).toInt()} g") }
+                        satFatPerServ?.let { SubNutrientRow("davon gesättigte Fettsäuren", "${(it * ratio).toInt()} g") }
+                        saltPerServ?.let {
+                            val mg = sodiumPerServ?.let { na -> (na * ratio * 1000f).toInt() }
+                                ?: (it * ratio * 1000f / 2.5f).toInt() // Näherung falls kein direkter Natrium-Wert: Na ≈ Salz/2.5
+                            SubNutrientRow("Salz", "${formatSmall(it * ratio)} g (Natrium ≈ $mg mg)")
+                        }
+                    }
                 }
                 // Analysis details
                 result?.let { r ->
@@ -1228,6 +1252,27 @@ fun AddToDiarySheet(
             color=MaterialTheme.colorScheme.onSecondaryContainer)
     }
 }
+private fun formatSmall(value: Float): String =
+    if (value in 0.01f..0.99f) "< 1" else "%.1f".format(value)
+
+@Composable
+private fun SubNutrientRow(label: String, value: String, highlight: Boolean = false) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(
+            label, fontSize = 12.sp,
+            fontWeight = if (highlight) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (highlight) MaterialTheme.colorScheme.tertiary
+                    else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+        )
+        Text(
+            value, fontSize = 12.sp,
+            fontWeight = if (highlight) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (highlight) MaterialTheme.colorScheme.tertiary
+                    else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+        )
+    }
+}
+
 @Composable private fun MacroItem(label: String, value: String, unit: String) {
     Column(horizontalAlignment=Alignment.CenterHorizontally) {
         Text(value, fontWeight=FontWeight.Bold, fontSize=18.sp, color=MaterialTheme.colorScheme.onPrimaryContainer)
