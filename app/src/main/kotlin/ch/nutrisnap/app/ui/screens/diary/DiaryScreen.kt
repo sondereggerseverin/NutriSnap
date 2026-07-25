@@ -318,6 +318,15 @@ private fun EntryDetailSheet(
     val factor = entry.amountGrams / 100f
     val micros = remember(foodItem, entry.amountGrams) {
         buildMap<String, Float> {
+            if (foodItem == null) {
+                // Kein verknüpftes FoodItem (z.B. Rezept- oder manueller Eintrag) —
+                // auf die am DiaryEntry selbst gespeicherten Werte zurückfallen.
+                if (entry.fiber > 0f) put("fiber", entry.fiber)
+                if (entry.sugar > 0f) put("sugar", entry.sugar)
+                if (entry.saturatedFat > 0f) put("saturatedFat", entry.saturatedFat)
+                if (entry.salt > 0f) put("salt", entry.salt)
+                if (entry.sodium > 0f) put("sodium", entry.sodium)
+            }
             foodItem?.let { f ->
                 f.fiber?.let { put("fiber", it * factor) }
                 f.sugar?.let { put("sugar", it * factor) }
