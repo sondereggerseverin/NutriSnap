@@ -38,6 +38,21 @@ import kotlinx.coroutines.launch
 
 // ── State for a single ingredient during verification ─────────────────────────
 
+/**
+ * Persistente, leichte Repräsentation einer manuellen Zutaten-Anpassung.
+ * Wird (anders als IngredientVerifyState) außerhalb des Sheets im ViewModel
+ * gehalten, damit sie weder beim Schließen des Sheets noch bei "Neu berechnen"
+ * (frische AnalysisResult-Instanz) verloren geht. Schlüssel ist die Zutaten-
+ * Zeile (result.line) — identisch zum Key, den die LazyColumn ohnehin nutzt.
+ */
+data class IngredientOverride(
+    val override: FoodItem? = null,
+    val manualFiber: Float? = null,
+    val amountOverride: Float? = null,
+    /** True = Zutat wurde vom User entfernt; beim Merge übersprungen. */
+    val deleted: Boolean = false
+)
+
 data class IngredientVerifyState(
     val result: RecipeNutritionAnalyzer.IngredientResult,
     // Override set by user scanning/searching/manual
@@ -80,6 +95,46 @@ data class IngredientVerifyState(
         } ?: result.micros.mapValues { it.value * amountRatio }
         return manualFiber?.let { base + ("fiber" to it) } ?: base
     }
+
+    fun toOverride(): IngredientOverride =
+        IngredientOverride(override = override, manualFiber = manualFiber, amountOverride = amountOverride)
+}
+
+data class VerifiedTotals(
+    val kcal: Float, val protein: Float, val carbs: Float, val fat: Float,
+    val fiber: Float?, val sugar: Float?, val saturatedFat: Float?, val salt: Float?, val sodium: Float?
+)
+
+/** Baut die aktuelle Zutatenliste aus einem frischen AnalysisResult + gespeicherten
+ *  manuellen Anpassungen zusammen. Als Löschung markierte Zutaten werden ausgelassen. */
+fun mergeIngredientOverrides(
+    ingredients: List<RecipeNutritionAnalyzer.IngredientResult>,
+    overrides: Map<String, IngredientOverride>
+): List<IngredientVerifyState> = ingredients.mapNotNull { result ->
+    val ov = overrides[result.line]
+    when {
+        ov?.deleted == true -> null
+        ov != null -> IngredientVerifyState(result, ov.override, ov.manualFiber, ov.amountOverride)
+        else -> IngredientVerifyState(result)
+    }
+}
+
+/** Reine Summierungslogik, wiederverwendbar sowohl im Sheet (Live-Anzeige) als
+ *  auch im ViewModel (Button "Auswahl übernehmen", ohne Sheet zu öffnen). */
+fun computeVerifiedTotals(states: List<IngredientVerifyState>): VerifiedTotals {
+    fun microTotal(key: String): Float? =
+        states.mapNotNull { it.effectiveMicros[key] }.takeIf { it.isNotEmpty() }?.sum()
+    return VerifiedTotals(
+        kcal = states.sumOf { it.effectiveCalories.toDouble() }.toFloat(),
+        protein = states.sumOf { it.effectiveProtein.toDouble() }.toFloat(),
+        carbs = states.sumOf { it.effectiveCarbs.toDouble() }.toFloat(),
+        fat = states.sumOf { it.effectiveFat.toDouble() }.toFloat(),
+        fiber = microTotal("fiber"),
+        sugar = microTotal("sugar"),
+        saturatedFat = microTotal("saturatedFat"),
+        salt = microTotal("salt"),
+        sodium = microTotal("sodium")
+    )
 }
 
 // ── Main Sheet ────────────────────────────────────────────────────────────────
@@ -90,33 +145,39 @@ fun IngredientVerifySheet(
     analysisResult: RecipeNutritionAnalyzer.AnalysisResult,
     recipeName: String,
     servings: Int,
+    /** Zuletzt gespeicherte manuelle Anpassungen für dieses Rezept (ViewModel-Zustand,
+     *  überlebt Schließen des Sheets und "Neu berechnen"). */
+    initialOverrides: Map<String, IngredientOverride> = emptyMap(),
+    /** Wird bei JEDER manuellen Änderung sofort aufgerufen, damit das ViewModel
+     *  den Stand hält — nicht erst bei "Nährwerte übernehmen". */
+    onOverridesChanged: (Map<String, IngredientOverride>) -> Unit = {},
     onDismiss: () -> Unit,
     onConfirm: (
         totalKcal: Float, protein: Float, carbs: Float, fat: Float,
         fiber: Float?, sugar: Float?, saturatedFat: Float?, salt: Float?, sodium: Float?
     ) -> Unit
 ) {
+    var overrides by remember { mutableStateOf(initialOverrides) }
     var verifyStates by remember {
-        mutableStateOf(analysisResult.ingredients.map { IngredientVerifyState(it) })
+        mutableStateOf(mergeIngredientOverrides(analysisResult.ingredients, initialOverrides))
     }
     // Merkt sich, für welches AnalysisResult verifyStates zuletzt aufgebaut wurde.
-    // Verhindert, dass ein neues Analyse-Ergebnis (z. B. durch "Neu berechnen")
-    // manuelle Anpassungen (override/manualFiber/amountOverride) überschreibt.
+    // Verhindert, dass ein neues Analyse-Ergebnis (z. B. durch "Neu berechnen" in der
+    // Rezeptkarte) manuelle Anpassungen überschreibt — diese werden aus `overrides`
+    // (ViewModel-gestützt, überlebt auch das Schließen dieses Sheets) neu gemerged.
     var lastMergedResult by remember { mutableStateOf(analysisResult) }
     LaunchedEffect(analysisResult) {
         if (analysisResult !== lastMergedResult) {
-            val previousByLine = verifyStates.associateBy { it.result.line }
-            verifyStates = analysisResult.ingredients.map { newResult ->
-                // Manuell überschriebene Zutaten (gleiche Zeile) bleiben exakt erhalten —
-                // nur ihr `result` (Basiswert aus DB/API) wird aktualisiert, falls sich
-                // z. B. die Portionsgröße geändert hat. Nicht überschriebene Zutaten
-                // werden komplett neu aus dem frischen Analyse-Ergebnis übernommen.
-                val prev = previousByLine[newResult.line]
-                if (prev != null) prev.copy(result = newResult) else IngredientVerifyState(newResult)
-            }
+            verifyStates = mergeIngredientOverrides(analysisResult.ingredients, overrides)
             lastMergedResult = analysisResult
         }
     }
+
+    fun updateOverride(line: String, ov: IngredientOverride?) {
+        overrides = if (ov == null) overrides - line else overrides + (line to ov)
+        onOverridesChanged(overrides)
+    }
+
     var scanTarget by remember { mutableStateOf<Int?>(null) }  // index of ingredient being scanned
     val context = LocalContext.current
 
@@ -244,12 +305,14 @@ fun IngredientVerifySheet(
                     onScan = { scanTarget = index },
                     onDelete = {
                         verifyStates = verifyStates.toMutableList().also { it.remove(state) }
+                        updateOverride(line, IngredientOverride(deleted = true))
                     },
                     onManualFiberSaved = { value ->
                         val updated = verifyStates.toMutableList().also {
                             it[index] = it[index].copy(manualFiber = value)
                         }
                         verifyStates = updated
+                        updateOverride(line, updated[index].toOverride())
                         val newTotal = updated.mapNotNull { it.effectiveMicros["fiber"] }.takeIf { it.isNotEmpty() }?.sum()
                         newTotal?.let {
                             android.widget.Toast.makeText(
@@ -260,9 +323,11 @@ fun IngredientVerifySheet(
                         }
                     },
                     onAmountSaved = { value ->
-                        verifyStates = verifyStates.toMutableList().also {
+                        val updated = verifyStates.toMutableList().also {
                             it[index] = it[index].copy(amountOverride = value)
                         }
+                        verifyStates = updated
+                        updateOverride(line, updated[index].toOverride())
                     }
                 )
                 HorizontalDivider(
@@ -306,9 +371,11 @@ fun IngredientVerifySheet(
             ingredientName = verifyStates[idx].result.parsed?.name ?: verifyStates[idx].result.line,
             onDismiss = { scanTarget = null },
             onFoodSelected = { food ->
-                verifyStates = verifyStates.toMutableList().also {
+                val updated = verifyStates.toMutableList().also {
                     it[idx] = it[idx].copy(override = food)
                 }
+                verifyStates = updated
+                updateOverride(updated[idx].result.line, updated[idx].toOverride())
                 scanTarget = null
             }
         )
