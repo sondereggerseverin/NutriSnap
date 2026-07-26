@@ -96,10 +96,29 @@ fun IngredientVerifySheet(
         fiber: Float?, sugar: Float?, saturatedFat: Float?, salt: Float?, sodium: Float?
     ) -> Unit
 ) {
-    var verifyStates by remember(analysisResult) {
+    var verifyStates by remember {
         mutableStateOf(analysisResult.ingredients.map { IngredientVerifyState(it) })
     }
+    // Merkt sich, für welches AnalysisResult verifyStates zuletzt aufgebaut wurde.
+    // Verhindert, dass ein neues Analyse-Ergebnis (z. B. durch "Neu berechnen")
+    // manuelle Anpassungen (override/manualFiber/amountOverride) überschreibt.
+    var lastMergedResult by remember { mutableStateOf(analysisResult) }
+    LaunchedEffect(analysisResult) {
+        if (analysisResult !== lastMergedResult) {
+            val previousByLine = verifyStates.associateBy { it.result.line }
+            verifyStates = analysisResult.ingredients.map { newResult ->
+                // Manuell überschriebene Zutaten (gleiche Zeile) bleiben exakt erhalten —
+                // nur ihr `result` (Basiswert aus DB/API) wird aktualisiert, falls sich
+                // z. B. die Portionsgröße geändert hat. Nicht überschriebene Zutaten
+                // werden komplett neu aus dem frischen Analyse-Ergebnis übernommen.
+                val prev = previousByLine[newResult.line]
+                if (prev != null) prev.copy(result = newResult) else IngredientVerifyState(newResult)
+            }
+            lastMergedResult = analysisResult
+        }
+    }
     var scanTarget by remember { mutableStateOf<Int?>(null) }  // index of ingredient being scanned
+    val context = LocalContext.current
 
     // Aufklapp-Status pro Zutat (Zeilen-Key) + Ziel für "direkt in Ballaststoffe-Eingabe springen"
     var expandedLines by remember { mutableStateOf(setOf<String>()) }
@@ -227,8 +246,17 @@ fun IngredientVerifySheet(
                         verifyStates = verifyStates.toMutableList().also { it.remove(state) }
                     },
                     onManualFiberSaved = { value ->
-                        verifyStates = verifyStates.toMutableList().also {
+                        val updated = verifyStates.toMutableList().also {
                             it[index] = it[index].copy(manualFiber = value)
+                        }
+                        verifyStates = updated
+                        val newTotal = updated.mapNotNull { it.effectiveMicros["fiber"] }.takeIf { it.isNotEmpty() }?.sum()
+                        newTotal?.let {
+                            android.widget.Toast.makeText(
+                                context,
+                                "Ballaststoffe aktualisiert → neuer Gesamtwert: ${"%.1f".format(it)} g",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
                         }
                     },
                     onAmountSaved = { value ->
