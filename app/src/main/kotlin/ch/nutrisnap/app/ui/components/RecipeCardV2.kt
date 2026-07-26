@@ -189,15 +189,26 @@ private fun RecipeMacroRow(recipe: Recipe, ratio: Float) {
     val carbs = recipe.carbsPerServing?.let { it * ratio }
     val fiber = recipe.fiberPerServing?.let { it * ratio }
 
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(NutriSpacing.md)
-    ) {
-        protein?.let { MacroCompact("P", it, "g", MacroColors.protein) }
-        kcal?.let { MacroCompact("", it, "kcal", MacroColors.calories) }
-        fat?.let { MacroCompact("F", it, "g", MacroColors.fat) }
-        carbs?.let { MacroCompact("KH", it, "g", MacroColors.carbs) }
-        fiber?.let { MacroCompact("Balla.", it, "g", MacroColors.fiber) }
+    Column {
+        kcal?.let {
+            Text(
+                "${it.toInt()} kcal",
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                color = MacroColors.calories
+            )
+            Spacer(Modifier.height(NutriSpacing.sm))
+        }
+
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(NutriSpacing.md)
+        ) {
+            protein?.let { MacroCompact("P", it, "g", MacroColors.protein) }
+            fat?.let { MacroCompact("F", it, "g", MacroColors.fat) }
+            carbs?.let { MacroCompact("KH", it, "g", MacroColors.carbs) }
+            fiber?.let { MacroCompact("Balla.", it, "g", MacroColors.fiber) }
+        }
     }
 }
 
@@ -210,8 +221,6 @@ private fun MacroCompact(label: String, value: Float, unit: String, color: Color
             fontSize = 13.sp,
             color = color
         )
-        if (label.isNotBlank()) {
-            Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
