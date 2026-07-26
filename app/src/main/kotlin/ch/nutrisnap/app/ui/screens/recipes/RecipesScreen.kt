@@ -287,6 +287,8 @@ fun RecipesScreen(
             analysisResult = verifyResult,
             recipeName     = verifyRecipe.title,
             servings       = verifyRecipe.servings,
+            initialOverrides = vm.getOverridesFor(verifyRecipe.id),
+            onOverridesChanged = { vm.setOverridesFor(verifyRecipe.id, it) },
             onDismiss      = { showVerifySheet = false },
             onConfirm      = { kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium ->
                 vm.applyVerifiedNutrition(verifyRecipe, kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium)
@@ -306,6 +308,8 @@ fun RecipesScreen(
             onEdit       = { editRecipe = live; selectedRecipe = null },
             onAnalyze    = { vm.analyzeNutrition(live) },
             onVerify     = { showVerifySheet = true },
+            onRecalculateFromOverrides = { vm.recalculateFromOverrides(live) },
+            hasStoredOverrides = vm.getOverridesFor(live.id).isNotEmpty(),
             onAddToShoppingList = { r ->
                 val ratio = r.servings.toFloat() / live.servings.coerceAtLeast(1).toFloat()
                 val names = live.ingredients.lines().mapNotNull { rawLine ->
@@ -719,6 +723,8 @@ fun RecipeDetailSheet(
     onEdit: () -> Unit,
     onAnalyze: () -> Unit,
     onVerify: () -> Unit = {},
+    onRecalculateFromOverrides: () -> Unit = {},
+    hasStoredOverrides: Boolean = false,
     onAddToShoppingList: (Recipe) -> Unit = {},
     onUpdateIngredients: (String) -> Unit = {}
 ) {
@@ -785,7 +791,9 @@ fun RecipeDetailSheet(
                     servings       = servings,
                     ratio          = ratio,
                     onAnalyze      = onAnalyze,
-                    onVerify       = onVerify
+                    onVerify       = onVerify,
+                    onRecalculateFromOverrides = onRecalculateFromOverrides,
+                    hasStoredOverrides = hasStoredOverrides
                 )
                 Spacer(Modifier.height(8.dp))
                 Button(onClick={onAddToDiary(recipe.copy(servings=servings))}, modifier=Modifier.fillMaxWidth()) {
@@ -1042,7 +1050,9 @@ private fun NutritionAnalysisCard(
     servings: Int,
     ratio: Float,
     onAnalyze: () -> Unit,
-    onVerify: () -> Unit = {}
+    onVerify: () -> Unit = {},
+    onRecalculateFromOverrides: () -> Unit = {},
+    hasStoredOverrides: Boolean = false
 ) {
     val isForThis = nutritionState.recipeId == recipe.id
     val isAnalyzing = nutritionState.isAnalyzing && isForThis
@@ -1072,10 +1082,23 @@ private fun NutritionAnalysisCard(
                 Text("📊 Nährwerte", fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onPrimaryContainer)
                 if (!isAnalyzing) {
-                    TextButton(onClick = onAnalyze, contentPadding = PaddingValues(4.dp)) {
-                        Icon(Icons.Default.Calculate, null, Modifier.size(14.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text(if (hasMacros) "Neu berechnen" else "Berechnen", fontSize = 11.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Nur sichtbar, wenn manuell verifizierte/angepasste Zutaten vorliegen:
+                        // summiert diese neu, OHNE erneut extern zu suchen — im Gegensatz zu
+                        // "Neu berechnen", das die komplette Zutatenliste neu von OFF/USDA/KI holt
+                        // und dabei manuelle Anpassungen NICHT berücksichtigt.
+                        if (hasStoredOverrides && isForThis) {
+                            TextButton(onClick = onRecalculateFromOverrides, contentPadding = PaddingValues(4.dp)) {
+                                Icon(Icons.Default.Sync, null, Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Auswahl übernehmen", fontSize = 11.sp)
+                            }
+                        }
+                        TextButton(onClick = onAnalyze, contentPadding = PaddingValues(4.dp)) {
+                            Icon(Icons.Default.Calculate, null, Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(if (hasMacros) "Neu berechnen" else "Berechnen", fontSize = 11.sp)
+                        }
                     }
                 }
             }
