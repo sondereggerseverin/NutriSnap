@@ -25,7 +25,12 @@ data class DiaryEntry(
     @ColumnInfo(defaultValue = "0") val sugar: Float = 0f,
     @ColumnInfo(defaultValue = "0") val saturatedFat: Float = 0f,
     @ColumnInfo(defaultValue = "0") val salt: Float = 0f,
-    @ColumnInfo(defaultValue = "0") val sodium: Float = 0f
+    @ColumnInfo(defaultValue = "0") val sodium: Float = 0f,
+    /** Nur bei Rezept-Einträgen gesetzt, wenn der Nutzer die Menge in Gramm statt
+     *  in Portionen eingegeben hat. amountGrams speichert weiterhin den daraus
+     *  abgeleiteten Portionsfaktor (für die Nährwert-Skalierung); recipeGrams ist
+     *  ausschliesslich für die Anzeige ("180 g" statt "0.8 Portionen"). */
+    val recipeGrams: Float? = null
 )
 
 enum class MealType { BREAKFAST, LUNCH, DINNER, SNACK }

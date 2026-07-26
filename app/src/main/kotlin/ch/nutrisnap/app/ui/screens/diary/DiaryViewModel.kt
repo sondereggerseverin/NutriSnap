@@ -133,8 +133,8 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun addRecipeAsMeal(recipe: Recipe, servingsFactor: Float, meal: MealType) {
-        viewModelScope.launch { repo.addRecipeAsMeal(recipe, servingsFactor, meal, _date.value) }
+    fun addRecipeAsMeal(recipe: Recipe, servingsFactor: Float, meal: MealType, gramsAmount: Float? = null) {
+        viewModelScope.launch { repo.addRecipeAsMeal(recipe, servingsFactor, meal, _date.value, gramsAmount) }
     }
 
     fun updateEntryAmount(entry: DiaryEntry, newValue: Float) {
@@ -146,7 +146,11 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
                     protein  = entry.protein * ratio,
                     carbs    = entry.carbs   * ratio,
                     fat      = entry.fat     * ratio,
-                    fiber    = entry.fiber   * ratio
+                    fiber    = entry.fiber   * ratio,
+                    sugar        = entry.sugar        * ratio,
+                    saturatedFat = entry.saturatedFat * ratio,
+                    salt         = entry.salt         * ratio,
+                    sodium       = entry.sodium       * ratio
                 ))
             } else {
                 val factor = newValue / entry.amountGrams
@@ -156,7 +160,12 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
                     protein     = entry.protein  * factor,
                     carbs       = entry.carbs    * factor,
                     fat         = entry.fat      * factor,
-                    fiber       = entry.fiber    * factor
+                    fiber       = entry.fiber    * factor,
+                    sugar        = entry.sugar        * factor,
+                    saturatedFat = entry.saturatedFat * factor,
+                    salt         = entry.salt         * factor,
+                    sodium       = entry.sodium       * factor,
+                    recipeGrams  = entry.recipeGrams?.let { it * factor }
                 ))
             }
         }

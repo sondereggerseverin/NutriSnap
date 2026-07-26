@@ -242,7 +242,11 @@ fun MicronutrientTable(
                             Text(label, fontSize = 12.sp, color = subColor)
                             val grams = value * ratio
                             val display = grams * factor
-                            val formatted = if (display in 0.01f..0.99f) "< 1" else display.toInt().toString()
+                            val formatted = when {
+                                key == "fiber" -> "%.1f".format(display)
+                                display in 0.01f..0.99f -> "< 1"
+                                else -> display.toInt().toString()
+                            }
                             val nrvPct = NRV_REFERENCE[key]?.let { ref -> ((grams / ref) * 100f).toInt() }
                             Text(
                                 "$formatted $unit" + (nrvPct?.let { "  ·  $it% NRV" } ?: ""),

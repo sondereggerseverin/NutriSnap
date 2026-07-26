@@ -64,7 +64,10 @@ object RecipeNutritionAnalyzer {
         /** How many of the matched ingredients came from the AI estimate (vs. real DB data). */
         val estimatedCount:     Int = 0,
         /** Summe aller Mikronaehrstoffe über alle Zutaten (absolut, nicht pro Portion). */
-        val totalMicros:        Map<String, Float> = emptyMap()
+        val totalMicros:        Map<String, Float> = emptyMap(),
+        /** False, wenn mindestens eine gematchte Zutat keine Ballaststoff-Angabe hatte
+         *  (totalMicros["fiber"] ist dann eine Unterschätzung, nicht 0). */
+        val fiberComplete:      Boolean = true
     )
 
     /** Alle nicht-null Mikronaehrstoffe eines FoodItem (pro 100g), skaliert auf [factor]. */
@@ -466,7 +469,9 @@ object RecipeNutritionAnalyzer {
             matchedCount       = results.count { it.matched },
             totalCount         = results.size,
             estimatedCount     = results.count { it.estimated },
-            totalMicros        = sumMicros(results.map { it.micros })
+            totalMicros        = sumMicros(results.map { it.micros }),
+            fiberComplete      = results.filter { it.matched }
+                .let { matched -> matched.isNotEmpty() && matched.all { it.micros.containsKey("fiber") } }
         )
     }
 

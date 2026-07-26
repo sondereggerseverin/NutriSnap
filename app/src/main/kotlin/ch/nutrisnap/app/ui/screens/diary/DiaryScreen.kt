@@ -50,6 +50,19 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+/** Formatiert eine Rezept-Portionsmenge (amountGrams speichert bei Rezepten den
+ *  Portionsfaktor, nicht Gramm) als "1 Portion", "2 Portionen", "0.5 Portionen" etc. */
+private fun formatPortionAmount(amount: Float): String {
+    val text = if (amount == amount.toInt().toFloat()) amount.toInt().toString() else "%.1f".format(amount)
+    return "$text Portion${if (amount == 1f) "" else "en"}"
+}
+
+/** Anzeige für einen Rezept-Tagebucheintrag: exakte Grammzahl, wenn der Nutzer in
+ *  Gramm erfasst hat (entry.recipeGrams gesetzt), sonst die Portionsanzahl. */
+private fun recipeAmountLabel(entry: DiaryEntry): String =
+    entry.recipeGrams?.let { "${it.toInt()} g" }
+        ?: formatPortionAmount(entry.amountGrams.takeIf { it > 0f } ?: 1f)
+
 private fun defaultMealForNow(): MealType = when (LocalTime.now().hour) {
     in 5..10  -> MealType.BREAKFAST
     in 11..14 -> MealType.LUNCH
@@ -250,7 +263,14 @@ private fun EditEntryDialog(
 ) {
     val isRecipe = entry.amountGrams == 0f || entry.foodItemId < 0
     var amountText by remember { mutableStateOf(
-        if (isRecipe) "1" else entry.amountGrams.toInt().toString()
+        when {
+            // Echter Rezept-Eintrag: amountGrams speichert den tatsächlichen Portionsfaktor.
+            entry.amountGrams > 0f && entry.foodItemId < 0 ->
+                if (entry.amountGrams == entry.amountGrams.toInt().toFloat()) entry.amountGrams.toInt().toString()
+                else entry.amountGrams.toString()
+            isRecipe -> "1" // manueller Eintrag (amountGrams == 0, keine Portionsangabe)
+            else -> entry.amountGrams.toInt().toString()
+        }
     ) }
     val unit = if (isRecipe) "Port." else "g"
 
@@ -403,7 +423,8 @@ private fun EntryDetailSheet(
             }
             val isRecipe = entry.amountGrams == 0f || entry.foodItemId < 0
             Text(
-                if (isRecipe) "1 Portion" else "${entry.amountGrams.toInt()} g",
+                if (isRecipe) recipeAmountLabel(entry)
+                else "${entry.amountGrams.toInt()} g",
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -583,7 +604,8 @@ private fun DiaryEntryRow(
     var showConfirm by remember { mutableStateOf(false) }
 
     val isRecipeEntry = entry.amountGrams == 0f || entry.foodItemId < 0
-    val amountLabel   = if (isRecipeEntry) "1 Port." else "${entry.amountGrams.toInt()} g"
+    val amountLabel   = if (isRecipeEntry) recipeAmountLabel(entry)
+                         else "${entry.amountGrams.toInt()} g"
 
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->

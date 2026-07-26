@@ -359,7 +359,7 @@ private fun HomeHeader(state: HomeUiState) {
                 Spacer(Modifier.height(NutriSpacing.sm))
                 WhiteMacroBar("Fett", state.totalFat, state.fatGoal)
                 Spacer(Modifier.height(NutriSpacing.sm))
-                WhiteMacroBar("Ballaststoffe", state.totalFiber, state.fiberGoal)
+                WhiteMacroBar("Ballaststoffe", state.totalFiber, state.fiberGoal, decimals = 1)
             }
         }
     }
@@ -383,7 +383,7 @@ private fun LabeledValue(value: String, label: String) {
 }
 
 @Composable
-private fun WhiteMacroBar(label: String, value: Float, goal: Float) {
+private fun WhiteMacroBar(label: String, value: Float, goal: Float, decimals: Int = 0) {
     val pct = (value / goal.coerceAtLeast(1f)).coerceIn(0f, 1f)
     Column {
         Row(
@@ -396,7 +396,7 @@ private fun WhiteMacroBar(label: String, value: Float, goal: Float) {
                 color = Color.White.copy(alpha = 0.8f)
             )
             Text(
-                "${value.toInt()}g",
+                if (decimals > 0) "${"%.${decimals}f".format(value)}g" else "${value.toInt()}g",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White

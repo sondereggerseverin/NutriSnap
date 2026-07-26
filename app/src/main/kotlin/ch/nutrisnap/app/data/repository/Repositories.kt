@@ -86,7 +86,8 @@ class DiaryRepository(db: NutriDatabase) {
         recipe: Recipe,
         servingsFactor: Float,
         mealType: MealType,
-        date: LocalDate
+        date: LocalDate,
+        gramsAmount: Float? = null
     ): Long {
         val perServing  = recipe.servings.coerceAtLeast(1).toFloat()
         val calsPerServ = recipe.totalCalories?.let { it / perServing } ?: 0f
@@ -115,7 +116,8 @@ class DiaryRepository(db: NutriDatabase) {
                 sugar       = sugar,
                 saturatedFat = saturatedFat,
                 salt        = salt,
-                sodium      = sodium
+                sodium      = sodium,
+                recipeGrams = gramsAmount
             )
         )
         dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }

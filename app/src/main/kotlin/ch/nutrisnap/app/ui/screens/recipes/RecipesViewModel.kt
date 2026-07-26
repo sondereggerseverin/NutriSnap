@@ -197,11 +197,22 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 val baseDesc = recipe.description.lines()
                     .filterNot { it.startsWith("📊") }.joinToString("\n").trim()
                 val newDesc = if (baseDesc.isNotBlank()) "$baseDesc\n\n$macroLine" else macroLine
+                val servDiv = recipe.servings.coerceAtLeast(1)
                 val updated = recipe.copy(
                     totalCalories     = analysis.totalCalories,
                     proteinPerServing = analysis.proteinPerServing,
                     carbsPerServing   = analysis.carbsPerServing,
                     fatPerServing     = analysis.fatPerServing,
+                    // Ballaststoffe & Co. wurden bisher berechnet aber nie persistiert,
+                    // daher liefen Tagebuch-Summe/Home-Übersicht immer auf 0 zurück.
+                    // Bei unvollständigen Zutaten-Daten wird die (ggf. unvollständige)
+                    // Summe trotzdem gespeichert statt verworfen — die Karte zeigt in
+                    // dem Fall zusätzlich einen Hinweis (siehe fiberComplete).
+                    fiberPerServing        = analysis.totalMicros["fiber"]?.div(servDiv) ?: recipe.fiberPerServing,
+                    sugarPerServing        = analysis.totalMicros["sugar"]?.div(servDiv) ?: recipe.sugarPerServing,
+                    saturatedFatPerServing = analysis.totalMicros["saturatedFat"]?.div(servDiv) ?: recipe.saturatedFatPerServing,
+                    saltPerServing         = analysis.totalMicros["salt"]?.div(servDiv) ?: recipe.saltPerServing,
+                    sodiumPerServing       = analysis.totalMicros["sodium"]?.div(servDiv) ?: recipe.sodiumPerServing,
                     description       = newDesc
                 )
                 repo.updateRecipe(updated)
@@ -212,7 +223,18 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun applyVerifiedNutrition(recipe: Recipe, kcalPerServ: Float, protPerServ: Float, carbsPerServ: Float, fatPerServ: Float) {
+    fun applyVerifiedNutrition(
+        recipe: Recipe,
+        kcalPerServ: Float,
+        protPerServ: Float,
+        carbsPerServ: Float,
+        fatPerServ: Float,
+        fiberPerServ: Float? = null,
+        sugarPerServ: Float? = null,
+        satFatPerServ: Float? = null,
+        saltPerServ: Float? = null,
+        sodiumPerServ: Float? = null
+    ) {
         viewModelScope.launch {
             val macroLine = "📊 Pro Portion: ${kcalPerServ.toInt()} kcal" +
                 " · ${protPerServ.toInt()}g Protein" +
@@ -226,6 +248,14 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 proteinPerServing = protPerServ,
                 carbsPerServing   = carbsPerServ,
                 fatPerServing     = fatPerServ,
+                // Bisher wurden diese Werte hier verworfen, obwohl die Verifizierungs-
+                // sheet sie bereits pro Zutat berechnet — dadurch fiel Ballaststoffe
+                // nach dem Verifizieren auf den (oft leeren) analyzeNutrition-Stand zurück.
+                fiberPerServing        = fiberPerServ  ?: recipe.fiberPerServing,
+                sugarPerServing        = sugarPerServ  ?: recipe.sugarPerServing,
+                saturatedFatPerServing = satFatPerServ ?: recipe.saturatedFatPerServing,
+                saltPerServing         = saltPerServ   ?: recipe.saltPerServing,
+                sodiumPerServing       = sodiumPerServ ?: recipe.sodiumPerServing,
                 description       = newDesc
             )
             repo.updateRecipe(updated)

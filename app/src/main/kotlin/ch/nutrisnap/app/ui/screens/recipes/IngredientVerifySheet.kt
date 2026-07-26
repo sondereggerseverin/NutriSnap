@@ -43,6 +43,19 @@ data class IngredientVerifyState(
     val effectiveCalories: Float get() = override?.let {
         (result.parsed?.amountG ?: 100f) / 100f * it.calories
     } ?: result.calories
+    /** Mikronaehrstoffe (Ballaststoffe etc.) für die tatsächlich verwendete Menge —
+     *  bei manuellem Override aus dem gescannten/gesuchten FoodItem, sonst aus der
+     *  ursprünglichen Analyse. Nur Werte, die die jeweilige Quelle geliefert hat. */
+    val effectiveMicros: Map<String, Float> get() = override?.let { food ->
+        val factor = (result.parsed?.amountG ?: 100f) / 100f
+        buildMap {
+            food.fiber?.let { put("fiber", it * factor) }
+            food.sugar?.let { put("sugar", it * factor) }
+            food.saturatedFat?.let { put("saturatedFat", it * factor) }
+            food.salt?.let { put("salt", it * factor) }
+            food.sodium?.let { put("sodium", it * factor) }
+        }
+    } ?: result.micros
 }
 
 // ── Main Sheet ────────────────────────────────────────────────────────────────
@@ -54,7 +67,10 @@ fun IngredientVerifySheet(
     recipeName: String,
     servings: Int,
     onDismiss: () -> Unit,
-    onConfirm: (totalKcal: Float, protein: Float, carbs: Float, fat: Float) -> Unit
+    onConfirm: (
+        totalKcal: Float, protein: Float, carbs: Float, fat: Float,
+        fiber: Float?, sugar: Float?, saturatedFat: Float?, salt: Float?, sodium: Float?
+    ) -> Unit
 ) {
     var verifyStates by remember(analysisResult) {
         mutableStateOf(analysisResult.ingredients.map { IngredientVerifyState(it) })
@@ -70,6 +86,18 @@ fun IngredientVerifySheet(
     val totalFat = verifyStates.sumOf { (it.override?.let { f ->
         (it.result.parsed?.amountG ?: 100f) / 100f * f.fat } ?: it.result.fat).toDouble() }.toFloat()
     val verifiedCount = verifyStates.count { it.isVerified }
+
+    // Ballaststoffe & Co.: null nur wenn KEINE Zutat überhaupt Daten dazu hatte,
+    // sonst (ggf. unvollständige) Summe — nie stillschweigend 0.
+    fun microTotal(key: String): Float? =
+        verifyStates.mapNotNull { it.effectiveMicros[key] }.takeIf { it.isNotEmpty() }?.sum()
+    val totalFiber  = microTotal("fiber")
+    val totalSugar  = microTotal("sugar")
+    val totalSatFat = microTotal("saturatedFat")
+    val totalSalt   = microTotal("salt")
+    val totalSodium = microTotal("sodium")
+    val fiberComplete = verifyStates.filter { it.isVerified }
+        .let { verified -> verified.isNotEmpty() && verified.all { it.effectiveMicros.containsKey("fiber") } }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -111,6 +139,17 @@ fun IngredientVerifySheet(
                             }
                         }
                     }
+                    totalFiber?.let {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Ballaststoffe: ${"%.1f".format(it)} g" +
+                                if (!fiberComplete) " (unvollständig – manuell prüfen)" else "",
+                            fontSize = 12.sp,
+                            fontWeight = if (!fiberComplete) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (!fiberComplete) MaterialTheme.colorScheme.error
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     Spacer(Modifier.height(12.dp))
                 }
             }
@@ -137,11 +176,17 @@ fun IngredientVerifySheet(
                 Spacer(Modifier.height(16.dp))
                 Button(
                     onClick = {
+                        val servDiv = servings.coerceAtLeast(1)
                         onConfirm(
-                            totalKcal / servings.coerceAtLeast(1),
-                            totalProt / servings.coerceAtLeast(1),
-                            totalCarbs / servings.coerceAtLeast(1),
-                            totalFat / servings.coerceAtLeast(1)
+                            totalKcal / servDiv,
+                            totalProt / servDiv,
+                            totalCarbs / servDiv,
+                            totalFat / servDiv,
+                            totalFiber?.div(servDiv),
+                            totalSugar?.div(servDiv),
+                            totalSatFat?.div(servDiv),
+                            totalSalt?.div(servDiv),
+                            totalSodium?.div(servDiv)
                         )
                     },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)

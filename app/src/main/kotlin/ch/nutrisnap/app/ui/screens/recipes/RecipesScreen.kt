@@ -273,8 +273,8 @@ fun RecipesScreen(
             recipeName     = verifyRecipe.title,
             servings       = verifyRecipe.servings,
             onDismiss      = { showVerifySheet = false },
-            onConfirm      = { kcal, prot, carbs, fat ->
-                vm.applyVerifiedNutrition(verifyRecipe, kcal, prot, carbs, fat)
+            onConfirm      = { kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium ->
+                vm.applyVerifiedNutrition(verifyRecipe, kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium)
                 showVerifySheet = false
             }
         )
@@ -317,7 +317,7 @@ fun RecipesScreen(
         AddToDiarySheet(
             recipe = recipe,
             gramsPerServing = gramsPerServing,
-            onConfirm = { servings, meal -> diaryVm.addRecipeAsMeal(recipe, servings, meal); addToDiaryRecipe = null },
+            onConfirm = { servings, grams, meal -> diaryVm.addRecipeAsMeal(recipe, servings, meal, grams); addToDiaryRecipe = null },
             onDismiss = { addToDiaryRecipe = null }
         )
     }
@@ -1089,8 +1089,15 @@ private fun NutritionAnalysisCard(
                     Spacer(Modifier.height(6.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         fiberPerServ?.let {
-                            SubNutrientRow("Ballaststoffe", "${(it * ratio).toInt()} g",
+                            SubNutrientRow("Ballaststoffe", "%.1f g".format(it * ratio),
                                 highlight = true)
+                        }
+                        if (result != null && !result.fiberComplete) {
+                            Text(
+                                "Ballaststoffe unvollständig – manuell prüfen",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.error
+                            )
                         }
                         sugarPerServ?.let { SubNutrientRow("davon Zucker", "${(it * ratio).toInt()} g") }
                         satFatPerServ?.let { SubNutrientRow("davon gesättigte Fettsäuren", "${(it * ratio).toInt()} g") }
@@ -1156,7 +1163,7 @@ private enum class DiaryQuantityUnit { SERVING, GRAM }
 fun AddToDiarySheet(
     recipe: Recipe,
     gramsPerServing: Float? = null,
-    onConfirm: (Float, MealType) -> Unit,
+    onConfirm: (servings: Float, gramsIfGramMode: Float?, meal: MealType) -> Unit,
     onDismiss: () -> Unit
 ) {
     var unit by remember { mutableStateOf(DiaryQuantityUnit.SERVING) }
@@ -1231,7 +1238,10 @@ fun AddToDiarySheet(
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick=onDismiss, Modifier.weight(1f)) { Text("Abbrechen") }
-                Button(onClick={onConfirm(servings,selectedMeal)}, Modifier.weight(1f), enabled=servings>0) {
+                Button(onClick={
+                    val gramsIfGramMode = if (unit == DiaryQuantityUnit.GRAM) gramsText.toFloatOrNull() else null
+                    onConfirm(servings, gramsIfGramMode, selectedMeal)
+                }, Modifier.weight(1f), enabled=servings>0) {
                     Icon(Icons.Default.Check,null,Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Hinzufügen")
                 }
             }
