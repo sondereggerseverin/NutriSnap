@@ -19,27 +19,37 @@ class FoodSearchRepository(
 ) {
 
     suspend fun search(query: String): List<FoodItem> {
-        val cached = foodItemDao.searchFoods(query)
+        // Schweizerdeutsche Begriffe (z.B. "Poulet", "Rüebli") und ihre Kurzformen
+        // (z.B. "pouletbrus" statt "Pouletbrust") finden sich in OFF/USDA/Nutritionix
+        // kaum, da diese Quellen hochdeutsche/englische Produktnamen führen. Für die
+        // externen Quellen wird deshalb zusätzlich der übersetzte Begriff angefragt.
+        // Die Swiss-DB bekommt weiterhin den Originalbegriff (kennt evtl. "Poulet" direkt).
+        val swissVariant = swissGermanVariant(query)
+        val effectiveQuery = swissVariant ?: query
+
+        val cached = foodItemDao.searchFoods(query) +
+            (swissVariant?.let { foodItemDao.searchFoods(it) } ?: emptyList())
+        val cachedDistinct = cached.distinctBy { normalizeKey(it) }
         // Nur ein EXAKTER Namens-Treffer zählt als "gut genug" — "beginnt mit" reicht
         // nicht, weil z.B. "Apfelringe" auch mit "apfel" beginnt und sonst faelschlich
         // als Treffer für die Anfrage "apfel" durchgeht, obwohl kein echter Apfel dabei ist.
-        if (cached.size >= 5 && cached.any { relevance(it, query) == 4 }) {
-            return cached.sortedWith(relevanceComparator(query))
+        if (cachedDistinct.size >= 5 && cachedDistinct.any { relevance(it, effectiveQuery) == 4 }) {
+            return cachedDistinct.sortedWith(relevanceComparator(effectiveQuery))
         }
 
         return coroutineScope {
-            val offDeferred = async { runCatching { openFoodFactsSearch(query) }.getOrDefault(emptyList()) }
-            val usdaDeferred = async { runCatching { usdaApi.search(query) }.getOrDefault(emptyList()) }
+            val offDeferred = async { runCatching { openFoodFactsSearch(effectiveQuery) }.getOrDefault(emptyList()) }
+            val usdaDeferred = async { runCatching { usdaApi.search(effectiveQuery) }.getOrDefault(emptyList()) }
             val swissDeferred = async { runCatching { SwissFoodApi.search(query) }.getOrDefault(emptyList()) }
 
             val off = offDeferred.await()
             val usda = usdaDeferred.await()
             val swiss = swissDeferred.await()
 
-            var combined = (cached + swiss + off + usda)
+            var combined = (cachedDistinct + swiss + off + usda)
 
             if (combined.size < 5) {
-                val nutritionix = runCatching { nutritionixApi.searchBranded(query) }.getOrDefault(emptyList())
+                val nutritionix = runCatching { nutritionixApi.searchBranded(effectiveQuery) }.getOrDefault(emptyList())
                 combined = combined + nutritionix
             }
 
@@ -47,13 +57,13 @@ class FoodSearchRepository(
             // keiner strukturierten Quelle als exakter Treffer auftauchen (OFF = nur
             // Markenprodukte, USDA = nur Englisch, Swiss-DB evtl. nicht erreichbar),
             // werden per KI grob geschätzt — auch wenn ähnlich klingende Treffer existieren.
-            if (combined.none { relevance(it, query) == 4 }) {
-                GroqFoodEstimatorApi.estimate(query)?.let { combined = combined + it }
+            if (combined.none { relevance(it, effectiveQuery) == 4 }) {
+                GroqFoodEstimatorApi.estimate(effectiveQuery)?.let { combined = combined + it }
             }
 
             val result = combined
                 .distinctBy { normalizeKey(it) }
-                .sortedWith(relevanceComparator(query))
+                .sortedWith(relevanceComparator(effectiveQuery))
 
             foodItemDao.insertAll(result.filter { it.source != FoodSource.MANUAL }.take(20))
             result
@@ -116,4 +126,43 @@ class FoodSearchRepository(
 
     private fun normalizeKey(item: FoodItem): String =
         (item.barcode ?: item.name.lowercase().trim())
+
+    // ── Schweizerdeutsch-Normalisierung ────────────────────────────────────────
+    // Häufige Regionalismen, die in OFF/USDA/Nutritionix (hochdeutsche/englische
+    // Produktnamen) nicht als solche gefunden werden. Bei Bedarf einfach ergänzen.
+    private val swissGermanRoots = mapOf(
+        "poulet" to "hähnchen",
+        "gitzi" to "ziege",
+        "rüebli" to "karotte",
+        "herdöpfel" to "kartoffel",
+        "gschwellti" to "pellkartoffel",
+        "nüssler" to "feldsalat",
+        "gipfeli" to "croissant",
+        "silserli" to "brötchen",
+        "zmorge" to "frühstück",
+        "zmittag" to "mittagessen",
+        "znacht" to "abendessen"
+    )
+
+    // Verkürzte/unvollständige Endungen, wie sie beim schnellen Eintippen entstehen
+    // (z.B. "pouletbrus" statt "pouletbrust").
+    private val endingCorrections = mapOf(
+        "brus" to "brust",
+        "gschnetzelt" to "geschnetzelt",
+        "flügeli" to "flügel"
+    )
+
+    /**
+     * Liefert die hochdeutsche Entsprechung für schweizerdeutsche Suchbegriffe
+     * (auch als Wortteil, z.B. "pouletbrust" -> "hähnchenbrust"), oder null, falls
+     * kein bekannter Regionalismus erkannt wurde.
+     */
+    private fun swissGermanVariant(query: String): String? {
+        val q = query.trim().lowercase()
+        val (root, standard) = swissGermanRoots.entries.firstOrNull { q.startsWith(it.key) } ?: return null
+        var suffix = q.removePrefix(root)
+        if (suffix.isBlank()) return standard
+        endingCorrections[suffix]?.let { suffix = it }
+        return (standard + suffix).trim()
+    }
 }
