@@ -70,6 +70,14 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     private val _batchState     = MutableStateFlow(BatchImportState())
     val batchState: StateFlow<BatchImportState> = _batchState.asStateFlow()
 
+    // Manuelle Zutaten-Anpassungen aus dem Verifizieren-Sheet, pro Rezept-ID.
+    // Überleben Schließen des Sheets UND "Neu berechnen" (frische AnalysisResult).
+    private val _ingredientOverrides = MutableStateFlow<Map<Long, Map<String, IngredientOverride>>>(emptyMap())
+    fun getOverridesFor(recipeId: Long): Map<String, IngredientOverride> = _ingredientOverrides.value[recipeId] ?: emptyMap()
+    fun setOverridesFor(recipeId: Long, overrides: Map<String, IngredientOverride>) {
+        _ingredientOverrides.update { it + (recipeId to overrides) }
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<RecipesUiState> = combine(
         _query.flatMapLatest { q ->
@@ -177,6 +185,26 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deleteRecipe(recipe: Recipe) {
         viewModelScope.launch { repo.deleteRecipe(recipe) }
+    }
+
+    /**
+     * "Auswahl übernehmen" — summiert die bereits gematchten/manuell angepassten
+     * Zutaten (letztes AnalysisResult + gespeicherte Overrides) neu, OHNE erneut
+     * bei OpenFoodFacts/USDA/Groq zu suchen. Gegenstück zu [analyzeNutrition],
+     * das immer komplett neu von der Zutatenliste aus sucht.
+     */
+    fun recalculateFromOverrides(recipe: Recipe) {
+        val result = _nutritionState.value.result.takeIf { _nutritionState.value.recipeId == recipe.id } ?: return
+        val overrides = getOverridesFor(recipe.id)
+        val states = mergeIngredientOverrides(result.ingredients, overrides)
+        val totals = computeVerifiedTotals(states)
+        val servDiv = recipe.servings.coerceAtLeast(1)
+        applyVerifiedNutrition(
+            recipe,
+            totals.kcal / servDiv, totals.protein / servDiv, totals.carbs / servDiv, totals.fat / servDiv,
+            totals.fiber?.div(servDiv), totals.sugar?.div(servDiv), totals.saturatedFat?.div(servDiv),
+            totals.salt?.div(servDiv), totals.sodium?.div(servDiv)
+        )
     }
 
     fun updateRecipe(recipe: Recipe) {
