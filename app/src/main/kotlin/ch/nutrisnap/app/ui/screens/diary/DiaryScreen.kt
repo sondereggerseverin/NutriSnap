@@ -262,9 +262,16 @@ private fun EditEntryDialog(
     onDismiss: () -> Unit
 ) {
     val isRecipe = entry.amountGrams == 0f || entry.foodItemId < 0
+    // Bei Gramm-Erfassung eines Rezepts (recipeGrams gesetzt) rechnet der Dialog
+    // in Gramm statt Portionen; amountGrams bleibt intern weiterhin der
+    // Portionsfaktor für die Nährwert-Skalierung.
+    val isGramTracked = entry.recipeGrams != null
+    // "baseValue" ist die Menge in der Einheit, in der amountText editiert wird.
+    val baseValue = if (isGramTracked) entry.recipeGrams!! else entry.amountGrams
     var amountText by remember { mutableStateOf(
         when {
-            // Echter Rezept-Eintrag: amountGrams speichert den tatsächlichen Portionsfaktor.
+            isGramTracked -> entry.recipeGrams!!.toInt().toString()
+            // Echter Rezept-Eintrag (Portionen): amountGrams speichert den tatsächlichen Portionsfaktor.
             entry.amountGrams > 0f && entry.foodItemId < 0 ->
                 if (entry.amountGrams == entry.amountGrams.toInt().toFloat()) entry.amountGrams.toInt().toString()
                 else entry.amountGrams.toString()
@@ -272,7 +279,7 @@ private fun EditEntryDialog(
             else -> entry.amountGrams.toInt().toString()
         }
     ) }
-    val unit = if (isRecipe) "Port." else "g"
+    val unit = if (isGramTracked) "g" else if (isRecipe) "Port." else "g"
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -295,8 +302,8 @@ private fun EditEntryDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 val amount = amountText.toFloatOrNull() ?: 0f
-                if (amount > 0 && entry.amountGrams > 0) {
-                    val factor = amount / entry.amountGrams
+                if (amount > 0 && baseValue > 0) {
+                    val factor = amount / baseValue
                     Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.md)) {
                         Text(
                             "${(entry.calories * factor).toInt()} kcal",
@@ -313,7 +320,13 @@ private fun EditEntryDialog(
         confirmButton = {
             Button(onClick = {
                 val v = amountText.toFloatOrNull()
-                if (v != null && v > 0) onSave(v)
+                if (v != null && v > 0) {
+                    // Bei Gramm-Erfassung: eingegebene Gramm in den äquivalenten
+                    // Portionsfaktor zurückrechnen (updateEntryAmount erwartet
+                    // stets einen Wert in derselben Einheit wie entry.amountGrams).
+                    val toSave = if (isGramTracked) v / entry.recipeGrams!! * entry.amountGrams else v
+                    onSave(toSave)
+                }
             }) { Text("Speichern") }
         },
         dismissButton = {
