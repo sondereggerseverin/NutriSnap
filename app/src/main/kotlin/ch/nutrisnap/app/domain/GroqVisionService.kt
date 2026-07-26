@@ -135,24 +135,32 @@ Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
         callVisionRaw(prompt, base64Jpeg).mapCatching { json.decodeFromString<NutritionLabelResult>(it) }
     }
 
-    private fun callVisionRaw(prompt: String, base64Jpeg: String): Result<String> {
-        // Primary: Gemini (besseres Free-Tier,1M Context)
-        if (GeminiService.isAvailable()) {
-            val geminiResult = kotlinx.coroutines.runBlocking {
-                GeminiService.generateVision(
-                    prompt = prompt,
-                    base64Jpeg = base64Jpeg,
-                    temperature = 0.3,
-                    maxTokens = 1000
-                )
-            }
-            if (geminiResult.isSuccess) return geminiResult
-            // Fallback to Groq if Gemini fails
-        }
+    /**
+     * Ruft Gemini (primary) und Groq (fallback) PARALLEL auf und nimmt das erste
+     * erfolgreiche Ergebnis. Vorher liefen beide Calls sequenziell (Gemini bis zu
+     * 28s Timeout, danach erst Groq) — das war die Ursache der ~30s-Verzögerung.
+     * Jetzt läuft Groq bereits mit, während Gemini noch wartet; schlägt einer der
+     * beiden fehl, wird auf das Ergebnis des anderen gewartet statt neu zu starten.
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private suspend fun callVisionRaw(prompt: String, base64Jpeg: String): Result<String> =
+        kotlinx.coroutines.coroutineScope {
+            val groqDeferred = kotlinx.coroutines.async(Dispatchers.IO) { callGroqVision(prompt, base64Jpeg) }
 
-        // Fallback: Groq
-        return callGroqVision(prompt, base64Jpeg)
-    }
+            if (!GeminiService.isAvailable()) return@coroutineScope groqDeferred.await()
+
+            val geminiDeferred = kotlinx.coroutines.async(Dispatchers.IO) {
+                GeminiService.generateVision(prompt = prompt, base64Jpeg = base64Jpeg, temperature = 0.3, maxTokens = 1000)
+            }
+
+            val result = kotlinx.coroutines.selects.select<Result<String>> {
+                geminiDeferred.onAwait { r -> if (r.isSuccess) r else groqDeferred.await() }
+                groqDeferred.onAwait { r -> if (r.isSuccess) r else geminiDeferred.await() }
+            }
+            geminiDeferred.cancel()
+            groqDeferred.cancel()
+            result
+        }
 
     private fun callGroqVision(prompt: String, base64Jpeg: String): Result<String> {
         return try {
