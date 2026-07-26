@@ -28,9 +28,11 @@ object GeminiService {
     private const val TEXT_MODEL = "gemini-2.5-flash"
     private const val VISION_MODEL = "gemini-2.5-flash"
 
+    // Kurze Timeouts: Gemini soll bei Problemen schnell an Groq (Parallel-Race)
+    // abgeben statt die UI 30s+ blockieren zu lassen.
     private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
         .build()
 
     /** Prüft ob ein Gemini API Key konfiguriert ist. */

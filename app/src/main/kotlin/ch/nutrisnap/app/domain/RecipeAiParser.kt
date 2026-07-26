@@ -1,8 +1,11 @@
 package ch.nutrisnap.app.domain
 
 import ch.nutrisnap.app.data.model.Recipe
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -102,8 +105,7 @@ object RecipeAiParser {
 
     // ── LLM call ──────────────────────────────────────────────────────────────
 
-    private fun callLlm(caption: String, apiKey: String): Recipe {
-        val systemPrompt = """
+    private val recipeSystemPrompt = """
 You are a recipe extraction assistant. Extract structured recipe data from social media captions.
 Respond ONLY with valid JSON matching this exact schema — no markdown, no explanation:
 {
@@ -138,72 +140,58 @@ Rules:
 - tags: comma-separated, max 5, lowercase
 - All numeric fields must be numbers (not strings), null if unknown
 - Ignore: "Comment X for...", "DM me for...", "Link in bio", hashtags, storage/heating tips unless they are actual steps
-        """.trimIndent()
+    """.trimIndent()
 
+    /**
+     * Ruft Gemini und Groq PARALLEL auf (statt sequentiell mit Fallback) und
+     * nimmt das erste erfolgreiche Ergebnis. Schlägt der zuerst antwortende
+     * Provider fehl, wird auf den anderen gewartet statt einen weiteren
+     * sequentiellen Request zu starten. Vermeidet die worst-case Latenz von
+     * "Gemini-Timeout + Groq-Call" (~30s+) zugunsten von max(Gemini, Groq).
+     */
+    private suspend fun callLlm(caption: String, apiKey: String): Recipe = coroutineScope {
         val userMessage = "Extract recipe from this caption:\n\n$caption"
 
-        // Primary: Gemini (besseres Free-Tier,1M Context)
-        if (GeminiService.isAvailable()) {
-            val geminiResult = runCatching {
-                val response = kotlinx.coroutines.runBlocking {
-                    GeminiService.generateText(
-                        prompt = userMessage,
-                        systemPrompt = systemPrompt,
-                        temperature = 0.1,
-                        maxTokens = 2000
-                    )
-                }
+        if (!GeminiService.isAvailable()) {
+            return@coroutineScope callGroq(caption, apiKey)
+        }
+
+        val geminiJob: Deferred<Result<Recipe>> = async {
+            runCatching {
+                val response = GeminiService.generateText(
+                    prompt = userMessage,
+                    systemPrompt = recipeSystemPrompt,
+                    temperature = 0.1,
+                    maxTokens = 2000
+                )
                 val content = response.getOrThrow()
                     .trim()
                     .removePrefix("```json").removePrefix("```").removeSuffix("```")
                     .trim()
                 parseLlmJson(JSONObject(content))
             }
-            if (geminiResult.isSuccess) return geminiResult.getOrThrow()
+        }
+        val groqJob: Deferred<Result<Recipe>> = async {
+            runCatching { callGroq(caption, apiKey) }
         }
 
-        // Fallback: Groq
-        return callGroq(caption, apiKey)
+        val (winnerJob, winnerResult) = select<Pair<Deferred<Result<Recipe>>, Result<Recipe>>> {
+            geminiJob.onAwait { geminiJob to it }
+            groqJob.onAwait { groqJob to it }
+        }
+        val loserJob = if (winnerJob === geminiJob) groqJob else geminiJob
+
+        if (winnerResult.isSuccess) {
+            loserJob.cancel()
+            winnerResult.getOrThrow()
+        } else {
+            // Zuerst antwortender Provider ist fehlgeschlagen — auf den anderen warten
+            // statt sofort aufzugeben.
+            loserJob.await().getOrThrow()
+        }
     }
 
     private fun callGroq(caption: String, apiKey: String): Recipe {
-        val systemPrompt = """
-You are a recipe extraction assistant. Extract structured recipe data from social media captions.
-Respond ONLY with valid JSON matching this exact schema — no markdown, no explanation:
-{
-  "title": "Clean recipe dish name (string)",
-  "description": "1-2 sentence description of the dish (string)",
-  "servings": 4,
-  "calories_per_serving": 548,
-  "protein_g": 51,
-  "carbs_g": 52,
-  "fat_g": 17,
-  "prep_time_minutes": null,
-  "ingredient_sections": [
-    {
-      "section_name": "Chipotle Chicken Marinade",
-      "items": ["1200g Raw Boneless Chicken Thighs", "2.5 Tsp Salt"]
-    }
-  ],
-  "instructions": "Step-by-step instructions as a single string. Use \\n between steps.",
-  "tags": "meal-prep,chicken,high-protein"
-}
-Rules:
-- title: Extract the DISH NAME ONLY. Rules in priority order:
-  1. If caption contains a line that IS clearly a food/dish name (e.g. "High Protein Pasta Salad", "Butter Chicken Burritos"), use that
-  2. If caption starts with descriptive text ("Wirklich ausgezeichnet...", "This is amazing..."), look for a dish name LATER in the caption near the ingredient list
-  3. NEVER use: likes/comments counts, usernames, dates, hashtags, promotional text, generic phrases like "Check this out"
-  4. If truly no dish name exists, construct one from the main ingredients (e.g. "Pasta Salat mit Thunfisch")
-- servings: extract the number of PORTIONS/SERVINGS this recipe makes. Look for "Makes X", "Ergibt X", "für X Personen", "X Portionen". If the caption says "Per Burrito" or "Per Serving" that means 1 serving in the macros. Default to 1 if unclear, NOT a random number.
-- ingredient_sections: group by section headers (e.g. "Marinade", "Sauce", "Topping"). Items separated by "-", "•", "*", or newlines. If no sections, use one section named "".
-- CRITICAL: Each ingredient item must be ONE ingredient only (e.g. "200g Hähnchenbrust"), NOT a full sentence or instruction.
-- calories_per_serving / protein_g / carbs_g / fat_g: extract PER SERVING values if mentioned, else null
-- instructions: numbered steps only, no ingredient lists. null if not present.
-- tags: comma-separated, max 5, lowercase
-- All numeric fields must be numbers (not strings), null if unknown
-- Ignore: "Comment X for...", "DM me for...", "Link in bio", hashtags, storage/heating tips unless they are actual steps
-        """.trimIndent()
-
         val userMessage = "Extract recipe from this caption:\n\n$caption"
 
         val body = JSONObject().apply {
@@ -211,7 +199,7 @@ Rules:
             put("max_tokens", 2000)
             put("temperature", 0.1)
             put("messages", JSONArray().apply {
-                put(JSONObject().apply { put("role", "system"); put("content", systemPrompt) })
+                put(JSONObject().apply { put("role", "system"); put("content", recipeSystemPrompt) })
                 put(JSONObject().apply { put("role", "user");   put("content", userMessage) })
             })
         }.toString()

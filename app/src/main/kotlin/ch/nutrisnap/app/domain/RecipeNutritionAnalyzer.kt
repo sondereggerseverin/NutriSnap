@@ -3,9 +3,11 @@ package ch.nutrisnap.app.domain
 import ch.nutrisnap.app.BuildConfig
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.Recipe
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.async
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -420,7 +422,12 @@ object RecipeNutritionAnalyzer {
         } else {
             val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
             val estimates = if (apiKey.isNotBlank()) {
-                runCatching { estimateViaAi(unmatched.map { it.parsed!!.name }, apiKey) }.getOrNull()
+                // War bisher NICHT auf Dispatchers.IO gewrappt -> blockierende
+                // Netzwerkcalls liefen auf dem Aufrufer-Dispatcher (i.d.R. Main aus
+                // viewModelScope.launch) -> NetworkOnMainThreadException-Risiko.
+                withContext(Dispatchers.IO) {
+                    runCatching { estimateViaAi(unmatched.map { it.parsed!!.name }, apiKey) }.getOrNull()
+                }
             } else null
 
             if (estimates == null) {
@@ -488,9 +495,9 @@ object RecipeNutritionAnalyzer {
      * results can be matched back up regardless of response order.
      * Uses Gemini (primary) with Groq fallback.
      */
-    private fun estimateViaAi(names: List<String>, apiKey: String): Map<String, AiNutritionEntry>? {
+    private suspend fun estimateViaAi(names: List<String>, apiKey: String): Map<String, AiNutritionEntry>? = coroutineScope {
         val distinctNames = names.distinct().take(25) // sane upper bound per recipe
-        if (distinctNames.isEmpty()) return null
+        if (distinctNames.isEmpty()) return@coroutineScope null
 
         val listText = distinctNames.joinToString("\n") { "- $it" }
         val systemPrompt = """
@@ -511,51 +518,62 @@ object RecipeNutritionAnalyzer {
 
         val userMessage = "Ingredients:\n$listText"
 
-        // Primary: Gemini
-        if (GeminiService.isAvailable()) {
-            val geminiResult = kotlinx.coroutines.runBlocking {
-                GeminiService.generateText(
-                    prompt = userMessage,
-                    systemPrompt = systemPrompt,
-                    temperature = 0.2,
-                    maxTokens = 1200
-                )
+        fun callGroq(): Map<String, AiNutritionEntry>? {
+            val payload = JSONObject().apply {
+                put("model", "llama-3.1-8b-instant")
+                put("temperature", 0.2)
+                put("max_tokens", 1200)
+                put("messages", JSONArray().apply {
+                    put(JSONObject().apply { put("role", "system"); put("content", systemPrompt) })
+                    put(JSONObject().apply { put("role", "user"); put("content", userMessage) })
+                })
             }
-            if (geminiResult.isSuccess) {
-                val parsed = parseAiResponse(geminiResult.getOrThrow())
-                if (parsed != null) return parsed
+            val req = Request.Builder()
+                .url(GROQ_URL)
+                .header("Authorization", "Bearer $apiKey")
+                .header("Content-Type", "application/json")
+                .post(payload.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+            val raw = aiClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                resp.body?.string() ?: return null
             }
+            val content = JSONObject(raw)
+                .optJSONArray("choices")?.optJSONObject(0)
+                ?.optJSONObject("message")?.optString("content")
+                ?: return null
+            return parseAiResponse(content)
         }
 
-        // Fallback: Groq
-        val payload = JSONObject().apply {
-            put("model", "llama-3.1-8b-instant")
-            put("temperature", 0.2)
-            put("max_tokens", 1200)
-            put("messages", JSONArray().apply {
-                put(JSONObject().apply { put("role", "system"); put("content", systemPrompt) })
-                put(JSONObject().apply { put("role", "user"); put("content", userMessage) })
-            })
+        if (!GeminiService.isAvailable()) {
+            return@coroutineScope callGroq()
         }
 
-        val req = Request.Builder()
-            .url(GROQ_URL)
-            .header("Authorization", "Bearer $apiKey")
-            .header("Content-Type", "application/json")
-            .post(payload.toString().toRequestBody("application/json".toMediaType()))
-            .build()
-
-        val raw = aiClient.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) return null
-            resp.body?.string() ?: return null
+        // Parallel-Race statt sequentiellem Fallback: vermeidet worst-case
+        // Latenz von "Gemini-Timeout + Groq-Call".
+        val geminiJob: Deferred<Map<String, AiNutritionEntry>?> = async {
+            val result = GeminiService.generateText(
+                prompt = userMessage,
+                systemPrompt = systemPrompt,
+                temperature = 0.2,
+                maxTokens = 1200
+            )
+            if (result.isSuccess) parseAiResponse(result.getOrThrow()) else null
         }
+        val groqJob: Deferred<Map<String, AiNutritionEntry>?> = async { runCatching { callGroq() }.getOrNull() }
 
-        val content = JSONObject(raw)
-            .optJSONArray("choices")?.optJSONObject(0)
-            ?.optJSONObject("message")?.optString("content")
-            ?: return null
+        val (winnerJob, winnerResult) = select<Pair<Deferred<Map<String, AiNutritionEntry>?>, Map<String, AiNutritionEntry>?>> {
+            geminiJob.onAwait { geminiJob to it }
+            groqJob.onAwait { groqJob to it }
+        }
+        val loserJob = if (winnerJob === geminiJob) groqJob else geminiJob
 
-        return parseAiResponse(content)
+        if (winnerResult != null) {
+            loserJob.cancel()
+            winnerResult
+        } else {
+            loserJob.await()
+        }
     }
 
     private fun parseAiResponse(content: String): Map<String, AiNutritionEntry>? {
