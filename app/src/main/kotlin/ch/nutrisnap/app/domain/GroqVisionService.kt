@@ -3,8 +3,12 @@ package ch.nutrisnap.app.domain
 import android.graphics.Bitmap
 import android.util.Base64
 import ch.nutrisnap.app.BuildConfig
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.selects.select
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -143,24 +147,23 @@ Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
      * beiden fehl, wird auf das Ergebnis des anderen gewartet statt neu zu starten.
      */
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    private suspend fun callVisionRaw(prompt: String, base64Jpeg: String): Result<String> =
-        kotlinx.coroutines.coroutineScope {
-            val groqDeferred = kotlinx.coroutines.async(Dispatchers.IO) { callGroqVision(prompt, base64Jpeg) }
+    private suspend fun callVisionRaw(prompt: String, base64Jpeg: String): Result<String> = coroutineScope {
+        val groqDeferred: Deferred<Result<String>> = async(Dispatchers.IO) { callGroqVision(prompt, base64Jpeg) }
 
-            if (!GeminiService.isAvailable()) return@coroutineScope groqDeferred.await()
+        if (!GeminiService.isAvailable()) return@coroutineScope groqDeferred.await()
 
-            val geminiDeferred = kotlinx.coroutines.async(Dispatchers.IO) {
-                GeminiService.generateVision(prompt = prompt, base64Jpeg = base64Jpeg, temperature = 0.3, maxTokens = 1000)
-            }
-
-            val result = kotlinx.coroutines.selects.select<Result<String>> {
-                geminiDeferred.onAwait { r -> if (r.isSuccess) r else groqDeferred.await() }
-                groqDeferred.onAwait { r -> if (r.isSuccess) r else geminiDeferred.await() }
-            }
-            geminiDeferred.cancel()
-            groqDeferred.cancel()
-            result
+        val geminiDeferred: Deferred<Result<String>> = async(Dispatchers.IO) {
+            GeminiService.generateVision(prompt = prompt, base64Jpeg = base64Jpeg, temperature = 0.3, maxTokens = 1000)
         }
+
+        val result = select<Result<String>> {
+            geminiDeferred.onAwait { r -> if (r.isSuccess) r else groqDeferred.await() }
+            groqDeferred.onAwait { r -> if (r.isSuccess) r else geminiDeferred.await() }
+        }
+        geminiDeferred.cancel()
+        groqDeferred.cancel()
+        result
+    }
 
     private fun callGroqVision(prompt: String, base64Jpeg: String): Result<String> {
         return try {
