@@ -213,13 +213,28 @@ fun RecipesScreen(
                     sub = if (hideIncomplete) "Schalte den Filter aus, um alle zu sehen" else "Tippe auf + und füge einen Link ein"
                 )
             } else {
-                LazyColumn(contentPadding = PaddingValues(bottom = 80.dp)) {
+                LazyColumn(
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp).let {
+                        PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 80.dp)
+                    },
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     items(displayedRecipes, key = { it.id }) { recipe ->
-                        RecipeCard(recipe,
-                            onClick      = { selectedRecipe = recipe },
-                            onDelete     = { vm.deleteRecipe(recipe) },
-                            onAddToDiary = { addToDiaryRecipe = recipe },
-                            onEdit       = { editRecipe = recipe })
+                        if (recipe.isIncomplete()) {
+                            RecipeCard(recipe,
+                                onClick      = { selectedRecipe = recipe },
+                                onDelete     = { vm.deleteRecipe(recipe) },
+                                onAddToDiary = { addToDiaryRecipe = recipe },
+                                onEdit       = { editRecipe = recipe })
+                        } else {
+                            ch.nutrisnap.app.ui.components.RecipeCardV2(
+                                recipe       = recipe,
+                                onClick      = { selectedRecipe = recipe },
+                                onAddToDiary = { addToDiaryRecipe = recipe },
+                                onEdit       = { editRecipe = recipe },
+                                onDelete     = { vm.deleteRecipe(recipe) }
+                            )
+                        }
                     }
                 }
             }
@@ -1294,3 +1309,4 @@ private fun MealType.label() = when(this) {
     MealType.BREAKFAST -> "Frühstück"; MealType.LUNCH -> "Mittagessen"
     MealType.DINNER    -> "Abendessen"; MealType.SNACK -> "Snack"
 }
+
