@@ -44,29 +44,32 @@ data class IngredientVerifyState(
     val override: FoodItem? = null,
     /** Manuell nachgetragene Ballaststoffe für die tatsächlich verwendete Menge (nicht pro 100g).
      *  Hat Vorrang vor jedem aus override/result stammenden Fiber-Wert. */
-    val manualFiber: Float? = null
+    val manualFiber: Float? = null,
+    /** Manuell korrigierte Menge in Gramm (überschreibt die aus dem Rezepttext geparste Menge). */
+    val amountOverride: Float? = null
 ) {
     val isVerified: Boolean get() = override != null || result.matched
     val effectiveFood: FoodItem? get() = override ?: result.foodItem
-    val effectiveCalories: Float get() = override?.let {
-        (result.parsed?.amountG ?: 100f) / 100f * it.calories
-    } ?: result.calories
-    val effectiveProtein: Float get() = override?.let {
-        (result.parsed?.amountG ?: 100f) / 100f * it.protein
-    } ?: result.protein
-    val effectiveCarbs: Float get() = override?.let {
-        (result.parsed?.amountG ?: 100f) / 100f * it.carbs
-    } ?: result.carbs
-    val effectiveFat: Float get() = override?.let {
-        (result.parsed?.amountG ?: 100f) / 100f * it.fat
-    } ?: result.fat
+    val originalAmountG: Float get() = result.parsed?.amountG ?: 100f
+    val effectiveAmountG: Float get() = amountOverride ?: originalAmountG
+    /** Verhältnis effektive/ursprüngliche Menge — Fallback-Skalierung, wenn kein FoodItem vorliegt. */
+    private val amountRatio: Float get() = effectiveAmountG / originalAmountG.coerceAtLeast(0.1f)
+
+    val effectiveCalories: Float get() = effectiveFood?.let { effectiveAmountG / 100f * it.calories }
+        ?: (result.calories * amountRatio)
+    val effectiveProtein: Float get() = effectiveFood?.let { effectiveAmountG / 100f * it.protein }
+        ?: (result.protein * amountRatio)
+    val effectiveCarbs: Float get() = effectiveFood?.let { effectiveAmountG / 100f * it.carbs }
+        ?: (result.carbs * amountRatio)
+    val effectiveFat: Float get() = effectiveFood?.let { effectiveAmountG / 100f * it.fat }
+        ?: (result.fat * amountRatio)
     /** Mikronaehrstoffe (Ballaststoffe etc.) für die tatsächlich verwendete Menge —
-     *  bei manuellem Override aus dem gescannten/gesuchten FoodItem, sonst aus der
-     *  ursprünglichen Analyse. Nur Werte, die die jeweilige Quelle geliefert hat.
+     *  bei bekanntem FoodItem (override oder Match) anhand der editierbaren Menge skaliert,
+     *  sonst anhand des Mengenverhältnisses aus der ursprünglichen Analyse.
      *  manualFiber überschreibt einen ggf. vorhandenen Fiber-Wert immer. */
     val effectiveMicros: Map<String, Float> get() {
-        val base = override?.let { food ->
-            val factor = (result.parsed?.amountG ?: 100f) / 100f
+        val base = effectiveFood?.let { food ->
+            val factor = effectiveAmountG / 100f
             buildMap {
                 food.fiber?.let { put("fiber", it * factor) }
                 food.sugar?.let { put("sugar", it * factor) }
@@ -74,7 +77,7 @@ data class IngredientVerifyState(
                 food.salt?.let { put("salt", it * factor) }
                 food.sodium?.let { put("sodium", it * factor) }
             }
-        } ?: result.micros
+        } ?: result.micros.mapValues { it.value * amountRatio }
         return manualFiber?.let { base + ("fiber" to it) } ?: base
     }
 }
@@ -227,6 +230,11 @@ fun IngredientVerifySheet(
                         verifyStates = verifyStates.toMutableList().also {
                             it[index] = it[index].copy(manualFiber = value)
                         }
+                    },
+                    onAmountSaved = { value ->
+                        verifyStates = verifyStates.toMutableList().also {
+                            it[index] = it[index].copy(amountOverride = value)
+                        }
                     }
                 )
                 HorizontalDivider(
@@ -290,7 +298,8 @@ private fun IngredientVerifyRow(
     onFiberEditConsumed: () -> Unit,
     onScan: () -> Unit,
     onDelete: () -> Unit,
-    onManualFiberSaved: (Float) -> Unit
+    onManualFiberSaved: (Float) -> Unit,
+    onAmountSaved: (Float) -> Unit
 ) {
     val isOverride = state.override != null
     val isMatched  = state.isVerified
@@ -300,6 +309,14 @@ private fun IngredientVerifyRow(
     var editingFiber by remember { mutableStateOf(false) }
     var fiberInput by remember { mutableStateOf(fiberValue?.let { "%.1f".format(it) } ?: "") }
     val fiberFocusRequester = remember { FocusRequester() }
+    var editingAmount by remember { mutableStateOf(false) }
+    var amountInput by remember { mutableStateOf("%.0f".format(state.effectiveAmountG)) }
+    val amountFocusRequester = remember { FocusRequester() }
+
+    fun saveAmount() {
+        amountInput.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }?.let { onAmountSaved(it) }
+        editingAmount = false
+    }
 
     LaunchedEffect(autoFocusFiberEdit) {
         if (autoFocusFiberEdit) {
@@ -389,7 +406,7 @@ private fun IngredientVerifyRow(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // Direkter Scan-Zugriff — kein Aufklappen nötig für die genaueste Methode
                     IconButton(onClick = onScan, Modifier.size(26.dp)) {
-                        Icon(Icons.Default.QrCodeScanner, "Produkt scannen", Modifier.size(15.dp),
+                        Icon(Icons.Default.QrCodeScanner, "Produkt ändern (Scan/Suche/Manuell)", Modifier.size(15.dp),
                             tint = MaterialTheme.colorScheme.primary)
                     }
                     Icon(
@@ -411,6 +428,45 @@ private fun IngredientVerifyRow(
                     .heightIn(max = 220.dp)
                     .verticalScroll(rememberScrollState())
             ) {
+                // Menge — editierbar, wirkt sich direkt auf alle Nährwerte dieser Zutat aus
+                if (editingAmount) {
+                    Row(verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(bottom = 8.dp)) {
+                        OutlinedTextField(
+                            value = amountInput,
+                            onValueChange = { amountInput = it },
+                            label = { Text("Menge (g)", fontSize = 11.sp) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f).focusRequester(amountFocusRequester),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        IconButton(onClick = { saveAmount() }) {
+                            Icon(Icons.Default.Check, "Speichern", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clickable {
+                                amountInput = "%.0f".format(state.effectiveAmountG)
+                                editingAmount = true
+                            }
+                            .padding(bottom = 6.dp)
+                    ) {
+                        Text(
+                            "Menge: ${"%.0f".format(state.effectiveAmountG)} g",
+                            fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Icon(Icons.Default.Edit, "Menge bearbeiten", Modifier.size(13.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
                 // Makro-Details — gleiche Quelle wie die Kalorien-Anzeige oben (effectiveXxx)
                 Row(
                     Modifier.fillMaxWidth().padding(bottom = 6.dp),
