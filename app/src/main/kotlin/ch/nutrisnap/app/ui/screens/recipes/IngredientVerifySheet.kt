@@ -5,11 +5,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -36,26 +40,42 @@ import kotlinx.coroutines.launch
 data class IngredientVerifyState(
     val result: RecipeNutritionAnalyzer.IngredientResult,
     // Override set by user scanning/searching/manual
-    val override: FoodItem? = null
+    val override: FoodItem? = null,
+    /** Manuell nachgetragene Ballaststoffe für die tatsächlich verwendete Menge (nicht pro 100g).
+     *  Hat Vorrang vor jedem aus override/result stammenden Fiber-Wert. */
+    val manualFiber: Float? = null
 ) {
     val isVerified: Boolean get() = override != null || result.matched
     val effectiveFood: FoodItem? get() = override ?: result.foodItem
     val effectiveCalories: Float get() = override?.let {
         (result.parsed?.amountG ?: 100f) / 100f * it.calories
     } ?: result.calories
+    val effectiveProtein: Float get() = override?.let {
+        (result.parsed?.amountG ?: 100f) / 100f * it.protein
+    } ?: result.protein
+    val effectiveCarbs: Float get() = override?.let {
+        (result.parsed?.amountG ?: 100f) / 100f * it.carbs
+    } ?: result.carbs
+    val effectiveFat: Float get() = override?.let {
+        (result.parsed?.amountG ?: 100f) / 100f * it.fat
+    } ?: result.fat
     /** Mikronaehrstoffe (Ballaststoffe etc.) für die tatsächlich verwendete Menge —
      *  bei manuellem Override aus dem gescannten/gesuchten FoodItem, sonst aus der
-     *  ursprünglichen Analyse. Nur Werte, die die jeweilige Quelle geliefert hat. */
-    val effectiveMicros: Map<String, Float> get() = override?.let { food ->
-        val factor = (result.parsed?.amountG ?: 100f) / 100f
-        buildMap {
-            food.fiber?.let { put("fiber", it * factor) }
-            food.sugar?.let { put("sugar", it * factor) }
-            food.saturatedFat?.let { put("saturatedFat", it * factor) }
-            food.salt?.let { put("salt", it * factor) }
-            food.sodium?.let { put("sodium", it * factor) }
-        }
-    } ?: result.micros
+     *  ursprünglichen Analyse. Nur Werte, die die jeweilige Quelle geliefert hat.
+     *  manualFiber überschreibt einen ggf. vorhandenen Fiber-Wert immer. */
+    val effectiveMicros: Map<String, Float> get() {
+        val base = override?.let { food ->
+            val factor = (result.parsed?.amountG ?: 100f) / 100f
+            buildMap {
+                food.fiber?.let { put("fiber", it * factor) }
+                food.sugar?.let { put("sugar", it * factor) }
+                food.saturatedFat?.let { put("saturatedFat", it * factor) }
+                food.salt?.let { put("salt", it * factor) }
+                food.sodium?.let { put("sodium", it * factor) }
+            }
+        } ?: result.micros
+        return manualFiber?.let { base + ("fiber" to it) } ?: base
+    }
 }
 
 // ── Main Sheet ────────────────────────────────────────────────────────────────
@@ -77,14 +97,24 @@ fun IngredientVerifySheet(
     }
     var scanTarget by remember { mutableStateOf<Int?>(null) }  // index of ingredient being scanned
 
+    // Aufklapp-Status pro Zutat (Zeilen-Key) + Ziel für "direkt in Ballaststoffe-Eingabe springen"
+    var expandedLines by remember { mutableStateOf(setOf<String>()) }
+    var fiberEditTarget by remember { mutableStateOf<String?>(null) }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
+    fun jumpToFiberEdit(line: String) {
+        expandedLines = expandedLines + line
+        fiberEditTarget = line
+        val idx = verifyStates.indexOfFirst { it.result.line == line }
+        if (idx >= 0) scope.launch { listState.animateScrollToItem(idx + 1) } // +1: Header-Item davor
+    }
+
     // Recalculate totals
     val totalKcal = verifyStates.sumOf { it.effectiveCalories.toDouble() }.toFloat()
-    val totalProt = verifyStates.sumOf { (it.override?.let { f ->
-        (it.result.parsed?.amountG ?: 100f) / 100f * f.protein } ?: it.result.protein).toDouble() }.toFloat()
-    val totalCarbs = verifyStates.sumOf { (it.override?.let { f ->
-        (it.result.parsed?.amountG ?: 100f) / 100f * f.carbs } ?: it.result.carbs).toDouble() }.toFloat()
-    val totalFat = verifyStates.sumOf { (it.override?.let { f ->
-        (it.result.parsed?.amountG ?: 100f) / 100f * f.fat } ?: it.result.fat).toDouble() }.toFloat()
+    val totalProt = verifyStates.sumOf { it.effectiveProtein.toDouble() }.toFloat()
+    val totalCarbs = verifyStates.sumOf { it.effectiveCarbs.toDouble() }.toFloat()
+    val totalFat = verifyStates.sumOf { it.effectiveFat.toDouble() }.toFloat()
     val verifiedCount = verifyStates.count { it.isVerified }
 
     // Ballaststoffe & Co.: null nur wenn KEINE Zutat überhaupt Daten dazu hatte,
@@ -96,14 +126,17 @@ fun IngredientVerifySheet(
     val totalSatFat = microTotal("saturatedFat")
     val totalSalt   = microTotal("salt")
     val totalSodium = microTotal("sodium")
+    // Zutaten, die die Ballaststoff-Warnung auslösen: verifiziert, aber ohne Fiber-Wert
+    val missingFiberStates = verifyStates.filter { it.isVerified && !it.effectiveMicros.containsKey("fiber") }
     val fiberComplete = verifyStates.filter { it.isVerified }
-        .let { verified -> verified.isNotEmpty() && verified.all { it.effectiveMicros.containsKey("fiber") } }
+        .let { verified -> verified.isNotEmpty() && missingFiberStates.isEmpty() }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         modifier = Modifier.fillMaxHeight(0.95f)
     ) {
         LazyColumn(
+            state = listState,
             contentPadding = PaddingValues(bottom = 32.dp),
             modifier = Modifier.fillMaxSize()
         ) {
@@ -150,6 +183,25 @@ fun IngredientVerifySheet(
                                     else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    if (!fiberComplete && missingFiberStates.isNotEmpty()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            if (missingFiberStates.size == 1) "Unvollständige Zutat:" else "Unvollständige Zutaten:",
+                            fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        missingFiberStates.forEach { s ->
+                            Text(
+                                "• ${s.result.line.trimStart('•', '-', ' ')} – Ballaststoffe fehlen",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { jumpToFiberEdit(s.result.line) }
+                                    .padding(vertical = 2.dp)
+                            )
+                        }
+                    }
                     Spacer(Modifier.height(12.dp))
                 }
             }
@@ -157,11 +209,23 @@ fun IngredientVerifySheet(
             // Ingredient rows — stable keys so Compose recomposes correctly after delete
             items(verifyStates, key = { it.result.line }) { state ->
                 val index = verifyStates.indexOf(state)
+                val line = state.result.line
                 IngredientVerifyRow(
                     state = state,
+                    expanded = expandedLines.contains(line),
+                    onToggleExpand = {
+                        expandedLines = if (expandedLines.contains(line)) expandedLines - line else expandedLines + line
+                    },
+                    autoFocusFiberEdit = fiberEditTarget == line,
+                    onFiberEditConsumed = { if (fiberEditTarget == line) fiberEditTarget = null },
                     onScan = { scanTarget = index },
                     onDelete = {
                         verifyStates = verifyStates.toMutableList().also { it.remove(state) }
+                    },
+                    onManualFiberSaved = { value ->
+                        verifyStates = verifyStates.toMutableList().also {
+                            it[index] = it[index].copy(manualFiber = value)
+                        }
                     }
                 )
                 HorizontalDivider(
@@ -219,18 +283,41 @@ fun IngredientVerifySheet(
 @Composable
 private fun IngredientVerifyRow(
     state: IngredientVerifyState,
+    expanded: Boolean,
+    onToggleExpand: () -> Unit,
+    autoFocusFiberEdit: Boolean,
+    onFiberEditConsumed: () -> Unit,
     onScan: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onManualFiberSaved: (Float) -> Unit
 ) {
     val isOverride = state.override != null
     val isMatched  = state.isVerified
-    var showActions by remember { mutableStateOf(false) }
+    val showActions = expanded
+    val fiberValue = state.effectiveMicros["fiber"]
+    val isManualFiber = state.manualFiber != null
+    var editingFiber by remember { mutableStateOf(false) }
+    var fiberInput by remember { mutableStateOf(fiberValue?.let { "%.1f".format(it) } ?: "") }
+    val fiberFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(autoFocusFiberEdit) {
+        if (autoFocusFiberEdit) {
+            editingFiber = true
+            fiberFocusRequester.requestFocus()
+            onFiberEditConsumed()
+        }
+    }
+
+    fun saveFiber() {
+        fiberInput.replace(',', '.').toFloatOrNull()?.let { onManualFiberSaved(it) }
+        editingFiber = false
+    }
 
     Column(Modifier.fillMaxWidth()) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .clickable { showActions = !showActions }
+                .clickable { onToggleExpand() }
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -313,37 +400,117 @@ private fun IngredientVerifyRow(
             }
         }
 
-        // Action row — shown when expanded
+        // Detail- & Action-Bereich — shown when expanded
         if (showActions) {
-            Row(
+            Column(
                 Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .heightIn(max = 220.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
-                // Keep as-is (close actions)
-                OutlinedButton(
-                    onClick = { showActions = false },
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                // Makro-Details — gleiche Quelle wie die Kalorien-Anzeige oben (effectiveXxx)
+                Row(
+                    Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Icon(Icons.Default.Check, null, Modifier.size(14.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Belassen", fontSize = 12.sp)
+                    Text("P ${"%.1f".format(state.effectiveProtein)} g", fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("·", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("K ${"%.1f".format(state.effectiveCarbs)} g", fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("·", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("F ${"%.1f".format(state.effectiveFat)} g", fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                // Delete
-                OutlinedButton(
-                    onClick = { showActions = false; onDelete() },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    ),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-                ) {
-                    Icon(Icons.Default.Delete, null, Modifier.size(14.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Löschen", fontSize = 12.sp)
+
+                // Ballaststoffe — hervorgehoben, ggf. mit manueller Eingabe
+                if (editingFiber) {
+                    Row(verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = fiberInput,
+                            onValueChange = { fiberInput = it },
+                            label = { Text("Ballaststoffe (g)", fontSize = 11.sp) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f).focusRequester(fiberFocusRequester),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        IconButton(onClick = { saveFiber() }) {
+                            Icon(Icons.Default.Check, "Speichern", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                } else if (fiberValue != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Ballaststoffe: ${"%.1f".format(fiberValue)} g",
+                            fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                        if (isManualFiber) {
+                            Spacer(Modifier.width(6.dp))
+                            Icon(Icons.Default.Edit, "manuell überschrieben", Modifier.size(12.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(" manuell", fontSize = 10.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                } else {
+                    Text(
+                        "Ballaststoffe: – (fehlen)",
+                        fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Text(
+                        "✎ Ballaststoffe manuell eintragen",
+                        fontSize = 11.sp, color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clickable { editingFiber = true }
+                            .padding(top = 2.dp)
+                    )
+                }
+
+                // Optional: Zucker & Salz, falls vorhanden
+                val sugar = state.effectiveMicros["sugar"]
+                val salt = state.effectiveMicros["salt"]
+                if (sugar != null || salt != null) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        listOfNotNull(
+                            sugar?.let { "Zucker ${"%.1f".format(it)} g" },
+                            salt?.let { "Salz ${"%.1f".format(it)} g" }
+                        ).joinToString("   ·   "),
+                        fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Keep as-is (close actions)
+                    OutlinedButton(
+                        onClick = onToggleExpand,
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.Check, null, Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Belassen", fontSize = 12.sp)
+                    }
+                    // Delete
+                    OutlinedButton(
+                        onClick = onDelete,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.Delete, null, Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Löschen", fontSize = 12.sp)
+                    }
                 }
             }
         }
