@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,10 +40,14 @@ private val PORTION_STEPS = listOf(1f, 1.5f, 2f, 3f)
 fun RecipeCardV2(
     recipe: Recipe,
     onClick: () -> Unit,
+    onAddToDiary: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
     modifier: Modifier = Modifier,
     initialServings: Float = recipe.servings.toFloat().coerceAtLeast(1f)
 ) {
     var servings by remember(recipe.id) { mutableStateOf(initialServings) }
+    var showConfirm by remember { mutableStateOf(false) }
     val baseServings = recipe.servings.coerceAtLeast(1)
     val ratio = servings / baseServings.toFloat()
 
@@ -54,14 +61,24 @@ fun RecipeCardV2(
             RecipeCardImage(recipe, modifier = Modifier.fillMaxWidth().height(160.dp))
 
             Column(Modifier.padding(NutriSpacing.lg)) {
-                Text(
-                    recipe.title,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Row(verticalAlignment = Alignment.Top) {
+                    Text(
+                        recipe.title,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
+                    )
+                    recipe.prepTimeMinutes?.let {
+                        Text(
+                            "⏱ $it min", fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = NutriSpacing.sm, top = 2.dp)
+                        )
+                    }
+                }
 
                 Spacer(Modifier.height(NutriSpacing.sm))
                 PortionSelector(
@@ -79,8 +96,31 @@ fun RecipeCardV2(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = NutriSpacing.xs)
                 )
+
+                Spacer(Modifier.height(NutriSpacing.sm))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    IconButton(onClick = onAddToDiary, Modifier.size(36.dp)) {
+                        Icon(Icons.Default.PlaylistAdd, "Ins Tagebuch", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                    }
+                    IconButton(onClick = onEdit, Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Edit, "Bearbeiten", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick = { showConfirm = true }, Modifier.size(36.dp)) {
+                        Icon(Icons.Default.DeleteOutline, "Löschen", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                    }
+                }
             }
         }
+    }
+
+    if (showConfirm) {
+        AlertDialog(onDismissRequest = { showConfirm = false },
+            title = { Text("Rezept löschen?") }, text = { Text(recipe.title) },
+            confirmButton = { TextButton(onClick = { onDelete(); showConfirm = false }) { Text("Löschen", color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(onClick = { showConfirm = false }) { Text("Abbrechen") } })
     }
 }
 
