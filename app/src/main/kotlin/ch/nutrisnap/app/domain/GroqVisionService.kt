@@ -21,19 +21,24 @@ import java.io.ByteArrayOutputStream
 import java.util.concurrent.TimeUnit
 
 @Serializable
-data class FoodScanResult(
-    val foodName: String = "",
+data class FridgeScanResult(
+    val ingredients: List<String> = emptyList()
+)
+
+/** Einzelne, vom Foto separierte Zutat eines Gerichts (vor DB-Abgleich). */
+@Serializable
+data class DishIngredientCandidate(
+    val name: String = "",
     val estimatedGrams: Float = 0f,
-    val calories: Float = 0f,
-    val protein: Float = 0f,
-    val carbs: Float = 0f,
-    val fat: Float = 0f,
+    /** "hoch", "mittel" oder "niedrig" — Sicherheit der Erkennung DIESER Zutat. */
     val confidence: String = "mittel"
 )
 
+/** Ergebnis der mehrstufigen Foto-Analyse: Gericht zerlegt in einzelne Zutaten. */
 @Serializable
-data class FridgeScanResult(
-    val ingredients: List<String> = emptyList()
+data class DishScanResult(
+    val dishName: String = "",
+    val ingredients: List<DishIngredientCandidate> = emptyList()
 )
 
 @Serializable
@@ -81,27 +86,36 @@ class GroqVisionService {
         return Bitmap.createScaledBitmap(bitmap, (w * ratio).toInt().coerceAtLeast(1), (h * ratio).toInt().coerceAtLeast(1), true)
     }
 
-    /** Schaetzt Lebensmittel + Kalorien/Makros aus einem Foto einer Mahlzeit. */
-    suspend fun analyzeFoodPhoto(base64Jpeg: String): Result<FoodScanResult> = withContext(Dispatchers.IO) {
+    /**
+     * Zerlegt ein Foto eines Gerichts in seine einzelnen sichtbaren Zutaten (statt eines
+     * pauschalen Gesamteintrags). Robust gegenüber Tellergerichten/Bowls mit mehreren,
+     * leicht überlappenden Komponenten. Deckt gleichzeitig die Stufen "Zutaten erkennen"
+     * und "Zutaten trennen" ab, da beides ein einzelner Vision-Call ist.
+     */
+    suspend fun analyzeDishIngredients(base64Jpeg: String): Result<DishScanResult> = withContext(Dispatchers.IO) {
         val prompt = """
-Du bist ein erfahrener Ernährungsberater. Analysiere das Foto eines Gerichts/einer Mahlzeit.
-Identifiziere was zu sehen ist, schätze die Portionsgrösse in Gramm und berechne realistische Nährwerte.
+Du bist ein erfahrener Ernährungsberater. Analysiere das Foto eines Gerichts/einer Mahlzeit und ZERLEGE es
+in seine einzelnen sichtbaren Bestandteile (z.B. "Pouletbrust", "Reis", "Brokkoli", "Sauce"), statt nur einen
+Gesamtnamen zu vergeben. Auch bei Bowls, gemischten Tellern oder leicht überlappenden Komponenten: identifiziere
+JEDE klar unterscheidbare Zutat einzeln und schätze ihre Portionsgrösse in Gramm separat.
 
 Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
 {
-  "foodName": "Bezeichnung des Gerichts",
-  "estimatedGrams": 350,
-  "calories": 520,
-  "protein": 28.0,
-  "carbs": 55.0,
-  "fat": 18.0,
-  "confidence": "hoch"
+  "dishName": "Kurze Gesamtbezeichnung des Gerichts",
+  "ingredients": [
+    {"name": "Pouletbrust, gegrillt", "estimatedGrams": 150, "confidence": "hoch"},
+    {"name": "Reis, gekocht", "estimatedGrams": 180, "confidence": "mittel"},
+    {"name": "Brokkoli", "estimatedGrams": 80, "confidence": "niedrig"}
+  ]
 }
 
-confidence ist "hoch", "mittel" oder "niedrig" je nachdem wie sicher die Schätzung ist.
-Alle Werte (calories/protein/carbs/fat) beziehen sich auf die GESAMTE geschätzte Portion, nicht auf 100g.
+confidence ist "hoch", "mittel" oder "niedrig" je nachdem wie sicher die Erkennung DIESER EINZELNEN Zutat ist
+(z.B. "niedrig" bei verdeckten/vermischten Zutaten wie Sauce oder Gewürzen). Erfinde keine Zutaten, die nicht
+zu sehen sind. Liste jede Zutat nur einmal, auch wenn sie an mehreren Stellen auf dem Teller vorkommt.
 """.trimIndent()
-        callVisionRaw(prompt, base64Jpeg).mapCatching { json.decodeFromString<FoodScanResult>(it) }
+        // Hoeheres Token-Limit als Standard-1000: bei vielen kleinen Zutaten (Bowls, Mezze-Teller)
+        // braucht die JSON-Antwort mit einem Eintrag pro Zutat mehr Platz als eine einzelne Schaetzung.
+        callVisionRaw(prompt, base64Jpeg, maxTokens = 2000).mapCatching { json.decodeFromString<DishScanResult>(it) }
     }
 
     /** Erkennt vorhandene Zutaten auf einem Foto (z.B. offener Kühlschrank/Vorratsschrank). */
@@ -147,13 +161,13 @@ Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
      * beiden fehl, wird auf das Ergebnis des anderen gewartet statt neu zu starten.
      */
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    private suspend fun callVisionRaw(prompt: String, base64Jpeg: String): Result<String> = coroutineScope {
-        val groqDeferred: Deferred<Result<String>> = async(Dispatchers.IO) { callGroqVision(prompt, base64Jpeg) }
+    private suspend fun callVisionRaw(prompt: String, base64Jpeg: String, maxTokens: Int = 1000): Result<String> = coroutineScope {
+        val groqDeferred: Deferred<Result<String>> = async(Dispatchers.IO) { callGroqVision(prompt, base64Jpeg, maxTokens) }
 
         if (!GeminiService.isAvailable()) return@coroutineScope groqDeferred.await()
 
         val geminiDeferred: Deferred<Result<String>> = async(Dispatchers.IO) {
-            GeminiService.generateVision(prompt = prompt, base64Jpeg = base64Jpeg, temperature = 0.3, maxTokens = 1000)
+            GeminiService.generateVision(prompt = prompt, base64Jpeg = base64Jpeg, temperature = 0.3, maxTokens = maxTokens)
         }
 
         val result = select<Result<String>> {
@@ -165,7 +179,7 @@ Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
         result
     }
 
-    private fun callGroqVision(prompt: String, base64Jpeg: String): Result<String> {
+    private fun callGroqVision(prompt: String, base64Jpeg: String, maxTokens: Int = 1000): Result<String> {
         return try {
             val apiKey = BuildConfig.GROQ_API_KEY
             if (apiKey.isBlank()) return Result.failure(Exception(
@@ -184,7 +198,7 @@ Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
             val requestJson = JSONObject().apply {
                 put("model", VISION_MODEL)
                 put("temperature", 0.3)
-                put("max_completion_tokens", 1000)
+                put("max_completion_tokens", maxTokens)
                 put("reasoning_effort", "none")
                 put("response_format", JSONObject().apply { put("type", "json_object") })
                 put("messages", JSONArray().apply {
