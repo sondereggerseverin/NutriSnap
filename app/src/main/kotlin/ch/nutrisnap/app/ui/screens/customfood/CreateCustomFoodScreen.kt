@@ -13,6 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.nutrisnap.app.domain.EntryPlausibilityChecker
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,6 +28,7 @@ fun CreateCustomFoodScreen(
     var fat      by remember { mutableStateOf("") }
     var fiber    by remember { mutableStateOf("") }
     var saved    by remember { mutableStateOf(false) }
+    var macroWarning by remember { mutableStateOf<String?>(null) }
 
     val nameError = name.isBlank() && saved
     val calError  = (calories.toFloatOrNull() ?: -1f) < 0 && saved
@@ -77,20 +79,52 @@ fun CreateCustomFoodScreen(
                 onClick = {
                     saved = true
                     if (isValid) {
-                        vm.save(
-                            name     = name,
-                            calories = calories.toFloat(),
-                            protein  = protein.toFloat(),
-                            carbs    = carbs.toFloat(),
-                            fat      = fat.toFloat(),
-                            fiber    = fiber.toFloatOrNull() ?: 0f
+                        val warning = EntryPlausibilityChecker.checkManualEntry(
+                            calories.toFloat(), protein.toFloat(), carbs.toFloat(), fat.toFloat()
                         )
-                        onBack()
+                        if (warning != null) {
+                            macroWarning = warning
+                        } else {
+                            vm.save(
+                                name     = name,
+                                calories = calories.toFloat(),
+                                protein  = protein.toFloat(),
+                                carbs    = carbs.toFloat(),
+                                fat      = fat.toFloat(),
+                                fiber    = fiber.toFloatOrNull() ?: 0f
+                            )
+                            onBack()
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Speichern") }
         }
+    }
+
+    macroWarning?.let { warning ->
+        AlertDialog(
+            onDismissRequest = { macroWarning = null },
+            title   = { Text("Werte prüfen") },
+            text    = { Text(warning) },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.save(
+                        name     = name,
+                        calories = calories.toFloat(),
+                        protein  = protein.toFloat(),
+                        carbs    = carbs.toFloat(),
+                        fat      = fat.toFloat(),
+                        fiber    = fiber.toFloatOrNull() ?: 0f
+                    )
+                    macroWarning = null
+                    onBack()
+                }) { Text("Trotzdem speichern") }
+            },
+            dismissButton = {
+                TextButton(onClick = { macroWarning = null }) { Text("Anpassen") }
+            }
+        )
     }
 }
 
