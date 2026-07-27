@@ -7,6 +7,7 @@ import ch.nutrisnap.app.data.api.UsdaFoodApi
 import ch.nutrisnap.app.data.db.FoodItemDao
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.FoodSource
+import ch.nutrisnap.app.domain.SearchUtils
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -26,6 +27,10 @@ class FoodSearchRepository(
         // Die Swiss-DB bekommt weiterhin den Originalbegriff (kennt evtl. "Poulet" direkt).
         val swissVariant = swissGermanVariant(query)
         val effectiveQuery = swissVariant ?: query
+        // Kompositum-Zerlegung: "süsskartoffelpommes" -> "süsskartoffel pommes".
+        // Wird als zusätzliche Kandidaten-Query an die Remote-Quellen geschickt,
+        // da deren Volltextsuche zusammengeschriebene Komposita oft nicht findet.
+        val compoundVariant = compoundSplitVariant(effectiveQuery)
 
         val cached = foodItemDao.searchFoods(query) +
             (swissVariant?.let { foodItemDao.searchFoods(it) } ?: emptyList())
@@ -41,23 +46,27 @@ class FoodSearchRepository(
             val offDeferred = async { runCatching { openFoodFactsSearch(effectiveQuery) }.getOrDefault(emptyList()) }
             val usdaDeferred = async { runCatching { usdaApi.search(effectiveQuery) }.getOrDefault(emptyList()) }
             val swissDeferred = async { runCatching { SwissFoodApi.search(query) }.getOrDefault(emptyList()) }
+            val compoundDeferred = compoundVariant?.let { cv ->
+                async { runCatching { openFoodFactsSearch(cv) }.getOrDefault(emptyList()) }
+            }
 
             val off = offDeferred.await()
             val usda = usdaDeferred.await()
             val swiss = swissDeferred.await()
+            val compound = compoundDeferred?.await() ?: emptyList()
 
-            var combined = (cachedDistinct + swiss + off + usda)
+            var combined = (cachedDistinct + swiss + off + usda + compound)
 
             if (combined.size < 5) {
                 val nutritionix = runCatching { nutritionixApi.searchBranded(effectiveQuery) }.getOrDefault(emptyList())
                 combined = combined + nutritionix
             }
 
-            // Letzter Fallback: einfache/generische Lebensmittel (z.B. "Apfel"), die in
-            // keiner strukturierten Quelle als exakter Treffer auftauchen (OFF = nur
-            // Markenprodukte, USDA = nur Englisch, Swiss-DB evtl. nicht erreichbar),
-            // werden per KI grob geschätzt — auch wenn ähnlich klingende Treffer existieren.
-            if (combined.none { relevance(it, effectiveQuery) == 4 }) {
+            // Echte Treffer (Wort- oder Kompositum-/Fuzzy-Match, relevance >= 2) haben
+            // immer Vorrang vor der KI-Schätzung. Nur wenn wirklich nichts Ähnliches
+            // gefunden wurde, wird per KI grob geschätzt (klar als "KI-geschätzt"
+            // markiert, s. GroqFoodEstimatorApi/FoodSource).
+            if (combined.none { relevance(it, effectiveQuery) >= 2 }) {
                 GroqFoodEstimatorApi.estimate(effectiveQuery)?.let { combined = combined + it }
             }
 
@@ -70,6 +79,8 @@ class FoodSearchRepository(
         }
     }
 
+
+
     private fun relevanceComparator(query: String): Comparator<FoodItem> = Companion.relevanceComparator(query)
     private fun relevance(item: FoodItem, query: String): Int = Companion.relevance(item, query)
 
@@ -80,13 +91,17 @@ class FoodSearchRepository(
          * 1 = enthält als Teilstring, 0 = kein Treffer.
          */
         fun relevance(item: FoodItem, query: String): Int {
-            val q = query.trim().lowercase()
-            val name = item.name.lowercase()
+            val q = SearchUtils.normalize(query)
+            val name = SearchUtils.normalize(item.name)
+            val qCompact = q.replace(" ", "")
+            val nameCompact = name.replace(" ", "")
             return when {
                 name == q -> 4
                 name.startsWith(q) -> 3
                 Regex("\\b${Regex.escape(q)}").containsMatchIn(name) -> 2
                 name.contains(q) -> 1
+                qCompact.length >= 3 && nameCompact.contains(qCompact) -> 1 // Kompositum, z.B. "süsskartoffelpommes"
+                SearchUtils.fuzzyMatch(q, name) -> 1 // Tippfehler/Synonym (z.B. "fritten" -> "pommes")
                 else -> 0
             }
         }
@@ -164,5 +179,31 @@ class FoodSearchRepository(
         if (suffix.isBlank()) return standard
         endingCorrections[suffix]?.let { suffix = it }
         return (standard + suffix).trim()
+    }
+
+    // Bekannte Lebensmittel-Substantive, an denen ein zusammengeschriebenes
+    // Kompositum aufgetrennt werden kann (z.B. "süsskartoffelpommes" ->
+    // "süsskartoffel pommes"). Bei Bedarf einfach ergänzen.
+    private val compoundSplitWords = listOf(
+        "pommes", "kartoffel", "kartoffeln", "curry", "salat", "brot", "suppe",
+        "sauce", "soße", "gemüse", "reis", "nudeln", "wurst", "käse", "brust"
+    )
+
+    /**
+     * Trennt ein zusammengeschriebenes Kompositum an einem bekannten Suffix-Wort
+     * auf ("süsskartoffelpommes" -> "süsskartoffel pommes"), damit die Volltextsuche
+     * externer Quellen (OFF etc.) auch bei zusammengeschriebenen Begriffen greift.
+     * Gibt null zurück, wenn die Query bereits Leerzeichen enthält oder kein
+     * bekanntes Suffix gefunden wird.
+     */
+    private fun compoundSplitVariant(query: String): String? {
+        val q = query.trim().lowercase()
+        if (q.contains(" ") || q.length < 6) return null
+        for (suffix in compoundSplitWords) {
+            if (q.endsWith(suffix) && q.length > suffix.length + 2) {
+                return "${q.removeSuffix(suffix)} $suffix"
+            }
+        }
+        return null
     }
 }
