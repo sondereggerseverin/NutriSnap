@@ -54,6 +54,9 @@ class DiaryRepository(db: NutriDatabase) {
 
     suspend fun addEntry(food: FoodItem, amountGrams: Float, mealType: MealType, date: LocalDate): Long {
         val f = amountGrams / 100f
+        // Ein Tagebuch-Eintrag braucht konkrete Zahlen (fuer Tagessummen/Ziele) - anders als
+        // FoodItem selbst darf DiaryEntry keine unbekannten Makros haben. Das 0-Fallback passiert
+        // deshalb bewusst genau hier, an der Erfassungsgrenze, statt still in der Datenquelle.
         val id = dao.insert(
             DiaryEntry(
                 foodItemId  = food.id,
@@ -61,10 +64,10 @@ class DiaryRepository(db: NutriDatabase) {
                 amountGrams = amountGrams,
                 mealType    = mealType,
                 dateStr     = date.toString(),
-                calories    = food.calories * f,
-                protein     = food.protein  * f,
-                carbs       = food.carbs    * f,
-                fat         = food.fat      * f,
+                calories    = (food.calories ?: 0f) * f,
+                protein     = (food.protein  ?: 0f) * f,
+                carbs       = (food.carbs    ?: 0f) * f,
+                fat         = (food.fat      ?: 0f) * f,
                 fiber       = (food.fiber ?: 0f) * f,
                 sugar       = (food.sugar ?: 0f) * f,
                 saturatedFat = (food.saturatedFat ?: 0f) * f,

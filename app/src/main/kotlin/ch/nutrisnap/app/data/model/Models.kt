@@ -186,11 +186,11 @@ data class FavoriteFoodEntity(
     @PrimaryKey val foodKey: String,
     val name: String,
     val brand: String? = null,
-    val caloriesPer100g: Float,   // column name kept for DB compat
-    val proteinPer100g: Float,
-    val carbsPer100g: Float,
-    val fatPer100g: Float,
-    val fiberPer100g: Float = 0f,
+    val caloriesPer100g: Float?,   // column name kept for DB compat; nullable = Quelle kannte den Wert nicht
+    val proteinPer100g: Float?,
+    val carbsPer100g: Float?,
+    val fatPer100g: Float?,
+    val fiberPer100g: Float? = null,
     val addedAt: Long = System.currentTimeMillis()
 )
 
@@ -205,7 +205,7 @@ fun FoodItem.toFavoriteEntity() = FavoriteFoodEntity(
     proteinPer100g  = protein,
     carbsPer100g    = carbs,
     fatPer100g      = fat,
-    fiberPer100g    = fiber ?: 0f
+    fiberPer100g    = fiber
 )
 
 fun FavoriteFoodEntity.toFoodItem() = FoodItem(

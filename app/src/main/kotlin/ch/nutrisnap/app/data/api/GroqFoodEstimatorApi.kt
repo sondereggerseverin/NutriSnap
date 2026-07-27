@@ -99,16 +99,18 @@ object GroqFoodEstimatorApi {
     }
 
     private fun buildFoodItem(data: JSONObject, query: String): FoodItem {
+        fun g(key: String): Float? =
+            if (data.has(key) && !data.isNull(key)) data.optDouble(key, Double.NaN).toFloat().takeIf { !it.isNaN() } else null
         return FoodItem(
             name = data.optString("name", query).ifBlank { query },
             brand = "KI-geschätzt",
-            calories = data.optDouble("calories", 0.0).toFloat(),
-            protein  = data.optDouble("protein", 0.0).toFloat(),
-            carbs    = data.optDouble("carbs", 0.0).toFloat(),
-            fat      = data.optDouble("fat", 0.0).toFloat(),
-            fiber    = data.optDouble("fiber", 0.0).toFloat().takeIf { it > 0f },
-            sugar    = data.optDouble("sugar", 0.0).toFloat().takeIf { it > 0f },
-            salt     = data.optDouble("salt", 0.0).toFloat().takeIf { it > 0f },
+            calories = g("calories"),
+            protein  = g("protein"),
+            carbs    = g("carbs"),
+            fat      = g("fat"),
+            fiber    = g("fiber"),
+            sugar    = g("sugar"),
+            salt     = g("salt"),
             servingSize = 100f,
             servingUnit = "g",
             source = FoodSource.MANUAL,

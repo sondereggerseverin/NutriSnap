@@ -75,6 +75,12 @@ object SwissFoodApi {
             }.getOrNull()
         }
 
+    /** Liest ein Naehrwertfeld als Float, oder null wenn nicht vorhanden. Unterscheidet
+     *  damit "wirklich 0" von "von der Quelle nicht geliefert" - im Gegensatz zu einem
+     *  Default-Wert oder einem takeIf{it>0}-Filter, der echte Nullen mitverwerfen wuerde. */
+    private fun JSONObject.g(key: String): Float? =
+        if (has(key) && !isNull(key)) optDouble(key, Double.NaN).toFloat().takeIf { !it.isNaN() } else null
+
     private fun parseFoodItem(obj: JSONObject): FoodItem? {
         return try {
             val name = obj.optString("name", "").ifBlank { return null }
@@ -88,13 +94,13 @@ object SwissFoodApi {
                 name = name,
                 brand = brand,
                 calories = calories,
-                protein = nutrients.optDouble("protein", 0.0).toFloat(),
-                carbs = nutrients.optDouble("carbohydrates", 0.0).toFloat(),
-                fat = nutrients.optDouble("fat", 0.0).toFloat(),
-                fiber = nutrients.optDouble("fiber", 0.0).toFloat().takeIf { it > 0 },
-                sugar = nutrients.optDouble("sugar", 0.0).toFloat().takeIf { it > 0 },
-                saturatedFat = nutrients.optDouble("saturated_fat", 0.0).toFloat().takeIf { it > 0 },
-                sodium = nutrients.optDouble("sodium", 0.0).toFloat().takeIf { it > 0 },
+                protein = nutrients.g("protein"),
+                carbs = nutrients.g("carbohydrates"),
+                fat = nutrients.g("fat"),
+                fiber = nutrients.g("fiber"),
+                sugar = nutrients.g("sugar"),
+                saturatedFat = nutrients.g("saturated_fat"),
+                sodium = nutrients.g("sodium"),
                 servingSize = 100f,
                 servingUnit = "g",
                 source = FoodSource.SWISS_FSVO,

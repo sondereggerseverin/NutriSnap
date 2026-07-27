@@ -85,15 +85,21 @@ class UsdaFoodApi(private val apiKey: String) {
             val name = obj.optString("description", "") .ifEmpty { return null }
             val nutrients = obj.optJSONArray("foodNutrients") ?: return null
 
-            // USDA Nutrient IDs: 208=Energie, 203=Protein, 205=Kohlenhydrate, 204=Fett
-            var calories = 0f; var protein = 0f; var carbs = 0f; var fat = 0f
+            // USDA Nutrient IDs: 208=Energie, 203=Protein, 205=Kohlenhydrate, 204=Fett,
+            // 291=Ballaststoffe, 307=Natrium, 269=Gesamtzucker, 606=gesaettigtes Fett,
+            // 306=Kalium, 539/1235=zugesetzter Zucker (je nach Datenrelease unterschiedliche ID).
+            // Nullable statt var-Float-mit-0-Default: ein Nutrient, der im foodNutrients-Array
+            // schlicht fehlt, darf nicht als "0" interpretiert werden.
+            var calories: Float? = null; var protein: Float? = null; var carbs: Float? = null; var fat: Float? = null
             var fiber: Float? = null; var sodium: Float? = null; var sugar: Float? = null
-            var saturatedFat: Float? = null; var potassium: Float? = null
+            var saturatedFat: Float? = null; var potassium: Float? = null; var addedSugars: Float? = null
 
             for (i in 0 until nutrients.length()) {
                 val n = nutrients.getJSONObject(i)
                 val nutrientId = n.optInt("nutrientId", n.optJSONObject("nutrient")?.optInt("id") ?: 0)
-                val value = n.optDouble("value", n.optDouble("amount", 0.0)).toFloat()
+                if (!n.has("value") && !n.has("amount")) continue
+                val value = n.optDouble("value", n.optDouble("amount", Double.NaN)).toFloat()
+                if (value.isNaN()) continue
                 when (nutrientId) {
                     208 -> calories = value
                     203 -> protein = value
@@ -104,11 +110,12 @@ class UsdaFoodApi(private val apiKey: String) {
                     269 -> sugar = value
                     606 -> saturatedFat = value
                     306 -> potassium = value
+                    539, 1235 -> addedSugars = value
                 }
             }
 
             val completeness = listOf(calories, protein, carbs, fat, fiber, sodium, sugar)
-                .count { it != null && (it as? Float ?: 0f) > 0 } * 14
+                .count { (it ?: 0f) > 0 } * 14
 
             FoodItem(
                 name = name.lowercase().replaceFirstChar { it.uppercase() },
@@ -119,6 +126,7 @@ class UsdaFoodApi(private val apiKey: String) {
                 fat = fat,
                 fiber = fiber,
                 sugar = sugar,
+                addedSugars = addedSugars,
                 saturatedFat = saturatedFat,
                 sodium = sodium,
                 potassium = potassium,

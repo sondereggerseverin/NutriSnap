@@ -77,6 +77,13 @@ class NutritionixApi(
         }
     }
 
+    /** Liest ein Nutritionix-Feld als Float, oder null wenn nicht vorhanden/kein Zahlenwert.
+     *  Vorherige Version nutzte optDouble(key) ohne Default (= NaN bei fehlendem Feld) und
+     *  filterte nur "!= 0.0" - das liess NaN durch und speicherte es als kaputten Float statt
+     *  null. Ausserdem wurden echte Nullwerte faelschlich zu null (siehe Docstring anderswo). */
+    private fun JSONObject.g(key: String): Float? =
+        if (has(key) && !isNull(key)) optDouble(key, Double.NaN).toFloat().takeIf { !it.isNaN() } else null
+
     private fun parseNutrientResponse(json: String): List<FoodItem> {
         return try {
             val foods = JSONObject(json).getJSONArray("foods")
@@ -85,15 +92,16 @@ class NutritionixApi(
                 FoodItem(
                     name = f.optString("food_name", "Unbekannt"),
                     brand = f.optString("brand_name").ifEmpty { null },
-                    calories = f.optDouble("nf_calories", 0.0).toFloat(),
-                    protein = f.optDouble("nf_protein", 0.0).toFloat(),
-                    carbs = f.optDouble("nf_total_carbohydrate", 0.0).toFloat(),
-                    fat = f.optDouble("nf_total_fat", 0.0).toFloat(),
-                    fiber = f.optDouble("nf_dietary_fiber").takeIf { it != 0.0 }?.toFloat(),
-                    sugar = f.optDouble("nf_sugars").takeIf { it != 0.0 }?.toFloat(),
-                    saturatedFat = f.optDouble("nf_saturated_fat").takeIf { it != 0.0 }?.toFloat(),
-                    sodium = f.optDouble("nf_sodium").takeIf { it != 0.0 }?.toFloat(),
-                    potassium = f.optDouble("nf_potassium").takeIf { it != 0.0 }?.toFloat(),
+                    calories = f.g("nf_calories"),
+                    protein = f.g("nf_protein"),
+                    carbs = f.g("nf_total_carbohydrate"),
+                    fat = f.g("nf_total_fat"),
+                    fiber = f.g("nf_dietary_fiber"),
+                    sugar = f.g("nf_sugars"),
+                    addedSugars = f.g("nf_added_sugars"),
+                    saturatedFat = f.g("nf_saturated_fat"),
+                    sodium = f.g("nf_sodium"),
+                    potassium = f.g("nf_potassium"),
                     servingSize = f.optDouble("serving_weight_grams", 100.0).toFloat(),
                     servingUnit = f.optString("serving_unit", "g"),
                     source = FoodSource.NUTRITIONIX,
@@ -113,8 +121,8 @@ class NutritionixApi(
                 FoodItem(
                     name = f.optString("food_name", ""),
                     brand = f.optString("brand_name").ifEmpty { null },
-                    calories = f.optDouble("nf_calories", 0.0).toFloat(),
-                    protein = 0f, carbs = 0f, fat = 0f, // werden beim Detail-Abruf befüllt
+                    calories = f.g("nf_calories"),
+                    protein = null, carbs = null, fat = null, // werden beim Detail-Abruf befüllt, bis dahin unbekannt statt 0
                     servingSize = f.optDouble("serving_weight_grams", 100.0).toFloat(),
                     servingUnit = f.optString("serving_unit", "g"),
                     source = FoodSource.NUTRITIONIX,

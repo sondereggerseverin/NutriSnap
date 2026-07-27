@@ -618,7 +618,7 @@ private fun QuickAddBar(favorites: List<FoodItem>, onQuickAdd: (FoodItem) -> Uni
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                     Text(
-                        "${food.calories.toInt()} kcal/100g",
+                        "${food.calories?.toInt() ?: "–"} kcal/100g",
                         fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                     )
@@ -1094,13 +1094,13 @@ private fun SearchTab(
             Spacer(Modifier.height(NutriSpacing.sm))
             Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.lg)) {
                 Text(
-                    "${(food.calories * grams / 100f).toInt()} kcal",
+                    "${((food.calories ?: 0f) * grams / 100f).toInt()} kcal",
                     fontWeight = FontWeight.SemiBold,
                     color = MacroColors.calories
                 )
-                Text("P ${(food.protein * grams / 100f).toInt()}g", fontSize = 13.sp, color = MacroColors.protein)
-                Text("K ${(food.carbs * grams / 100f).toInt()}g", fontSize = 13.sp, color = MacroColors.carbs)
-                Text("F ${(food.fat * grams / 100f).toInt()}g", fontSize = 13.sp, color = MacroColors.fat)
+                Text("P ${((food.protein ?: 0f) * grams / 100f).toInt()}g", fontSize = 13.sp, color = MacroColors.protein)
+                Text("K ${((food.carbs ?: 0f) * grams / 100f).toInt()}g", fontSize = 13.sp, color = MacroColors.carbs)
+                Text("F ${((food.fat ?: 0f) * grams / 100f).toInt()}g", fontSize = 13.sp, color = MacroColors.fat)
             }
         }
         Spacer(Modifier.height(NutriSpacing.lg))
@@ -1298,7 +1298,7 @@ private fun FoodResultRow(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                food.brand ?: "${food.calories.toInt()} kcal/100g",
+                food.brand ?: "${food.calories?.toInt() ?: "–"} kcal/100g",
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -1307,7 +1307,7 @@ private fun FoodResultRow(
         }
         Spacer(Modifier.width(NutriSpacing.sm))
         Text(
-            "${food.calories.toInt()} kcal",
+            "${food.calories?.toInt() ?: "–"} kcal",
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             color = MacroColors.calories

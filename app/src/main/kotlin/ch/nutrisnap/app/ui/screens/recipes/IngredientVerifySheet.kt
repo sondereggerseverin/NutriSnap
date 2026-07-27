@@ -70,13 +70,13 @@ data class IngredientVerifyState(
     /** Verhältnis effektive/ursprüngliche Menge — Fallback-Skalierung, wenn kein FoodItem vorliegt. */
     private val amountRatio: Float get() = effectiveAmountG / originalAmountG.coerceAtLeast(0.1f)
 
-    val effectiveCalories: Float get() = effectiveFood?.let { effectiveAmountG / 100f * it.calories }
+    val effectiveCalories: Float get() = effectiveFood?.let { effectiveAmountG / 100f * (it.calories ?: 0f) }
         ?: (result.calories * amountRatio)
-    val effectiveProtein: Float get() = effectiveFood?.let { effectiveAmountG / 100f * it.protein }
+    val effectiveProtein: Float get() = effectiveFood?.let { effectiveAmountG / 100f * (it.protein ?: 0f) }
         ?: (result.protein * amountRatio)
-    val effectiveCarbs: Float get() = effectiveFood?.let { effectiveAmountG / 100f * it.carbs }
+    val effectiveCarbs: Float get() = effectiveFood?.let { effectiveAmountG / 100f * (it.carbs ?: 0f) }
         ?: (result.carbs * amountRatio)
-    val effectiveFat: Float get() = effectiveFood?.let { effectiveAmountG / 100f * it.fat }
+    val effectiveFat: Float get() = effectiveFood?.let { effectiveAmountG / 100f * (it.fat ?: 0f) }
         ?: (result.fat * amountRatio)
     /** Mikronaehrstoffe (Ballaststoffe etc.) für die tatsächlich verwendete Menge —
      *  bei bekanntem FoodItem (override oder Match) anhand der editierbaren Menge skaliert,
@@ -959,7 +959,7 @@ private fun FoodSearchScreen(
                             verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(food.name, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                                Text("${food.calories.toInt()} kcal · ${food.protein.toInt()}g P · ${food.carbs.toInt()}g K",
+                                Text("${food.calories?.toInt() ?: "–"} kcal · ${food.protein?.toInt() ?: "–"}g P · ${food.carbs?.toInt() ?: "–"}g K",
                                     fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Icon(Icons.Default.Add, "Auswählen", Modifier.size(20.dp),

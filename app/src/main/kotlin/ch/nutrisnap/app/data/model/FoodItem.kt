@@ -11,17 +11,21 @@ data class FoodItem(
     val brand: String? = null,
     val barcode: String? = null,
 
-    // Makronaehrstoffe (pro 100g)
-    val calories: Float,
-    val protein: Float,
-    val carbs: Float,
-    val fat: Float,
+    // Makronaehrstoffe (pro 100g). Nullable: eine fehlende Angabe der Quelle ist
+    // "unbekannt", nicht "0". Alle vier gleich behandelt - keine Sonderregel fuer Kalorien.
+    val calories: Float?,
+    val protein: Float?,
+    val carbs: Float?,
+    val fat: Float?,
     val servingSize: Float = 100f,
     val servingUnit: String = "g",
 
     // Mikronaehrstoffe (pro 100g, nullable wenn nicht bekannt)
     val fiber: Float? = null,
     val sugar: Float? = null,
+    /** Zugesetzter Zucker (pro 100g), separat vom Gesamtzucker [sugar].
+     *  Aktuell nur zuverlaessig von USDA FDC geliefert (Nutrient-ID 539/1235). */
+    val addedSugars: Float? = null,
     val saturatedFat: Float? = null,
     val monoFat: Float? = null,
     val polyFat: Float? = null,

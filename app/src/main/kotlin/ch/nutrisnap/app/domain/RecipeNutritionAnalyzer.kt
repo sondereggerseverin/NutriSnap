@@ -336,12 +336,14 @@ object RecipeNutritionAnalyzer {
                     .takeIf { it > 0 } ?: n.optDouble("energy_kcal_100g", -1.0).toFloat()
                     .takeIf { it > 0 }) ?: continue
                 val name = p.optString("product_name", originalName).ifBlank { originalName }
+                fun g(key: String): Float? =
+                    if (n.has(key) && !n.isNull(key)) n.optDouble(key, Double.NaN).toFloat().takeIf { !it.isNaN() } else null
                 return FoodItem(
                     name     = name,
                     calories = kcal,
-                    protein  = n.optDouble("proteins_100g", 0.0).toFloat(),
-                    carbs    = n.optDouble("carbohydrates_100g", 0.0).toFloat(),
-                    fat      = n.optDouble("fat_100g", 0.0).toFloat(),
+                    protein  = g("proteins_100g"),
+                    carbs    = g("carbohydrates_100g"),
+                    fat      = g("fat_100g"),
                     source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
                 )
             }
@@ -408,10 +410,13 @@ object RecipeNutritionAnalyzer {
                                 line     = line,
                                 parsed   = parsed,
                                 foodItem = food,
-                                calories = food.calories * factor,
-                                protein  = food.protein  * factor,
-                                carbs    = food.carbs    * factor,
-                                fat      = food.fat      * factor,
+                                // Unbekannte Werte fliessen als 0 in die Rezept-Summe ein (analog zum
+                                // fiberComplete-Flag unten waere eine explizite "unvollstaendig"-Markierung
+                                // pro Makro denkbar, aber ausserhalb des DB-Scopes dieser Aenderung).
+                                calories = (food.calories ?: 0f) * factor,
+                                protein  = (food.protein  ?: 0f) * factor,
+                                carbs    = (food.carbs    ?: 0f) * factor,
+                                fat      = (food.fat      ?: 0f) * factor,
                                 matched  = true,
                                 micros   = food.scaledMicros(factor)
                             )

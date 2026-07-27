@@ -63,7 +63,7 @@ interface UserProfileDao {
         GeneratedRecipeEntity::class,
         ShoppingListItem::class
     ],
-    version = 19,
+    version = 20,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -318,6 +318,120 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // Phase 12: Naehrwertdaten-Qualitaet - calories/protein/carbs/fat auf food_items
+        // werden nullable (fehlender Wert von OFF/BLV/USDA/Nutritionix ist "unbekannt",
+        // nicht "0"). SQLite kennt kein ALTER COLUMN -> Tabelle neu anlegen + Daten kopieren
+        // (gleiches Muster wie MIGRATION_8_9). Zusaetzlich: addedSugars-Spalte fuer
+        // zugesetzten Zucker (aktuell nur zuverlaessig von USDA FDC geliefert).
+        private val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS food_items_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        brand TEXT,
+                        barcode TEXT,
+                        calories REAL,
+                        protein REAL,
+                        carbs REAL,
+                        fat REAL,
+                        servingSize REAL NOT NULL DEFAULT 100,
+                        servingUnit TEXT NOT NULL DEFAULT 'g',
+                        fiber REAL,
+                        sugar REAL,
+                        addedSugars REAL,
+                        saturatedFat REAL,
+                        monoFat REAL,
+                        polyFat REAL,
+                        transFat REAL,
+                        salt REAL,
+                        sodium REAL,
+                        alcohol REAL,
+                        cholesterol REAL,
+                        water REAL,
+                        vitaminA REAL,
+                        vitaminB1 REAL,
+                        vitaminB2 REAL,
+                        vitaminB3 REAL,
+                        vitaminB5 REAL,
+                        vitaminB6 REAL,
+                        vitaminB7 REAL,
+                        vitaminB11 REAL,
+                        vitaminB12 REAL,
+                        vitaminC REAL,
+                        vitaminD REAL,
+                        vitaminE REAL,
+                        vitaminK REAL,
+                        potassium REAL,
+                        calcium REAL,
+                        iron REAL,
+                        magnesium REAL,
+                        zinc REAL,
+                        phosphorus REAL,
+                        copper REAL,
+                        manganese REAL,
+                        fluoride REAL,
+                        iodine REAL,
+                        selenium REAL,
+                        chromium REAL,
+                        molybdenum REAL,
+                        chloride REAL,
+                        choline REAL,
+                        arsenic REAL,
+                        boron REAL,
+                        cobalt REAL,
+                        rubidium REAL,
+                        silicon REAL,
+                        sulfur REAL,
+                        tin REAL,
+                        vanadium REAL,
+                        source TEXT NOT NULL DEFAULT 'MANUAL',
+                        completenessScore INTEGER NOT NULL DEFAULT 0,
+                        timesUsed INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    INSERT INTO food_items_new
+                    SELECT id, name, brand, barcode, calories, protein, carbs, fat,
+                        servingSize, servingUnit, fiber, sugar, NULL, saturatedFat,
+                        monoFat, polyFat, transFat, salt, sodium, alcohol, cholesterol, water,
+                        vitaminA, vitaminB1, vitaminB2, vitaminB3, vitaminB5, vitaminB6,
+                        vitaminB7, vitaminB11, vitaminB12, vitaminC, vitaminD, vitaminE, vitaminK,
+                        potassium, calcium, iron, magnesium, zinc, phosphorus, copper, manganese,
+                        fluoride, iodine, selenium, chromium, molybdenum, chloride, choline,
+                        arsenic, boron, cobalt, rubidium, silicon, sulfur, tin, vanadium,
+                        source, completenessScore, timesUsed
+                    FROM food_items
+                """.trimIndent())
+                db.execSQL("DROP TABLE food_items")
+                db.execSQL("ALTER TABLE food_items_new RENAME TO food_items")
+
+                // favorite_foods: gleiche Nullable-Korrektur fuer konsistente Semantik
+                // ueber Favoriten hinweg (kann Werte aus einem FoodItem mit Luecken uebernehmen).
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS favorite_foods_new (
+                        foodKey TEXT NOT NULL PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        brand TEXT,
+                        caloriesPer100g REAL,
+                        proteinPer100g REAL,
+                        carbsPer100g REAL,
+                        fatPer100g REAL,
+                        fiberPer100g REAL,
+                        addedAt INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    INSERT INTO favorite_foods_new
+                    SELECT foodKey, name, brand, caloriesPer100g, proteinPer100g, carbsPer100g,
+                        fatPer100g, fiberPer100g, addedAt
+                    FROM favorite_foods
+                """.trimIndent())
+                db.execSQL("DROP TABLE favorite_foods")
+                db.execSQL("ALTER TABLE favorite_foods_new RENAME TO favorite_foods")
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -330,7 +444,7 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
                         MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
                         MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16,
-                        MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19
+                        MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20
                     )
                     .build()
                     .also { INSTANCE = it }
