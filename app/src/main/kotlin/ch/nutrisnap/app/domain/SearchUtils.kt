@@ -20,21 +20,37 @@ object SearchUtils {
         // Exakte Teilstring-Suche (schnell)
         if (c.contains(q)) return true
 
-        // Fuzzy Match für kurze Queries (ab 3 Zeichen)
+        // Kompositum-Toleranz: "süsskartoffelpommes" (ein Wort) soll gegen
+        // "Süßkartoffel Pommes" (zwei Wörter) matchen, unabhängig davon auf
+        // welcher Seite das Leerzeichen fehlt/steht.
+        val qCompact = q.replace(" ", "")
+        val cCompact = c.replace(" ", "")
+        if (qCompact.length >= 3 && cCompact.contains(qCompact)) return true
+
+        // Fuzzy Match für kurze Queries (ab 3 Zeichen), auf normaler und
+        // kompakter Form (deckt Tippfehler UND Leerzeichen-Varianten ab).
         if (q.length >= 3) {
-            val windowSize = q.length + 2
-            for (i in 0..(c.length - q.length).coerceAtLeast(0)) {
-                val window = c.substring(i, (i + windowSize).coerceAtMost(c.length))
-                if (levenshteinDistance(q, window) <= if (q.length > 6) 2 else 1) return true
-            }
+            if (fuzzyWindowMatch(q, c)) return true
+            if (fuzzyWindowMatch(qCompact, cCompact)) return true
         }
 
-        // Synonym-Check
-        val synonyms = GERMAN_SYNONYMS[q]
-        if (synonyms != null) {
-            return synonyms.any { c.contains(it) }
+        // Synonym-Check (beide Richtungen: Query->Synonyme und Synonym->Query,
+        // damit z.B. sowohl "pommes" als auch "fritten" den jeweils anderen
+        // Eintrag findet ohne die Map doppelt pflegen zu müssen)
+        GERMAN_SYNONYMS[q]?.let { synonyms -> if (synonyms.any { c.contains(it) }) return true }
+        GERMAN_SYNONYMS.entries.forEach { (key, values) ->
+            if (values.contains(q) && c.contains(key)) return true
         }
 
+        return false
+    }
+
+    private fun fuzzyWindowMatch(q: String, c: String): Boolean {
+        val windowSize = q.length + 2
+        for (i in 0..(c.length - q.length).coerceAtLeast(0)) {
+            val window = c.substring(i, (i + windowSize).coerceAtMost(c.length))
+            if (levenshteinDistance(q, window) <= if (q.length > 6) 2 else 1) return true
+        }
         return false
     }
 
@@ -43,14 +59,18 @@ object SearchUtils {
      */
     fun rankResults(query: String, results: List<String>): List<Pair<String, Int>> {
         val q = normalize(query)
+        val qCompact = q.replace(" ", "")
         return results.map { candidate ->
             val c = normalize(candidate)
+            val cCompact = c.replace(" ", "")
             val score = when {
                 c == q -> 100                    // exakter Treffer
                 c.startsWith(q) -> 90            // beginnt mit Query
                 c.contains(" $q") -> 80          // Wortanfang nach Leerzeichen
                 c.contains(q) -> 70              // enthält Query irgendwo
+                cCompact.contains(qCompact) -> 60 // Kompositum-Treffer (Leerzeichen ignoriert)
                 levenshteinDistance(q, c.take(q.length + 2)) <= 1 -> 50  // fast gleich
+                fuzzyMatch(q, c) -> 40            // Synonym/Fuzzy-Treffer
                 else -> 0
             }
             candidate to score
@@ -91,6 +111,11 @@ object SearchUtils {
         "vollkornbrot" to listOf("wholegrain bread", "vollkorn"),
         "magerquark" to listOf("quark", "topfen", "cottage cheese"),
         "haferflocken" to listOf("oats", "oatmeal", "porridge"),
-        "rinderhack" to listOf("ground beef", "hackfleisch", "faschiertes")
+        "rinderhack" to listOf("ground beef", "hackfleisch", "faschiertes"),
+        "pommes" to listOf("pommes frites", "fritten", "french fries", "fries"),
+        "curry" to listOf("thai curry", "currysauce", "currypaste", "currygericht"),
+        "suesskartoffel" to listOf("sweet potato", "suesskartoffeln"),
+        "poulet" to listOf("chicken", "haehnchen", "huhn"),
+        "rueebli" to listOf("karotte", "carrot", "moehre")
     )
 }
