@@ -150,7 +150,12 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
                     sugar        = entry.sugar        * ratio,
                     saturatedFat = entry.saturatedFat * ratio,
                     salt         = entry.salt         * ratio,
-                    sodium       = entry.sodium       * ratio
+                    sodium       = entry.sodium       * ratio,
+                    originalCalories = entry.originalCalories?.let { it * ratio },
+                    originalProtein  = entry.originalProtein?.let { it * ratio },
+                    originalCarbs    = entry.originalCarbs?.let { it * ratio },
+                    originalFat      = entry.originalFat?.let { it * ratio },
+                    originalFiber    = entry.originalFiber?.let { it * ratio }
                 ))
             } else {
                 val factor = newValue / entry.amountGrams
@@ -165,9 +170,63 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
                     saturatedFat = entry.saturatedFat * factor,
                     salt         = entry.salt         * factor,
                     sodium       = entry.sodium       * factor,
-                    recipeGrams  = entry.recipeGrams?.let { it * factor }
+                    recipeGrams  = entry.recipeGrams?.let { it * factor },
+                    originalCalories = entry.originalCalories?.let { it * factor },
+                    originalProtein  = entry.originalProtein?.let { it * factor },
+                    originalCarbs    = entry.originalCarbs?.let { it * factor },
+                    originalFat      = entry.originalFat?.let { it * factor },
+                    originalFiber    = entry.originalFiber?.let { it * factor }
                 ))
             }
+        }
+    }
+
+    /**
+     * Direkte Makro-Korrektur (globale Korrekturebene): überschreibt genau EIN
+     * Feld der Endsumme, ohne die zugrunde liegenden Zutaten anzufassen. Vor dem
+     * allerersten Override wird der automatisch berechnete Wert je Feld als
+     * "original" gesichert, damit ein späteres "Override entfernen" (clearGlobalOverride)
+     * die Werte wiederherstellen kann.
+     */
+    fun setGlobalMacroOverride(entry: DiaryEntry, field: MacroField, newValue: Float) {
+        viewModelScope.launch {
+            val withSnapshot = entry.copy(
+                isGloballyOverridden = true,
+                originalCalories = entry.originalCalories ?: entry.calories,
+                originalProtein  = entry.originalProtein  ?: entry.protein,
+                originalCarbs    = entry.originalCarbs    ?: entry.carbs,
+                originalFat      = entry.originalFat      ?: entry.fat,
+                originalFiber    = entry.originalFiber    ?: entry.fiber
+            )
+            val updated = when (field) {
+                MacroField.CALORIES -> withSnapshot.copy(calories = newValue)
+                MacroField.PROTEIN  -> withSnapshot.copy(protein = newValue)
+                MacroField.CARBS    -> withSnapshot.copy(carbs = newValue)
+                MacroField.FAT      -> withSnapshot.copy(fat = newValue)
+                MacroField.FIBER    -> withSnapshot.copy(fiber = newValue)
+            }
+            repo.updateEntry(updated)
+        }
+    }
+
+    /** Entfernt den globalen Override und stellt die automatisch berechneten
+     *  (Original-)Werte wieder her. */
+    fun clearGlobalOverride(entry: DiaryEntry) {
+        if (!entry.isGloballyOverridden) return
+        viewModelScope.launch {
+            repo.updateEntry(entry.copy(
+                isGloballyOverridden = false,
+                calories = entry.originalCalories ?: entry.calories,
+                protein  = entry.originalProtein  ?: entry.protein,
+                carbs    = entry.originalCarbs    ?: entry.carbs,
+                fat      = entry.originalFat      ?: entry.fat,
+                fiber    = entry.originalFiber    ?: entry.fiber,
+                originalCalories = null,
+                originalProtein  = null,
+                originalCarbs    = null,
+                originalFat      = null,
+                originalFiber    = null
+            ))
         }
     }
 

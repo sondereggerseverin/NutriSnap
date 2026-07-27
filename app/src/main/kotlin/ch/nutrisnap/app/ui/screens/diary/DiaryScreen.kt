@@ -3,6 +3,7 @@ package ch.nutrisnap.app.ui.screens.diary
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -81,6 +82,10 @@ fun DiaryScreen(
     var showAddSheet by remember { mutableStateOf(autoOpenAdd || autoOpenScanner) }
     var editEntry    by remember { mutableStateOf<DiaryEntry?>(null) }
     var detailEntry  by remember { mutableStateOf<DiaryEntry?>(null) }
+    // Direkte Makro-Korrektur (globale Ebene): welches Feld gerade im MacroEditSheet
+    // bearbeitet wird. Der zugehörige Eintrag wird bei jeder Rekomposition frisch aus
+    // state.entries geholt, damit der Wert nach dem Speichern sofort aktuell ist.
+    var macroEditField by remember { mutableStateOf<MacroField?>(null) }
     var expandedNutrition by remember { mutableStateOf<MealType?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val mealPrefs by context.notifDataStore.data.collectAsState(initial = null)
@@ -235,13 +240,26 @@ fun DiaryScreen(
     if (showAddSheet) AddFoodSheet(vm = vm, initialMeal = initialMeal, autoOpenScanner = autoOpenScanner, onDismiss = { showAddSheet = false })
 
     detailEntry?.let { entry ->
+        // Immer den aktuellen Eintrag aus dem State nehmen (nicht die evtl. veraltete
+        // Closure-Referenz), damit ein Makro-Override sofort sichtbar wird.
+        val liveEntry = state.entries.firstOrNull { it.id == entry.id } ?: entry
         val foodItem by vm.entryDetailFood.collectAsState()
         EntryDetailSheet(
-            entry     = entry,
+            entry     = liveEntry,
             foodItem  = foodItem,
-            onEdit    = { editEntry = entry; detailEntry = null; vm.clearEntryDetail() },
+            onEdit    = { editEntry = liveEntry; detailEntry = null; vm.clearEntryDetail() },
+            onEditMacro = { field -> macroEditField = field },
             onDismiss = { detailEntry = null; vm.clearEntryDetail() }
         )
+        macroEditField?.let { field ->
+            MacroEditSheet(
+                entry = liveEntry,
+                field = field,
+                onSave = { newValue -> vm.setGlobalMacroOverride(liveEntry, field, newValue); macroEditField = null },
+                onRemoveOverride = { vm.clearGlobalOverride(liveEntry); macroEditField = null },
+                onDismiss = { macroEditField = null }
+            )
+        }
     }
 
     editEntry?.let { entry ->
@@ -346,6 +364,7 @@ private fun EntryDetailSheet(
     entry: DiaryEntry,
     foodItem: ch.nutrisnap.app.data.model.FoodItem?,
     onEdit: () -> Unit,
+    onEditMacro: (MacroField) -> Unit,
     onDismiss: () -> Unit
 ) {
     val factor = entry.amountGrams / 100f
@@ -441,15 +460,34 @@ private fun EntryDetailSheet(
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            if (entry.isGloballyOverridden) {
+                Spacer(Modifier.height(NutriSpacing.xs))
+                Text(
+                    "Gesamtwert manuell gesetzt – Zutaten wurden nicht verändert",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+            }
             Spacer(Modifier.height(NutriSpacing.md))
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                EntryMacroItem("Kalorien", "${entry.calories.toInt()}", "kcal", MacroColors.calories)
-                EntryMacroItem("Protein", "${entry.protein.toInt()}", "g", MacroColors.protein)
-                EntryMacroItem("Kohlenhy.", "${entry.carbs.toInt()}", "g", MacroColors.carbs)
-                EntryMacroItem("Fett", "${entry.fat.toInt()}", "g", MacroColors.fat)
+                EntryMacroItem("Kalorien", "${entry.calories.toInt()}", "kcal", MacroColors.calories, entry.isGloballyOverridden) { onEditMacro(MacroField.CALORIES) }
+                EntryMacroItem("Protein", "${entry.protein.toInt()}", "g", MacroColors.protein, entry.isGloballyOverridden) { onEditMacro(MacroField.PROTEIN) }
+                EntryMacroItem("Kohlenhy.", "${entry.carbs.toInt()}", "g", MacroColors.carbs, entry.isGloballyOverridden) { onEditMacro(MacroField.CARBS) }
+                EntryMacroItem("Fett", "${entry.fat.toInt()}", "g", MacroColors.fat, entry.isGloballyOverridden) { onEditMacro(MacroField.FAT) }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Lange drücken zum direkten Anpassen eines Werts",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = NutriSpacing.xs)
+                )
+                TextButton(onClick = { onEditMacro(MacroField.FIBER) }) {
+                    Text("Ballaststoffe", fontSize = 11.sp)
+                }
             }
             if (micros.isNotEmpty()) {
                 HorizontalDivider(Modifier.padding(vertical = NutriSpacing.md))
@@ -466,9 +504,22 @@ private fun EntryDetailSheet(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun EntryMacroItem(label: String, value: String, unit: String, color: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun EntryMacroItem(
+    label: String,
+    value: String,
+    unit: String,
+    color: Color,
+    isOverridden: Boolean = false,
+    onLongPress: (() -> Unit)? = null
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = if (onLongPress != null) {
+            Modifier.combinedClickable(onClick = {}, onLongClick = onLongPress)
+        } else Modifier
+    ) {
         Text(
             value,
             fontWeight = FontWeight.Bold,
@@ -477,6 +528,7 @@ private fun EntryMacroItem(label: String, value: String, unit: String, color: Co
         )
         Text(unit, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (isOverridden) ManualOverrideBadge()
     }
 }
 

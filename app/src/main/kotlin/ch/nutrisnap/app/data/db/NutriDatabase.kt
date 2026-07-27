@@ -63,7 +63,7 @@ interface UserProfileDao {
         GeneratedRecipeEntity::class,
         ShoppingListItem::class
     ],
-    version = 18,
+    version = 19,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -304,6 +304,20 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // Phase 11: direkte Makro-Korrektur ohne Zutaten-Umweg - globaler Override
+        // der Endsumme (Kalorien/Protein/Kohlenhydrate/Fett/Ballaststoffe) je Eintrag,
+        // unabhaengig von der bestehenden Zutaten-Korrektur.
+        private val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE diary_entries ADD COLUMN isGloballyOverridden INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE diary_entries ADD COLUMN originalCalories REAL")
+                db.execSQL("ALTER TABLE diary_entries ADD COLUMN originalProtein REAL")
+                db.execSQL("ALTER TABLE diary_entries ADD COLUMN originalCarbs REAL")
+                db.execSQL("ALTER TABLE diary_entries ADD COLUMN originalFat REAL")
+                db.execSQL("ALTER TABLE diary_entries ADD COLUMN originalFiber REAL")
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -316,7 +330,7 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
                         MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
                         MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16,
-                        MIGRATION_16_17, MIGRATION_17_18
+                        MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19
                     )
                     .build()
                     .also { INSTANCE = it }

@@ -30,10 +30,41 @@ data class DiaryEntry(
      *  in Portionen eingegeben hat. amountGrams speichert weiterhin den daraus
      *  abgeleiteten Portionsfaktor (für die Nährwert-Skalierung); recipeGrams ist
      *  ausschliesslich für die Anzeige ("180 g" statt "0.8 Portionen"). */
-    val recipeGrams: Float? = null
+    val recipeGrams: Float? = null,
+    /** Globale Makro-Korrektur (siehe MacroField): true, wenn der Nutzer Kalorien/
+     *  Protein/Kohlenhydrate/Fett/Ballaststoffe direkt überschrieben hat, statt über
+     *  die Zutatenebene zu korrigieren. Die Zutaten (falls vorhanden) bleiben dabei
+     *  unangetastet - nur die Endsumme dieses Eintrags wird ersetzt. */
+    @ColumnInfo(defaultValue = "0") val isGloballyOverridden: Boolean = false,
+    /** Snapshot der automatisch berechneten Werte vor dem ersten Override, damit
+     *  "Override entfernen" die ursprünglichen Werte wiederherstellen kann. Wird bei
+     *  Mengenänderungen proportional mitskaliert (siehe updateEntryAmount). */
+    val originalCalories: Float? = null,
+    val originalProtein: Float? = null,
+    val originalCarbs: Float? = null,
+    val originalFat: Float? = null,
+    val originalFiber: Float? = null
 )
 
 enum class MealType { BREAKFAST, LUNCH, DINNER, SNACK }
+
+/** Die fünf Makro-/Nährwertfelder, die per direkter Korrektur (ohne Zutaten-Umweg)
+ *  überschrieben werden können. */
+enum class MacroField(val label: String, val unit: String) {
+    CALORIES("Kalorien", "kcal"),
+    PROTEIN("Protein", "g"),
+    CARBS("Kohlenhydrate", "g"),
+    FAT("Fett", "g"),
+    FIBER("Ballaststoffe", "g")
+}
+
+fun DiaryEntry.valueOf(field: MacroField): Float = when (field) {
+    MacroField.CALORIES -> calories
+    MacroField.PROTEIN  -> protein
+    MacroField.CARBS    -> carbs
+    MacroField.FAT      -> fat
+    MacroField.FIBER    -> fiber
+}
 
 /** Wandelt den gespeicherten "meal_order"-Preference-String in eine vollständige MealType-Reihenfolge um. */
 fun parseMealOrder(stored: String?): List<MealType> {
