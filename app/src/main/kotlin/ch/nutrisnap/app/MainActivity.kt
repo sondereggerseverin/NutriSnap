@@ -330,9 +330,16 @@ fun MainScaffold(
                     hcVm = hcVm,
                     onNavigateToDiary = { meal, autoOpenAdd ->
                         val route = if (meal != null) "diary?meal=${meal.name}&open=$autoOpenAdd" else "diary?open=$autoOpenAdd"
-                        navController.navigate(route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true; restoreState = true
+                        if (autoOpenAdd) {
+                            // Frischer Push statt Tab-Preserving-Pattern: sonst wird bei bereits
+                            // besuchtem Diary-Tab die alte Compose-Instanz (samt showAddSheet=false)
+                            // wiederverwendet und das Add-Sheet oeffnet sich nicht.
+                            navController.navigate(route)
+                        } else {
+                            navController.navigate(route) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true; restoreState = true
+                            }
                         }
                     },
                     onNavigateToHealth = { navController.navigate("health") },
