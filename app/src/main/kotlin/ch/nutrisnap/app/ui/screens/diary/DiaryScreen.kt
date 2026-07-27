@@ -40,6 +40,7 @@ import ch.nutrisnap.app.ui.components.NutritionFactsProgress
 import ch.nutrisnap.app.ui.components.SectionHeader
 import ch.nutrisnap.app.domain.EntryPlausibilityChecker
 import ch.nutrisnap.app.domain.FoodPortionPresets
+import ch.nutrisnap.app.domain.EverydayServingSizes
 import ch.nutrisnap.app.ui.screens.barcode.BarcodeScannerScreen
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import androidx.compose.ui.graphics.Color
@@ -1077,6 +1078,7 @@ private fun SearchTab(
             }
             Spacer(Modifier.height(NutriSpacing.sm))
         }
+        var showServingGuide by remember { mutableStateOf(false) }
         Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
             OutlinedTextField(
                 value = amountText,
@@ -1085,9 +1087,21 @@ private fun SearchTab(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.weight(1f),
                 singleLine = true,
-                shape = RoundedCornerShape(NutriRadius.md)
+                shape = RoundedCornerShape(NutriRadius.md),
+                trailingIcon = {
+                    IconButton(onClick = { showServingGuide = true }) {
+                        Icon(Icons.Default.Straighten, "Alltagseinheiten anzeigen")
+                    }
+                }
             )
             MealPicker(selected = selectedMeal) { selectedMeal = it }
+        }
+        if (showServingGuide) {
+            ServingSizeGuideDialog(
+                food = food,
+                onSelect = { grams -> amountText = grams.toInt().toString(); showServingGuide = false },
+                onDismiss = { showServingGuide = false }
+            )
         }
         val grams = amountText.toFloatOrNull() ?: 0f
         if (grams > 0) {
@@ -1257,6 +1271,62 @@ private fun ManualEntryTab(
             )
         }
     }
+}
+
+/**
+ * Visueller Portionsgrössen-Guide: zeigt ~80 Alltagseinheiten (Tasse, Handvoll, Scheibe, ...)
+ * mit Emoji-Referenzbild, Objektname und dem für [food] berechneten Kalorienwert, als
+ * Alternative zur reinen Gramm-Eingabe. Ergänzt [FoodPortionPresets] um allgemeine,
+ * lebensmittelunabhängige Masse.
+ */
+@Composable
+private fun ServingSizeGuideDialog(
+    food: FoodItem,
+    onSelect: (grams: Float) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Wie viel ungefähr?") },
+        text = {
+            LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                items(EverydayServingSizes.ALL) { unit ->
+                    val kcal = (food.calories ?: 0f) * unit.grams / 100f
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(unit.grams) }
+                            .padding(vertical = NutriSpacing.sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(unit.emoji, fontSize = 22.sp)
+                            Spacer(Modifier.width(NutriSpacing.sm))
+                            Column {
+                                Text(unit.label, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                Text(
+                                    "${unit.grams.toInt()} g",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Text(
+                            "${kcal.toInt()} kcal",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MacroColors.calories
+                        )
+                    }
+                    HorizontalDivider()
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Schliessen") }
+        }
+    )
 }
 
 @Composable
