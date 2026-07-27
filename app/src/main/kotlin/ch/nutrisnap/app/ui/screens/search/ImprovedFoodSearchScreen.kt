@@ -143,9 +143,14 @@ private fun IdleSearchContent(recentFoods: List<FoodItem>, frequentFoods: List<F
 
 @Composable
 private fun SearchResultsList(items: List<FoodItem>, query: String, onFoodSelected: (FoodItem) -> Unit) {
+    // Keine Ergebnisse hat exakten/Wort-Treffer (relevance >= 2) -> alles was
+    // angezeigt wird, kommt nur aus Tippfehler-/Kompositum-/Synonym-Matching.
+    // Statt das wie sichere Treffer zu präsentieren, klar als Vorschlag kennzeichnen.
+    val onlyFuzzyMatches = items.isNotEmpty() && items.none { FoodSearchRepository.relevance(it, query) >= 2 }
     LazyColumn {
         item {
-            Text("${items.size} Ergebnisse fuer \"$query\"",
+            Text(
+                text = if (onlyFuzzyMatches) "Meintest du eines davon?" else "${items.size} Ergebnisse fuer \"$query\"",
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
