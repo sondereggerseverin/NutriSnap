@@ -353,7 +353,15 @@ object RecipeNutritionAnalyzer {
         val lines = recipe.ingredients.lines()
             .map { it.trim() }
             .filter { isIngredientLine(it) }
+        return analyzeIngredientLines(lines, recipe.servings.coerceAtLeast(1))
+    }
 
+    /**
+     * Wie [analyze], aber für Zutatenzeilen, die nicht aus einem [Recipe] stammen
+     * (z.B. von der mehrstufigen KI-Foto-Analyse produzierte "150g Reis"-Zeilen).
+     * [servings] = 1, da eine fotografierte Mahlzeit bereits die gesamte Portion ist.
+     */
+    suspend fun analyzeIngredientLines(lines: List<String>, servings: Int = 1): AnalysisResult {
         // ── Pass 1: local DB + OpenFoodFacts (parallel, per-ingredient) ───────────
         val firstPass = withContext(Dispatchers.IO) {
             coroutineScope {
@@ -457,7 +465,7 @@ object RecipeNutritionAnalyzer {
             }
         }
 
-        val servings = recipe.servings.coerceAtLeast(1).toFloat()
+        val servingsF = servings.coerceAtLeast(1).toFloat()
         val totCal   = results.sumOf { it.calories.toDouble() }.toFloat()
         val totProt  = results.sumOf { it.protein.toDouble() }.toFloat()
         val totCarb  = results.sumOf { it.carbs.toDouble() }.toFloat()
@@ -469,10 +477,10 @@ object RecipeNutritionAnalyzer {
             totalProtein       = totProt,
             totalCarbs         = totCarb,
             totalFat           = totFat,
-            caloriesPerServing = totCal  / servings,
-            proteinPerServing  = totProt / servings,
-            carbsPerServing    = totCarb / servings,
-            fatPerServing      = totFat  / servings,
+            caloriesPerServing = totCal  / servingsF,
+            proteinPerServing  = totProt / servingsF,
+            carbsPerServing    = totCarb / servingsF,
+            fatPerServing      = totFat  / servingsF,
             matchedCount       = results.count { it.matched },
             totalCount         = results.size,
             estimatedCount     = results.count { it.estimated },

@@ -1,24 +1,21 @@
 package ch.nutrisnap.app.ui.screens.scan
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.MealType
-import ch.nutrisnap.app.domain.FoodScanResult
+import ch.nutrisnap.app.ui.screens.recipes.IngredientVerifySheet
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FoodScanScreen(
     onNavigateBack: () -> Unit,
@@ -29,22 +26,20 @@ fun FoodScanScreen(
     when (val s = state) {
         is FoodScanState.Capturing -> PhotoCaptureScreen(
             title = "Essen scannen",
-            instructions = "Foto vom Teller machen – die KI schätzt Kalorien & Makros",
+            instructions = "Foto vom Teller machen – die KI erkennt und trennt jede einzelne Zutat",
             onPhotoCaptured = { bitmap -> vm.analyzePhoto(bitmap) },
             onNavigateBack = onNavigateBack
         )
-        is FoodScanState.Analyzing -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularProgressIndicator()
-                Spacer(Modifier.height(16.dp))
-                Text("Analysiere Foto…")
-            }
-        }
-        is FoodScanState.Result -> FoodScanResultView(
-            result = s.result,
-            onSave = { edited, mealType -> vm.saveToDiary(edited, mealType) },
-            onRetake = { vm.retake() },
-            onBack = onNavigateBack
+        is FoodScanState.Analyzing -> AnalysisProgressView(stage = s.stage)
+        is FoodScanState.Verify -> VerifyAndSaveFlow(
+            dishName = s.dishName,
+            analysisResult = s.analysisResult,
+            initialOverrides = vm.getOverrides(),
+            onOverridesChanged = vm::setOverrides,
+            onSave = { name, kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium, meal ->
+                vm.saveToDiary(name, kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium, meal)
+            },
+            onDismiss = { vm.retake() }
         )
         is FoodScanState.Error -> Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -59,98 +54,163 @@ fun FoodScanScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+// ── Sichtbarer 5-Stufen-Analyse-Fortschritt ────────────────────────────────────
+
+private data class StageInfo(val stage: PhotoAnalysisStage, val label: String)
+
+private val ANALYSIS_STAGES = listOf(
+    StageInfo(PhotoAnalysisStage.IDENTIFYING_INGREDIENTS, "Zutaten werden erkannt…"),
+    StageInfo(PhotoAnalysisStage.SEPARATING_INGREDIENTS, "Zutaten werden getrennt…"),
+    StageInfo(PhotoAnalysisStage.SEARCHING_NUTRITION_DATABASE, "Nährwerte werden gesucht…"),
+    StageInfo(PhotoAnalysisStage.BREAKING_DOWN_MACROS, "Makros werden aufgeschlüsselt…"),
+    StageInfo(PhotoAnalysisStage.FINALIZING_RESULTS, "Ergebnis wird finalisiert…")
+)
+
 @Composable
-private fun FoodScanResultView(
-    result: FoodScanResult,
-    onSave: (FoodScanResult, MealType) -> Unit,
-    onRetake: () -> Unit,
-    onBack: () -> Unit
-) {
-    var gramsText by remember { mutableStateOf(result.estimatedGrams.toInt().toString()) }
-    var mealType by remember { mutableStateOf(MealType.LUNCH) }
-    var mealMenuExpanded by remember { mutableStateOf(false) }
+private fun AnalysisProgressView(stage: PhotoAnalysisStage) {
+    val currentIndex = ANALYSIS_STAGES.indexOfFirst { it.stage == stage }.coerceAtLeast(0)
 
-    val originalGrams = result.estimatedGrams.coerceAtLeast(1f)
-    val factor = (gramsText.toFloatOrNull() ?: originalGrams) / originalGrams
-    val scaled = result.copy(
-        estimatedGrams = gramsText.toFloatOrNull() ?: result.estimatedGrams,
-        calories = result.calories * factor,
-        protein = result.protein * factor,
-        carbs = result.carbs * factor,
-        fat = result.fat * factor
-    )
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Ergebnis") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") } }
-            )
-        },
-        bottomBar = {
-            Surface(shadowElevation = 8.dp) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(onClick = onRetake, modifier = Modifier.weight(1f)) { Text("Neu fotografieren") }
-                    Button(onClick = { onSave(scaled, mealType) }, modifier = Modifier.weight(1f)) { Text("Speichern") }
-                }
-            }
-        }
-    ) { padding ->
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
-            Modifier
-                .padding(padding)
-                .padding(16.dp)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(32.dp).fillMaxWidth()
         ) {
-            Text(result.foodName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-
-            AssistChip(onClick = {}, label = { Text("Sicherheit der Schätzung: ${result.confidence}") })
-
-            OutlinedTextField(
-                value = gramsText,
-                onValueChange = { gramsText = it },
-                label = { Text("Geschätzte Menge (g)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(), singleLine = true
+            Text(
+                "KI-Analyse läuft…",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
             )
-
-            Card {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MacroRow("Kalorien", "${scaled.calories.toInt()} kcal")
-                    MacroRow("Protein", "${scaled.protein.toInt()} g")
-                    MacroRow("Kohlenhydrate", "${scaled.carbs.toInt()} g")
-                    MacroRow("Fett", "${scaled.fat.toInt()} g")
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Dein Foto wird Schritt für Schritt in einzelne Zutaten zerlegt",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(24.dp))
+            LinearProgressIndicator(
+                progress = { (currentIndex + 1) / ANALYSIS_STAGES.size.toFloat() },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(24.dp))
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                ANALYSIS_STAGES.forEachIndexed { index, info ->
+                    StageRow(
+                        label = info.label,
+                        status = when {
+                            index < currentIndex -> StageStatus.DONE
+                            index == currentIndex -> StageStatus.ACTIVE
+                            else -> StageStatus.PENDING
+                        }
+                    )
                 }
             }
-
-            ExposedDropdownMenuBox(expanded = mealMenuExpanded, onExpandedChange = { mealMenuExpanded = it }) {
-                OutlinedTextField(
-                    value = mealType.name, onValueChange = {}, readOnly = true,
-                    label = { Text("Mahlzeit") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = mealMenuExpanded) },
-                    modifier = Modifier.menuAnchor().fillMaxWidth()
-                )
-                ExposedDropdownMenu(expanded = mealMenuExpanded, onDismissRequest = { mealMenuExpanded = false }) {
-                    MealType.entries.forEach { type ->
-                        DropdownMenuItem(text = { Text(type.name) }, onClick = { mealType = type; mealMenuExpanded = false })
-                    }
-                }
-            }
-            Spacer(Modifier.height(8.dp))
         }
     }
 }
 
+private enum class StageStatus { DONE, ACTIVE, PENDING }
+
 @Composable
-private fun MacroRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, fontWeight = FontWeight.SemiBold)
+private fun StageRow(label: String, status: StageStatus) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        when (status) {
+            StageStatus.DONE -> Icon(
+                Icons.Default.Check, null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+            StageStatus.ACTIVE -> CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.5.dp
+            )
+            StageStatus.PENDING -> Icon(
+                Icons.Default.RadioButtonUnchecked, null,
+                tint = MaterialTheme.colorScheme.outlineVariant,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Text(
+            label,
+            color = when (status) {
+                StageStatus.PENDING -> MaterialTheme.colorScheme.onSurfaceVariant
+                else -> MaterialTheme.colorScheme.onSurface
+            },
+            fontWeight = if (status == StageStatus.ACTIVE) FontWeight.SemiBold else FontWeight.Normal
+        )
     }
+}
+
+// ── Verify-Sheet (bestehende Komponente) + Mahlzeit-Auswahl vorm Speichern ─────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VerifyAndSaveFlow(
+    dishName: String,
+    analysisResult: ch.nutrisnap.app.domain.RecipeNutritionAnalyzer.AnalysisResult,
+    initialOverrides: Map<String, ch.nutrisnap.app.ui.screens.recipes.IngredientOverride>,
+    onOverridesChanged: (Map<String, ch.nutrisnap.app.ui.screens.recipes.IngredientOverride>) -> Unit,
+    onSave: (
+        dishName: String, kcal: Float, protein: Float, carbs: Float, fat: Float,
+        fiber: Float?, sugar: Float?, saturatedFat: Float?, salt: Float?, sodium: Float?,
+        mealType: MealType
+    ) -> Unit,
+    onDismiss: () -> Unit
+) {
+    // Zwischenspeicher für die vom Verify-Sheet gelieferten, finalen Summen —
+    // Mahlzeit-Auswahl erfolgt danach in einem leichten Dialog.
+    var pendingTotals by remember { mutableStateOf<PendingTotals?>(null) }
+
+    IngredientVerifySheet(
+        analysisResult = analysisResult,
+        recipeName = dishName,
+        servings = 1,
+        initialOverrides = initialOverrides,
+        onOverridesChanged = onOverridesChanged,
+        onDismiss = onDismiss,
+        onConfirm = { kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium ->
+            pendingTotals = PendingTotals(kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium)
+        }
+    )
+
+    pendingTotals?.let { t ->
+        MealTypePickerDialog(
+            onDismiss = { pendingTotals = null },
+            onConfirm = { meal ->
+                onSave(dishName, t.kcal, t.protein, t.carbs, t.fat, t.fiber, t.sugar, t.saturatedFat, t.salt, t.sodium, meal)
+                pendingTotals = null
+            }
+        )
+    }
+}
+
+private data class PendingTotals(
+    val kcal: Float, val protein: Float, val carbs: Float, val fat: Float,
+    val fiber: Float?, val sugar: Float?, val saturatedFat: Float?, val salt: Float?, val sodium: Float?
+)
+
+@Composable
+private fun MealTypePickerDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (MealType) -> Unit
+) {
+    var mealType by remember { mutableStateOf(MealType.LUNCH) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Mahlzeit wählen") },
+        text = {
+            Column {
+                MealType.entries.forEach { type ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        RadioButton(selected = mealType == type, onClick = { mealType = type })
+                        Text(type.name, modifier = Modifier.padding(start = 4.dp))
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onConfirm(mealType) }) { Text("Ins Tagebuch übernehmen") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } }
+    )
 }
