@@ -17,6 +17,8 @@ import org.json.JSONArray
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 
 data class YazioImportResult(
     val importedDays: Int = 0,
@@ -113,7 +115,8 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                         val protein = cols[5].trim().toFloatOrNull() ?: 0f
                         val fat = cols[6].trim().toFloatOrNull() ?: 0f
                         val carbs = cols[7].trim().toFloatOrNull() ?: 0f
-                        val date = LocalDate.parse(dateStr)
+                        val date = parseYazioDate(dateStr)
+                            ?: throw DateTimeParseException("Unbekanntes Datumsformat", dateStr, 0)
                         val mealType = when (mealStr) {
                             "breakfast", "fruehstueck", "fruehstuck" -> MealType.BREAKFAST
                             "lunch", "mittagessen" -> MealType.LUNCH
@@ -305,6 +308,28 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
 
     fun resetRecipeState() { _recipeState.value = YazioRecipeImportState.Idle }
     fun resetFoodState() { _foodState.value = YazioFoodImportState.Idle }
+
+    /**
+     * Yazio's App-CSV-Export liefert Daten im Format dd/MM/yyyy (z.B. "10/01/2026"),
+     * nicht ISO (yyyy-MM-dd). [LocalDate.parse] ohne Formatter erwartet ISO und ist bei
+     * jeder Zeile fehlgeschlagen -> der komplette Import wurde stillschweigend uebersprungen.
+     * Versucht daher mehrere bekannte Formate, ISO zuletzt als Fallback (z.B. fuer Dateien
+     * aus [importBundledRecipes] o.ae. Quellen, die bereits ISO liefern).
+     */
+    private fun parseYazioDate(raw: String): LocalDate? {
+        val formatters = listOf(
+            DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+            DateTimeFormatter.ofPattern("d/M/yyyy"),
+            DateTimeFormatter.ofPattern("dd.MM.yyyy"),
+            DateTimeFormatter.ISO_LOCAL_DATE
+        )
+        for (fmt in formatters) {
+            try {
+                return LocalDate.parse(raw, fmt)
+            } catch (e: DateTimeParseException) { /* naechstes Format probieren */ }
+        }
+        return null
+    }
 
     /** Einfacher CSV-Split, der Anführungszeichen-umschlossene Felder mit Kommas korrekt behandelt. */
     private fun splitCsvLine(line: String): List<String> {
