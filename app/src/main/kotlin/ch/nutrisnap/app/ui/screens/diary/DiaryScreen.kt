@@ -81,6 +81,16 @@ fun DiaryScreen(
 ) {
     val state by vm.uiState.collectAsState()
     var showAddSheet by remember { mutableStateOf(autoOpenAdd || autoOpenScanner) }
+    // BUG-FIX: showAddSheet wurde bisher nur beim Erstellen der Compose-Instanz aus
+    // autoOpenAdd/autoOpenScanner initialisiert. Da NavHost Tab-Instanzen bei
+    // Tab-Wechseln wiederverwendet (restoreState/saveState), blieb bei erneutem
+    // Aufruf mit autoOpenAdd=true die alte Instanz (samt showAddSheet=false) aktiv
+    // und das Sheet oeffnete sich nicht mehr — deshalb wich MainActivity bislang auf
+    // einen "frischen Push" ohne popUpTo aus, was den Back-Stack aufblähte und dazu
+    // fuehrte, dass man von Tagebuch nicht mehr sauber zu Start zurückkam.
+    LaunchedEffect(autoOpenAdd, autoOpenScanner) {
+        if (autoOpenAdd || autoOpenScanner) showAddSheet = true
+    }
     var editEntry    by remember { mutableStateOf<DiaryEntry?>(null) }
     var detailEntry  by remember { mutableStateOf<DiaryEntry?>(null) }
     // Direkte Makro-Korrektur (globale Ebene): welches Feld gerade im MacroEditSheet
@@ -99,7 +109,16 @@ fun DiaryScreen(
     val recipesState by recipesVm.uiState.collectAsState()
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        // BUG-FIX: Bisher liess sich das Add-Sheet nur ueber den "+" auf der
+        // Startseite (Meal-Quick-Add -> Navigation mit autoOpenAdd=true) oeffnen.
+        // Wer bereits im Tagebuch war, hatte keine Moeglichkeit, ohne Umweg ueber
+        // "Start" einen Eintrag zu erfassen.
+        floatingActionButton = {
+            FloatingActionButton(onClick = { showAddSheet = true }) {
+                Icon(Icons.Default.Add, contentDescription = "Eintrag hinzufügen")
+            }
+        }
     ) { padding ->
         LazyColumn(
             Modifier.padding(padding).fillMaxSize(),
