@@ -19,8 +19,7 @@ interface CustomFoodDao {
     @Query("SELECT * FROM custom_foods WHERE name LIKE '%' || :query || '%' ORDER BY createdAt DESC LIMIT 50")
     suspend fun searchOnce(query: String): List<CustomFoodItem>
 
-    @Query("SELECT * FROM custom_foods WHERE id = :id LIMIT 1")
-    suspend fun getById(id: Int): CustomFoodItem?
+
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(item: CustomFoodItem): Long
