@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.data.model
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -12,6 +13,8 @@ data class CustomFoodItem(
     val carbs: Float,
     val fat: Float,
     val fiber: Float = 0f,
+    @ColumnInfo(defaultValue = "0") val sugar: Float = 0f,
+    @ColumnInfo(defaultValue = "0") val salt: Float = 0f,
     /** Barcode (EAN / QR), falls aus YAZIO-Export vorhanden. */
     val barcode: String? = null,
     /** Markenname, z. B. "Felfel". Wird beim Import aus dem brand-Feld übernommen. */
@@ -20,6 +23,7 @@ data class CustomFoodItem(
     val category: String? = null,
     /** Übliche Portionsgröße in Gramm (Default 100 g = YAZIO per-100g-Basis). */
     val portionSizeG: Float = 100f,
+    @ColumnInfo(defaultValue = "'manual'") val source: String = "manual",
     val createdAt: Long = System.currentTimeMillis(),
     val userId: String = ""
 )
