@@ -143,7 +143,9 @@ class DiaryRepository(db: NutriDatabase) {
         sugar: Float = 0f,
         saturatedFat: Float = 0f,
         salt: Float = 0f,
-        sodium: Float = 0f
+        sodium: Float = 0f,
+        matchedCustomFoodId: Int? = null,
+        matchedRecipeId: Long? = null
     ): Long {
         val id = dao.insert(
             DiaryEntry(
@@ -160,7 +162,9 @@ class DiaryRepository(db: NutriDatabase) {
                 sugar        = sugar,
                 saturatedFat = saturatedFat,
                 salt         = salt,
-                sodium       = sodium
+                sodium       = sodium,
+                matchedCustomFoodId = matchedCustomFoodId,
+                matchedRecipeId     = matchedRecipeId
             )
         )
         dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }
@@ -263,6 +267,8 @@ private fun CustomFoodItem.toFoodItem(): FoodItem = FoodItem(
     carbs = carbs,
     fat = fat,
     fiber = fiber,
+    sugar = sugar,
+    salt = salt,
     servingSize = portionSizeG,
     source = FoodSource.MANUAL,
     completenessScore = 90
