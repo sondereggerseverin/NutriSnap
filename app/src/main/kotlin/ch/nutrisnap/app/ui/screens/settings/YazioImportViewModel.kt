@@ -377,11 +377,7 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                         carbs = obj.optDouble("carbsPer100g", 0.0).toFloat(),
                         fat = obj.optDouble("fatPer100g", 0.0).toFloat(),
                         fiber = obj.optDouble("fiberPer100g", 0.0).toFloat(),
-                        barcode = barcode,
-                        brand = brand,
-                        category = category,
-                        portionSizeG = 100f
-                    )
+
                     db.customFoodDao().insert(food)
                     imported++
                 }
