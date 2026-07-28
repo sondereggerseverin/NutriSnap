@@ -199,6 +199,9 @@ class DiaryRepository(db: NutriDatabase) {
 
     suspend fun deleteAllEntries() = dao.deleteAll()
 
+    /** Einmaliger Snapshot aller Tagebuch-Eintraege, u.a. fuer Dedup-Checks beim Bulk-Import. */
+    suspend fun getAllEntriesOnce() = dao.getAllOnce()
+
     /**
      * Persistiert die manuell per Drag-Handle geänderte Reihenfolge innerhalb einer Mahlzeit.
      * orderedIds = Einträge in der neuen Anzeigereihenfolge (Index = neue sortOrder).

@@ -152,6 +152,94 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
+     * Importiert den mitgelieferten Diary-Export (app/src/main/assets/yazio_nutrition_log.csv)
+     * direkt aus den Assets, ohne dass der Nutzer die Datei manuell ueber den Dateipicker
+     * auswaehlen muss. Der Datei-Picker-Import [importNutritionLog] setzt eine vom Nutzer
+     * ausgewaehlte Datei via [Uri] voraus - die im Repo mitgelieferte, aktualisierte CSV
+     * (z.B. nach einem frischen Yazio-Export) wurde dadurch nie automatisch uebernommen.
+     *
+     * Dedup: bereits vorhandene Eintraege (gleiches Datum + gleicher Produktname + gleiche
+     * Kalorienzahl) werden uebersprungen, damit ein wiederholter Import (oder ein bereits
+     * per Dateipicker teilweise erfolgter Import) keine doppelten Tagebuch-Eintraege erzeugt.
+     */
+    fun importBundledNutritionLog() {
+        viewModelScope.launch {
+            _state.value = YazioImportState.Loading
+            try {
+                val context = getApplication<Application>()
+                val text = context.assets.open("yazio_nutrition_log.csv")
+                    .bufferedReader(Charsets.UTF_8).use { it.readText() }
+                val lines = text.lineSequence().toList()
+                if (lines.isEmpty()) throw Exception("Leere CSV-Datei")
+                val allLines = lines.drop(1) // Header ueberspringen
+
+                // Dedup-Key: Datum|Produktname (lowercase)|Kalorien (gerundet)
+                val existing = mutableSetOf<String>()
+                for (entry in diaryRepo.getAllEntriesOnce()) {
+                    existing.add(
+                        "${entry.dateStr}|${entry.foodName.trim().lowercase()}|${entry.calories.toInt()}"
+                    )
+                }
+
+                var imported = 0
+                var skipped = 0
+                val days = mutableSetOf<LocalDate>()
+
+                for (rawLine in allLines) {
+                    val line = rawLine.trim()
+                    if (line.isBlank()) continue
+                    val cols = splitCsvLine(line)
+                    if (cols.size < 8) { skipped++; continue }
+                    try {
+                        val dateStr = cols[0].trim()
+                        val mealStr = cols[1].trim().lowercase()
+                        val product = cols[2].trim().ifBlank { "Unbekannt" }
+                        val kcal = cols[4].trim().toFloatOrNull() ?: 0f
+                        val protein = cols[5].trim().toFloatOrNull() ?: 0f
+                        val fat = cols[6].trim().toFloatOrNull() ?: 0f
+                        val carbs = cols[7].trim().toFloatOrNull() ?: 0f
+                        val date = parseYazioDate(dateStr)
+                            ?: throw DateTimeParseException("Unbekanntes Datumsformat", dateStr, 0)
+
+                        val key = "${date}|${product.trim().lowercase()}|${kcal.toInt()}"
+                        if (key in existing) { skipped++; continue }
+
+                        val mealType = when (mealStr) {
+                            "breakfast", "fruehstueck", "fruehstuck" -> MealType.BREAKFAST
+                            "lunch", "mittagessen" -> MealType.LUNCH
+                            "dinner", "abendessen" -> MealType.DINNER
+                            else -> MealType.SNACK
+                        }
+                        diaryRepo.addManualEntry(
+                            name = product,
+                            kcal = kcal,
+                            protein = protein,
+                            carbs = carbs,
+                            fat = fat,
+                            mealType = mealType,
+                            date = date
+                        )
+                        existing.add(key)
+                        days.add(date)
+                        imported++
+                    } catch (e: Exception) {
+                        skipped++
+                    }
+                }
+                _state.value = YazioImportState.Success(
+                    YazioImportResult(
+                        importedDays = days.size,
+                        importedEntries = imported,
+                        skippedEntries = skipped
+                    )
+                )
+            } catch (e: Exception) {
+                _state.value = YazioImportState.Error(e.message ?: "Unbekannter Fehler")
+            }
+        }
+    }
+
+    /**
      * Importiert die mitgelieferten Yazio-Rezepte (app/src/main/assets/yazio_recipes.json)
      * direkt in die "recipes" Tabelle. Ueberspringt Rezepte deren Titel bereits existiert.
      */

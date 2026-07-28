@@ -63,10 +63,14 @@ fun YazioImportScreen(
 
             when (val s = state) {
                 is YazioImportState.Idle -> {
-                    Button(onClick = { filePicker.launch("*/*") }, modifier = Modifier.fillMaxWidth()) {
+                    Button(onClick = { viewModel.importBundledNutritionLog() }, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Filled.UploadFile, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("nutrition_log.csv auswaehlen")
+                        Text("Mitgelieferte Diary-Historie importieren")
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(onClick = { filePicker.launch("*/*") }, modifier = Modifier.fillMaxWidth()) {
+                        Text("...oder eigene nutrition_log.csv auswaehlen")
                     }
                     Spacer(Modifier.height(12.dp))
                     OutlinedButton(
