@@ -1,4 +1,4 @@
-# Build errors - run 559
+# Build errors - run 561
 
 ## Error lines
 ```
@@ -81,7 +81,7 @@ WARNING: D8: An error occurred when parsing kotlin metadata. This normally happe
 > Task :app:kspDebugKotlin FAILED
    > KSP failed with exit code: PROCESSING_ERROR
 Caused by: java.lang.Exception: KSP failed with exit code: PROCESSING_ERROR
-BUILD FAILED in 6m 39s
+BUILD FAILED in 7m 31s
 ```
 
 ## Last 150 lines
@@ -234,6 +234,6 @@ Caused by: java.lang.Exception: KSP failed with exit code: PROCESSING_ERROR
 	... 2 more
 
 
-BUILD FAILED in 6m 39s
+BUILD FAILED in 7m 31s
 23 actionable tasks: 23 executed
 ```
