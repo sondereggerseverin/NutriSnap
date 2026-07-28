@@ -42,8 +42,8 @@ data class DiaryEntry(
     val originalCalories: Float? = null,
     val originalProtein: Float? = null,
     val originalCarbs: Float? = null,
-    val originalFat: Float? = null,
-
+    val originalFat: Float? = null
+)
 
 enum class MealType { BREAKFAST, LUNCH, DINNER, SNACK }
 
