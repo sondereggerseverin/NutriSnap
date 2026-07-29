@@ -19,6 +19,9 @@ interface CustomFoodDao {
     @Query("SELECT * FROM custom_foods WHERE name LIKE '%' || :query || '%' ORDER BY createdAt DESC LIMIT 50")
     suspend fun searchOnce(query: String): List<CustomFoodItem>
 
+    @Query("SELECT * FROM custom_foods WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Int): CustomFoodItem?
+
     /** Einmaliger Snapshot aller Einträge, für Dedup-/Verknüpfungs-Lookups beim
      *  Yazio-Import (Foods, Rezept-Zutaten, Tagebuch-Matching). */
     @Query("SELECT * FROM custom_foods")
