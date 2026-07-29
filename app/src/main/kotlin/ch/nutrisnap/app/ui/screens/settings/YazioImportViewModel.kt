@@ -24,7 +24,8 @@ import java.time.format.DateTimeParseException
 data class YazioImportResult(
     val importedDays: Int = 0,
     val importedEntries: Int = 0,
-    val skippedEntries: Int = 0
+    val skippedEntries: Int = 0,
+    val autoCreatedFoods: Int = 0
 )
 
 sealed class YazioImportState {
@@ -36,11 +37,13 @@ sealed class YazioImportState {
 
 data class YazioRecipeImportResult(
     val importedRecipes: Int = 0,
-    val skippedRecipes: Int = 0
+    val skippedRecipes: Int = 0,
+    val autoCreatedIngredientFoods: Int = 0
 )
 
 data class YazioFoodImportResult(
     val importedFoods: Int = 0,
+    val updatedFoods: Int = 0,
     val skippedFoods: Int = 0
 )
 
@@ -82,6 +85,10 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
     private val _foodState = MutableStateFlow<YazioFoodImportState>(YazioFoodImportState.Idle)
     val foodState: StateFlow<YazioFoodImportState> = _foodState
 
+    /** name|brand|barcode (lowercase/getrimmt) - Identitätsschlüssel für Dedup. */
+    private fun identityKey(name: String, brand: String?, barcode: String?): String =
+        "${name.trim().lowercase()}|${(brand ?: "").trim().lowercase()}|${(barcode ?: "").trim()}"
+
     fun importNutritionLog(uri: Uri) {
         viewModelScope.launch {
             _state.value = YazioImportState.Loading
@@ -96,56 +103,9 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                 if (first != 0xFEFF) reader.reset()
                 val header = reader.readLine() // Header ueberspringen
                 if (header == null) throw Exception("Leere CSV-Datei")
-
-                var imported = 0
-                var skipped = 0
-                val days = mutableSetOf<LocalDate>()
                 val allLines = reader.readLines()
                 reader.close()
-
-                for (rawLine in allLines) {
-                    val line = rawLine.trim()
-                    if (line.isBlank()) continue
-                    val cols = splitCsvLine(line)
-                    if (cols.size < 8) { skipped++; continue }
-                    try {
-                        val dateStr = cols[0].trim()
-                        val mealStr = cols[1].trim().lowercase()
-                        val product = cols[2].trim().ifBlank { "Unbekannt" }
-                        val kcal = cols[4].trim().toFloatOrNull() ?: 0f
-                        val protein = cols[5].trim().toFloatOrNull() ?: 0f
-                        val fat = cols[6].trim().toFloatOrNull() ?: 0f
-                        val carbs = cols[7].trim().toFloatOrNull() ?: 0f
-                        val date = parseYazioDate(dateStr)
-                            ?: throw DateTimeParseException("Unbekanntes Datumsformat", dateStr, 0)
-                        val mealType = when (mealStr) {
-                            "breakfast", "fruehstueck", "fruehstuck" -> MealType.BREAKFAST
-                            "lunch", "mittagessen" -> MealType.LUNCH
-                            "dinner", "abendessen" -> MealType.DINNER
-                            else -> MealType.SNACK
-                        }
-                        diaryRepo.addManualEntry(
-                            name = product,
-                            kcal = kcal,
-                            protein = protein,
-                            carbs = carbs,
-                            fat = fat,
-                            mealType = mealType,
-                            date = date
-                        )
-                        days.add(date)
-                        imported++
-                    } catch (e: Exception) {
-                        skipped++
-                    }
-                }
-                _state.value = YazioImportState.Success(
-                    YazioImportResult(
-                        importedDays = days.size,
-                        importedEntries = imported,
-                        skippedEntries = skipped
-                    )
-                )
+                _state.value = YazioImportState.Success(runNutritionLogImport(allLines))
             } catch (e: Exception) {
                 _state.value = YazioImportState.Error(e.message ?: "Unbekannter Fehler")
             }
@@ -172,68 +132,7 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                     .bufferedReader(Charsets.UTF_8).use { it.readText() }
                 val lines = text.lineSequence().toList()
                 if (lines.isEmpty()) throw Exception("Leere CSV-Datei")
-                val allLines = lines.drop(1) // Header ueberspringen
-
-                // Dedup-Key: Datum|Produktname (lowercase)|Kalorien (gerundet)
-                val existing = mutableSetOf<String>()
-                for (entry in diaryRepo.getAllEntriesOnce()) {
-                    existing.add(
-                        "${entry.dateStr}|${entry.foodName.trim().lowercase()}|${entry.calories.toInt()}"
-                    )
-                }
-
-                var imported = 0
-                var skipped = 0
-                val days = mutableSetOf<LocalDate>()
-
-                for (rawLine in allLines) {
-                    val line = rawLine.trim()
-                    if (line.isBlank()) continue
-                    val cols = splitCsvLine(line)
-                    if (cols.size < 8) { skipped++; continue }
-                    try {
-                        val dateStr = cols[0].trim()
-                        val mealStr = cols[1].trim().lowercase()
-                        val product = cols[2].trim().ifBlank { "Unbekannt" }
-                        val kcal = cols[4].trim().toFloatOrNull() ?: 0f
-                        val protein = cols[5].trim().toFloatOrNull() ?: 0f
-                        val fat = cols[6].trim().toFloatOrNull() ?: 0f
-                        val carbs = cols[7].trim().toFloatOrNull() ?: 0f
-                        val date = parseYazioDate(dateStr)
-                            ?: throw DateTimeParseException("Unbekanntes Datumsformat", dateStr, 0)
-
-                        val key = "${date}|${product.trim().lowercase()}|${kcal.toInt()}"
-                        if (key in existing) { skipped++; continue }
-
-                        val mealType = when (mealStr) {
-                            "breakfast", "fruehstueck", "fruehstuck" -> MealType.BREAKFAST
-                            "lunch", "mittagessen" -> MealType.LUNCH
-                            "dinner", "abendessen" -> MealType.DINNER
-                            else -> MealType.SNACK
-                        }
-                        diaryRepo.addManualEntry(
-                            name = product,
-                            kcal = kcal,
-                            protein = protein,
-                            carbs = carbs,
-                            fat = fat,
-                            mealType = mealType,
-                            date = date
-                        )
-                        existing.add(key)
-                        days.add(date)
-                        imported++
-                    } catch (e: Exception) {
-                        skipped++
-                    }
-                }
-                _state.value = YazioImportState.Success(
-                    YazioImportResult(
-                        importedDays = days.size,
-                        importedEntries = imported,
-                        skippedEntries = skipped
-                    )
-                )
+                _state.value = YazioImportState.Success(runNutritionLogImport(lines.drop(1)))
             } catch (e: Exception) {
                 _state.value = YazioImportState.Error(e.message ?: "Unbekannter Fehler")
             }
@@ -241,8 +140,123 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
+     * Gemeinsame Import-Logik fuer Datei-Picker- und Bundled-Diary-Import.
+     * Verknuepft jede Zeile mit einem bereits importierten Food/Rezept (per Name);
+     * existiert weder Food noch Rezept, wird automatisch ein neues Food aus den
+     * CSV-Totalwerten abgeleitet (source = yazio_diary_only), damit kein Eintrag
+     * verloren geht. Dedup ueber Datum+Produktname+Kalorien macht den Import idempotent.
+     */
+    private suspend fun runNutritionLogImport(dataLines: List<String>): YazioImportResult {
+        val existingKeys = mutableSetOf<String>()
+        for (entry in diaryRepo.getAllEntriesOnce()) {
+            existingKeys.add("${entry.dateStr}|${entry.foodName.trim().lowercase()}|${entry.calories.toInt()}")
+        }
+
+        val foodByName = db.customFoodDao().getAllOnce()
+            .associate { it.name.trim().lowercase() to it.id }.toMutableMap()
+        val recipeByTitle = db.recipeDao().getAll().first()
+            .associate { it.title.trim().lowercase() to it.id }
+
+        var imported = 0
+        var skipped = 0
+        var autoCreatedFoods = 0
+        val days = mutableSetOf<LocalDate>()
+
+        for (rawLine in dataLines) {
+            val line = rawLine.trim()
+            if (line.isBlank()) continue
+            val cols = splitCsvLine(line)
+            if (cols.size < 8) { skipped++; continue }
+            try {
+                val dateStr = cols[0].trim()
+                val mealStr = cols[1].trim().lowercase()
+                val product = cols[2].trim().ifBlank { "Unbekannt" }
+                val mengeRaw = cols[3].trim()
+                val kcal = cols[4].trim().toFloatOrNull() ?: 0f
+                val protein = cols[5].trim().toFloatOrNull() ?: 0f
+                val fat = cols[6].trim().toFloatOrNull() ?: 0f
+                val carbs = cols[7].trim().toFloatOrNull() ?: 0f
+                val date = parseYazioDate(dateStr)
+                    ?: throw DateTimeParseException("Unbekanntes Datumsformat", dateStr, 0)
+
+                val key = "${date}|${product.trim().lowercase()}|${kcal.toInt()}"
+                if (key in existingKeys) { skipped++; continue }
+
+                val mealType = when (mealStr) {
+                    "breakfast", "fruehstueck", "fruehstuck" -> MealType.BREAKFAST
+                    "lunch", "mittagessen" -> MealType.LUNCH
+                    "dinner", "abendessen" -> MealType.DINNER
+                    else -> MealType.SNACK
+                }
+
+                val quantityG = parseGrams(mengeRaw)
+                val nameKey = product.lowercase()
+                var matchedFoodId = foodByName[nameKey]
+                val matchedRecipeId = recipeByTitle[nameKey]
+
+                if (matchedFoodId == null && matchedRecipeId == null) {
+                    // Weder Food noch Rezept vorhanden -> neues Food aus den CSV-Werten
+                    // ableiten, damit kein Eintrag verloren geht. Bei bekannter Grammmenge
+                    // wird auf 100g hochgerechnet, sonst der Totalwert als Naeherung
+                    // gespeichert (source = yazio_diary_only macht das transparent).
+                    val factor = if (quantityG != null && quantityG > 0f) 100f / quantityG else 1f
+                    val newId = db.customFoodDao().insert(
+                        CustomFoodItem(
+                            name = product,
+                            calories = kcal * factor,
+                            protein = protein * factor,
+                            carbs = carbs * factor,
+                            fat = fat * factor,
+                            portionSizeG = quantityG ?: 100f,
+                            source = "yazio_diary_only"
+                        )
+                    )
+                    matchedFoodId = newId.toInt()
+                    foodByName[nameKey] = matchedFoodId
+                    autoCreatedFoods++
+                }
+
+                diaryRepo.addManualEntry(
+                    name = product,
+                    kcal = kcal,
+                    protein = protein,
+                    carbs = carbs,
+                    fat = fat,
+                    mealType = mealType,
+                    date = date,
+                    amountGrams = quantityG ?: 0f,
+                    matchedCustomFoodId = if (matchedRecipeId != null) null else matchedFoodId,
+                    matchedRecipeId = matchedRecipeId
+                )
+                existingKeys.add(key)
+                days.add(date)
+                imported++
+            } catch (e: Exception) {
+                skipped++
+            }
+        }
+
+        return YazioImportResult(
+            importedDays = days.size,
+            importedEntries = imported,
+            skippedEntries = skipped,
+            autoCreatedFoods = autoCreatedFoods
+        )
+    }
+
+    /** Parst die "Menge"-Spalte ("140.0g" -> 140.0). Andere Formate (z.B. Portionsangaben)
+     *  liefern null, da daraus keine Grammmenge abgeleitet werden kann. */
+    private fun parseGrams(raw: String): Float? {
+        val match = Regex("^([\\d.,]+)\\s*g$").find(raw) ?: return null
+        return match.groupValues[1].replace(",", ".").toFloatOrNull()
+    }
+
+    /**
      * Importiert die mitgelieferten Yazio-Rezepte (app/src/main/assets/yazio_recipes.json)
      * direkt in die "recipes" Tabelle. Ueberspringt Rezepte deren Titel bereits existiert.
+     * Zutaten, die noch nicht als eigenes Lebensmittel existieren, werden automatisch
+     * angelegt (Makros unbekannt, da die Rezeptdatei nur Name/Menge/Einheit/Produzent
+     * liefert), damit kein Rezept unvollstaendig importiert wird.
      */
     fun importBundledRecipes() {
         viewModelScope.launch {
@@ -258,8 +272,15 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                     db.recipeDao().getAll().first().forEach { existing.add(it.title.trim().lowercase()) }
                 } catch (e: Exception) { /* ignore */ }
 
+                // name(lowercase) -> id, fuer Zutaten-Matching; wird bei Neuanlage erweitert,
+                // damit dieselbe Zutat innerhalb dieses Imports nicht mehrfach angelegt wird.
+                val foodIdByName = db.customFoodDao().getAllOnce()
+                    .associate { it.name.trim().lowercase() to it.id }
+                    .toMutableMap()
+
                 var imported = 0
                 var skipped = 0
+                var autoCreatedIngredients = 0
 
                 for (i in 0 until arr.length()) {
                     val obj = arr.getJSONObject(i)
@@ -271,6 +292,8 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                     val proteinPerServing = obj.optDouble("proteinPerServing", 0.0).toFloat()
                     val carbsPerServing = obj.optDouble("carbsPerServing", 0.0).toFloat()
                     val fatPerServing = obj.optDouble("fatPerServing", 0.0).toFloat()
+                    val fiberPerServing = obj.optDouble("fiberPerServing", 0.0).toFloat()
+                    val sugarPerServing = obj.optDouble("sugarPerServing", 0.0).toFloat()
                     val imageUrl = obj.optString("imageUrl", null).takeUnless { it.isNullOrBlank() }
 
                     val ingredientsArr = obj.optJSONArray("ingredients")
@@ -278,10 +301,25 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                     if (ingredientsArr != null) {
                         for (j in 0 until ingredientsArr.length()) {
                             val ing = ingredientsArr.getJSONObject(j)
-                            val name = ing.optString("name", "")
+                            val name = ing.optString("name", "").trim()
                             val amount = ing.optDouble("amount", 0.0)
                             val unit = ing.optString("unit", "g")
-                            val producer = ing.optString("producer", null)
+                            val producer = ing.optString("producer", null).takeUnless { it.isNullOrBlank() }
+
+                            if (name.isNotBlank() && foodIdByName[name.lowercase()] == null) {
+                                val displayName = if (!producer.isNullOrBlank()) "$name ($producer)" else name
+                                val newId = db.customFoodDao().insert(
+                                    CustomFoodItem(
+                                        name = displayName,
+                                        calories = 0f, protein = 0f, carbs = 0f, fat = 0f,
+                                        brand = producer,
+                                        source = "yazio_recipe_ingredient"
+                                    )
+                                )
+                                foodIdByName[name.lowercase()] = newId.toInt()
+                                autoCreatedIngredients++
+                            }
+
                             ingredientsText.append("- ")
                             if (amount > 0) {
                                 val amountStr = if (amount == amount.toLong().toDouble())
@@ -306,16 +344,23 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                         proteinPerServing = proteinPerServing,
                         carbsPerServing = carbsPerServing,
                         fatPerServing = fatPerServing,
+                        fiberPerServing = fiberPerServing,
+                        sugarPerServing = sugarPerServing,
                         servings = servings,
                         prepTimeMinutes = null,
                         tags = "",
                         showNutrition = true
                     )
                     db.recipeDao().insert(recipe)
+                    existing.add(title.trim().lowercase())
                     imported++
                 }
                 _recipeState.value = YazioRecipeImportState.Success(
-                    YazioRecipeImportResult(importedRecipes = imported, skippedRecipes = skipped)
+                    YazioRecipeImportResult(
+                        importedRecipes = imported,
+                        skippedRecipes = skipped,
+                        autoCreatedIngredientFoods = autoCreatedIngredients
+                    )
                 )
             } catch (e: Exception) {
                 _recipeState.value = YazioRecipeImportState.Error(e.message ?: "Unbekannter Fehler")
@@ -327,11 +372,10 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
      * Importiert die mitgelieferten eigenen Yazio-Produkte (yazio_foods.json)
      * als eigene Lebensmittel (custom_foods). Nährwerte sind bereits pro 100 g.
      *
-     * Fix: Dedup-Vergleich nutzt jetzt den zusammengesetzten displayName
-     * (name + brand) — identisch mit dem gespeicherten CustomFoodItem.name —
-     * statt nur dem rohen name-Feld. Verhindert doppelte Imports nach App-Neustart.
-     *
-     * Neu: barcode, brand, category und portionSizeG werden gespeichert.
+     * Dedup-Identität = name+brand+barcode (lowercase). Existiert der Eintrag bereits
+     * mit identischen Makros -> übersprungen. Bei abweichenden Werten -> aktualisiert
+     * (Yazio-Wert gewinnt, source = yazio_import). Existiert er nicht -> neu angelegt.
+     * Damit ist der Import idempotent und Konflikte werden zugunsten von Yazio gelöst.
      */
     fun importBundledFoods() {
         viewModelScope.launch {
@@ -342,48 +386,75 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                     .bufferedReader(Charsets.UTF_8).use { it.readText() }
                 val arr = JSONArray(jsonText)
 
-                // Dedup: existing keys = gespeicherter name (= displayName) in Lowercase
-                val existing = mutableSetOf<String>()
-                try {
-                    db.customFoodDao().getAll().first()
-                        .forEach { existing.add(it.name.trim().lowercase()) }
-                } catch (e: Exception) { /* ignore */ }
+                val existing = db.customFoodDao().getAllOnce()
+                val existingByKey = existing.associateBy { identityKey(it.name, it.brand, it.barcode) }
 
                 var imported = 0
+                var updated = 0
                 var skipped = 0
 
                 for (i in 0 until arr.length()) {
                     val obj = arr.getJSONObject(i)
                     val name = obj.optString("name", "Unbekanntes Produkt").trim()
-                    val brand = obj.optString("brand", null)
-                        .takeUnless { it.isNullOrBlank() }
-                    val barcode = obj.optString("barcode", null)
-                        .takeUnless { it.isNullOrBlank() }
-                    val category = obj.optString("category", null)
-                        .takeUnless { it.isNullOrBlank() }
+                    val brand = obj.optString("brand", null).takeUnless { it.isNullOrBlank() }
+                    val barcode = obj.optString("barcode", null).takeUnless { it.isNullOrBlank() }
+                    val category = obj.optString("category", null).takeUnless { it.isNullOrBlank() }
 
-                    // displayName exakt so bauen wie beim Lesen aus der DB erwartet
+                    val calories = obj.optDouble("caloriesPer100g", 0.0).toFloat()
+                    val protein = obj.optDouble("proteinPer100g", 0.0).toFloat()
+                    val carbs = obj.optDouble("carbsPer100g", 0.0).toFloat()
+                    val fat = obj.optDouble("fatPer100g", 0.0).toFloat()
+                    val fiber = obj.optDouble("fiberPer100g", 0.0).toFloat()
+                    val sugar = obj.optDouble("sugarPer100g", 0.0).toFloat()
+                    val salt = obj.optDouble("saltPer100g", 0.0).toFloat()
+
+                    // displayName wird fuer Anzeige/Suche gefuehrt (Marke in Klammern);
+                    // die Dedup-Identitaet selbst laeuft getrennt ueber name+brand+barcode.
                     val displayName = if (!brand.isNullOrBlank()) "$name ($brand)" else name
+                    val key = identityKey(name, brand, barcode)
+                    val existingItem = existingByKey[key]
 
-                    // FIX: Vergleich mit displayName statt rohem name
-                    if (displayName.trim().lowercase() in existing) {
-                        skipped++
-                        continue
+                    if (existingItem == null) {
+                        db.customFoodDao().insert(
+                            CustomFoodItem(
+                                name = displayName,
+                                calories = calories,
+                                protein = protein,
+                                carbs = carbs,
+                                fat = fat,
+                                fiber = fiber,
+                                sugar = sugar,
+                                salt = salt,
+                                barcode = barcode,
+                                brand = brand,
+                                category = category,
+                                portionSizeG = 100f,
+                                source = "yazio_import"
+                            )
+                        )
+                        imported++
+                    } else {
+                        val macrosDiffer = existingItem.calories != calories ||
+                            existingItem.protein != protein || existingItem.carbs != carbs ||
+                            existingItem.fat != fat || existingItem.fiber != fiber ||
+                            existingItem.sugar != sugar || existingItem.salt != salt
+                        if (macrosDiffer) {
+                            db.customFoodDao().update(
+                                existingItem.copy(
+                                    calories = calories, protein = protein, carbs = carbs, fat = fat,
+                                    fiber = fiber, sugar = sugar, salt = salt,
+                                    category = category ?: existingItem.category,
+                                    source = "yazio_import"
+                                )
+                            )
+                            updated++
+                        } else {
+                            skipped++
+                        }
                     }
-
-                    val food = CustomFoodItem(
-                        name = displayName,
-                        calories = obj.optDouble("caloriesPer100g", 0.0).toFloat(),
-                        protein = obj.optDouble("proteinPer100g", 0.0).toFloat(),
-                        carbs = obj.optDouble("carbsPer100g", 0.0).toFloat(),
-                        fat = obj.optDouble("fatPer100g", 0.0).toFloat(),
-                        fiber = obj.optDouble("fiberPer100g", 0.0).toFloat(),
-
-                    db.customFoodDao().insert(food)
-                    imported++
                 }
                 _foodState.value = YazioFoodImportState.Success(
-                    YazioFoodImportResult(importedFoods = imported, skippedFoods = skipped)
+                    YazioFoodImportResult(importedFoods = imported, updatedFoods = updated, skippedFoods = skipped)
                 )
             } catch (e: Exception) {
                 _foodState.value = YazioFoodImportState.Error(e.message ?: "Unbekannter Fehler")

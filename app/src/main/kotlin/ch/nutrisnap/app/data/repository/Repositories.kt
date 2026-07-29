@@ -144,6 +144,7 @@ class DiaryRepository(db: NutriDatabase) {
         saturatedFat: Float = 0f,
         salt: Float = 0f,
         sodium: Float = 0f,
+        amountGrams: Float = 0f,
         matchedCustomFoodId: Int? = null,
         matchedRecipeId: Long? = null
     ): Long {
@@ -151,7 +152,7 @@ class DiaryRepository(db: NutriDatabase) {
             DiaryEntry(
                 foodItemId  = -999,
                 foodName    = name,
-                amountGrams = 0f,
+                amountGrams = amountGrams,
                 mealType    = mealType,
                 dateStr     = date.toString(),
                 calories    = kcal,

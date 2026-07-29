@@ -23,6 +23,9 @@ data class CustomFoodItem(
     val category: String? = null,
     /** Übliche Portionsgröße in Gramm (Default 100 g = YAZIO per-100g-Basis). */
     val portionSizeG: Float = 100f,
+    /** Herkunft: "manual" (Nutzer), "yazio_import" (aus yazio_foods.json), "yazio_recipe_ingredient"
+     *  (automatisch aus einer Rezept-Zutat ohne bekannte Makros angelegt), "yazio_diary_only"
+     *  (nur aus dem CSV-Tagebuch bekannt, kein foods.json-Eintrag vorhanden). */
     @ColumnInfo(defaultValue = "'manual'") val source: String = "manual",
     val createdAt: Long = System.currentTimeMillis(),
     val userId: String = ""

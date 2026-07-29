@@ -95,6 +95,9 @@ fun YazioImportScreen(
                             Spacer(Modifier.height(8.dp))
                             Text("Tage: ${s.result.importedDays}")
                             Text("Eintraege importiert: ${s.result.importedEntries}")
+                            if (s.result.autoCreatedFoods > 0) {
+                                Text("Neu angelegte Lebensmittel: ${s.result.autoCreatedFoods}")
+                            }
                             if (s.result.skippedEntries > 0) {
                                 Text("Uebersprungen: ${s.result.skippedEntries}")
                             }
@@ -147,6 +150,9 @@ fun YazioImportScreen(
                             Text("Rezept-Import abgeschlossen", fontWeight = FontWeight.Bold)
                             Spacer(Modifier.height(8.dp))
                             Text("Importiert: ${rs.result.importedRecipes}")
+                            if (rs.result.autoCreatedIngredientFoods > 0) {
+                                Text("Neu angelegte Zutaten: ${rs.result.autoCreatedIngredientFoods}")
+                            }
                             if (rs.result.skippedRecipes > 0) {
                                 Text("Bereits vorhanden (uebersprungen): ${rs.result.skippedRecipes}")
                             }
@@ -196,6 +202,9 @@ fun YazioImportScreen(
                             Text("Produkt-Import abgeschlossen", fontWeight = FontWeight.Bold)
                             Spacer(Modifier.height(8.dp))
                             Text("Importiert: ${fs.result.importedFoods}")
+                            if (fs.result.updatedFoods > 0) {
+                                Text("Aktualisiert: ${fs.result.updatedFoods}")
+                            }
                             if (fs.result.skippedFoods > 0) {
                                 Text("Bereits vorhanden (uebersprungen): ${fs.result.skippedFoods}")
                             }

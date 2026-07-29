@@ -42,7 +42,14 @@ data class DiaryEntry(
     val originalCalories: Float? = null,
     val originalProtein: Float? = null,
     val originalCarbs: Float? = null,
-    val originalFat: Float? = null
+    val originalFat: Float? = null,
+    val originalFiber: Float? = null,
+    /** Verknüpfung zu custom_foods.id, falls dieser Eintrag (z.B. beim Yazio-Import)
+     *  einem eigenen Lebensmittel zugeordnet werden konnte. */
+    val matchedCustomFoodId: Int? = null,
+    /** Verknüpfung zu recipes.id, falls dieser Eintrag einem importierten Rezept
+     *  zugeordnet werden konnte. */
+    val matchedRecipeId: Long? = null
 )
 
 enum class MealType { BREAKFAST, LUNCH, DINNER, SNACK }

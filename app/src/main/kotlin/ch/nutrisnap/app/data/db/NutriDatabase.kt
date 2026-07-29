@@ -432,6 +432,10 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // Phase: vollständiger Yazio-Import. custom_foods bekommt sugar/salt (bisher aus
+        // yazio_foods.json verworfen) und eine source-Spalte zur Herkunftskennzeichnung.
+        // diary_entries bekommt matchedCustomFoodId/matchedRecipeId, damit importierte
+        // Tagebuch-Zeilen mit bereits importierten Foods/Rezepten verknüpft werden können.
         private val MIGRATION_20_21 = object : Migration(20, 21) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE custom_foods ADD COLUMN sugar REAL NOT NULL DEFAULT 0")
@@ -439,7 +443,6 @@ abstract class NutriDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE custom_foods ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'")
                 db.execSQL("ALTER TABLE diary_entries ADD COLUMN matchedCustomFoodId INTEGER")
                 db.execSQL("ALTER TABLE diary_entries ADD COLUMN matchedRecipeId INTEGER")
-                db.execSQL("ALTER TABLE ingredient_matches ADD COLUMN matchedCustomFoodId INTEGER")
             }
         }
 
