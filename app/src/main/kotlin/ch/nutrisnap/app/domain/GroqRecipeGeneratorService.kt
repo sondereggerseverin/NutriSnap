@@ -1,6 +1,10 @@
 package ch.nutrisnap.app.domain
 
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -489,26 +493,38 @@ $JSON_SCHEMA_HINT
 
     private fun Float.roundToIntSafe(): Int = this.coerceAtLeast(0f).let { Math.round(it) }
 
-    /** Führt den LLM-Call aus: primär Gemini, Fallback Groq. */
-    private fun callLlm(prompt: String, maxTokens: Int = 3000): Result<String> {
-        // Primary: Gemini
-        if (GeminiService.isAvailable()) {
-            val geminiResult = kotlinx.coroutines.runBlocking {
-                GeminiService.generateText(
-                    prompt = prompt,
-                    temperature = 0.7,
-                    maxTokens = maxTokens
-                )
-            }
-            if (geminiResult.isSuccess) {
-                val cleaned = geminiResult.getOrThrow().trim()
-                    .removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
-                return Result.success(cleaned)
-            }
+    /**
+     * Ruft Gemini und Groq PARALLEL auf (statt sequenziell mit Fallback) und nimmt das
+     * erste erfolgreiche Ergebnis. Vorher wartete dieser Call bis zu Gemini's vollem
+     * Timeout (~28s, s. GeminiService), bevor überhaupt erst Groq versucht wurde - das war
+     * dieselbe 30s-Verzögerung, die in GroqVisionService/RecipeAiParser bereits behoben
+     * wurde (s. dortige Kommentare), hier aber noch nicht.
+     */
+    private suspend fun callLlm(prompt: String, maxTokens: Int = 3000): Result<String> = coroutineScope {
+        if (!GeminiService.isAvailable()) {
+            return@coroutineScope callGroq(prompt, maxTokens)
         }
 
-        // Fallback: Groq
-        return callGroq(prompt, maxTokens)
+        val geminiJob: Deferred<Result<String>> = async {
+            GeminiService.generateText(prompt = prompt, temperature = 0.7, maxTokens = maxTokens)
+                .map { it.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim() }
+        }
+        val groqJob: Deferred<Result<String>> = async { callGroq(prompt, maxTokens) }
+
+        val (winnerJob, winnerResult) = select<Pair<Deferred<Result<String>>, Result<String>>> {
+            geminiJob.onAwait { geminiJob to it }
+            groqJob.onAwait { groqJob to it }
+        }
+        val loserJob = if (winnerJob === geminiJob) groqJob else geminiJob
+
+        if (winnerResult.isSuccess) {
+            loserJob.cancel()
+            winnerResult
+        } else {
+            // Zuerst antwortender Provider ist fehlgeschlagen - auf den anderen warten
+            // statt sofort aufzugeben.
+            loserJob.await()
+        }
     }
 
     private fun callGroq(prompt: String, maxTokens: Int = 3000): Result<String> {
@@ -558,9 +574,9 @@ $JSON_SCHEMA_HINT
         }
     }
 
-    private fun tryProvider(prompt: String): Result<GeneratedRecipe> =
+    private suspend fun tryProvider(prompt: String): Result<GeneratedRecipe> =
         callLlm(prompt, maxTokens = 2000).mapCatching { json.decodeFromString<GeneratedRecipe>(it) }
 
-    private fun tryDayPlanProvider(prompt: String): Result<DayPlan> =
+    private suspend fun tryDayPlanProvider(prompt: String): Result<DayPlan> =
         callLlm(prompt, maxTokens = 3000).mapCatching { json.decodeFromString<DayPlan>(it) }
 }
