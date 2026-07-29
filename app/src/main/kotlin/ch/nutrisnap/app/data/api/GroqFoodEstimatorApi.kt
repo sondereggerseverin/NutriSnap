@@ -5,8 +5,11 @@ import ch.nutrisnap.app.BuildConfig
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.FoodSource
 import ch.nutrisnap.app.domain.GeminiService
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -32,70 +35,99 @@ object GroqFoodEstimatorApi {
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
+    /**
+     * Ruft Gemini und Groq PARALLEL auf (statt sequenziell mit Fallback via runBlocking)
+     * und nimmt das erste erfolgreiche Ergebnis. Vorher wartete dieser Call bis zu Gemini's
+     * vollem Timeout (~28s, s. GeminiService), bevor überhaupt erst Groq versucht wurde -
+     * dieselbe 30s-Verzögerung, die in GroqVisionService/RecipeAiParser bereits behoben
+     * wurde, hier aber noch nicht.
+     */
     suspend fun estimate(query: String): FoodItem? = withContext(Dispatchers.IO) {
-        runCatching {
-            val prompt = """
-                Gib die durchschnittlichen Nährwerte pro 100g für das deutsche Lebensmittel
-                "$query" zurück (rohe/übliche Zubereitungsform, keine bestimmte Marke).
-                Antworte AUSSCHLIESSLICH mit einem JSON-Objekt, keine Erklärung, kein Markdown:
-                {"name":"...", "calories":0.0, "protein":0.0, "carbs":0.0, "fat":0.0,
-                 "fiber":0.0, "sugar":0.0, "salt":0.0}
-                Falls "$query" kein plausibles Lebensmittel ist, antworte mit {}
-            """.trimIndent()
+        val prompt = """
+            Gib die durchschnittlichen Nährwerte pro 100g für das deutsche Lebensmittel
+            "$query" zurück (rohe/übliche Zubereitungsform, keine bestimmte Marke).
+            Antworte AUSSCHLIESSLICH mit einem JSON-Objekt, keine Erklärung, kein Markdown:
+            {"name":"...", "calories":0.0, "protein":0.0, "carbs":0.0, "fat":0.0,
+             "fiber":0.0, "sugar":0.0, "salt":0.0}
+            Falls "$query" kein plausibles Lebensmittel ist, antworte mit {}
+        """.trimIndent()
 
-            // Primary: Gemini
-            if (GeminiService.isAvailable()) {
-                val geminiResult = runBlocking {
-                    GeminiService.generateText(prompt = prompt, temperature = 0.2, maxTokens = 300)
-                }
-                if (geminiResult.isSuccess) {
-                    val content = geminiResult.getOrThrow()
-                        .trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
-                    val data = JSONObject(content)
-                    if (data.has("calories")) {
-                        return@withContext buildFoodItem(data, query)
-                    }
-                }
+        if (!GeminiService.isAvailable()) {
+            return@withContext runCatching { estimateViaGroq(prompt, query) }
+                .onFailure { e -> Log.w(TAG, "Schätzung für \"$query\" fehlgeschlagen: ${e.message}") }
+                .getOrNull()
+        }
+
+        coroutineScope {
+            val geminiJob: Deferred<FoodItem?> = async {
+                runCatching { estimateViaGemini(prompt, query) }.getOrNull()
+            }
+            val groqJob: Deferred<FoodItem?> = async {
+                runCatching { estimateViaGroq(prompt, query) }
+                    .onFailure { e -> Log.w(TAG, "Schätzung für \"$query\" fehlgeschlagen: ${e.message}") }
+                    .getOrNull()
             }
 
-            // Fallback: Groq
-            val apiKey = BuildConfig.GROQ_API_KEY
-            if (apiKey.isBlank()) return@withContext null
-
-            val requestJson = JSONObject().apply {
-                put("model", "openai/gpt-oss-120b")
-                put("temperature", 0.2)
-                put("max_tokens", 300)
-                put("reasoning_effort", "low")
-                put("messages", org.json.JSONArray().apply {
-                    put(JSONObject().apply { put("role", "user"); put("content", prompt) })
-                })
-            }.toString()
-
-            val request = Request.Builder()
-                .url("https://api.groq.com/openai/v1/chat/completions")
-                .addHeader("Authorization", "Bearer $apiKey")
-                .post(requestJson.toRequestBody("application/json".toMediaType()))
-                .build()
-
-            val response = client.newCall(request).execute()
-            val bodyStr = response.body?.string()
-            if (!response.isSuccessful || bodyStr == null) {
-                Log.w(TAG, "Schätzung für \"$query\" fehlgeschlagen: HTTP ${response.code}")
-                return@withContext null
+            val (winnerJob, winnerResult) = select<Pair<Deferred<FoodItem?>, FoodItem?>> {
+                geminiJob.onAwait { geminiJob to it }
+                groqJob.onAwait { groqJob to it }
             }
+            val loserJob = if (winnerJob === geminiJob) groqJob else geminiJob
 
-            val content = JSONObject(bodyStr)
-                .getJSONArray("choices").getJSONObject(0)
-                .getJSONObject("message").getString("content")
-                .trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+            if (winnerResult != null) {
+                loserJob.cancel()
+                winnerResult
+            } else {
+                loserJob.await()
+            }
+        }
+    }
 
-            val data = JSONObject(content)
-            if (!data.has("calories")) return@withContext null
+    private suspend fun estimateViaGemini(prompt: String, query: String): FoodItem? {
+        val geminiResult = GeminiService.generateText(prompt = prompt, temperature = 0.2, maxTokens = 300)
+        if (geminiResult.isFailure) return null
+        val content = geminiResult.getOrThrow()
+            .trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+        val data = JSONObject(content)
+        return if (data.has("calories")) buildFoodItem(data, query) else null
+    }
 
-            buildFoodItem(data, query)
-        }.onFailure { e -> Log.w(TAG, "Schätzung für \"$query\" fehlgeschlagen: ${e.message}") }
-            .getOrNull()
+    private fun estimateViaGroq(prompt: String, query: String): FoodItem? {
+        val apiKey = BuildConfig.GROQ_API_KEY
+        if (apiKey.isBlank()) return null
+
+        val requestJson = JSONObject().apply {
+            put("model", "openai/gpt-oss-120b")
+            put("temperature", 0.2)
+            put("max_tokens", 300)
+            put("reasoning_effort", "low")
+            put("messages", org.json.JSONArray().apply {
+                put(JSONObject().apply { put("role", "user"); put("content", prompt) })
+            })
+        }.toString()
+
+        val request = Request.Builder()
+            .url("https://api.groq.com/openai/v1/chat/completions")
+            .addHeader("Authorization", "Bearer $apiKey")
+            .post(requestJson.toRequestBody("application/json".toMediaType()))
+            .build()
+
+        val response = client.newCall(request).execute()
+        val bodyStr = response.body?.string()
+        if (!response.isSuccessful || bodyStr == null) {
+            Log.w(TAG, "Schätzung für \"$query\" fehlgeschlagen: HTTP ${response.code}")
+            return null
+        }
+
+        val content = JSONObject(bodyStr)
+            .getJSONArray("choices").getJSONObject(0)
+            .getJSONObject("message").getString("content")
+            .trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+
+        val data = JSONObject(content)
+        if (!data.has("calories")) return null
+
+        return buildFoodItem(data, query)
     }
 
     private fun buildFoodItem(data: JSONObject, query: String): FoodItem {
