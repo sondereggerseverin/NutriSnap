@@ -15,6 +15,8 @@ data class IngredientMatch(
     val ingredientName: String,      // Normalisierter Name z.B. "Haferflocken"
     val amountGrams: Float = 0f,     // Menge in Gramm (0 = unbekannt)
 
+    val matchedFoodItemId: Long? = null,  // null = noch nicht gematcht
+    val matchedFoodName: String? = null,
     val matchedCalories: Float? = null,
     val matchedProtein: Float? = null,
     val matchedCarbs: Float? = null,
