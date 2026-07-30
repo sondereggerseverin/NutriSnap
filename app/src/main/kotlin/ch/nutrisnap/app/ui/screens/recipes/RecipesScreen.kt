@@ -71,14 +71,53 @@ private fun scaleNumbers(line: String, ratio: Float): String {
 // ── Structured ingredient parsing ─────────────────────────────────────────────
 private data class ParsedIngredient(val amount: String, val unit: String, val name: String)
 private val INGREDIENT_UNITS = listOf("g", "ml", "kg", "l", "tsp", "tbsp", "EL", "TL", "Stück", "Prise", "Bund", "Dose", "Packung", "Scheibe", "Zehe")
-private val INGREDIENT_AMOUNT_REGEX = Regex("""^(\d+(?:[.,]\d+)?)\s*(g|ml|kg|l|tsp|tbsp|EL|TL|[Ss]tück|[Pp]rize|[Bb]und|[Dd]ose|[Pp]ackung|[Ss]cheibe|[Zz]eh)?\s+(.+)""")
+// Unicode-Bruchzeichen (¼ ½ ⅓ ...) und blosse ASCII-Bruchschreibweisen (2/3, 1 1/8)
+// wurden bisher nicht erkannt -> solche Zeilen bekamen faelschlich ein "?"-Icon,
+// obwohl eine Menge vorhanden ist.
+private const val FRACTION_CHARS = "¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞"
+private val UNICODE_FRACTION_VALUES = mapOf(
+    '¼' to 0.25f, '½' to 0.5f, '¾' to 0.75f,
+    '⅓' to 0.33f, '⅔' to 0.67f,
+    '⅕' to 0.2f, '⅖' to 0.4f, '⅗' to 0.6f, '⅘' to 0.8f,
+    '⅙' to 0.17f, '⅚' to 0.83f,
+    '⅛' to 0.13f, '⅜' to 0.38f, '⅝' to 0.63f, '⅞' to 0.88f
+)
+private val INGREDIENT_AMOUNT_REGEX = Regex(
+    "^((?:\\d+(?:[.,]\\d+)?\\s+)?[$FRACTION_CHARS]|(?:\\d+\\s+)?\\d+/\\d+|\\d+(?:[.,]\\d+)?)" +
+        "\\s*(g|ml|kg|l|tsp|tbsp|EL|TL|[Ss]tück|[Pp]rize|[Bb]und|[Dd]ose|[Pp]ackung|[Ss]cheibe|[Zz]eh)?\\s+(.+)"
+)
+
+/** Wandelt "1 ¼", "¼", "2/3", "1 1/8" oder "1.5" in einen reinen Dezimalstring um. */
+private fun parseAmountToken(raw: String): String {
+    val trimmed = raw.trim()
+    val fractionChar = trimmed.lastOrNull { it in FRACTION_CHARS }
+    if (fractionChar != null) {
+        val wholePart = trimmed.dropLast(1).trim().replace(',', '.').toFloatOrNull() ?: 0f
+        val value = wholePart + (UNICODE_FRACTION_VALUES[fractionChar] ?: 0f)
+        return formatAmount(value)
+    }
+    if (trimmed.contains('/')) {
+        val parts = trimmed.split(Regex("\\s+"))
+        val slashParts = parts.last().split('/')
+        val num = slashParts.getOrNull(0)?.toFloatOrNull()
+        val den = slashParts.getOrNull(1)?.toFloatOrNull()
+        if (num != null && den != null && den != 0f) {
+            val wholePart = if (parts.size > 1) parts.dropLast(1).joinToString(" ").replace(',', '.').toFloatOrNull() ?: 0f else 0f
+            return formatAmount(wholePart + num / den)
+        }
+    }
+    return trimmed.replace(',', '.')
+}
+
+private fun formatAmount(value: Float): String =
+    if (value == value.toLong().toFloat()) value.toLong().toString() else "%.2f".format(value)
 
 private fun parseIngredientLine(line: String): ParsedIngredient {
     val trimmed = line.trimStart('•', '-', ' ')
     val m = INGREDIENT_AMOUNT_REGEX.find(trimmed)
     return if (m != null) {
         ParsedIngredient(
-            amount = m.groupValues[1].replace(',', '.'),
+            amount = parseAmountToken(m.groupValues[1]),
             unit = m.groupValues[2].ifBlank { "g" },
             name = m.groupValues[3]
         )

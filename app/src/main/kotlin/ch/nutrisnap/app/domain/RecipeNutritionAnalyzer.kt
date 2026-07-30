@@ -224,11 +224,24 @@ object RecipeNutritionAnalyzer {
             .mapNotNull { parseIngredientLine(it)?.amountG }
             .sum()
 
+    private const val FRACTION_CHARS = "¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞"
+    private val UNICODE_FRACTION_VALUES = mapOf(
+        '¼' to 0.25f, '½' to 0.5f, '¾' to 0.75f,
+        '⅓' to 0.33f, '⅔' to 0.67f,
+        '⅕' to 0.2f, '⅖' to 0.4f, '⅗' to 0.6f, '⅘' to 0.8f,
+        '⅙' to 0.17f, '⅚' to 0.83f,
+        '⅛' to 0.13f, '⅜' to 0.38f, '⅝' to 0.63f, '⅞' to 0.88f
+    )
+
     fun parseIngredientLine(line: String): ParsedIngredient? {
         val clean = line.trimStart('*', '-', '\u2022', '\u00b7', ' ').trim()
         if (clean.isBlank() || clean.length < 2) return null
 
-        val numRegex = Regex("""^(\d+(?:[.,/]\d+)?(?:\s+and\s+\d+/\d+)?)\s*""")
+        // Erkennt zusaetzlich Unicode-Bruchzeichen ("¼ tsp", "1 ¼ cups"), die zuvor
+        // nicht erkannt wurden und auf den 100g-Fallback zurueckfielen.
+        val numRegex = Regex(
+            "^((?:\\d+\\s+)?[$FRACTION_CHARS]|\\d+(?:[.,/]\\d+)?(?:\\s+and\\s+\\d+/\\d+)?)\\s*"
+        )
         val numMatch = numRegex.find(clean) ?: run {
             val lc = clean.lowercase()
             val amt = if (lc.contains("spray") || lc.contains("prise") || lc.contains("pinch")) 2f else 100f
@@ -266,6 +279,11 @@ object RecipeNutritionAnalyzer {
 
     private fun parseNumber(s: String): Float {
         val clean = s.trim()
+        val fractionChar = clean.lastOrNull { it in FRACTION_CHARS }
+        if (fractionChar != null) {
+            val wholePart = clean.dropLast(1).trim().replace(',', '.').toFloatOrNull() ?: 0f
+            return wholePart + (UNICODE_FRACTION_VALUES[fractionChar] ?: 0f)
+        }
         val mixed = Regex("""(\d+)\s+(?:and\s+)?(\d+)/(\d+)""").find(clean)
         if (mixed != null) {
             val whole = mixed.groupValues[1].toFloatOrNull() ?: 0f
