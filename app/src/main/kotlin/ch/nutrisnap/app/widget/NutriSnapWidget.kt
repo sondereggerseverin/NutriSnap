@@ -28,7 +28,6 @@ import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
-import androidx.glance.material3.GlanceTheme
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
@@ -44,6 +43,11 @@ private val MEDIUM = DpSize(250.dp, 110.dp)
 // liefert ColorProvider-Objekte ohne synchronen Zugriff auf den Rohwert außerhalb von
 // Compose – fürs Bitmap-Rendering des Rings reicht ein fixer, dezenter Grauton.
 private const val RING_TRACK_COLOR = 0x33808080 // ARGB: 20% grau
+
+// Feste Widget-Farben (kein GlanceTheme/Material3-Dependency nötig – vermeidet
+// Kotlin/Compose-Compiler-Metadata-Mismatch mit glance-material3:1.1.1).
+private val WidgetBackground = ColorProvider(androidx.compose.ui.graphics.Color(0xFF1A1A1A))
+private val WidgetOnBackground = ColorProvider(androidx.compose.ui.graphics.Color.White)
 
 class NutriSnapWidget : GlanceAppWidget() {
 
@@ -65,12 +69,12 @@ private fun WidgetContent(snapshot: WidgetSnapshot?) {
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(GlanceTheme.colors.background)
+            .background(WidgetBackground)
             .clickable(actionRunCallback<QuickAddAction>())
             .padding(12.dp)
     ) {
         if (snapshot == null) {
-            Text("…", style = TextStyle(color = GlanceTheme.colors.onBackground))
+            Text("…", style = TextStyle(color = WidgetOnBackground))
         } else if (isCompact) {
             CompactLayout(snapshot)
         } else {
@@ -106,7 +110,7 @@ private fun WideLayout(s: WidgetSnapshot) {
                 style = TextStyle(
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
-                    color = GlanceTheme.colors.onBackground
+                    color = WidgetOnBackground
                 )
             )
             Spacer(modifier = GlanceModifier.height(6.dp))
@@ -141,7 +145,7 @@ private fun CalorieRing(s: WidgetSnapshot, ringSizeDp: Int) {
             style = TextStyle(
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
-                color = GlanceTheme.colors.onBackground,
+                color = WidgetOnBackground,
                 textAlign = TextAlign.Center
             )
         )
@@ -170,7 +174,7 @@ private fun MacroDot(argbColor: Int, grams: Float) {
         Spacer(modifier = GlanceModifier.width(4.dp))
         Text(
             "${grams.roundToInt()}g",
-            style = TextStyle(fontSize = 11.sp, color = GlanceTheme.colors.onBackground)
+            style = TextStyle(fontSize = 11.sp, color = WidgetOnBackground)
         )
     }
 }
@@ -179,6 +183,6 @@ private fun MacroDot(argbColor: Int, grams: Float) {
 private fun StreakLine(streak: Int) {
     Text(
         "🔥 $streak",
-        style = TextStyle(fontSize = 12.sp, color = GlanceTheme.colors.onBackground)
+        style = TextStyle(fontSize = 12.sp, color = WidgetOnBackground)
     )
 }
