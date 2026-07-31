@@ -83,7 +83,7 @@ private fun WidgetContent(snapshot: WidgetSnapshot?) {
 private fun CompactLayout(s: WidgetSnapshot) {
     Column(
         modifier = GlanceModifier.fillMaxSize(),
-        horizontalAlignment = Alignment.Horizontally,
+        horizontalAlignment = Alignment.CenterHorizontally,
         verticalAlignment = Alignment.Vertical.CenterVertically
     ) {
         CalorieRing(s, ringSizeDp = 72)
