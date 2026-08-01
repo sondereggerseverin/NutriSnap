@@ -105,6 +105,10 @@ dependencies {
     implementation(libs.supabase.postgrest)
     implementation(libs.supabase.realtime)
     implementation(libs.ktor.client.android)
+    // Feature 6: PDF-Wochen-/Monatsreport
+    implementation("com.itextpdf:itext7-core:7.2.5") {
+        exclude(group = "org.bouncycastle")
+    }
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
     testImplementation(libs.junit)

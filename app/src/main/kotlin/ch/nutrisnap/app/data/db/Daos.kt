@@ -61,6 +61,11 @@ interface DiaryDao {
     @Query("SELECT * FROM diary_entries ORDER BY dateStr, mealType")
     suspend fun getAllOnce(): List<DiaryEntry>
 
+    /** Rohe (nicht aggregierte) Einträge ab [fromDate], u.a. für die Mustererkennung
+     *  wiederkehrender Mahlzeiten (Feature 5), die pro Eintrag foodItemId/mealType braucht. */
+    @Query("SELECT * FROM diary_entries WHERE dateStr >= :fromDate ORDER BY dateStr, mealType")
+    suspend fun getEntriesSince(fromDate: String): List<DiaryEntry>
+
     @Query("SELECT * FROM diary_entries WHERE id = :id")
     suspend fun getById(id: Long): DiaryEntry?
 

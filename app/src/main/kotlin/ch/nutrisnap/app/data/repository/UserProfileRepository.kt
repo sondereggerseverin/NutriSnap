@@ -27,7 +27,13 @@ data class UserProfile(
     val activityFactor:   Float = 1.55f,
     val sex:              Sex   = Sex.UNSPECIFIED,
     /** Modell des Backofens/Kombi-Dampfgarers (z.B. "V-ZUG Combi-Steam SL CSTSLc"), leer = keins hinterlegt. */
-    val applianceModel:   String = ""
+    val applianceModel:   String = "",
+    /** Feature 3 (Ziel-Prognose): null = kein Zielgewicht gesetzt, Prognose bleibt aus. */
+    val targetWeightKg:      Float?  = null,
+    /** null = kein eigenes Wochenziel gesetzt, Standard 0.5 kg/Woche wird verwendet. */
+    val weeklyTargetLossKg:  Float?  = null,
+    /** ISO-Datum (yyyy-MM-dd) der zuletzt berechneten Prognose, für "X Tage früher/später". */
+    val lastPrognosisDateStr: String? = null
 ) {
     /**
      * Mifflin-St-Jeor. Der Geschlechts-Term macht bis zu ~166 kcal Unterschied

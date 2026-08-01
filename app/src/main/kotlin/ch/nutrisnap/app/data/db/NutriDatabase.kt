@@ -20,7 +20,12 @@ data class UserProfileEntity(
     val fatGoalG: Float = 65f,
     val activityFactor: Float = 1.55f,
     @ColumnInfo(defaultValue = "'UNSPECIFIED'") val sex: String = "UNSPECIFIED",
-    @ColumnInfo(defaultValue = "") val applianceModel: String = ""
+    @ColumnInfo(defaultValue = "") val applianceModel: String = "",
+    // Feature 3 (Ziel-Prognose): alle drei optional, solange kein Zielgewicht in den
+    // Settings gesetzt ist, liefert GoalPrognosisCalculator bewusst keine Prognose.
+    @ColumnInfo(defaultValue = "NULL") val targetWeightKg: Float? = null,
+    @ColumnInfo(defaultValue = "NULL") val weeklyTargetLossKg: Float? = null,
+    @ColumnInfo(defaultValue = "NULL") val lastPrognosisDateStr: String? = null
 )
 
 fun UserProfileEntity.toDomain() = UserProfile(
@@ -28,14 +33,18 @@ fun UserProfileEntity.toDomain() = UserProfile(
     dailyCalorieGoal = dailyCalorieGoal, proteinGoalG = proteinGoalG,
     carbsGoalG = carbsGoalG, fatGoalG = fatGoalG, activityFactor = activityFactor,
     sex = runCatching { Sex.valueOf(sex) }.getOrDefault(Sex.UNSPECIFIED),
-    applianceModel = applianceModel
+    applianceModel = applianceModel,
+    targetWeightKg = targetWeightKg, weeklyTargetLossKg = weeklyTargetLossKg,
+    lastPrognosisDateStr = lastPrognosisDateStr
 )
 
 fun UserProfile.toEntity() = UserProfileEntity(
     weightKg = weightKg, heightCm = heightCm, ageYears = ageYears,
     dailyCalorieGoal = dailyCalorieGoal, proteinGoalG = proteinGoalG,
     carbsGoalG = carbsGoalG, fatGoalG = fatGoalG, activityFactor = activityFactor,
-    sex = sex.name, applianceModel = applianceModel
+    sex = sex.name, applianceModel = applianceModel,
+    targetWeightKg = targetWeightKg, weeklyTargetLossKg = weeklyTargetLossKg,
+    lastPrognosisDateStr = lastPrognosisDateStr
 )
 
 @Dao
@@ -61,9 +70,13 @@ interface UserProfileDao {
         MealTemplate::class,
         MealTemplateItem::class,
         GeneratedRecipeEntity::class,
-        ShoppingListItem::class
+        ShoppingListItem::class,
+        // Neue Entities (9-Feature-Patch):
+        ch.nutrisnap.app.data.db.entity.GlobalIngredientMatch::class,       // Feature 2
+        ch.nutrisnap.app.data.db.entity.FoodUsageContext::class,            // Feature 7
+        ch.nutrisnap.app.data.db.entity.DetectedMealPatternEntity::class    // Feature 5
     ],
-    version = 21,
+    version = 22,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -81,6 +94,9 @@ abstract class NutriDatabase : RoomDatabase() {
     abstract fun mealTemplateDao(): MealTemplateDao
     abstract fun generatedRecipeDao(): GeneratedRecipeDao
     abstract fun shoppingListDao(): ShoppingListDao
+    abstract fun globalIngredientMatchDao(): GlobalIngredientMatchDao
+    abstract fun foodUsageContextDao(): FoodUsageContextDao
+    abstract fun detectedMealPatternDao(): DetectedMealPatternDao
 
     companion object {
         @Volatile private var INSTANCE: NutriDatabase? = null
@@ -446,6 +462,64 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // 9-Feature-Patch: neue Tabellen für Feature 2 (globales Zutaten-Wörterbuch),
+        // Feature 7 (tageszeit-bewusstes Favoriten-Ranking), Feature 5 (automatisch
+        // erkannte wiederkehrende Mahlzeiten) sowie neue optionale Spalten auf user_profile
+        // für Feature 3 (Ziel-Prognose).
+        private val MIGRATION_21_22 = object : Migration(21, 22) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS global_ingredient_matches (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        normalizedName TEXT NOT NULL,
+                        originalName TEXT NOT NULL,
+                        offProductId TEXT NOT NULL,
+                        offProductName TEXT NOT NULL,
+                        kcalPer100g REAL NOT NULL,
+                        proteinPer100g REAL NOT NULL,
+                        carbsPer100g REAL NOT NULL,
+                        fatPer100g REAL NOT NULL,
+                        matchConfidence REAL NOT NULL DEFAULT 1.0,
+                        usageCount INTEGER NOT NULL DEFAULT 1,
+                        lastUsedAt INTEGER NOT NULL,
+                        isVerifiedByUser INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_global_ingredient_matches_normalizedName ON global_ingredient_matches(normalizedName)")
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS food_usage_context (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        foodId TEXT NOT NULL,
+                        foodName TEXT NOT NULL,
+                        hourBucket INTEGER NOT NULL,
+                        dayOfWeek INTEGER NOT NULL,
+                        usageCount INTEGER NOT NULL DEFAULT 1,
+                        lastUsedAt INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_food_usage_context_foodId_hourBucket_dayOfWeek ON food_usage_context(foodId, hourBucket, dayOfWeek)")
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS detected_meal_patterns (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        fingerprint TEXT NOT NULL,
+                        label TEXT NOT NULL,
+                        mealType TEXT NOT NULL,
+                        foodItemIds TEXT NOT NULL,
+                        avgKcal REAL NOT NULL,
+                        occurrences INTEGER NOT NULL,
+                        lastSeenAt INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_detected_meal_patterns_fingerprint ON detected_meal_patterns(fingerprint)")
+
+                db.execSQL("ALTER TABLE user_profile ADD COLUMN targetWeightKg REAL")
+                db.execSQL("ALTER TABLE user_profile ADD COLUMN weeklyTargetLossKg REAL")
+                db.execSQL("ALTER TABLE user_profile ADD COLUMN lastPrognosisDateStr TEXT")
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -459,7 +533,7 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
                         MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16,
                         MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
-                        MIGRATION_20_21
+                        MIGRATION_20_21, MIGRATION_21_22
                     )
                     .build()
                     .also { INSTANCE = it }

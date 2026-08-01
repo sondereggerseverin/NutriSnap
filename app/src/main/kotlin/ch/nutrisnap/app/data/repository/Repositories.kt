@@ -207,6 +207,11 @@ class DiaryRepository(db: NutriDatabase) {
     /** Einmaliger Snapshot aller Tagebuch-Eintraege, u.a. fuer Dedup-Checks beim Bulk-Import. */
     suspend fun getAllEntriesOnce() = dao.getAllOnce()
 
+    /** Rohe Einträge der letzten [days] Tage (heute mitgezählt), u.a. für die
+     *  Mustererkennung wiederkehrender Mahlzeiten. */
+    suspend fun getDiaryEntriesLastNDays(days: Int): List<DiaryEntry> =
+        dao.getEntriesSince(LocalDate.now().minusDays((days - 1).toLong()).toString())
+
     /**
      * Persistiert die manuell per Drag-Handle geänderte Reihenfolge innerhalb einer Mahlzeit.
      * orderedIds = Einträge in der neuen Anzeigereihenfolge (Index = neue sortOrder).
