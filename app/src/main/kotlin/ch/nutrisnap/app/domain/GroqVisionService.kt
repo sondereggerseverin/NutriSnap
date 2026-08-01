@@ -94,24 +94,38 @@ class GroqVisionService {
      */
     suspend fun analyzeDishIngredients(base64Jpeg: String): Result<DishScanResult> = withContext(Dispatchers.IO) {
         val prompt = """
-Du bist ein erfahrener Ernährungsberater. Analysiere das Foto eines Gerichts/einer Mahlzeit und ZERLEGE es
-in seine einzelnen sichtbaren Bestandteile (z.B. "Pouletbrust", "Reis", "Brokkoli", "Sauce"), statt nur einen
-Gesamtnamen zu vergeben. Auch bei Bowls, gemischten Tellern oder leicht überlappenden Komponenten: identifiziere
-JEDE klar unterscheidbare Zutat einzeln und schätze ihre Portionsgrösse in Gramm separat.
+Du bist ein erfahrener Schweizer Ernährungsberater und Food-Vision-Experte. Analysiere das Foto eines Gerichts und zerlege es in seine einzelnen sichtbaren Bestandteile. Schätze die Portionsgrösse jeder Zutat in Gramm.
+
+WICHTIGE SCHWEIZER PRIORITÄTEN (strikt beachten):
+
+1. Bei cremigen, breiigen, klumpigen oder feinkörnigen Massen (grau, mauve, violett, beige, bräunlich):
+   - Birchermüesli / Bircher / Overnight Oats / Müesli mit Joghurt hat HÖCHSTE Priorität.
+   - Viele Birchermüesli (besonders mit Beeren, Zwetschgen, Heidelbeeren oder dunklem Joghurt) sind grau-violett oder mauve und können homogen/klumpig wirken – das ist NORMAL und kein Ausschlusskriterium.
+   - Fleischsalat, Fleischpastete, Pâté oder Wurstsalat erst in Betracht ziehen, wenn klar sichtbare Fleisch-/Wurststreifen, Mayonnaise-Glanz und typische Randen-/Peperoni-Stückchen vorhanden sind UND keine Hafer-/Getreide-Textur erkennbar ist.
+   - Farbe allein entscheidet NIE gegen Birchermüesli.
+
+2. Bei dunklem Brot + rotem/glänzendem Aufstrich:
+   - Typisch: Ruchbrot / Vollkornbrot / Parapan + Konfitüre / Marmelade.
+   - Nicht automatisch als "Brot mit Fleischwurst" o.ä. interpretieren.
+
+3. Bei dünnen, dunkelroten, trocken-faserigen Fleischscheiben:
+   - Bevorzuge Trockenfleisch / Bündnerfleisch / Bündnerfleisch-ähnlich vor normalem Rohschinken.
+
+4. Spiesse mit orangen Würfeln + roten Beeren + grüner Kugel = Melone + Erdbeere + Traube (klassisch).
 
 Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
 {
-  "dishName": "Kurze Gesamtbezeichnung des Gerichts",
+  "dishName": "Kurze Gesamtbezeichnung des Gerichts (z.B. Schweizer Picknick-Platte)",
   "ingredients": [
-    {"name": "Pouletbrust, gegrillt", "estimatedGrams": 150, "confidence": "hoch"},
-    {"name": "Reis, gekocht", "estimatedGrams": 180, "confidence": "mittel"},
-    {"name": "Brokkoli", "estimatedGrams": 80, "confidence": "niedrig"}
+    {"name": "Birchermüesli", "estimatedGrams": 120, "confidence": "mittel"},
+    {"name": "Vollkornbrot mit Konfitüre", "estimatedGrams": 60, "confidence": "hoch"},
+    {"name": "Trockenfleisch", "estimatedGrams": 40, "confidence": "hoch"},
+    {"name": "Melone", "estimatedGrams": 100, "confidence": "hoch"},
+    {"name": "Erdbeeren", "estimatedGrams": 30, "confidence": "hoch"}
   ]
 }
 
-confidence ist "hoch", "mittel" oder "niedrig" je nachdem wie sicher die Erkennung DIESER EINZELNEN Zutat ist
-(z.B. "niedrig" bei verdeckten/vermischten Zutaten wie Sauce oder Gewürzen). Erfinde keine Zutaten, die nicht
-zu sehen sind. Liste jede Zutat nur einmal, auch wenn sie an mehreren Stellen auf dem Teller vorkommt.
+confidence ist "hoch", "mittel" oder "niedrig". Erfinde keine Zutaten, die nicht sichtbar sind. Liste jede Zutat nur einmal.
 """.trimIndent()
         // Hoeheres Token-Limit als Standard-1000: bei vielen kleinen Zutaten (Bowls, Mezze-Teller)
         // braucht die JSON-Antwort mit einem Eintrag pro Zutat mehr Platz als eine einzelne Schaetzung.
