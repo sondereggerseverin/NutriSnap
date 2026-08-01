@@ -57,7 +57,7 @@ class GoalPrognosisCalculator(
     suspend fun calculatePrognosis(): GoalPrognosis? {
         val profile = userProfileRepository.get().first()
         val targetWeight = profile.targetWeightKg ?: return null
-        val weeklyTargetLoss = profile.weeklyTargetLossKg ?: 0.5
+        val weeklyTargetLoss = (profile.weeklyTargetLossKg ?: 0.5f).toDouble()
         val currentWeight = weightRepository.getLatest()?.weightKg ?: return null
 
         val weightToLose = currentWeight - targetWeight
