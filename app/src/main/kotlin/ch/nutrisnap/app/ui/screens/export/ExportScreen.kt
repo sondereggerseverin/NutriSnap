@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.db.NutriDatabase
+import ch.nutrisnap.app.data.repository.PdfReportGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -35,6 +36,17 @@ private fun csvEscape(s: String): String =
 
 class ExportViewModel(app: Application) : AndroidViewModel(app) {
     private val db = NutriDatabase.getInstance(app)
+    private val pdfReportGenerator = PdfReportGenerator(app, db)
+
+    suspend fun generateAndShareWeeklyReport() = withContext(Dispatchers.IO) {
+        val file = pdfReportGenerator.generateWeeklyReport()
+        withContext(Dispatchers.Main) { pdfReportGenerator.shareReport(file) }
+    }
+
+    suspend fun generateAndShareMonthlyReport() = withContext(Dispatchers.IO) {
+        val file = pdfReportGenerator.generateMonthlyReport()
+        withContext(Dispatchers.Main) { pdfReportGenerator.shareReport(file) }
+    }
 
     suspend fun buildDiaryCsv(): String = withContext(Dispatchers.IO) {
         val entries = db.diaryDao().getAllOnce()
@@ -158,6 +170,41 @@ fun ExportScreen(
                 },
                 onShare = { scope.launch { share(vm.buildWeightCsv()) } }
             )
+
+            Card(Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(2.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(Icons.Default.PictureAsPdf, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
+                        Column {
+                            Text("PDF-Report", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                            Text("Kalorien, Makros & Gewicht als Bericht zum Teilen", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    runCatching { vm.generateAndShareWeeklyReport() }
+                                        .onFailure { snackbar.showSnackbar("Report fehlgeschlagen") }
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Wochenreport", fontSize = 13.sp) }
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    runCatching { vm.generateAndShareMonthlyReport() }
+                                        .onFailure { snackbar.showSnackbar("Report fehlgeschlagen") }
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Monatsbericht", fontSize = 13.sp) }
+                    }
+                }
+            }
         }
     }
 }

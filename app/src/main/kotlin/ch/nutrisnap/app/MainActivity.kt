@@ -45,6 +45,8 @@ import ch.nutrisnap.app.ui.screens.auth.LoginScreen
 import ch.nutrisnap.app.ui.screens.customfood.CreateCustomFoodScreen
 import ch.nutrisnap.app.ui.screens.diary.DiaryScreen
 import ch.nutrisnap.app.ui.screens.export.ExportScreen
+import ch.nutrisnap.app.ui.screens.insights.InsightsScreen
+import ch.nutrisnap.app.ui.screens.chat.DataChatScreen
 import ch.nutrisnap.app.ui.screens.home.HomeScreen
 import ch.nutrisnap.app.ui.screens.mealtemplate.MealTemplateScreen
 import ch.nutrisnap.app.ui.screens.recipes.RecipesHubScreen
@@ -375,7 +377,12 @@ fun MainScaffold(
                 Screen.Analysis.route,
                 enterTransition = { tabEnter }, exitTransition = { tabExit },
                 popEnterTransition = { tabEnter }, popExitTransition = { tabExit }
-            ) { AnalysisScreen() }
+            ) {
+                AnalysisScreen(
+                    onNavigateToInsights = { navController.navigate("insights") },
+                    onNavigateToChat      = { navController.navigate("chat") }
+                )
+            }
             composable(
                 Screen.Settings.route,
                 enterTransition = { tabEnter }, exitTransition = { tabExit },
@@ -426,6 +433,20 @@ fun MainScaffold(
                 popEnterTransition = { popEnter }, popExitTransition = { popExit }
             ) {
                 ExportScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                "insights",
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) {
+                InsightsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                "chat",
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) {
+                DataChatScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 "health",

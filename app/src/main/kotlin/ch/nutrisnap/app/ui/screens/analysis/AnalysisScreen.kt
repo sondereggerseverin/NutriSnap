@@ -11,6 +11,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,7 +35,11 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 
 @Composable
-fun AnalysisScreen(vm: AnalysisViewModel = viewModel()) {
+fun AnalysisScreen(
+    vm: AnalysisViewModel = viewModel(),
+    onNavigateToInsights: () -> Unit = {},
+    onNavigateToChat: () -> Unit = {}
+) {
     val state by vm.uiState.collectAsState()
     var showDatePicker by remember { mutableStateOf(false) }
 
@@ -64,6 +70,33 @@ fun AnalysisScreen(vm: AnalysisViewModel = viewModel()) {
     ) {
         item {
             Text("Analyse", fontWeight = FontWeight.Bold, fontSize = 24.sp)
+        }
+
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
+                Card(
+                    modifier = Modifier.weight(1f).clickable(onClick = onNavigateToInsights),
+                    shape = RoundedCornerShape(NutriRadius.md)
+                ) {
+                    Column(Modifier.padding(NutriSpacing.md)) {
+                        Icon(Icons.Default.Insights, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(NutriSpacing.xs))
+                        Text("Insights", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Text("Zusammenhänge in deinen Daten", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Card(
+                    modifier = Modifier.weight(1f).clickable(onClick = onNavigateToChat),
+                    shape = RoundedCornerShape(NutriRadius.md)
+                ) {
+                    Column(Modifier.padding(NutriSpacing.md)) {
+                        Icon(Icons.Default.Chat, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(NutriSpacing.xs))
+                        Text("Frag deine App", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Text("Chat über deine Daten", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
         }
 
         item {

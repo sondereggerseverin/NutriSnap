@@ -102,6 +102,8 @@ fun SettingsScreen(
     var activity    by remember(profile.activityFactor)   { mutableStateOf(profile.activityFactor) }
     var sex         by remember(profile.sex)               { mutableStateOf(profile.sex) }
     var applianceModelText by remember(profile.applianceModel) { mutableStateOf(profile.applianceModel) }
+    var targetWeightText by remember(profile.targetWeightKg) { mutableStateOf(profile.targetWeightKg?.toString() ?: "") }
+    var weeklyTargetLossText by remember(profile.weeklyTargetLossKg) { mutableStateOf(profile.weeklyTargetLossKg?.toString() ?: "") }
     var selectedGoal by remember { mutableStateOf(FitnessGoal.MAINTAIN) }
     var showSaved   by remember { mutableStateOf(false) }
 
@@ -314,6 +316,21 @@ fun SettingsScreen(
             ) { applianceModelText = it }
         }
 
+        // Zielgewicht & Prognose
+        SettingsCard(title = "Zielgewicht & Prognose", icon = Icons.Default.Flag) {
+            Text(
+                "Optional: Zielgewicht setzen, um zu sehen, wann du es bei deinem aktuellen Tempo erreichst.",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(NutriSpacing.xs))
+            GoalField("Zielgewicht (kg)", targetWeightText, KeyboardType.Decimal) { targetWeightText = it }
+            Spacer(Modifier.height(NutriSpacing.xs))
+            GoalField("Wochenziel (kg/Woche, z.B. 0.5)", weeklyTargetLossText, KeyboardType.Decimal) { weeklyTargetLossText = it }
+            Spacer(Modifier.height(NutriSpacing.xs))
+            GoalPrognosisPreview()
+        }
+
         // TDEE Preview
         val previewProfile = UserProfile(
             weightKg       = weightText.toFloatOrNull() ?: profile.weightKg,
@@ -368,7 +385,9 @@ fun SettingsScreen(
                     fatGoalG         = fatText.toFloatOrNull()     ?: 65f,
                     activityFactor   = activity,
                     sex              = sex,
-                    applianceModel   = applianceModelText.trim()
+                    applianceModel   = applianceModelText.trim(),
+                    targetWeightKg     = targetWeightText.toFloatOrNull(),
+                    weeklyTargetLossKg = weeklyTargetLossText.toFloatOrNull()
                 ))
                 showSaved = true
             },
@@ -738,6 +757,49 @@ private fun ThemeCard(
                 color = if (isSelected) theme.primaryDark else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
+        }
+    }
+}
+
+// Feature 3: Ziel-Prognose live unter den Zielgewicht-Feldern anzeigen (bezieht sich
+// immer auf den zuletzt GESPEICHERTEN Stand, nicht auf ungespeicherte Texteingaben).
+@Composable
+private fun GoalPrognosisPreview(
+    vm: ch.nutrisnap.app.domain.GoalPrognosisViewModel = viewModel()
+) {
+    val prognosis by vm.prognosis.collectAsState()
+    val p = prognosis ?: return
+
+    Spacer(Modifier.height(NutriSpacing.sm))
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (p.isOnTrack) MaterialTheme.colorScheme.primaryContainer
+            else MaterialTheme.colorScheme.errorContainer
+        ),
+        shape = RoundedCornerShape(NutriRadius.md)
+    ) {
+        Column(Modifier.padding(NutriSpacing.md)) {
+            Text(
+                if (p.isOnTrack) "Im Plan" else "Vom Plan abgewichen",
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp
+            )
+            Text(
+                "Ziel voraussichtlich erreicht am ${p.estimatedGoalDate} (in ${p.daysRemaining} Tagen)",
+                fontSize = 12.sp
+            )
+            Text(
+                "Aktuelles Tempo: ${String.format("%.2f", p.actualWeeklyRateKg)} kg/Woche · Ziel: ${String.format("%.2f", p.targetWeeklyRateKg)} kg/Woche",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (!p.isOnTrack && p.suggestedKcalAdjustment != 0) {
+                Text(
+                    "Empfehlung: Tagesziel um ${p.suggestedKcalAdjustment} kcal anpassen",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
