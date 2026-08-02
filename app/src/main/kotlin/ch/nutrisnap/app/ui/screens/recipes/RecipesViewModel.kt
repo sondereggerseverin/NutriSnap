@@ -84,6 +84,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     private val _budgetScaleState = MutableStateFlow(BudgetScaleState())
     val budgetScaleState: StateFlow<BudgetScaleState> = _budgetScaleState.asStateFlow()
 
+    private val _isTranslating = MutableStateFlow(false)
+
     /** Feature 1: Rezeptportion auf das heutige Kalorien-Restbudget skalieren. */
     fun scaleToRemainingBudget(recipe: Recipe) {
         viewModelScope.launch {
@@ -98,6 +100,24 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun clearBudgetScale() { _budgetScaleState.value = BudgetScaleState() }
+
+    /** Übersetzt Zutaten + Zubereitung ins Deutsche und rechnet auf metrische Einheiten um. */
+    fun translateToGermanMetric(recipe: Recipe) {
+        if (_isTranslating.value) return
+        viewModelScope.launch {
+            _isTranslating.value = true
+            runCatching {
+                val converted = RecipeGermanMetricConverter.convertWithAi(recipe).getOrThrow()
+                val updated = recipe.copy(
+                    title = converted.title.ifBlank { recipe.title },
+                    ingredients = converted.ingredients.ifBlank { recipe.ingredients },
+                    instructions = converted.instructions.ifBlank { recipe.instructions }
+                )
+                repo.updateRecipe(updated)
+            }
+            _isTranslating.value = false
+        }
+    }
 
     private val _query          = MutableStateFlow("")
     private val _platformFilter = MutableStateFlow<String?>(null)
@@ -124,7 +144,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         _platformFilter,
         _sort,
         _importState,
-        _nutritionState
+        _nutritionState,
+        _isTranslating
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         val recipes        = values[0] as List<Recipe>
@@ -133,6 +154,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         val sort           = values[3] as RecipeSort
         val imp            = values[4] as ImportState
         val nut            = values[5] as NutritionState
+        val translating    = values[6] as Boolean
 
         val filtered = if (platformFilter == null) recipes
             else recipes.filter { (it.platform ?: "web").lowercase() == platformFilter }
@@ -152,7 +174,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             lastImport       = imp.lastImport,
             instagramBlocked = imp.instagramBlocked,
             blockedUrl       = imp.blockedUrl,
-            nutritionState   = nut
+            nutritionState   = nut,
+            isTranslating    = translating
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RecipesUiState())
 
@@ -168,6 +191,20 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _importState.update { it.copy(isImporting = true, importError = null, instagramBlocked = false) }
             val result: RecipeScrapeResult = repo.importFromUrl(url)
+            if (result.success && result.recipe != null && shouldAutoGermanMetric()) {
+                val r = result.recipe
+                val converted = RecipeGermanMetricConverter.convertWithAi(r).getOrNull()
+                if (converted != null) {
+                    val updated = r.copy(
+                        title = converted.title.ifBlank { r.title },
+                        ingredients = converted.ingredients.ifBlank { r.ingredients },
+                        instructions = converted.instructions.ifBlank { r.instructions }
+                    )
+                    repo.updateRecipe(updated)
+                    _importState.update { it.copy(isImporting = false, lastImport = updated) }
+                    return@launch
+                }
+            }
             _importState.update { state ->
                 when {
                     result.instagramBlocked ->
@@ -219,7 +256,18 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                     fatPerServing = extracted.fatPerServing,
                     tags = "bild"
                 )
-                val saved = recipe.copy(id = repo.saveRecipe(recipe))
+                var saved = recipe.copy(id = repo.saveRecipe(recipe))
+                if (shouldAutoGermanMetric()) {
+                    val converted = RecipeGermanMetricConverter.convertWithAi(saved).getOrNull()
+                    if (converted != null) {
+                        saved = saved.copy(
+                            title = converted.title.ifBlank { saved.title },
+                            ingredients = converted.ingredients.ifBlank { saved.ingredients },
+                            instructions = converted.instructions.ifBlank { saved.instructions }
+                        )
+                        repo.updateRecipe(saved)
+                    }
+                }
                 _importState.update { it.copy(isImporting = false, lastImport = saved) }
             } catch (e: Exception) {
                 _importState.update {
@@ -227,6 +275,13 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
+    }
+
+    private suspend fun shouldAutoGermanMetric(): Boolean {
+        return runCatching {
+            val prefs = getApplication<Application>().notifDataStore.data.first()
+            prefs[KEY_AUTO_GERMAN_METRIC] == true
+        }.getOrDefault(false)
     }
 
     /** Fügt neue URLs zur Batch-Queue hinzu (Duplikate werden ignoriert). */

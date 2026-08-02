@@ -40,29 +40,17 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
+import ch.nutrisnap.app.domain.RecipeGermanMetricConverter
 import ch.nutrisnap.app.domain.UrlExtractor
 import ch.nutrisnap.app.ui.components.EmptyState
 import ch.nutrisnap.app.ui.components.MicronutrientTable
 import ch.nutrisnap.app.ui.theme.MacroColors
 import coil.compose.AsyncImage
 
-// ── Unit conversions ──────────────────────────────────────────────────────────
-private data class ConvEntry(val pattern: Regex, val toMetric: (Double) -> String)
-private val CONVERSIONS = listOf(
-    ConvEntry(Regex("""(\d+(?:[.,]\d+)?)\s*(?:cups?|Cup)"""))         { v -> "${(v*240).toInt()}ml" },
-    ConvEntry(Regex("""(\d+(?:[.,]\d+)?)\s*(?:tbsp|Tbsp|EL)"""))      { v -> "${(v*15).toInt()}ml" },
-    ConvEntry(Regex("""(\d+(?:[.,]\d+)?)\s*(?:tsp|Tsp|TL)"""))        { v -> "${(v*5).toInt()}ml" },
-    ConvEntry(Regex("""(\d+(?:[.,]\d+)?)\s*(?:oz|Oz)\b"""))           { v -> "${(v*28.35).toInt()}g" },
-    ConvEntry(Regex("""(\d+(?:[.,]\d+)?)\s*(?:lbs?|pounds?)"""))      { v -> "${(v*453.6).toInt()}g" },
-    ConvEntry(Regex("""(\d+(?:[.,]\d+)?)\s*(?:fl\.?\s*oz)"""))        { v -> "${(v*29.57).toInt()}ml" }
-)
-private fun convertToMetric(text: String): String {
-    var r = text
-    CONVERSIONS.forEach { conv -> r = conv.pattern.replace(r) { mr ->
-        mr.groupValues[1].replace(',','.').toDoubleOrNull()?.let { conv.toMetric(it) } ?: mr.value
-    }}
-    return r
-}
+// ── Unit conversions (Brüche + cups/tbsp/°F → metrisch) ───────────────────────
+private fun convertToMetric(text: String): String =
+    RecipeGermanMetricConverter.convertUnitsToMetric(text)
+
 private fun scaleNumbers(line: String, ratio: Float): String {
     if (ratio == 1f) return line
     return Regex("""(\d+(?:[./]\d+)?)""").replace(line) { mr ->
@@ -369,7 +357,9 @@ fun RecipesScreen(
                 selectedRecipe = null
             },
             onUpdateIngredients = { newText -> vm.updateRecipe(live.copy(ingredients = newText)) },
-            onScaleToBudget = { vm.scaleToRemainingBudget(live) }
+            onScaleToBudget = { vm.scaleToRemainingBudget(live) },
+            onTranslateGermanMetric = { vm.translateToGermanMetric(live) },
+            isTranslating = state.isTranslating
         )
     }
 
@@ -853,7 +843,9 @@ fun RecipeDetailSheet(
     hasStoredOverrides: Boolean = false,
     onAddToShoppingList: (Recipe) -> Unit = {},
     onUpdateIngredients: (String) -> Unit = {},
-    onScaleToBudget: () -> Unit = {}
+    onScaleToBudget: () -> Unit = {},
+    onTranslateGermanMetric: () -> Unit = {},
+    isTranslating: Boolean = false
 ) {
     val context = LocalContext.current
     var servings   by remember(recipe.id) { mutableStateOf(recipe.servings) }
@@ -905,7 +897,22 @@ fun RecipeDetailSheet(
                             Text("Metrische Einheiten", fontSize=13.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
                             Switch(checked=metricMode, onCheckedChange={metricMode=it}, modifier=Modifier.height(24.dp))
                         }
-                        TextButton(onClick = onScaleToBudget, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(top = 8.dp)) {
+                        OutlinedButton(
+                            onClick = onTranslateGermanMetric,
+                            enabled = !isTranslating,
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                        ) {
+                            if (isTranslating) {
+                                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Übersetze…", fontSize = 13.sp)
+                            } else {
+                                Icon(Icons.Default.Language, null, Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Deutsch + metrisch", fontSize = 13.sp)
+                            }
+                        }
+                        TextButton(onClick = onScaleToBudget, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(top = 4.dp)) {
                             Icon(Icons.Default.PieChart, null, Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("Auf mein Restbudget anpassen", fontSize = 13.sp)

@@ -35,6 +35,7 @@ import kotlinx.coroutines.launch
 import androidx.datastore.preferences.core.edit
 import ch.nutrisnap.app.ui.theme.AppTheme
 import ch.nutrisnap.app.ui.theme.KEY_APP_THEME
+import ch.nutrisnap.app.ui.theme.KEY_AUTO_GERMAN_METRIC
 
 enum class FitnessGoal(val label: String, val emoji: String, val desc: String) {
     LOSE_WEIGHT("Abnehmen",        "\uD83D\uDD25", "–500 kcal vom TDEE · mehr Protein"),
@@ -173,6 +174,32 @@ fun SettingsScreen(
                     Icon(Icons.Default.ShoppingCart, null, Modifier.size(16.dp))
                     Spacer(Modifier.width(NutriSpacing.xs)); Text("Einkaufsliste", fontSize = 12.sp)
                 }
+            }
+        }
+
+        SettingsCard(title = "Rezepte", icon = Icons.Default.RestaurantMenu) {
+            val autoGerman = prefs?.get(KEY_AUTO_GERMAN_METRIC) ?: false
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                    Text("Import: Deutsch + metrisch", fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                    Text(
+                        "Neue Rezepte automatisch übersetzen und auf ml/g umrechnen",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = autoGerman,
+                    onCheckedChange = { checked ->
+                        scope.launch {
+                            context.notifDataStore.edit { it[KEY_AUTO_GERMAN_METRIC] = checked }
+                        }
+                    }
+                )
             }
         }
 

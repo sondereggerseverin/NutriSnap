@@ -233,6 +233,7 @@ val LocalAppTheme = staticCompositionLocalOf { AppTheme.FOREST_GREEN }
 
 val KEY_APP_THEME = stringPreferencesKey("app_theme")
 val KEY_MEAL_ORDER = stringPreferencesKey("meal_order")
+val KEY_AUTO_GERMAN_METRIC = androidx.datastore.preferences.core.booleanPreferencesKey("auto_german_metric")
 
 // ── Typography ─────────────────────────────────────────────────────────────────
 
