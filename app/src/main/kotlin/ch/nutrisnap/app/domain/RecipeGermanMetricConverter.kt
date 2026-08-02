@@ -25,8 +25,15 @@ object RecipeGermanMetricConverter {
      * Unterstützt Brüche wie 1/4, ½, 1 1/2.
      */
     fun convertUnitsToMetric(text: String): String {
-        var r = text
-        // Unicode-Brüche → ASCII
+        return text.lines().joinToString("\n") { convertLineToMetric(it) }
+    }
+
+    /**
+     * Flüssigkeiten → ml, feste Zutaten → g (mit typischen Dichten).
+     * Cups/tbsp/tsp werden nicht pauschal als Volumen belassen.
+     */
+    private fun convertLineToMetric(line: String): String {
+        var r = line
         val unicodeFractions = mapOf(
             '¼' to "1/4", '½' to "1/2", '¾' to "3/4",
             '⅓' to "1/3", '⅔' to "2/3", '⅛' to "1/8",
@@ -34,7 +41,6 @@ object RecipeGermanMetricConverter {
         )
         unicodeFractions.forEach { (u, a) -> r = r.replace(u.toString(), a) }
 
-        // Gemischte Zahlen: "1 1/2 cup" → 1.5
         fun parseAmount(raw: String): Double? {
             val s = raw.trim().replace(',', '.')
             val mixed = Regex("""^(\d+)\s+(\d+)/(\d+)$""").matchEntire(s)
@@ -56,8 +62,9 @@ object RecipeGermanMetricConverter {
         fun fmt(v: Double, unit: String): String {
             val rounded = when {
                 v >= 100 -> v.toInt().toString()
-                v >= 10 -> ((v * 10).toInt() / 10.0).let {
-                    if (it == it.toInt().toDouble()) it.toInt().toString() else "%.1f".format(it)
+                v >= 10 -> {
+                    val t = (v * 10).toInt() / 10.0
+                    if (t == t.toInt().toDouble()) t.toInt().toString() else "%.1f".format(t)
                 }
                 else -> {
                     val t = (v * 10).toInt() / 10.0
@@ -67,25 +74,101 @@ object RecipeGermanMetricConverter {
             return "$rounded$unit"
         }
 
-        data class Rule(val pattern: Regex, val convert: (Double) -> String)
-        val rules = listOf(
-            Rule(Regex("""(\d+\s+\d+/\d+|\d+/\d+|\d+(?:[.,]\d+)?)\s*(?:cups?|Cups?)\b""")) { v -> fmt(v * 240, " ml") },
-            Rule(Regex("""(\d+\s+\d+/\d+|\d+/\d+|\d+(?:[.,]\d+)?)\s*(?:tbsp|Tbsp|tablespoons?)\b""")) { v -> fmt(v * 15, " ml") },
-            Rule(Regex("""(\d+\s+\d+/\d+|\d+/\d+|\d+(?:[.,]\d+)?)\s*(?:tsp|Tsp|teaspoons?)\b""")) { v -> fmt(v * 5, " ml") },
-            Rule(Regex("""(\d+\s+\d+/\d+|\d+/\d+|\d+(?:[.,]\d+)?)\s*(?:fl\.?\s*oz)\b""", RegexOption.IGNORE_CASE)) { v -> fmt(v * 29.57, " ml") },
-            Rule(Regex("""(\d+\s+\d+/\d+|\d+/\d+|\d+(?:[.,]\d+)?)\s*(?:oz|ounces?)\b""", RegexOption.IGNORE_CASE)) { v -> fmt(v * 28.35, " g") },
-            Rule(Regex("""(\d+\s+\d+/\d+|\d+/\d+|\d+(?:[.,]\d+)?)\s*(?:lbs?|pounds?)\b""", RegexOption.IGNORE_CASE)) { v -> fmt(v * 453.6, " g") },
-            Rule(Regex("""(\d+(?:[.,]\d+)?)\s*°\s*F\b""")) { v -> "${((v - 32) * 5 / 9).toInt()}°C" },
-            Rule(Regex("""(\d+(?:[.,]\d+)?)\s*degrees?\s*F(?:ahrenheit)?\b""", RegexOption.IGNORE_CASE)) { v -> "${((v - 32) * 5 / 9).toInt()}°C" }
-        )
+        // °F → °C zuerst
+        r = Regex("""(\d+(?:[.,]\d+)?)\s*°\s*F\b""").replace(r) { mr ->
+            val v = mr.groupValues[1].replace(',', '.').toDoubleOrNull() ?: return@replace mr.value
+            "${((v - 32) * 5 / 9).toInt()}°C"
+        }
+        r = Regex("""(\d+(?:[.,]\d+)?)\s*degrees?\s*F(?:ahrenheit)?\b""", RegexOption.IGNORE_CASE).replace(r) { mr ->
+            val v = mr.groupValues[1].replace(',', '.').toDoubleOrNull() ?: return@replace mr.value
+            "${((v - 32) * 5 / 9).toInt()}°C"
+        }
 
-        rules.forEach { rule ->
-            r = rule.pattern.replace(r) { mr ->
-                parseAmount(mr.groupValues[1])?.let { rule.convert(it) } ?: mr.value
+        // oz / lb immer Gewicht
+        r = Regex("""(\d+\s+\d+/\d+|\d+/\d+|\d+(?:[.,]\d+)?)\s*(?:lbs?|pounds?)\b""", RegexOption.IGNORE_CASE).replace(r) { mr ->
+            parseAmount(mr.groupValues[1])?.let { fmt(it * 453.6, " g") } ?: mr.value
+        }
+        r = Regex("""(\d+\s+\d+/\d+|\d+/\d+|\d+(?:[.,]\d+)?)\s*(?:fl\.?\s*oz)\b""", RegexOption.IGNORE_CASE).replace(r) { mr ->
+            parseAmount(mr.groupValues[1])?.let { fmt(it * 29.57, " ml") } ?: mr.value
+        }
+        r = Regex("""(\d+\s+\d+/\d+|\d+/\d+|\d+(?:[.,]\d+)?)\s*(?:oz|ounces?)\b""", RegexOption.IGNORE_CASE).replace(r) { mr ->
+            parseAmount(mr.groupValues[1])?.let { fmt(it * 28.35, " g") } ?: mr.value
+        }
+
+        // cup / tbsp / tsp: abhängig von der Zutat (Name nach der Einheit)
+        val volPattern = Regex(
+            """(\d+\s+\d+/\d+|\d+/\d+|\d+(?:[.,]\d+)?)\s*(cups?|tbsp|tbs|tablespoons?|tsp|teaspoons?)\b\s*(.*)""",
+            RegexOption.IGNORE_CASE
+        )
+        r = volPattern.replace(r) { mr ->
+            val amt = parseAmount(mr.groupValues[1]) ?: return@replace mr.value
+            val unit = mr.groupValues[2].lowercase()
+            val rest = mr.groupValues[3]
+            val name = rest.lowercase()
+
+            val isLiquid = LIQUID_KEYWORDS.any { name.contains(it) }
+            val densityPerCup = densityGPerCup(name) // null = unbekannt
+
+            when {
+                unit.startsWith("cup") -> {
+                    when {
+                        isLiquid -> fmt(amt * 240, " ml") + (if (rest.isNotBlank()) " $rest" else "")
+                        densityPerCup != null -> fmt(amt * densityPerCup, " g") + (if (rest.isNotBlank()) " $rest" else "")
+                        else -> fmt(amt * 240, " g") + (if (rest.isNotBlank()) " $rest" else "") // Feststoffe default: g≈ml-Volumen
+                    }
+                }
+                unit.startsWith("tbsp") || unit == "tbs" || unit.startsWith("table") -> {
+                    when {
+                        isLiquid -> fmt(amt * 15, " ml") + (if (rest.isNotBlank()) " $rest" else "")
+                        densityPerCup != null -> fmt(amt * densityPerCup / 16.0, " g") + (if (rest.isNotBlank()) " $rest" else "")
+                        else -> fmt(amt * 15, " g") + (if (rest.isNotBlank()) " $rest" else "")
+                    }
+                }
+                else -> { // tsp
+                    when {
+                        isLiquid -> fmt(amt * 5, " ml") + (if (rest.isNotBlank()) " $rest" else "")
+                        densityPerCup != null -> fmt(amt * densityPerCup / 48.0, " g") + (if (rest.isNotBlank()) " $rest" else "")
+                        else -> fmt(amt * 5, " g") + (if (rest.isNotBlank()) " $rest" else "")
+                    }
+                }
             }
         }
+
         return r
     }
+
+    /** g pro US-Cup für gängige feste Zutaten. */
+    private fun densityGPerCup(nameLower: String): Double? {
+        val rules = listOf(
+            listOf("flour", "mehl") to 120.0,
+            listOf("sugar", "zucker", "coconut sugar") to 200.0,
+            listOf("powdered sugar", "icing", "confectioner", "puderzucker") to 120.0,
+            listOf("butter", "butter") to 227.0,
+            listOf("cottage cheese", "hüttenkäse", "huttenkase") to 225.0,
+            listOf("greek yogurt", "joghurt", "yogurt", "yoghurt") to 245.0,
+            listOf("honey", "honig") to 340.0,
+            listOf("protein powder", "proteinpulver", "whey") to 120.0,
+            listOf("cinnamon", "zimt") to 125.0,
+            listOf("baking powder", "backpulver") to 220.0,
+            listOf("baking soda", "natron") to 220.0,
+            listOf("salt", "salz") to 290.0,
+            listOf("cocoa", "kakao") to 85.0,
+            listOf("oat", "hafer") to 90.0,
+            listOf("rice", "reis") to 185.0,
+            listOf("cheese", "käse", "kase") to 110.0
+        )
+        for ((keys, dens) in rules) {
+            if (keys.any { nameLower.contains(it) }) return dens
+        }
+        return null
+    }
+
+    private val LIQUID_KEYWORDS = listOf(
+        "milk", "milch", "water", "wasser", "oil", "öl", "ol ", " cream", "sahne",
+        "broth", "brühe", "bruhe", "stock", "juice", "saft", "vinegar", "essig",
+        "wine", "wein", "beer", "bier", "syrup", "sirup", "extract", "vanilleextrakt",
+        "vanilla extract", "soy sauce", "sojasauce", "stock", "fond"
+    )
 
     /**
      * KI: Zutaten + Zubereitung ins Deutsche übersetzen und metrisch umrechnen.
@@ -96,13 +179,16 @@ object RecipeGermanMetricConverter {
 Du bist ein Schweizer/deutscher Koch-Assistent. Wandle das folgende Rezept ins Deutsche um und rechne alle Mengen in metrische Einheiten um.
 
 Regeln:
-- Zutatennamen auf Deutsch (z.B. cottage cheese → Hüttenkäse, greek yogurt → griechischer Joghurt, all-purpose flour → Weissmehl).
-- cups → ml (1 cup = 240 ml), tbsp → ml (15 ml), tsp → ml (5 ml), oz → g, lb → g.
-- °F → °C.
-- Brüche als Dezimalzahl oder gängige Mengenangaben (z.B. 1/4 cup → 60 ml).
+- Zutatennamen auf Deutsch (z.B. cottage cheese → Hüttenkäse, greek yogurt → griechischer Joghurt, flour → Mehl).
+- FESTE Zutaten immer in Gramm (g), NICHT in ml:
+  Mehl ~120 g/cup, Zucker ~200 g/cup, Butter ~227 g/cup, Hüttenkäse ~225 g/cup,
+  Honig ~340 g/cup, Zimt/Gewürze pro TL in g, Backpulver/Natron/Salz in g.
+- FLÜSSIGE Zutaten in ml: Milch, Wasser, Öl, Extrakt, Saft, Brühe.
+- oz → g, lb → g, °F → °C.
+- Beispiel: "1 cup flour" → "120 g Mehl", "1/4 cup milk" → "60 ml Milch", "2 tbsp butter" → "28 g Butter".
 - Zubereitungsschritte auf Deutsch, klar und nummeriert.
-- Mengen realistisch runden (ganze ml/g wo sinnvoll).
-- Gruppierungen (dough:, filling:) als deutsche Überschriften behalten (Teig:, Füllung:, Glasur:).
+- Mengen realistisch runden (ganze g/ml).
+- Gruppierungen (dough:, filling:) als deutsche Überschriften (Teig:, Füllung:, Glasur:).
 - Erfinde keine Zutaten hinzu.
 
 Originaltitel: ${recipe.title}

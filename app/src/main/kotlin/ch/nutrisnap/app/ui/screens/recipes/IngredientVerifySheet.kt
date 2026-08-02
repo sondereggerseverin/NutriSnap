@@ -541,7 +541,7 @@ private fun IngredientVerifyRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(bottom = 8.dp).fillMaxWidth()
                 ) {
-                    Column(Modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             "Menge: ${"%.0f".format(state.effectiveAmountG)} g",
                             fontSize = 13.sp, fontWeight = FontWeight.SemiBold
