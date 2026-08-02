@@ -49,7 +49,7 @@ import coil.compose.AsyncImage
 
 // ── Unit conversions (Brüche + cups/tbsp/°F → metrisch) ───────────────────────
 private fun convertToMetric(text: String): String =
-    RecipeGermanMetricConverter.convertUnitsToMetric(text)
+    runCatching { RecipeGermanMetricConverter.convertUnitsToMetric(text) }.getOrDefault(text)
 
 private fun scaleNumbers(line: String, ratio: Float): String {
     if (ratio == 1f) return line
@@ -350,7 +350,7 @@ fun RecipesScreen(
                     if (rawLine.isBlank()) return@mapNotNull null
                     val scaled = if (ratio != 1f) scaleNumbers(rawLine, ratio) else rawLine
                     val isHeader = !scaled.startsWith("•") && !scaled.startsWith("-") &&
-                        scaled.isNotEmpty() && !scaled[0].isDigit() && !scaled.startsWith(" ") && scaled.length > 2
+                        scaled.length > 2 && !scaled.first().isDigit() && !scaled.startsWith(" ")
                     if (isHeader) null else scaled.trimStart('•', '-', ' ').trim().takeIf { it.isNotBlank() }
                 }
                 shoppingVm.addRecipeIngredients(live.title, names.map { Triple(it, null, null) })
@@ -550,7 +550,7 @@ private fun platformVisuals(platform: String?): Pair<List<Color>, androidx.compo
         "instagram" -> listOf(Color(0xFFFEDA77), Color(0xFFDC2743), Color(0xFF962FBF)) to Icons.Default.CameraAlt
         "tiktok"    -> listOf(Color(0xFF25F4EE), Color(0xFF000000), Color(0xFFFE2C55)) to Icons.Default.VideoLibrary
         "ki"        -> listOf(Color(0xFFFF9B45), Color(0xFFD9633B)) to Icons.Default.AutoAwesome
-        "bild"      -> listOf(Color(0xFF5B8DEF), Color(0xFF3A6BC7)) to Icons.Default.Image
+        "bild"      -> listOf(Color(0xFF5B8DEF), Color(0xFF3A6BC7)) to Icons.Default.Photo
         else        -> listOf(Color(0xFF2D6A4F), Color(0xFF40916C)) to Icons.Default.RestaurantMenu
     }
 
@@ -627,7 +627,7 @@ fun ImportSheet(prefillUrl: String, isLoading: Boolean, error: String?,
                     enabled = !isLoading,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.Image, null, Modifier.size(18.dp))
+                    Icon(Icons.Default.PhotoCamera, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Rezept aus Bild importieren")
                 }
@@ -857,8 +857,17 @@ fun RecipeDetailSheet(
     var ingredientLines by remember(recipe.id) { mutableStateOf(recipe.ingredients.lines()) }
     var scanTargetIdx by remember { mutableStateOf<Int?>(null) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, modifier = Modifier.fillMaxHeight(0.94f)) {
-        LazyColumn(contentPadding = PaddingValues(bottom = 32.dp, start = 16.dp, end = 16.dp)) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        modifier = Modifier.fillMaxHeight(0.94f)
+    ) {
+        // fillMaxSize verhindert Infinite-Constraint-Crash von LazyColumn im BottomSheet
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 32.dp, start = 16.dp, end = 16.dp)
+        ) {
 
             item {
                 RecipeThumbnail(recipe = recipe, modifier = Modifier.fillMaxWidth().height(220.dp), shape = RoundedCornerShape(14.dp))
@@ -907,7 +916,7 @@ fun RecipeDetailSheet(
                                 Spacer(Modifier.width(8.dp))
                                 Text("Übersetze…", fontSize = 13.sp)
                             } else {
-                                Icon(Icons.Default.Language, null, Modifier.size(16.dp))
+                                Icon(Icons.Default.AutoAwesome, null, Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
                                 Text("Deutsch + metrisch", fontSize = 13.sp)
                             }
@@ -1105,7 +1114,7 @@ fun RecipeDetailSheet(
                         val scaled  = if (ratio != 1f) scaleNumbers(rawLine, ratio) else rawLine
                         val display = if (metricMode) convertToMetric(scaled) else scaled
                         val isHeader = !display.startsWith("•") && !display.startsWith("-") &&
-                            display.isNotEmpty() && !display[0].isDigit() && !display.startsWith(" ") && display.length > 2
+                            display.length > 2 && !display.first().isDigit() && !display.startsWith(" ")
                         if (isHeader) {
                             Spacer(Modifier.height(10.dp))
                             Text(display.trimEnd(':'), fontWeight=FontWeight.SemiBold, fontSize=13.sp, color=MaterialTheme.colorScheme.primary)

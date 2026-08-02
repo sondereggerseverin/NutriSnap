@@ -25,7 +25,13 @@ object RecipeGermanMetricConverter {
      * Unterstützt Brüche wie 1/4, ½, 1 1/2.
      */
     fun convertUnitsToMetric(text: String): String {
-        return text.lines().joinToString("\n") { convertLineToMetric(it) }
+        return try {
+            text.lines().joinToString("\n") { line ->
+                runCatching { convertLineToMetric(line) }.getOrDefault(line)
+            }
+        } catch (_: Exception) {
+            text
+        }
     }
 
     /**
