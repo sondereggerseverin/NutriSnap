@@ -1,5 +1,10 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import android.graphics.BitmapFactory
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
+
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
@@ -160,6 +165,7 @@ fun RecipesScreen(
     LaunchedEffect(sharedUrl) { if (!sharedUrl.isNullOrBlank()) showImportSheet = true }
     LaunchedEffect(sharedRecipeJson) { if (!sharedRecipeJson.isNullOrBlank()) vm.importFromSharedJson(sharedRecipeJson) }
     LaunchedEffect(state.instagramBlocked) { if (state.instagramBlocked) showImportSheet = true }
+    LaunchedEffect(state.lastImport) { if (state.lastImport != null) showImportSheet = false }
     LaunchedEffect(sharedBatchUrls) {
         if (sharedBatchUrls.isNotEmpty()) { vm.addBatchUrls(sharedBatchUrls); showBatchSheet = true }
     }
@@ -554,6 +560,7 @@ private fun platformVisuals(platform: String?): Pair<List<Color>, androidx.compo
         "instagram" -> listOf(Color(0xFFFEDA77), Color(0xFFDC2743), Color(0xFF962FBF)) to Icons.Default.CameraAlt
         "tiktok"    -> listOf(Color(0xFF25F4EE), Color(0xFF000000), Color(0xFFFE2C55)) to Icons.Default.VideoLibrary
         "ki"        -> listOf(Color(0xFFFF9B45), Color(0xFFD9633B)) to Icons.Default.AutoAwesome
+        "bild"      -> listOf(Color(0xFF5B8DEF), Color(0xFF3A6BC7)) to Icons.Default.Image
         else        -> listOf(Color(0xFF2D6A4F), Color(0xFF40916C)) to Icons.Default.RestaurantMenu
     }
 
@@ -570,6 +577,21 @@ fun ImportSheet(prefillUrl: String, isLoading: Boolean, error: String?,
     var showManual by remember(openAtManualCaption) { mutableStateOf(openAtManualCaption) }
     var manualTitle by remember { mutableStateOf("") }; var manualCaption by remember { mutableStateOf("") }
     val isInstagram = "instagram.com" in url || "instagr.am" in url
+
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                val bitmap = BitmapFactory.decodeStream(stream)
+                    ?: throw IllegalStateException("Bild konnte nicht geladen werden")
+                vm.importFromImage(bitmap)
+            } ?: throw IllegalStateException("Bild konnte nicht geöffnet werden")
+        }.onFailure {
+            // Fehler landet über importError im Sheet
+        }
+    }
     LaunchedEffect(error) {
         if (error != null && isInstagram) showManual = true
     }
@@ -604,7 +626,31 @@ fun ImportSheet(prefillUrl: String, isLoading: Boolean, error: String?,
                         Text("Link kopieren und unten einfügen", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(12.dp))
+
+                OutlinedButton(
+                    onClick = {
+                        imagePicker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    enabled = !isLoading,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Image, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Rezept aus Bild importieren")
+                }
+                Text(
+                    "Screenshot oder Foto einer Rezeptkarte auswählen",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+                )
+
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                Text("Oder per Link", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(8.dp))
 
                 OutlinedTextField(value=url, onValueChange={url=it}, label={Text("URL einfügen")},
                     leadingIcon={Icon(Icons.Default.Link,null)}, modifier=Modifier.fillMaxWidth(), singleLine=true, isError=error!=null)

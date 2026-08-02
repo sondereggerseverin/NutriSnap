@@ -11,6 +11,8 @@ import ch.nutrisnap.app.data.repository.RecipeBudgetScaler
 import ch.nutrisnap.app.data.repository.RecipeRepository
 import ch.nutrisnap.app.domain.RecipeAiParser
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
+import ch.nutrisnap.app.domain.GroqVisionService
+import android.graphics.Bitmap
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -174,6 +176,54 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                         state.copy(isImporting = false, lastImport = result.recipe)
                     else ->
                         state.copy(isImporting = false, importError = result.error ?: "Fehler beim Importieren")
+                }
+            }
+        }
+    }
+
+    /**
+     * Importiert ein Rezept aus einem Foto/Screenshot (Rezeptkarte, Blog-Screenshot, etc.).
+     * Nutzt Vision-KI, speichert direkt als Rezept mit platform = "bild".
+     */
+    fun importFromImage(bitmap: Bitmap) {
+        viewModelScope.launch {
+            _importState.update { it.copy(isImporting = true, importError = null, instagramBlocked = false) }
+            try {
+                val vision = GroqVisionService()
+                val base64 = vision.bitmapToBase64Jpeg(bitmap, quality = 80)
+                val extracted = vision.extractRecipeFromImage(base64).getOrElse { e ->
+                    _importState.update {
+                        it.copy(isImporting = false, importError = e.message ?: "Bild konnte nicht gelesen werden")
+                    }
+                    return@launch
+                }
+                if (extracted.title.isBlank() && extracted.ingredients.isBlank()) {
+                    _importState.update {
+                        it.copy(isImporting = false, importError = "Kein Rezept im Bild erkannt")
+                    }
+                    return@launch
+                }
+                val totalMin = listOfNotNull(extracted.prepTimeMinutes, extracted.cookTimeMinutes)
+                    .takeIf { it.isNotEmpty() }?.sum()
+                val recipe = Recipe(
+                    title = extracted.title.ifBlank { "Rezept aus Bild" },
+                    description = extracted.description,
+                    platform = "bild",
+                    ingredients = extracted.ingredients,
+                    instructions = extracted.instructions,
+                    servings = extracted.servings.coerceAtLeast(1),
+                    prepTimeMinutes = totalMin ?: extracted.prepTimeMinutes,
+                    totalCalories = extracted.caloriesPerServing?.let { it * extracted.servings.coerceAtLeast(1) },
+                    proteinPerServing = extracted.proteinPerServing,
+                    carbsPerServing = extracted.carbsPerServing,
+                    fatPerServing = extracted.fatPerServing,
+                    tags = "bild"
+                )
+                val saved = recipe.copy(id = repo.saveRecipe(recipe))
+                _importState.update { it.copy(isImporting = false, lastImport = saved) }
+            } catch (e: Exception) {
+                _importState.update {
+                    it.copy(isImporting = false, importError = e.message ?: "Fehler beim Bild-Import")
                 }
             }
         }

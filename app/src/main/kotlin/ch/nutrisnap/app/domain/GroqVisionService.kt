@@ -50,6 +50,22 @@ data class NutritionLabelResult(
     val fiberPer100g: Float = 0f
 )
 
+/** Aus einem Rezept-Foto / Screenshot extrahiertes Rezept. */
+@Serializable
+data class RecipeFromImageResult(
+    val title: String = "",
+    val description: String = "",
+    val ingredients: String = "",
+    val instructions: String = "",
+    val servings: Int = 1,
+    val prepTimeMinutes: Int? = null,
+    val cookTimeMinutes: Int? = null,
+    val caloriesPerServing: Float? = null,
+    val proteinPerServing: Float? = null,
+    val carbsPerServing: Float? = null,
+    val fatPerServing: Float? = null
+)
+
 /**
  * Nutzt Groq's multimodales Vision-Modell um Fotos zu analysieren.
  * Gleicher kostenloser Groq-Tier wie GroqRecipeGeneratorService, gleicher API-Key
@@ -165,6 +181,46 @@ Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
 }
 """.trimIndent()
         callVisionRaw(prompt, base64Jpeg).mapCatching { json.decodeFromString<NutritionLabelResult>(it) }
+    }
+
+    /**
+     * Liest ein Rezept von einem Foto oder Screenshot (z.B. Rezeptkarte, Blog-Screenshot,
+     * handgeschriebenes Rezept). Gibt strukturierte Felder zurück, die direkt als [Recipe]
+     * gespeichert werden können.
+     */
+    suspend fun extractRecipeFromImage(base64Jpeg: String): Result<RecipeFromImageResult> = withContext(Dispatchers.IO) {
+        val prompt = """
+Du siehst ein Foto oder einen Screenshot eines Rezepts (Rezeptkarte, Blog, Social Media, Notiz).
+Extrahiere ALLE sichtbaren Informationen so vollständig und originalgetreu wie möglich.
+
+Regeln:
+- ingredients: jede Zutat in einer eigenen Zeile, idealerweise mit Menge (z.B. "1 cup cottage cheese").
+  Gruppiere optional mit Überschriften wie "dough:" / "filling:" wenn das Bild das so zeigt.
+- instructions: nummerierte Schritte, einer pro Zeile (1. ... 2. ...).
+- Wenn Nährwerte pro Portion sichtbar sind (kcal, Protein, KH, Fett), übernimm sie.
+- Wenn Anzahl Portionen / servings sichtbar ist, übernimm sie.
+- Zeiten in Minuten umrechnen falls nötig.
+- Erfinde nichts, was nicht lesbar ist. Unleserliche Teile weglassen.
+- Sprache der Zutaten/Anleitung beibehalten (Englisch bleibt Englisch, Deutsch bleibt Deutsch).
+
+Antworte NUR mit folgendem JSON (kein Markdown):
+{
+  "title": "Rezepttitel",
+  "description": "Kurze Beschreibung falls vorhanden, sonst leer",
+  "ingredients": "1 cup cottage cheese\n1/4 cup milk\n...",
+  "instructions": "1. Preheat oven...\n2. Blend...",
+  "servings": 12,
+  "prepTimeMinutes": 15,
+  "cookTimeMinutes": 46,
+  "caloriesPerServing": 142,
+  "proteinPerServing": 13,
+  "carbsPerServing": 14,
+  "fatPerServing": 3
+}
+""".trimIndent()
+        callVisionRaw(prompt, base64Jpeg, maxTokens = 3000).mapCatching {
+            json.decodeFromString<RecipeFromImageResult>(it)
+        }
     }
 
     /**
