@@ -331,7 +331,8 @@ fun RecipesScreen(
         )
     }
 
-    selectedRecipe?.let { recipe ->
+    // Detail-Sheet nicht gleichzeitig mit Verify-Sheet (doppeltes ModalBottomSheet = Crash)
+    if (!showVerifySheet) selectedRecipe?.let { recipe ->
         // Always show latest version from state
         val live = state.recipes.find { it.id == recipe.id } ?: recipe
         RecipeDetailSheet(

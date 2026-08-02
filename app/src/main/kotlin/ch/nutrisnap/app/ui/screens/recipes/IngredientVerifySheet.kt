@@ -36,6 +36,12 @@ import ch.nutrisnap.app.data.repository.FoodItemRepository
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import kotlinx.coroutines.launch
 
+private fun fmtMacro(v: Float): String =
+    if (v.isFinite()) "%.1f".format(v) else "0.0"
+
+private fun safeInt(v: Float): Int =
+    if (v.isFinite()) v.toInt().coerceAtLeast(0) else 0
+
 // ── State for a single ingredient during verification ─────────────────────────
 
 /**
@@ -70,14 +76,22 @@ data class IngredientVerifyState(
     /** Verhältnis effektive/ursprüngliche Menge — Fallback-Skalierung, wenn kein FoodItem vorliegt. */
     private val amountRatio: Float get() = effectiveAmountG / originalAmountG.coerceAtLeast(0.1f)
 
-    val effectiveCalories: Float get() = effectiveFood?.let { effectiveAmountG / 100f * (it.calories ?: 0f) }
-        ?: (result.calories * amountRatio)
-    val effectiveProtein: Float get() = effectiveFood?.let { effectiveAmountG / 100f * (it.protein ?: 0f) }
-        ?: (result.protein * amountRatio)
-    val effectiveCarbs: Float get() = effectiveFood?.let { effectiveAmountG / 100f * (it.carbs ?: 0f) }
-        ?: (result.carbs * amountRatio)
-    val effectiveFat: Float get() = effectiveFood?.let { effectiveAmountG / 100f * (it.fat ?: 0f) }
-        ?: (result.fat * amountRatio)
+    val effectiveCalories: Float get() = (
+        effectiveFood?.let { effectiveAmountG / 100f * (it.calories ?: 0f) }
+            ?: (result.calories * amountRatio)
+    ).let { if (it.isFinite()) it else 0f }
+    val effectiveProtein: Float get() = (
+        effectiveFood?.let { effectiveAmountG / 100f * (it.protein ?: 0f) }
+            ?: (result.protein * amountRatio)
+    ).let { if (it.isFinite()) it else 0f }
+    val effectiveCarbs: Float get() = (
+        effectiveFood?.let { effectiveAmountG / 100f * (it.carbs ?: 0f) }
+            ?: (result.carbs * amountRatio)
+    ).let { if (it.isFinite()) it else 0f }
+    val effectiveFat: Float get() = (
+        effectiveFood?.let { effectiveAmountG / 100f * (it.fat ?: 0f) }
+            ?: (result.fat * amountRatio)
+    ).let { if (it.isFinite()) it else 0f }
     /** Mikronaehrstoffe (Ballaststoffe etc.) für die tatsächlich verwendete Menge —
      *  bei bekanntem FoodItem (override oder Match) anhand der editierbaren Menge skaliert,
      *  sonst anhand des Mengenverhältnisses aus der ursprünglichen Analyse.
@@ -247,15 +261,15 @@ fun IngredientVerifySheet(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Column {
-                                Text("${totalKcal.toInt()} kcal", fontWeight = FontWeight.Bold, fontSize = 22.sp,
+                                Text("${safeInt(totalKcal)} kcal", fontWeight = FontWeight.Bold, fontSize = 22.sp,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer)
                                 Text("$verifiedCount/${verifyStates.size} verifiziert",
                                     fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.7f))
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                MacroChip("P", "${totalProt.toInt()}g")
-                                MacroChip("K", "${totalCarbs.toInt()}g")
-                                MacroChip("F", "${totalFat.toInt()}g")
+                                MacroChip("P", "${safeInt(totalProt)}g")
+                                MacroChip("K", "${safeInt(totalCarbs)}g")
+                                MacroChip("F", "${safeInt(totalFat)}g")
                             }
                         }
                     }
@@ -508,7 +522,7 @@ private fun IngredientVerifyRow(
             Column(horizontalAlignment = Alignment.End) {
                 if (state.effectiveCalories > 0f) {
                     Text(
-                        "${state.effectiveCalories.toInt()} kcal",
+                        "${safeInt(state.effectiveCalories)} kcal",
                         fontSize = 12.sp, fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -530,13 +544,12 @@ private fun IngredientVerifyRow(
 
         // Detail- & Action-Bereich — shown when expanded
         if (showActions) {
+            // Kein nested verticalScroll in LazyColumn-Item (Crash-Ursache)
             Column(
                 Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .heightIn(max = 220.dp)
-                    .verticalScroll(rememberScrollState())
             ) {
                 // Menge — immer aus dem Rezept (parsed), editierbar mit +/- und Freitext ("100g")
                 Row(
@@ -560,7 +573,7 @@ private fun IngredientVerifyRow(
                         }
                     }
                     // − 10g
-                    FilledTonalIconButton(
+                    IconButton(
                         onClick = {
                             val next = (state.effectiveAmountG - 10f).coerceAtLeast(1f)
                             onAmountSaved(next)
@@ -570,7 +583,7 @@ private fun IngredientVerifyRow(
                         Icon(Icons.Default.Remove, "−10 g", Modifier.size(18.dp))
                     }
                     // + 10g
-                    FilledTonalIconButton(
+                    IconButton(
                         onClick = {
                             onAmountSaved(state.effectiveAmountG + 10f)
                         },
@@ -624,13 +637,13 @@ private fun IngredientVerifyRow(
                     Modifier.fillMaxWidth().padding(bottom = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text("P ${"%.1f".format(state.effectiveProtein)} g", fontSize = 12.sp,
+                    Text("P ${fmtMacro(state.effectiveProtein)} g", fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("·", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("K ${"%.1f".format(state.effectiveCarbs)} g", fontSize = 12.sp,
+                    Text("K ${fmtMacro(state.effectiveCarbs)} g", fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("·", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("F ${"%.1f".format(state.effectiveFat)} g", fontSize = 12.sp,
+                    Text("F ${fmtMacro(state.effectiveFat)} g", fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
