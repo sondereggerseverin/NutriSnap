@@ -170,11 +170,13 @@ class HealthConnectRepository(
     }
 
     /**
-     * Syncs historical data for the last [days] days.
-     * Skips days that are already in the cache (date exists in DB).
-     * Also fills in weight readings from Health Connect for each day.
+     * Syncs historical data for the last [days] days (default 180 ≈ 6 Monate).
+     * Lädt Tage nach, bei denen Aktivitätskalorien fehlen, und aktualisiert die
+     * letzten RECENT_REFRESH_DAYS immer (verspätete HC/Samsung-Writes).
+     * Für Daten älter als ~30 Tage braucht der Nutzer die Health-Connect-
+     * History-Permission — ohne sie liefert HC schlicht nichts.
      */
-    suspend fun syncHistorical(days: Int = 30): Result<Int> = runCatching {
+    suspend fun syncHistorical(days: Int = 180): Result<Int> = runCatching {
         val today = LocalDate.now()
         val bmr = currentBmr()
         // Fetch all weight data in one API call for efficiency
