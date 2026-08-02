@@ -11,6 +11,9 @@ interface DiaryDao {
     @Query("SELECT * FROM diary_entries WHERE dateStr = :dateStr ORDER BY mealType, sortOrder, id")
     fun getEntriesForDate(dateStr: String): Flow<List<DiaryEntry>>
 
+    @Query("SELECT * FROM diary_entries WHERE dateStr = :dateStr ORDER BY mealType, sortOrder, id")
+    suspend fun getEntriesForDateOnce(dateStr: String): List<DiaryEntry>
+
     @Query("UPDATE diary_entries SET sortOrder = :sortOrder WHERE id = :id")
     suspend fun updateSortOrder(id: Long, sortOrder: Int)
 

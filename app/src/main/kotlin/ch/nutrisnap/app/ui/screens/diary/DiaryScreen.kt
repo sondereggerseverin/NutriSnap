@@ -42,6 +42,8 @@ import ch.nutrisnap.app.domain.EntryPlausibilityChecker
 import ch.nutrisnap.app.domain.FoodPortionPresets
 import ch.nutrisnap.app.domain.EverydayServingSizes
 import ch.nutrisnap.app.ui.screens.barcode.BarcodeScannerScreen
+import ch.nutrisnap.app.ui.screens.scan.PhotoCaptureScreen
+import android.graphics.Bitmap
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import androidx.compose.ui.graphics.Color
 import ch.nutrisnap.app.ui.theme.MacroColors
@@ -140,6 +142,25 @@ fun DiaryScreen(
             contentPadding = PaddingValues(bottom = 100.dp)
         ) {
             item { DateNavigator(state.selectedDate, vm::prevDay, vm::nextDay) }
+            item {
+                TextButton(
+                    onClick = {
+                        vm.copyYesterday { n ->
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    if (n > 0) "$n Einträge von gestern übernommen"
+                                    else "Gestern war leer – nichts zu kopieren"
+                                )
+                            }
+                        }
+                    },
+                    modifier = Modifier.padding(horizontal = NutriSpacing.lg)
+                ) {
+                    Icon(Icons.Default.ContentCopy, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Gestern übernehmen", fontSize = 13.sp)
+                }
+            }
             item {
                 MacroBar(
                     calories = state.totalCalories,
@@ -928,6 +949,11 @@ fun AddFoodSheet(
     var showScanner  by remember { mutableStateOf(autoOpenScanner) }
     var barcodeStatus by remember { mutableStateOf("") }
 
+    var pendingUnknownBarcode by remember { mutableStateOf<String?>(null) }
+    var labelCaptureStep by remember { mutableStateOf(0) } // 0=none, 1=first photo, 2=optional second
+    var firstLabelBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var isSavingProduct by remember { mutableStateOf(false) }
+
     if (showScanner) {
         BarcodeScannerScreen(
             onBarcodeDetected = { barcode ->
@@ -940,10 +966,74 @@ fun AddFoodSheet(
                         vm.setBarcodeResult(food)
                     } else {
                         barcodeStatus = "Barcode $barcode nicht gefunden"
+                        pendingUnknownBarcode = barcode
                     }
                 }
             },
             onNavigateBack = { showScanner = false }
+        )
+        return
+    }
+
+    // Unbekanntes Produkt: Nährwerttabelle fotografieren (1–2 Fotos)
+    if (labelCaptureStep > 0 && pendingUnknownBarcode != null) {
+        PhotoCaptureScreen(
+            title = if (labelCaptureStep == 1) "Nährwerttabelle fotografieren" else "Zweites Foto (optional)",
+            instructions = if (labelCaptureStep == 1)
+                "Barcode $pendingUnknownBarcode – Nährwerttabelle (pro 100g) scharf fotografieren"
+            else
+                "Falls Name/Werte auf der anderen Seite: jetzt fotografieren, oder zurück",
+            onPhotoCaptured = { bitmap ->
+                if (labelCaptureStep == 1) {
+                    firstLabelBitmap = bitmap
+                    labelCaptureStep = 2
+                } else {
+                    isSavingProduct = true
+                    val meal = initialMeal ?: defaultMealForNow()
+                    vm.captureUnknownProduct(
+                        barcode = pendingUnknownBarcode!!,
+                        labelBitmap = firstLabelBitmap!!,
+                        secondBitmap = bitmap,
+                        meal = meal,
+                        amountGrams = 100f
+                    ) { food ->
+                        isSavingProduct = false
+                        labelCaptureStep = 0
+                        firstLabelBitmap = null
+                        pendingUnknownBarcode = null
+                        barcodeStatus = if (food != null)
+                            "„${food.name}“ gespeichert & eingetragen"
+                        else
+                            "Etikett konnte nicht gelesen werden"
+                    }
+                }
+            },
+            onNavigateBack = {
+                if (labelCaptureStep == 2 && firstLabelBitmap != null) {
+                    // Ohne zweites Foto speichern
+                    isSavingProduct = true
+                    val meal = initialMeal ?: defaultMealForNow()
+                    vm.captureUnknownProduct(
+                        barcode = pendingUnknownBarcode!!,
+                        labelBitmap = firstLabelBitmap!!,
+                        secondBitmap = null,
+                        meal = meal,
+                        amountGrams = 100f
+                    ) { food ->
+                        isSavingProduct = false
+                        labelCaptureStep = 0
+                        firstLabelBitmap = null
+                        pendingUnknownBarcode = null
+                        barcodeStatus = if (food != null)
+                            "„${food.name}“ gespeichert & eingetragen"
+                        else
+                            "Etikett konnte nicht gelesen werden"
+                    }
+                } else {
+                    labelCaptureStep = 0
+                    firstLabelBitmap = null
+                }
+            }
         )
         return
     }
@@ -1003,6 +1093,45 @@ fun AddFoodSheet(
 
             Spacer(Modifier.height(NutriSpacing.md))
 
+            if (pendingUnknownBarcode != null && labelCaptureStep == 0) {
+                Card(
+                    Modifier.fillMaxWidth().padding(bottom = NutriSpacing.sm),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f))
+                ) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(
+                            "Barcode $pendingUnknownBarcode nicht in der Datenbank",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp
+                        )
+                        Text(
+                            "Nährwerttabelle fotografieren – Produkt wird gespeichert und ist nächstes Mal per Barcode findbar.",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = { labelCaptureStep = 1 },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.PhotoCamera, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Etikett fotografieren")
+                        }
+                        TextButton(onClick = { pendingUnknownBarcode = null; barcodeStatus = "" }) {
+                            Text("Abbrechen")
+                        }
+                    }
+                }
+            }
+            if (isSavingProduct) {
+                Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Produkt wird gespeichert…", fontSize = 13.sp)
+                }
+            }
+
             when (activeTab) {
                 AddFoodTab.SEARCH -> SearchTab(
                     vm = vm,
@@ -1047,6 +1176,13 @@ private fun SearchTab(
 
     LaunchedEffect(barcodeResult) {
         barcodeResult?.let { selectedFood = it; vm.clearBarcodeResult() }
+    }
+    LaunchedEffect(selectedFood) {
+        val food = selectedFood ?: return@LaunchedEffect
+        val last = vm.getLastAmount(food.name)
+        if (last != null && last > 0f) {
+            amountText = if (last == last.toInt().toFloat()) last.toInt().toString() else "%.0f".format(last)
+        }
     }
 
     if (selectedFood == null) {
@@ -1244,7 +1380,7 @@ private fun SearchTab(
                     if (grams > 0) {
                         val warning = EntryPlausibilityChecker.checkPortion(grams)
                         if (warning != null) portionWarning = warning
-                        else { vm.addEntry(food, grams, selectedMeal); onDismiss() }
+                        else { vm.addEntryWithMemory(food, grams, selectedMeal); onDismiss() }
                     }
                 },
                 modifier = Modifier.weight(1f),
@@ -1258,7 +1394,7 @@ private fun SearchTab(
                 text    = { Text(warning) },
                 confirmButton = {
                     TextButton(onClick = {
-                        vm.addEntry(food, grams, selectedMeal)
+                        vm.addEntryWithMemory(food, grams, selectedMeal)
                         portionWarning = null
                         onDismiss()
                     }) { Text("Trotzdem hinzufügen") }

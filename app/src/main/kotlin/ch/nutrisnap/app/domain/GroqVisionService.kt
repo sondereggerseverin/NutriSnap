@@ -47,7 +47,11 @@ data class NutritionLabelResult(
     val proteinPer100g: Float = 0f,
     val carbsPer100g: Float = 0f,
     val fatPer100g: Float = 0f,
-    val fiberPer100g: Float = 0f
+    val fiberPer100g: Float = 0f,
+    val sugarPer100g: Float = 0f,
+    val saltPer100g: Float = 0f,
+    val productName: String = "",
+    val brand: String = ""
 )
 
 /** Aus einem Rezept-Foto / Screenshot extrahiertes Rezept. */
@@ -171,13 +175,19 @@ Auf dem Foto ist eine Nährwerttabelle (von einer Lebensmittelverpackung) zu seh
 Lies die Werte PRO 100g/100ml aus der Tabelle ab. Falls die Tabelle nur Werte pro Portion zeigt
 und die Portionsgrösse erkennbar ist, rechne korrekt auf 100g um.
 
+Lies auch Produktname und Marke, falls sichtbar (auch bei gedrehtem/spiegelverkehrtem Text).
+
 Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
 {
   "caloriesPer100g": 250,
   "proteinPer100g": 12.0,
   "carbsPer100g": 30.0,
   "fatPer100g": 8.0,
-  "fiberPer100g": 3.0
+  "fiberPer100g": 3.0,
+  "sugarPer100g": 5.0,
+  "saltPer100g": 1.0,
+  "productName": "Produktname",
+  "brand": "Marke"
 }
 """.trimIndent()
         callVisionRaw(prompt, base64Jpeg).mapCatching { json.decodeFromString<NutritionLabelResult>(it) }

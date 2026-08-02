@@ -22,6 +22,9 @@ interface CustomFoodDao {
     @Query("SELECT * FROM custom_foods WHERE id = :id LIMIT 1")
     suspend fun getById(id: Int): CustomFoodItem?
 
+    @Query("SELECT * FROM custom_foods WHERE barcode = :barcode LIMIT 1")
+    suspend fun getByBarcode(barcode: String): CustomFoodItem?
+
     /** Einmaliger Snapshot aller Einträge, für Dedup-/Verknüpfungs-Lookups beim
      *  Yazio-Import (Foods, Rezept-Zutaten, Tagebuch-Matching). */
     @Query("SELECT * FROM custom_foods")

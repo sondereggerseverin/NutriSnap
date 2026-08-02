@@ -269,6 +269,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
                 _importState.update { it.copy(isImporting = false, lastImport = saved) }
+                // Auto-Nährwerte aus Zutaten berechnen
+                analyzeNutrition(saved)
             } catch (e: Exception) {
                 _importState.update {
                     it.copy(isImporting = false, importError = e.message ?: "Fehler beim Bild-Import")

@@ -9,6 +9,13 @@ import ch.nutrisnap.app.data.repository.DiaryRepository
 import ch.nutrisnap.app.data.repository.FavoriteFoodRepository
 import ch.nutrisnap.app.data.repository.FoodItemRepository
 import ch.nutrisnap.app.data.repository.UserProfileRepository
+import ch.nutrisnap.app.domain.GroqVisionService
+import android.graphics.Bitmap
+import android.content.Context
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.edit
+import ch.nutrisnap.app.ui.screens.settings.notifDataStore
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -145,6 +152,116 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setBarcodeResult(food: FoodItem) { _barcodeResult.value = food }
     fun clearBarcodeResult()             { _barcodeResult.value = null }
+
+    /**
+     * Unbekanntes Produkt: Nährwert-Foto(s) auslesen, als CustomFood mit Barcode speichern
+     * und optional sofort ins Tagebuch eintragen.
+     */
+    fun captureUnknownProduct(
+        barcode: String,
+        labelBitmap: Bitmap,
+        secondBitmap: Bitmap? = null,
+        meal: MealType,
+        amountGrams: Float = 100f,
+        onDone: (FoodItem?) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val vision = GroqVisionService()
+                val b64 = vision.bitmapToBase64Jpeg(labelBitmap, quality = 85)
+                var label = vision.analyzeNutritionLabel(b64).getOrElse { e ->
+                    onDone(null)
+                    return@launch
+                }
+                // Zweites Foto (falls Etikett getrennt) – fehlende Felder ergänzen
+                if (secondBitmap != null) {
+                    val b642 = vision.bitmapToBase64Jpeg(secondBitmap, quality = 85)
+                    vision.analyzeNutritionLabel(b642).getOrNull()?.let { second ->
+                        label = label.copy(
+                            caloriesPer100g = label.caloriesPer100g.takeIf { it > 0f } ?: second.caloriesPer100g,
+                            proteinPer100g = label.proteinPer100g.takeIf { it > 0f } ?: second.proteinPer100g,
+                            carbsPer100g = label.carbsPer100g.takeIf { it > 0f } ?: second.carbsPer100g,
+                            fatPer100g = label.fatPer100g.takeIf { it > 0f } ?: second.fatPer100g,
+                            fiberPer100g = label.fiberPer100g.takeIf { it > 0f } ?: second.fiberPer100g,
+                            sugarPer100g = label.sugarPer100g.takeIf { it > 0f } ?: second.sugarPer100g,
+                            saltPer100g = label.saltPer100g.takeIf { it > 0f } ?: second.saltPer100g,
+                            productName = label.productName.ifBlank { second.productName },
+                            brand = label.brand.ifBlank { second.brand }
+                        )
+                    }
+                }
+                val name = label.productName.ifBlank { "Produkt $barcode" }
+                val custom = CustomFoodItem(
+                    name = name,
+                    brand = label.brand.ifBlank { null },
+                    barcode = barcode,
+                    calories = label.caloriesPer100g,
+                    protein = label.proteinPer100g,
+                    carbs = label.carbsPer100g,
+                    fat = label.fatPer100g,
+                    fiber = label.fiberPer100g,
+                    sugar = label.sugarPer100g,
+                    salt = label.saltPer100g,
+                    portionSizeG = 100f,
+                    source = "label_scan"
+                )
+                foodRepo.saveCustomFoodWithBarcode(custom)
+                val food = FoodItem(
+                    name = custom.name,
+                    brand = custom.brand,
+                    barcode = barcode,
+                    calories = custom.calories,
+                    protein = custom.protein,
+                    carbs = custom.carbs,
+                    fat = custom.fat,
+                    fiber = custom.fiber,
+                    sugar = custom.sugar,
+                    salt = custom.salt,
+                    servingSize = 100f,
+                    source = FoodSource.MANUAL,
+                    completenessScore = 95
+                )
+                addEntry(food, amountGrams, meal)
+                rememberLastAmount(food.name, amountGrams)
+                onDone(food)
+            } catch (e: Exception) {
+                onDone(null)
+            }
+        }
+    }
+
+    /** Kopiert alle Einträge von gestern auf das aktuell gewählte Datum. */
+    fun copyYesterday(onDone: (Int) -> Unit = {}) {
+        viewModelScope.launch {
+            val target = _date.value
+            val source = target.minusDays(1)
+            val entries = repo.getEntriesForDateOnce(source)
+            var n = 0
+            for (e in entries) {
+                repo.duplicateEntryToDate(e, target)
+                n++
+            }
+            onDone(n)
+        }
+    }
+
+    fun rememberLastAmount(foodName: String, grams: Float) {
+        viewModelScope.launch {
+            val key = floatPreferencesKey("last_amount_" + foodName.lowercase().trim().take(80).hashCode())
+            getApplication<Application>().notifDataStore.edit { it[key] = grams }
+        }
+    }
+
+    suspend fun getLastAmount(foodName: String): Float? {
+        val key = floatPreferencesKey("last_amount_" + foodName.lowercase().trim().take(80).hashCode())
+        val prefs = getApplication<Application>().notifDataStore.data.first()
+        return prefs[key]
+    }
+
+    fun addEntryWithMemory(food: FoodItem, grams: Float, meal: MealType) {
+        addEntry(food, grams, meal)
+        rememberLastAmount(food.name, grams)
+    }
 
     fun addEntry(food: FoodItem, grams: Float, meal: MealType) {
         viewModelScope.launch {

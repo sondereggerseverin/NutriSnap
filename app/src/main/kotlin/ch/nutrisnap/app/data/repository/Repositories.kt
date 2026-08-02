@@ -79,6 +79,20 @@ class DiaryRepository(db: NutriDatabase) {
         return id
     }
 
+    suspend fun getEntriesForDateOnce(date: LocalDate): List<DiaryEntry> =
+        dao.getEntriesForDateOnce(date.toString())
+
+    /** Kopiert einen bestehenden Eintrag auf ein anderes Datum (gleiche Makros/Menge). */
+    suspend fun duplicateEntryToDate(entry: DiaryEntry, targetDate: LocalDate): Long {
+        val copy = entry.copy(
+            id = 0,
+            dateStr = targetDate.toString()
+        )
+        val id = dao.insert(copy)
+        dao.getById(id)?.let { e -> pushSafely { SupabaseSync.upsertDiaryEntry(e) } }
+        return id
+    }
+
     /**
      * Add a recipe as a diary entry.
      * amountGrams stores the servingsFactor (e.g. 1.0 = 1 portion, 2.0 = 2 portions)
@@ -329,7 +343,18 @@ class FoodItemRepository(db: NutriDatabase) {
             .sortedWith(FoodSearchRepository.relevanceComparator(query))
     }
 
-    suspend fun searchBarcode(barcode: String): FoodItem? = remoteRepo.searchByBarcode(barcode)
+    suspend fun searchBarcode(barcode: String): FoodItem? {
+        // 1) Eigene gespeicherte Produkte (z.B. per Etikett-Foto angelegt)
+        customFoodDao.getByBarcode(barcode)?.let { return it.toFoodItem() }
+        // 2) Lokaler food_items-Cache
+        dao.searchByBarcode(barcode)?.let { return it }
+        // 3) Remote (OFF / Swiss / …)
+        return remoteRepo.searchByBarcode(barcode)
+    }
+
+    suspend fun saveCustomFoodWithBarcode(item: CustomFoodItem): Long =
+        customFoodDao.insert(item)
+
     suspend fun getById(id: Int): FoodItem?                = dao.getById(id)
     suspend fun saveCustomFood(item: FoodItem): Long       = dao.insert(item)
     suspend fun deleteFood(item: FoodItem)                 = dao.delete(item)
