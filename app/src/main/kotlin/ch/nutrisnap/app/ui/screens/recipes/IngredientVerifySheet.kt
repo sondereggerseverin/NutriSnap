@@ -222,7 +222,10 @@ fun IngredientVerifySheet(
         LazyColumn(
             state = listState,
             contentPadding = PaddingValues(bottom = 32.dp),
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding()
+                .navigationBarsPadding()
         ) {
             // Header
             item {
