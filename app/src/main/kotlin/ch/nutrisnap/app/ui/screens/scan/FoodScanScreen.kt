@@ -19,6 +19,7 @@ import ch.nutrisnap.app.ui.screens.recipes.IngredientVerifySheet
 @Composable
 fun FoodScanScreen(
     onNavigateBack: () -> Unit,
+    initialMeal: MealType? = null,
     vm: FoodScanViewModel = viewModel()
 ) {
     val state by vm.state.collectAsState()
@@ -36,6 +37,7 @@ fun FoodScanScreen(
             analysisResult = s.analysisResult,
             initialOverrides = vm.getOverrides(),
             onOverridesChanged = vm::setOverrides,
+            initialMeal = initialMeal,
             onSave = { name, kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium, meal ->
                 vm.saveToDiary(name, kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium, meal)
             },
@@ -149,6 +151,7 @@ private fun VerifyAndSaveFlow(
     analysisResult: ch.nutrisnap.app.domain.RecipeNutritionAnalyzer.AnalysisResult,
     initialOverrides: Map<String, ch.nutrisnap.app.ui.screens.recipes.IngredientOverride>,
     onOverridesChanged: (Map<String, ch.nutrisnap.app.ui.screens.recipes.IngredientOverride>) -> Unit,
+    initialMeal: MealType? = null,
     onSave: (
         dishName: String, kcal: Float, protein: Float, carbs: Float, fat: Float,
         fiber: Float?, sugar: Float?, saturatedFat: Float?, salt: Float?, sodium: Float?,
@@ -174,6 +177,7 @@ private fun VerifyAndSaveFlow(
 
     pendingTotals?.let { t ->
         MealTypePickerDialog(
+            initialMeal = initialMeal,
             onDismiss = { pendingTotals = null },
             onConfirm = { meal ->
                 onSave(dishName, t.kcal, t.protein, t.carbs, t.fat, t.fiber, t.sugar, t.saturatedFat, t.salt, t.sodium, meal)
@@ -190,10 +194,26 @@ private data class PendingTotals(
 
 @Composable
 private fun MealTypePickerDialog(
+    initialMeal: MealType? = null,
     onDismiss: () -> Unit,
     onConfirm: (MealType) -> Unit
 ) {
-    var mealType by remember { mutableStateOf(MealType.LUNCH) }
+    var mealType by remember {
+        mutableStateOf(
+            initialMeal ?: when (java.time.LocalTime.now().hour) {
+                in 5..10  -> MealType.BREAKFAST
+                in 11..14 -> MealType.LUNCH
+                in 17..21 -> MealType.DINNER
+                else      -> MealType.SNACK
+            }
+        )
+    }
+    fun label(t: MealType) = when (t) {
+        MealType.BREAKFAST -> "Frühstück"
+        MealType.LUNCH     -> "Mittagessen"
+        MealType.DINNER    -> "Abendessen"
+        MealType.SNACK     -> "Snack"
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Mahlzeit wählen") },
@@ -205,7 +225,7 @@ private fun MealTypePickerDialog(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                     ) {
                         RadioButton(selected = mealType == type, onClick = { mealType = type })
-                        Text(type.name, modifier = Modifier.padding(start = 4.dp))
+                        Text(label(type), modifier = Modifier.padding(start = 4.dp))
                     }
                 }
             }

@@ -82,8 +82,8 @@ private fun QuickActionsRow(onScan: () -> Unit, onRecipeImport: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
     ) {
         QuickActionCard(
-            icon = Icons.Default.QrCodeScanner,
-            label = "Scannen",
+            icon = Icons.Default.PhotoCamera,
+            label = "Essen fotografieren",
             color = MacroColors.protein,
             onClick = onScan,
             modifier = Modifier.weight(1f)

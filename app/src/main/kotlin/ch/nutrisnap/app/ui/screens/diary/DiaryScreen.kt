@@ -77,7 +77,8 @@ fun DiaryScreen(
     vm: DiaryViewModel = viewModel(),
     initialMeal: MealType? = null,
     autoOpenAdd: Boolean = false,
-    autoOpenScanner: Boolean = false
+    autoOpenScanner: Boolean = false,
+    onNavigateToPhotoScan: (MealType?) -> Unit = {}
 ) {
     val state by vm.uiState.collectAsState()
     var showAddSheet by remember { mutableStateOf(autoOpenAdd || autoOpenScanner) }
@@ -115,8 +116,21 @@ fun DiaryScreen(
         // Wer bereits im Tagebuch war, hatte keine Moeglichkeit, ohne Umweg ueber
         // "Start" einen Eintrag zu erfassen.
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddSheet = true }) {
-                Icon(Icons.Default.Add, contentDescription = "Eintrag hinzufügen")
+            Column(horizontalAlignment = Alignment.End) {
+                SmallFloatingActionButton(
+                    onClick = {
+                        val meal = initialMeal ?: defaultMealForNow()
+                        onNavigateToPhotoScan(meal)
+                    },
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                ) {
+                    Icon(Icons.Default.PhotoCamera, contentDescription = "Essen fotografieren")
+                }
+                Spacer(Modifier.height(12.dp))
+                FloatingActionButton(onClick = { showAddSheet = true }) {
+                    Icon(Icons.Default.Add, contentDescription = "Eintrag hinzufügen")
+                }
             }
         }
     ) { padding ->
@@ -257,7 +271,16 @@ fun DiaryScreen(
         }
     }
 
-    if (showAddSheet) AddFoodSheet(vm = vm, initialMeal = initialMeal, autoOpenScanner = autoOpenScanner, onDismiss = { showAddSheet = false })
+    if (showAddSheet) AddFoodSheet(
+        vm = vm,
+        initialMeal = initialMeal,
+        autoOpenScanner = autoOpenScanner,
+        onNavigateToPhotoScan = {
+            showAddSheet = false
+            onNavigateToPhotoScan(initialMeal ?: defaultMealForNow())
+        },
+        onDismiss = { showAddSheet = false }
+    )
 
     detailEntry?.let { entry ->
         // Immer den aktuellen Eintrag aus dem State nehmen (nicht die evtl. veraltete
@@ -853,7 +876,13 @@ enum class AddFoodTab { SEARCH, MANUAL }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddFoodSheet(vm: DiaryViewModel, initialMeal: MealType? = null, autoOpenScanner: Boolean = false, onDismiss: () -> Unit) {
+fun AddFoodSheet(
+    vm: DiaryViewModel,
+    initialMeal: MealType? = null,
+    autoOpenScanner: Boolean = false,
+    onNavigateToPhotoScan: () -> Unit = {},
+    onDismiss: () -> Unit
+) {
     var activeTab    by remember { mutableStateOf(AddFoodTab.SEARCH) }
     var showScanner  by remember { mutableStateOf(autoOpenScanner) }
     var barcodeStatus by remember { mutableStateOf("") }
@@ -890,6 +919,31 @@ fun AddFoodSheet(vm: DiaryViewModel, initialMeal: MealType? = null, autoOpenScan
                 fontSize = 18.sp,
                 modifier = Modifier.padding(bottom = NutriSpacing.md)
             )
+
+            // Direkte Einstiege: Foto ist der kürzeste Weg zum Tracken per Kamera
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = NutriSpacing.md),
+                horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
+            ) {
+                OutlinedButton(
+                    onClick = onNavigateToPhotoScan,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.PhotoCamera, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(NutriSpacing.xs))
+                    Text("Foto")
+                }
+                OutlinedButton(
+                    onClick = { showScanner = true },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.QrCodeScanner, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(NutriSpacing.xs))
+                    Text("Barcode")
+                }
+            }
 
             TabRow(selectedTabIndex = activeTab.ordinal) {
                 Tab(

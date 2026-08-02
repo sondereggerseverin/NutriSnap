@@ -48,18 +48,18 @@ fun ScanChooserScreen(
             verticalArrangement = Arrangement.spacedBy(NutriSpacing.md)
         ) {
             ScanOptionCard(
+                icon = Icons.Default.PhotoCamera,
+                title = "Essen fotografieren",
+                subtitle = "KI erkennt und trennt jede Zutat – du kannst alles manuell anpassen",
+                color = MacroColors.calories,
+                onClick = onPhotoEstimate
+            )
+            ScanOptionCard(
                 icon = Icons.Default.QrCodeScanner,
                 title = "Barcode scannen",
                 subtitle = "Verpacktes Produkt per Barcode suchen und ins Tagebuch eintragen",
                 color = MacroColors.protein,
                 onClick = onBarcode
-            )
-            ScanOptionCard(
-                icon = Icons.Default.PhotoCamera,
-                title = "Essen fotografieren",
-                subtitle = "KI schätzt Kalorien & Makros anhand eines Fotos",
-                color = MacroColors.calories,
-                onClick = onPhotoEstimate
             )
             ScanOptionCard(
                 icon = Icons.Default.CameraAlt,

@@ -344,7 +344,7 @@ fun MainScaffold(
                         }
                     },
                     onNavigateToHealth = { navController.navigate("health") },
-                    onNavigateToFoodScan = { navController.navigate("scan_chooser") },
+                    onNavigateToFoodScan = { navController.navigate("food_scan") },
                     onNavigateToRecipeImport = {
                         navController.navigate(Screen.Recipes.route) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
@@ -366,7 +366,15 @@ fun MainScaffold(
                 val mealArg = backStackEntry.arguments?.getString("meal")?.let { runCatching { MealType.valueOf(it) }.getOrNull() }
                 val openArg = backStackEntry.arguments?.getBoolean("open") ?: false
                 val scanArg = backStackEntry.arguments?.getBoolean("scan") ?: false
-                DiaryScreen(initialMeal = mealArg, autoOpenAdd = openArg, autoOpenScanner = scanArg)
+                DiaryScreen(
+                    initialMeal = mealArg,
+                    autoOpenAdd = openArg,
+                    autoOpenScanner = scanArg,
+                    onNavigateToPhotoScan = { meal ->
+                        val route = if (meal != null) "food_scan?meal=${meal.name}" else "food_scan"
+                        navController.navigate(route)
+                    }
+                )
             }
             composable(
                 Screen.Recipes.route,
@@ -490,6 +498,22 @@ fun MainScaffold(
             ) {
                 YazioImportScreen(onBack = { navController.popBackStack() })
             }
+            composable(
+                route = "food_scan?meal={meal}",
+                arguments = listOf(
+                    navArgument("meal") { type = NavType.StringType; nullable = true; defaultValue = null }
+                ),
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) { backStackEntry ->
+                val mealArg = backStackEntry.arguments?.getString("meal")
+                    ?.let { runCatching { MealType.valueOf(it) }.getOrNull() }
+                FoodScanScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    initialMeal = mealArg
+                )
+            }
+            // Alias ohne Query, damit bestehende navigate("food_scan") Calls weiter funktionieren
             composable(
                 "food_scan",
                 enterTransition = { pushEnter }, exitTransition = { pushExit },

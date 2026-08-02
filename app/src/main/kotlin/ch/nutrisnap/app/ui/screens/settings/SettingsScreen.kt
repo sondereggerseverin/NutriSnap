@@ -150,6 +150,10 @@ fun SettingsScreen(
 
         // Feature-Shortcuts
         SettingsCard(title = "Features", icon = Icons.Default.Apps) {
+            Button(onClick = onNavigateToScan, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.PhotoCamera, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(NutriSpacing.sm)); Text("Essen fotografieren / Scannen")
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
                 OutlinedButton(onClick = onNavigateToStats, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.BarChart, null, Modifier.size(16.dp))
@@ -191,10 +195,6 @@ fun SettingsScreen(
             OutlinedButton(onClick = onNavigateToYazioImport, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.UploadFile, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(NutriSpacing.sm)); Text("Yazio-Daten importieren")
-            }
-            Button(onClick = onNavigateToScan, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.QrCodeScanner, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(NutriSpacing.sm)); Text("Scannen (Barcode, Foto, Etikett)")
             }
         }
 
