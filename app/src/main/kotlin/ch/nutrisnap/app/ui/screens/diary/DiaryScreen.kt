@@ -106,6 +106,7 @@ fun DiaryScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val quickAddFavorites by vm.favorites.collectAsState()
+    val mealSuggestions by vm.mealSuggestions.collectAsState()
     val recipesVm: ch.nutrisnap.app.ui.screens.recipes.RecipesViewModel = viewModel()
     val recipesState by recipesVm.uiState.collectAsState()
 
@@ -148,6 +149,16 @@ fun DiaryScreen(
                     fat      = state.totalFat,
                     modifier = Modifier.padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.sm)
                 )
+            }
+            if (mealSuggestions.isNotEmpty()) {
+                items(mealSuggestions, key = { it.id }) { pattern ->
+                    MealSuggestionCard(
+                        pattern = pattern,
+                        onApply = { vm.applyMealSuggestion(pattern) },
+                        onDismiss = { vm.dismissMealSuggestion(pattern) },
+                        modifier = Modifier.padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs)
+                    )
+                }
             }
             if (quickAddFavorites.isNotEmpty()) {
                 item {
@@ -619,6 +630,36 @@ private fun RecipeQuickAddBar(recipes: List<Recipe>, onQuickAdd: (Recipe) -> Uni
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MealSuggestionCard(
+    pattern: ch.nutrisnap.app.domain.DetectedMealPattern,
+    onApply: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        shape = RoundedCornerShape(NutriRadius.md)
+    ) {
+        Row(
+            Modifier.padding(horizontal = NutriSpacing.md, vertical = NutriSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("🔁 ${pattern.label}", fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer)
+                Text("≈ ${pattern.avgKcal.toInt()} kcal · ${pattern.occurrences}x geloggt", fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f))
+            }
+            TextButton(onClick = onApply) { Text("Hinzufügen") }
+            IconButton(onClick = onDismiss, Modifier.size(28.dp)) {
+                Icon(Icons.Default.Close, "Verwerfen", Modifier.size(16.dp))
             }
         }
     }

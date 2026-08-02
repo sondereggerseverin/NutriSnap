@@ -34,6 +34,12 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     private val foodRepo    = FoodItemRepository(db)
     private val profileRepo = UserProfileRepository(db)
     private val favRepo     = FavoriteFoodRepository(db)
+    private val contextRanking = ch.nutrisnap.app.data.repository.ContextualFoodRankingRepository(
+        db.foodUsageContextDao(), favRepo
+    )
+    private val mealPatternDetector = ch.nutrisnap.app.domain.MealPatternDetector(
+        repo, ch.nutrisnap.app.data.repository.MealPatternRepository(db.detectedMealPatternDao())
+    )
 
     private val _date = MutableStateFlow(LocalDate.now())
 
@@ -67,12 +73,53 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     val isSearching:    StateFlow<Boolean>        = _isSearching
     val barcodeResult:  StateFlow<FoodItem?>      = _barcodeResult
 
-    // Favorites
+    // Favorites — Reihenfolge tageszeit-bewusst (Feature 7): Foods, die üblicherweise
+    // um diese Uhrzeit/an diesem Wochentag geloggt werden, stehen zuerst. Inhalt bleibt
+    // unverändert List<FoodItem>, nur die Sortierung wechselt — die UI braucht dafür
+    // keine Anpassung.
     val favorites: StateFlow<List<FoodItem>> = favRepo.getAll()
+        .map { list ->
+            val ranked = runCatching { contextRanking.getRankedFavoritesForNow() }.getOrDefault(emptyList())
+            if (ranked.isEmpty()) return@map list
+            val rankIndex = ranked.mapIndexed { idx, r -> r.foodId to idx }.toMap()
+            list.sortedBy { rankIndex[it.id.toString()] ?: Int.MAX_VALUE }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun isFavorite(food: FoodItem): Flow<Boolean> = favRepo.isFavorite(food)
     fun toggleFavorite(food: FoodItem) = viewModelScope.launch { favRepo.toggle(food) }
+
+    // Feature 5: wiederkehrende Mahlzeiten. Erkennung läuft einmal pro ViewModel-Instanz
+    // (günstig genug: nur 28 Tage Diary-Historie), kein eigener WorkManager-Job nötig.
+    private val _mealSuggestions = MutableStateFlow<List<ch.nutrisnap.app.domain.DetectedMealPattern>>(emptyList())
+    val mealSuggestions: StateFlow<List<ch.nutrisnap.app.domain.DetectedMealPattern>> = _mealSuggestions.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            runCatching { mealPatternDetector.detectAndSavePatterns() }
+            _mealSuggestions.value = runCatching { mealPatternDetector.getSuggestionsForNow() }.getOrDefault(emptyList())
+        }
+    }
+
+    /** 1-Tap-Relog: loggt alle Foods eines erkannten Musters mit der zuletzt genutzten
+     *  Menge (falls bekannt, sonst 100g als neutraler Default). */
+    fun applyMealSuggestion(pattern: ch.nutrisnap.app.domain.DetectedMealPattern) {
+        viewModelScope.launch {
+            val allEntries = repo.getAllEntriesOnce()
+            pattern.foodItemIds.forEach { fid ->
+                val lastAmount = allEntries.filter { it.foodItemId == fid }.maxByOrNull { it.dateStr }?.amountGrams
+                foodRepo.getById(fid)?.let { food ->
+                    repo.addEntry(food, lastAmount ?: 100f, pattern.mealType, _date.value)
+                    contextRanking.recordFoodUsage(fid.toString(), food.name)
+                }
+            }
+            _mealSuggestions.update { list -> list.filterNot { it.id == pattern.id } }
+        }
+    }
+
+    fun dismissMealSuggestion(pattern: ch.nutrisnap.app.domain.DetectedMealPattern) {
+        _mealSuggestions.update { list -> list.filterNot { it.id == pattern.id } }
+    }
 
     fun setDate(date: LocalDate) { _date.value = date }
     fun prevDay()                { _date.value = _date.value.minusDays(1) }
@@ -100,7 +147,10 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     fun clearBarcodeResult()             { _barcodeResult.value = null }
 
     fun addEntry(food: FoodItem, grams: Float, meal: MealType) {
-        viewModelScope.launch { repo.addEntry(food, grams, meal, _date.value) }
+        viewModelScope.launch {
+            repo.addEntry(food, grams, meal, _date.value)
+            contextRanking.recordFoodUsage(food.id.toString(), food.name)
+        }
     }
 
     /**
@@ -112,6 +162,7 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     fun quickAddFavorite(food: FoodItem, grams: Float, meal: MealType, onAdded: (DiaryEntry) -> Unit) {
         viewModelScope.launch {
             val id = repo.addEntry(food, grams, meal, _date.value)
+            contextRanking.recordFoodUsage(food.id.toString(), food.name)
             repo.getById(id)?.let { onAdded(it) }
         }
     }

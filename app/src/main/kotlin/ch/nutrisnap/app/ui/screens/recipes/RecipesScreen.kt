@@ -155,6 +155,7 @@ fun RecipesScreen(
     var hideIncomplete    by remember { mutableStateOf(false) }
     var showBatchSheet    by remember { mutableStateOf(false) }
     val batchState by vm.batchState.collectAsState()
+    val budgetScaleState by vm.budgetScaleState.collectAsState()
 
     LaunchedEffect(sharedUrl) { if (!sharedUrl.isNullOrBlank()) showImportSheet = true }
     LaunchedEffect(sharedRecipeJson) { if (!sharedRecipeJson.isNullOrBlank()) vm.importFromSharedJson(sharedRecipeJson) }
@@ -361,7 +362,47 @@ fun RecipesScreen(
                 shoppingVm.addRecipeIngredients(live.title, names.map { Triple(it, null, null) })
                 selectedRecipe = null
             },
-            onUpdateIngredients = { newText -> vm.updateRecipe(live.copy(ingredients = newText)) }
+            onUpdateIngredients = { newText -> vm.updateRecipe(live.copy(ingredients = newText)) },
+            onScaleToBudget = { vm.scaleToRemainingBudget(live) }
+        )
+    }
+
+    // Feature 1: Ergebnis der Restbudget-Skalierung
+    if (budgetScaleState.isLoading || budgetScaleState.result != null || budgetScaleState.error != null) {
+        AlertDialog(
+            onDismissRequest = { vm.clearBudgetScale() },
+            title = { Text("Auf Restbudget anpassen") },
+            text = {
+                when {
+                    budgetScaleState.isLoading -> Text("Berechne …")
+                    budgetScaleState.error != null -> Text(budgetScaleState.error!!)
+                    budgetScaleState.result != null -> {
+                        val r = budgetScaleState.result!!
+                        Column {
+                            Text("Noch ${r.remainingKcal.toInt()} kcal übrig heute.")
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "${(r.scaleFactor * 100).toInt()}% der Portion " +
+                                    "(${String.format("%.1f", r.scaledServings)} statt ${r.recipe.servings} Portionen) " +
+                                    "≈ ${r.scaledKcal.toInt()} kcal",
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text("Protein ${r.scaledProtein.toInt()}g · Carbs ${r.scaledCarbs.toInt()}g · Fett ${r.scaledFat.toInt()}g",
+                                fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.height(10.dp))
+                            Text("Zutaten (angepasst):", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            r.ingredients.forEach { line ->
+                                val text = if (line.parsed && line.scaledAmountG != null)
+                                    "${line.scaledAmountG.toInt()}g ${line.name ?: line.originalLine}"
+                                else line.originalLine
+                                Text("• $text", fontSize = 13.sp)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { vm.clearBudgetScale() }) { Text("OK") } }
         )
     }
 
@@ -765,7 +806,8 @@ fun RecipeDetailSheet(
     onRecalculateFromOverrides: () -> Unit = {},
     hasStoredOverrides: Boolean = false,
     onAddToShoppingList: (Recipe) -> Unit = {},
-    onUpdateIngredients: (String) -> Unit = {}
+    onUpdateIngredients: (String) -> Unit = {},
+    onScaleToBudget: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var servings   by remember(recipe.id) { mutableStateOf(recipe.servings) }
@@ -816,6 +858,11 @@ fun RecipeDetailSheet(
                         Row(Modifier.fillMaxWidth().padding(top=8.dp), horizontalArrangement=Arrangement.SpaceBetween, verticalAlignment=Alignment.CenterVertically) {
                             Text("Metrische Einheiten", fontSize=13.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
                             Switch(checked=metricMode, onCheckedChange={metricMode=it}, modifier=Modifier.height(24.dp))
+                        }
+                        TextButton(onClick = onScaleToBudget, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(top = 8.dp)) {
+                            Icon(Icons.Default.PieChart, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Auf mein Restbudget anpassen", fontSize = 13.sp)
                         }
                     }
                 }

@@ -44,6 +44,12 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
     private val diaryRepo = DiaryRepository(db)
     private val visionService = GroqVisionService()
 
+    init {
+        ch.nutrisnap.app.domain.RecipeNutritionAnalyzer.initGlobalDictionary(
+            ch.nutrisnap.app.data.repository.GlobalIngredientDictionary(db.globalIngredientMatchDao())
+        )
+    }
+
     private val _state = MutableStateFlow<FoodScanState>(FoodScanState.Capturing)
     val state: StateFlow<FoodScanState> = _state
 

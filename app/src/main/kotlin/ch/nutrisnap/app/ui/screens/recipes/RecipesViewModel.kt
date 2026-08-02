@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeScrapeResult
+import ch.nutrisnap.app.data.repository.RecipeBudgetScaleResult
+import ch.nutrisnap.app.data.repository.RecipeBudgetScaler
 import ch.nutrisnap.app.data.repository.RecipeRepository
 import ch.nutrisnap.app.domain.RecipeAiParser
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
@@ -59,8 +61,41 @@ data class RecipesUiState(
     val nutritionState:   NutritionState = NutritionState()
 )
 
+data class BudgetScaleState(
+    val isLoading: Boolean = false,
+    val result: RecipeBudgetScaleResult? = null,
+    val error: String? = null
+)
+
 class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = RecipeRepository(NutriDatabase.getInstance(app), app)
+    private val budgetScaler = RecipeBudgetScaler(NutriDatabase.getInstance(app))
+
+    init {
+        // Feature 2: globales Zutaten-Wörterbuch für RecipeNutritionAnalyzer aktivieren
+        // (idempotent, auch von FoodScanViewModel aus aufgerufen).
+        ch.nutrisnap.app.domain.RecipeNutritionAnalyzer.initGlobalDictionary(
+            ch.nutrisnap.app.data.repository.GlobalIngredientDictionary(NutriDatabase.getInstance(app).globalIngredientMatchDao())
+        )
+    }
+
+    private val _budgetScaleState = MutableStateFlow(BudgetScaleState())
+    val budgetScaleState: StateFlow<BudgetScaleState> = _budgetScaleState.asStateFlow()
+
+    /** Feature 1: Rezeptportion auf das heutige Kalorien-Restbudget skalieren. */
+    fun scaleToRemainingBudget(recipe: Recipe) {
+        viewModelScope.launch {
+            _budgetScaleState.value = BudgetScaleState(isLoading = true)
+            runCatching { budgetScaler.scaleToRemainingBudget(recipe) }
+                .onSuccess { r ->
+                    _budgetScaleState.value = if (r != null) BudgetScaleState(result = r)
+                        else BudgetScaleState(error = "Für dieses Rezept sind keine Kalorienangaben hinterlegt — erst \"Analysieren\" ausführen.")
+                }
+                .onFailure { e -> _budgetScaleState.value = BudgetScaleState(error = e.message ?: "Unbekannter Fehler") }
+        }
+    }
+
+    fun clearBudgetScale() { _budgetScaleState.value = BudgetScaleState() }
 
     private val _query          = MutableStateFlow("")
     private val _platformFilter = MutableStateFlow<String?>(null)

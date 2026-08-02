@@ -3,6 +3,7 @@ package ch.nutrisnap.app.domain
 import ch.nutrisnap.app.BuildConfig
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.Recipe
+import ch.nutrisnap.app.data.repository.GlobalIngredientDictionary
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
@@ -20,8 +21,9 @@ import java.util.concurrent.TimeUnit
 /**
  * Analyzes recipe ingredients by looking up macros for each line, in order:
  *  1. Curated local nutrition DB (covers ~200 common generic ingredients)
- *  2. OpenFoodFacts search (covers specific/branded products)
- *  3. AI estimate via Groq (covers anything neither source has — spice
+ *  2. Feature 2: globales Zutaten-Wörterbuch (frühere Treffer aus 1./3., app-weit gecacht)
+ *  3. OpenFoodFacts search (covers specific/branded products)
+ *  4. AI estimate via Groq (covers anything neither source has — spice
  *     blends, regional ingredients, prepared products, typos, etc.)
  *
  * The AI step is a single batched call for ALL still-unmatched ingredients
@@ -29,6 +31,12 @@ import java.util.concurrent.TimeUnit
  * items costs exactly one extra request, not three.
  */
 object RecipeNutritionAnalyzer {
+
+    // Feature 2: per initGlobalDictionary() von der Application aus gesetzt (siehe
+    // NutriSnapApplication.onCreate). Bleibt null, falls das nie aufgerufen wird — die
+    // Analyse funktioniert dann exakt wie vorher, nur ohne den Cache-Vorteil.
+    private var globalDictionary: GlobalIngredientDictionary? = null
+    fun initGlobalDictionary(dictionary: GlobalIngredientDictionary) { globalDictionary = dictionary }
 
     data class IngredientResult(
         val line:     String,
@@ -422,8 +430,44 @@ object RecipeNutritionAnalyzer {
                             )
                         }
 
+                        // Feature 2: bereits einmal aufgelöste Zutat (egal ob damals lokale DB
+                        // oder OFF) -> direkt aus dem Cache, ohne erneute OFF-Netzwerkanfrage.
+                        globalDictionary?.lookup(parsed.name)?.let { cached ->
+                            val cachedFood = FoodItem(
+                                name     = cached.offProductName,
+                                calories = cached.kcalPer100g.toFloat(),
+                                protein  = cached.proteinPer100g.toFloat(),
+                                carbs    = cached.carbsPer100g.toFloat(),
+                                fat      = cached.fatPer100g.toFloat(),
+                                source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
+                            )
+                            return@async IngredientResult(
+                                line     = line,
+                                parsed   = parsed,
+                                foodItem = cachedFood,
+                                calories = (cachedFood.calories ?: 0f) * factor,
+                                protein  = (cachedFood.protein ?: 0f) * factor,
+                                carbs    = (cachedFood.carbs   ?: 0f) * factor,
+                                fat      = (cachedFood.fat     ?: 0f) * factor,
+                                matched  = true
+                            )
+                        }
+
                         val food = searchOFF(parsed.name)
                         if (food != null) {
+                            // Neuer OFF-Treffer -> fürs nächste Mal (auch für andere Rezepte
+                            // mit derselben Zutat) im globalen Wörterbuch ablegen.
+                            food.calories?.let { kcal ->
+                                globalDictionary?.save(
+                                    originalName    = parsed.name,
+                                    offProductId    = "",
+                                    offProductName  = food.name,
+                                    kcalPer100g     = kcal.toDouble(),
+                                    proteinPer100g  = (food.protein ?: 0f).toDouble(),
+                                    carbsPer100g    = (food.carbs   ?: 0f).toDouble(),
+                                    fatPer100g      = (food.fat     ?: 0f).toDouble()
+                                )
+                            }
                             IngredientResult(
                                 line     = line,
                                 parsed   = parsed,
