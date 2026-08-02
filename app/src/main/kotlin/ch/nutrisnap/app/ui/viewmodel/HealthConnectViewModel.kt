@@ -245,7 +245,7 @@ class HealthConnectViewModel(app: Application) : AndroidViewModel(app) {
     fun syncHistorical() {
         viewModelScope.launch {
             _uiState.update { it.copy(isHistoricalSyncing = true) }
-            repository.syncHistorical(30)
+            repository.syncHistorical(42)
                 .onSuccess { pushHistoricalHealthDaily() }
                 .onFailure { err ->
                     // Historical sync errors are silent (non-blocking)

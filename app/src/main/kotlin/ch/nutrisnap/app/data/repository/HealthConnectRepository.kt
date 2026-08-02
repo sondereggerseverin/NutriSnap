@@ -39,6 +39,27 @@ class HealthConnectRepository(
             .onFailure { Log.w(TAG, "Samsung Health Tier 0 calories read failed for $date", it) }
             .getOrNull()
 
+    /**
+     * Entscheidet, ob ein Tag erneut von Health Connect / Samsung Health gelesen werden muss.
+     * Wichtig: Früher wurde nur bei steps==0 nachgeladen — dadurch blieben Tage mit
+     * Schritten, aber ohne Aktivitätskalorien (oder mit null nach Schema-Migration)
+     * dauerhaft leer. Zusätzlich werden die letzten [RECENT_REFRESH_DAYS] Tage immer
+     * aktualisiert, weil Samsung Health Daten oft verzögert schreibt.
+     */
+    private fun needsResync(existing: HealthConnectCache?, date: LocalDate, today: LocalDate): Boolean {
+        if (existing == null) return true
+        // Aktuelle Tage: HC/Samsung schreiben Aktivitätsdaten oft erst Stunden später
+        if (!date.isBefore(today.minusDays(RECENT_REFRESH_DAYS.toLong()))) return true
+        // Fehlende Aktivitätskalorien nachträglich nachziehen
+        if (existing.activeCaloriesKcal == null) return true
+        return false
+    }
+
+    companion object {
+        /** Wie viele der letzten Tage bei jedem Sync zwingend neu gelesen werden. */
+        private const val RECENT_REFRESH_DAYS = 7
+    }
+
     fun getTodayData(): Flow<HealthConnectCache?> = dao.getCacheForDate(LocalDate.now())
     fun getLast7Days(): Flow<List<HealthConnectCache>> = dao.getLast7Days()
     fun getLast30Days(): Flow<List<HealthConnectCache>> = dao.getLast30Days()
@@ -63,9 +84,10 @@ class HealthConnectRepository(
         val cached = dao.getRangeOnce(from, cappedTo).associateBy { it.date }
         val missingDays = generateSequence(from) { d -> d.plusDays(1) }
             .takeWhile { !it.isAfter(cappedTo) }
-            .filter { it == today || cached[it] == null || cached[it]!!.steps == 0L }
+            .filter { needsResync(cached[it], it, today) }
             .toList()
         if (missingDays.isEmpty()) return@runCatching 0
+        Log.d(TAG, "ensureRangeSynced: ${missingDays.size} day(s) to refresh in $from..$cappedTo")
 
         val weightFrom = from.atStartOfDay(ZoneId.systemDefault()).toInstant()
         val weightTo = cappedTo.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
@@ -80,18 +102,21 @@ class HealthConnectRepository(
             val sleep = runCatching { manager.getSleepForNight(date) }.getOrDefault(0L)
             val weight = weightMap[date] ?: cached[date]?.weightKg
 
+            val prev = cached[date]
             dao.insertOrUpdate(
                 HealthConnectCache(
                     date = date,
                     steps = steps,
-                    activeCaloriesKcal = calories,
+                    // null von HC nicht über vorhandene Werte drüberbügeln (transiente Fehler)
+                    activeCaloriesKcal = calories ?: prev?.activeCaloriesKcal,
                     weightKg = weight,
-                    sleepMinutes = sleep,
-                    avgHeartRateBpm = cached[date]?.avgHeartRateBpm
+                    sleepMinutes = if (sleep > 0L) sleep else (prev?.sleepMinutes ?: 0L),
+                    avgHeartRateBpm = prev?.avgHeartRateBpm
                 )
             )
             synced++
         }
+        Log.d(TAG, "ensureRangeSynced: wrote $synced day(s)")
         synced
     }
 
@@ -162,9 +187,9 @@ class HealthConnectRepository(
         var synced = 0
         for (i in 1..days) {
             val date = today.minusDays(i.toLong())
-            // Skip today (handled by syncToday) and days already cached with data
             val existing = dao.getCacheForDateOnce(date)
-            if (existing != null && existing.steps > 0) continue
+            // Nachträglich: auch Tage ohne Aktivitätskalorien oder aktuelle Tage neu laden
+            if (!needsResync(existing, date, today)) continue
 
             val steps = runCatching { manager.getStepsForDay(date) }.getOrDefault(0L)
             val calories = samsungActiveCalories(date)
@@ -175,14 +200,15 @@ class HealthConnectRepository(
             val cache = HealthConnectCache(
                 date = date,
                 steps = steps,
-                activeCaloriesKcal = calories,
+                activeCaloriesKcal = calories ?: existing?.activeCaloriesKcal,
                 weightKg = weight,
-                sleepMinutes = sleep,
+                sleepMinutes = if (sleep > 0L) sleep else (existing?.sleepMinutes ?: 0L),
                 avgHeartRateBpm = existing?.avgHeartRateBpm
             )
             dao.insertOrUpdate(cache)
             synced++
         }
+        Log.d(TAG, "syncHistorical($days): wrote $synced day(s)")
         synced
     }
 
