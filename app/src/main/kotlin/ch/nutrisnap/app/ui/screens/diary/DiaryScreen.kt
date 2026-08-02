@@ -12,6 +12,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -72,6 +74,16 @@ private fun defaultMealForNow(): MealType = when (LocalTime.now().hour) {
     in 11..14 -> MealType.LUNCH
     in 17..21 -> MealType.DINNER
     else      -> MealType.SNACK
+}
+
+
+/** Parst Mengeneingaben wie "100", "100g", "100 g", "1,5", "100ml". */
+private fun parseGramsInput(text: String): Float? {
+    val cleaned = text.trim()
+        .replace(',', '.')
+        .replace(Regex("""(?i)\s*(g|gramm|grams?|ml|milliliter)\s*$"""), "")
+        .trim()
+    return cleaned.toFloatOrNull()?.takeIf { it > 0f }
 }
 
 @Composable
@@ -394,7 +406,7 @@ private fun EditEntryDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                val amount = amountText.toFloatOrNull() ?: 0f
+                val amount = parseGramsInput(amountText) ?: 0f
                 if (amount > 0 && baseValue > 0) {
                     val factor = amount / baseValue
                     Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.md)) {
@@ -412,7 +424,7 @@ private fun EditEntryDialog(
         },
         confirmButton = {
             Button(onClick = {
-                val v = amountText.toFloatOrNull()
+                val v = parseGramsInput(amountText)
                 if (v != null && v > 0) {
                     // Bei Gramm-Erfassung: eingegebene Gramm in den äquivalenten
                     // Portionsfaktor zurückrechnen (updateEntryAmount erwartet
@@ -1329,12 +1341,34 @@ private fun SearchTab(
             Spacer(Modifier.height(NutriSpacing.sm))
         }
         var showServingGuide by remember { mutableStateOf(false) }
+        val grams = parseGramsInput(amountText) ?: 0f
+        fun confirmAdd(andClose: Boolean) {
+            if (grams <= 0f) return
+            val warning = EntryPlausibilityChecker.checkPortion(grams)
+            if (warning != null) {
+                portionWarning = warning
+            } else {
+                vm.addEntryWithMemory(food, grams, selectedMeal)
+                if (andClose) onDismiss()
+                else {
+                    selectedFood = null
+                    amountText = "100"
+                    query = ""
+                    vm.searchFood("")
+                }
+            }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
             OutlinedTextField(
                 value = amountText,
                 onValueChange = { amountText = it },
                 label = { Text("Menge (g)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                placeholder = { Text("z.B. 100 oder 100g") },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Decimal,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(onDone = { confirmAdd(andClose = false) }),
                 modifier = Modifier.weight(1f),
                 singleLine = true,
                 shape = RoundedCornerShape(NutriRadius.md),
@@ -1342,18 +1376,22 @@ private fun SearchTab(
                     IconButton(onClick = { showServingGuide = true }) {
                         Icon(Icons.Default.Straighten, "Alltagseinheiten anzeigen")
                     }
-                }
+                },
+                supportingText = {
+                    if (amountText.isNotBlank() && parseGramsInput(amountText) == null)
+                        Text("Ungültige Menge – z.B. 100 oder 100g", color = MaterialTheme.colorScheme.error)
+                },
+                isError = amountText.isNotBlank() && parseGramsInput(amountText) == null
             )
             MealPicker(selected = selectedMeal) { selectedMeal = it }
         }
         if (showServingGuide) {
             ServingSizeGuideDialog(
                 food = food,
-                onSelect = { grams -> amountText = grams.toInt().toString(); showServingGuide = false },
+                onSelect = { g -> amountText = g.toInt().toString(); showServingGuide = false },
                 onDismiss = { showServingGuide = false }
             )
         }
-        val grams = amountText.toFloatOrNull() ?: 0f
         if (grams > 0) {
             Spacer(Modifier.height(NutriSpacing.sm))
             Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.lg)) {
@@ -1368,6 +1406,17 @@ private fun SearchTab(
             }
         }
         Spacer(Modifier.height(NutriSpacing.lg))
+        // Primär: + weiteres Lebensmittel (Sheet bleibt offen)
+        Button(
+            onClick = { confirmAdd(andClose = false) },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = grams > 0
+        ) {
+            Icon(Icons.Default.Add, null, Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Hinzufügen & weiteres")
+        }
+        Spacer(Modifier.height(NutriSpacing.sm))
         Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
             OutlinedButton(
                 onClick = { selectedFood = null },
@@ -1375,17 +1424,13 @@ private fun SearchTab(
             ) {
                 Text("Zurück")
             }
-            Button(
-                onClick  = {
-                    if (grams > 0) {
-                        val warning = EntryPlausibilityChecker.checkPortion(grams)
-                        if (warning != null) portionWarning = warning
-                        else { vm.addEntryWithMemory(food, grams, selectedMeal); onDismiss() }
-                    }
-                },
+            OutlinedButton(
+                onClick = { confirmAdd(andClose = true) },
                 modifier = Modifier.weight(1f),
                 enabled = grams > 0
-            ) { Text("Hinzufügen") }
+            ) {
+                Text("Hinzufügen & fertig")
+            }
         }
         portionWarning?.let { warning ->
             AlertDialog(
@@ -1396,11 +1441,17 @@ private fun SearchTab(
                     TextButton(onClick = {
                         vm.addEntryWithMemory(food, grams, selectedMeal)
                         portionWarning = null
-                        onDismiss()
-                    }) { Text("Trotzdem hinzufügen") }
+                        selectedFood = null
+                        amountText = "100"
+                        query = ""
+                    }) { Text("Trotzdem + weiteres") }
                 },
                 dismissButton = {
-                    TextButton(onClick = { portionWarning = null }) { Text("Anpassen") }
+                    TextButton(onClick = {
+                        vm.addEntryWithMemory(food, grams, selectedMeal)
+                        portionWarning = null
+                        onDismiss()
+                    }) { Text("Trotzdem & fertig") }
                 }
             )
         }
