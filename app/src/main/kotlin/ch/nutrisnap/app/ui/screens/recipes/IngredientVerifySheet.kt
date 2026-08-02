@@ -405,11 +405,23 @@ private fun IngredientVerifyRow(
     var fiberInput by remember { mutableStateOf(fiberValue?.let { "%.1f".format(it) } ?: "") }
     val fiberFocusRequester = remember { FocusRequester() }
     var editingAmount by remember { mutableStateOf(false) }
-    var amountInput by remember { mutableStateOf("%.0f".format(state.effectiveAmountG)) }
+    // Keyed by recipe line + effective amount so the field always follows the recipe
+    // (previously remember {} kept a stale 300g when the line said 350g).
+    var amountInput by remember(state.result.line, state.effectiveAmountG) {
+        mutableStateOf("%.0f".format(state.effectiveAmountG))
+    }
     val amountFocusRequester = remember { FocusRequester() }
 
+    fun parseAmountInput(text: String): Float? {
+        val cleaned = text.trim()
+            .replace(',', '.')
+            .replace(Regex("""(?i)\s*(g|gramm|grams?|ml)\s*$"""), "")
+            .trim()
+        return cleaned.toFloatOrNull()?.takeIf { it > 0f }
+    }
+
     fun saveAmount() {
-        amountInput.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }?.let { onAmountSaved(it) }
+        parseAmountInput(amountInput)?.let { onAmountSaved(it) }
         editingAmount = false
     }
 
@@ -523,7 +535,55 @@ private fun IngredientVerifyRow(
                     .heightIn(max = 220.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                // Menge — editierbar, wirkt sich direkt auf alle Nährwerte dieser Zutat aus
+                // Menge — immer aus dem Rezept (parsed), editierbar mit +/- und Freitext ("100g")
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(bottom = 8.dp).fillMaxWidth()
+                ) {
+                    Column(Modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Menge: ${"%.0f".format(state.effectiveAmountG)} g",
+                            fontSize = 13.sp, fontWeight = FontWeight.SemiBold
+                        )
+                        if (state.amountOverride != null &&
+                            kotlin.math.abs(state.amountOverride - state.originalAmountG) > 0.5f
+                        ) {
+                            Text(
+                                "Rezept: ${"%.0f".format(state.originalAmountG)} g",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    // − 10g
+                    FilledTonalIconButton(
+                        onClick = {
+                            val next = (state.effectiveAmountG - 10f).coerceAtLeast(1f)
+                            onAmountSaved(next)
+                        },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(Icons.Default.Remove, "−10 g", Modifier.size(18.dp))
+                    }
+                    // + 10g
+                    FilledTonalIconButton(
+                        onClick = {
+                            onAmountSaved(state.effectiveAmountG + 10f)
+                        },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(Icons.Default.Add, "+10 g", Modifier.size(18.dp))
+                    }
+                    // Freitext (100 / 100g)
+                    IconButton(onClick = {
+                        amountInput = "%.0f".format(state.effectiveAmountG)
+                        editingAmount = true
+                    }) {
+                        Icon(Icons.Default.Edit, "Menge tippen", Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
                 if (editingAmount) {
                     Row(verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -532,33 +592,27 @@ private fun IngredientVerifyRow(
                             value = amountInput,
                             onValueChange = { amountInput = it },
                             label = { Text("Menge (g)", fontSize = 11.sp) },
+                            placeholder = { Text("z.B. 350 oder 350g") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             singleLine = true,
                             modifier = Modifier.weight(1f).focusRequester(amountFocusRequester),
-                            shape = RoundedCornerShape(10.dp)
+                            shape = RoundedCornerShape(10.dp),
+                            isError = amountInput.isNotBlank() && parseAmountInput(amountInput) == null
                         )
                         IconButton(onClick = { saveAmount() }) {
                             Icon(Icons.Default.Check, "Speichern", tint = MaterialTheme.colorScheme.primary)
                         }
+                        // Zurück auf Rezeptmenge
+                        TextButton(onClick = {
+                            onAmountSaved(state.originalAmountG)
+                            amountInput = "%.0f".format(state.originalAmountG)
+                            editingAmount = false
+                        }) {
+                            Text("Rezept", fontSize = 11.sp)
+                        }
                     }
-                } else {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clickable {
-                                amountInput = "%.0f".format(state.effectiveAmountG)
-                                editingAmount = true
-                            }
-                            .padding(bottom = 6.dp)
-                    ) {
-                        Text(
-                            "Menge: ${"%.0f".format(state.effectiveAmountG)} g",
-                            fontSize = 12.sp, fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Icon(Icons.Default.Edit, "Menge bearbeiten", Modifier.size(13.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    LaunchedEffect(editingAmount) {
+                        if (editingAmount) amountFocusRequester.requestFocus()
                     }
                 }
 

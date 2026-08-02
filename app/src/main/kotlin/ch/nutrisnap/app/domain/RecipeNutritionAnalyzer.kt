@@ -251,6 +251,18 @@ object RecipeNutritionAnalyzer {
             "^((?:\\d+\\s+)?[$FRACTION_CHARS]|\\d+(?:[.,/]\\d+)?(?:\\s+and\\s+\\d+/\\d+)?)\\s*"
         )
         val numMatch = numRegex.find(clean) ?: run {
+            // Menge am Ende: "Hähnchenbrust 350 g" / "Tagliatelle 300g"
+            val trailing = Regex(
+                """^(.*?)\s+((?:\d+\s+)?[$FRACTION_CHARS]|\d+(?:[.,/]\d+)?)\s*(g|kg|ml|l|el|tl|tbsp|tsp)\b\s*$""",
+                RegexOption.IGNORE_CASE
+            ).find(clean)
+            if (trailing != null) {
+                val foodName = trailing.groupValues[1].trim()
+                val amt = parseNumber(trailing.groupValues[2].trim())
+                val unit = trailing.groupValues[3].lowercase()
+                val mult = UNIT_TO_G[unit] ?: 1f
+                return ParsedIngredient((amt * mult).coerceAtLeast(1f), foodName.take(50))
+            }
             val lc = clean.lowercase()
             val amt = if (lc.contains("spray") || lc.contains("prise") || lc.contains("pinch")) 2f else 100f
             return ParsedIngredient(amt, clean.take(50))
