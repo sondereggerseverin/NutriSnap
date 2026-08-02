@@ -324,8 +324,11 @@ fun RecipesScreen(
             initialOverrides = vm.getOverridesFor(verifyRecipe.id),
             onOverridesChanged = { vm.setOverridesFor(verifyRecipe.id, it) },
             onDismiss      = { showVerifySheet = false },
-            onConfirm      = { kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium ->
-                vm.applyVerifiedNutrition(verifyRecipe, kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium)
+            onConfirm      = { kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium, totalWeightG ->
+                vm.applyVerifiedNutrition(
+                    verifyRecipe, kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium,
+                    totalIngredientWeightG = totalWeightG
+                )
                 showVerifySheet = false
             }
         )
@@ -358,6 +361,7 @@ fun RecipesScreen(
                 selectedRecipe = null
             },
             onUpdateIngredients = { newText -> vm.updateRecipe(live.copy(ingredients = newText)) },
+            onUpdateCookedWeight = { w -> vm.updateRecipe(live.copy(cookedWeightG = w)) },
             onScaleToBudget = { vm.scaleToRemainingBudget(live) },
             onTranslateGermanMetric = { vm.translateToGermanMetric(live) },
             isTranslating = state.isTranslating
@@ -404,15 +408,16 @@ fun RecipesScreen(
     }
 
     addToDiaryRecipe?.let { recipe ->
-        // Gramm/Portion direkt aus dem Zutatentext summieren — unabhängig davon,
-        // ob bereits eine Nährwert-Analyse gelaufen ist.
-        val gramsPerServing = RecipeNutritionAnalyzer.estimateTotalGrams(recipe.ingredients)
-            .takeIf { it > 0f }
-            ?.div(recipe.servings.coerceAtLeast(1))
+        // 1) Gekochtes Gewicht oder gespeicherte Zutatensumme, 2) Fallback: aus Text schätzen
+        val totalYield = recipe.yieldWeightG()
+            ?: RecipeNutritionAnalyzer.estimateTotalGrams(recipe.ingredients).takeIf { it > 0f }
+        val gramsPerServing = totalYield?.div(recipe.servings.coerceAtLeast(1))
 
         AddToDiarySheet(
             recipe = recipe,
             gramsPerServing = gramsPerServing,
+            yieldTotalG = totalYield,
+            isCookedWeight = recipe.cookedWeightG != null && (recipe.cookedWeightG ?: 0f) > 0f,
             onConfirm = { servings, grams, meal -> diaryVm.addRecipeAsMeal(recipe, servings, meal, grams); addToDiaryRecipe = null },
             onDismiss = { addToDiaryRecipe = null }
         )
@@ -844,6 +849,7 @@ fun RecipeDetailSheet(
     hasStoredOverrides: Boolean = false,
     onAddToShoppingList: (Recipe) -> Unit = {},
     onUpdateIngredients: (String) -> Unit = {},
+    onUpdateCookedWeight: (Float?) -> Unit = {},
     onScaleToBudget: () -> Unit = {},
     onTranslateGermanMetric: () -> Unit = {},
     isTranslating: Boolean = false
@@ -926,6 +932,83 @@ fun RecipeDetailSheet(
                             Icon(Icons.Default.PieChart, null, Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("Auf mein Restbudget anpassen", fontSize = 13.sp)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
+
+            // Roh- / Kochgewicht für Gramm-Tracking (Nudeln, Reis, …)
+            item {
+                var cookedText by remember(recipe.id, recipe.cookedWeightG) {
+                    mutableStateOf(recipe.cookedWeightG?.takeIf { it > 0f }?.toInt()?.toString() ?: "")
+                }
+                val rawTotal = recipe.totalIngredientWeightG
+                    ?: RecipeNutritionAnalyzer.estimateTotalGrams(recipe.ingredients).takeIf { it > 0f }
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text("Gericht-Gewicht", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        if (rawTotal != null) {
+                            Text(
+                                "Σ Zutaten (roh): ${rawTotal.toInt()} g  ·  ≈ ${(rawTotal / recipe.servings.coerceAtLeast(1)).toInt()} g/Port.",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Text(
+                                "Rohgewicht: Zutaten verifizieren oder mit Mengen in g erfassen",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = cookedText,
+                            onValueChange = { cookedText = it.filter { c -> c.isDigit() || c == '.' || c == ',' } },
+                            label = { Text("Gewicht nach Kochen (g, optional)") },
+                            placeholder = { Text("z.B. 1800") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.fillMaxWidth(),
+                            supportingText = {
+                                Text(
+                                    "Nudeln/Reis nehmen Wasser auf – hier fertiges Gewicht eintragen, dann z.B. 600 g tracken.",
+                                    fontSize = 11.sp
+                                )
+                            }
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = {
+                                    val v = cookedText.replace(',', '.').toFloatOrNull()
+                                    onUpdateCookedWeight(v?.takeIf { it > 0f })
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Speichern")
+                            }
+                            if (recipe.cookedWeightG != null) {
+                                TextButton(onClick = {
+                                    cookedText = ""
+                                    onUpdateCookedWeight(null)
+                                }) {
+                                    Text("Zurücksetzen")
+                                }
+                            }
+                        }
+                        recipe.yieldWeightG()?.let { y ->
+                            Text(
+                                "Tracking-Basis: ${y.toInt()} g gesamt (${if (recipe.cookedWeightG != null) "gekocht" else "roh"})",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
                         }
                     }
                 }
@@ -1350,12 +1433,20 @@ private enum class DiaryQuantityUnit { SERVING, GRAM }
 fun AddToDiarySheet(
     recipe: Recipe,
     gramsPerServing: Float? = null,
+    yieldTotalG: Float? = null,
+    isCookedWeight: Boolean = false,
     onConfirm: (servings: Float, gramsIfGramMode: Float?, meal: MealType) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var unit by remember { mutableStateOf(DiaryQuantityUnit.SERVING) }
-    var servingsText by remember { mutableStateOf(recipe.servings.toString()) }
-    var gramsText by remember { mutableStateOf(gramsPerServing?.let { (it * recipe.servings).toInt().toString() } ?: "") }
+    var unit by remember { mutableStateOf(if (gramsPerServing != null) DiaryQuantityUnit.GRAM else DiaryQuantityUnit.SERVING) }
+    var servingsText by remember { mutableStateOf("1") }
+    var gramsText by remember {
+        mutableStateOf(
+            gramsPerServing?.toInt()?.toString()
+                ?: yieldTotalG?.let { (it / recipe.servings.coerceAtLeast(1)).toInt().toString() }
+                ?: ""
+        )
+    }
     var selectedMeal by remember { mutableStateOf(MealType.LUNCH) }
 
     // Immer in Portionen umrechnen, egal welche Einheit der Nutzer eingibt — die
@@ -1375,6 +1466,22 @@ fun AddToDiarySheet(
             Text("Ins Tagebuch", fontWeight=FontWeight.Bold, fontSize=18.sp)
             Spacer(Modifier.height(4.dp))
             Text(recipe.title, fontSize=13.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
+            if (yieldTotalG != null && yieldTotalG > 0f) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    if (isCookedWeight)
+                        "Gesamt (nach Kochen): ${yieldTotalG.toInt()} g · ${gramsPerServing?.toInt() ?: "–"} g/Portion"
+                    else
+                        "Σ Zutaten (roh): ${yieldTotalG.toInt()} g · ${gramsPerServing?.toInt() ?: "–"} g/Portion",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    "Tipp: Nudeln/Reis – „Gewicht nach Kochen“ im Rezept setzen für genaues Tracking.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp), verticalAlignment=Alignment.CenterVertically) {
                 OutlinedTextField(

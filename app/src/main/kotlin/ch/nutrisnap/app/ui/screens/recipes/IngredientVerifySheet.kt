@@ -168,7 +168,8 @@ fun IngredientVerifySheet(
     onDismiss: () -> Unit,
     onConfirm: (
         totalKcal: Float, protein: Float, carbs: Float, fat: Float,
-        fiber: Float?, sugar: Float?, saturatedFat: Float?, salt: Float?, sodium: Float?
+        fiber: Float?, sugar: Float?, saturatedFat: Float?, salt: Float?, sodium: Float?,
+        totalIngredientWeightG: Float?
     ) -> Unit
 ) {
     var overrides by remember { mutableStateOf(initialOverrides) }
@@ -273,6 +274,21 @@ fun IngredientVerifySheet(
                             }
                         }
                     }
+                    val totalWeightG = verifyStates.sumOf { it.effectiveAmountG.toDouble() }.toFloat()
+                    if (totalWeightG > 0f) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Σ Zutaten: ${totalWeightG.toInt()} g  ·  ≈ ${(totalWeightG / servings.coerceAtLeast(1)).toInt()} g/Portion",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            "Nach dem Kochen abweichend? Im Rezept „Gewicht nach Kochen“ setzen.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     totalFiber?.let {
                         Spacer(Modifier.height(6.dp))
                         Text(
@@ -360,6 +376,8 @@ fun IngredientVerifySheet(
                 Button(
                     onClick = {
                         val servDiv = servings.coerceAtLeast(1)
+                        val totalWeight = verifyStates.sumOf { it.effectiveAmountG.toDouble() }.toFloat()
+                            .takeIf { it > 0f }
                         onConfirm(
                             totalKcal / servDiv,
                             totalProt / servDiv,
@@ -369,7 +387,8 @@ fun IngredientVerifySheet(
                             totalSugar?.div(servDiv),
                             totalSatFat?.div(servDiv),
                             totalSalt?.div(servDiv),
-                            totalSodium?.div(servDiv)
+                            totalSodium?.div(servDiv),
+                            totalWeight
                         )
                     },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)

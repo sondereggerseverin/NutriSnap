@@ -346,11 +346,13 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         val states = mergeIngredientOverrides(result.ingredients, overrides)
         val totals = computeVerifiedTotals(states)
         val servDiv = recipe.servings.coerceAtLeast(1)
+        val totalWeight = states.sumOf { it.effectiveAmountG.toDouble() }.toFloat().takeIf { it > 0f }
         applyVerifiedNutrition(
             recipe,
             totals.kcal / servDiv, totals.protein / servDiv, totals.carbs / servDiv, totals.fat / servDiv,
             totals.fiber?.div(servDiv), totals.sugar?.div(servDiv), totals.saturatedFat?.div(servDiv),
-            totals.salt?.div(servDiv), totals.sodium?.div(servDiv)
+            totals.salt?.div(servDiv), totals.sodium?.div(servDiv),
+            totalIngredientWeightG = totalWeight
         )
     }
 
@@ -408,7 +410,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         sugarPerServ: Float? = null,
         satFatPerServ: Float? = null,
         saltPerServ: Float? = null,
-        sodiumPerServ: Float? = null
+        sodiumPerServ: Float? = null,
+        totalIngredientWeightG: Float? = null
     ) {
         viewModelScope.launch {
             val macroLine = "📊 Pro Portion: ${kcalPerServ.toInt()} kcal" +
@@ -431,6 +434,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 saturatedFatPerServing = satFatPerServ ?: recipe.saturatedFatPerServing,
                 saltPerServing         = saltPerServ   ?: recipe.saltPerServing,
                 sodiumPerServing       = sodiumPerServ ?: recipe.sodiumPerServing,
+                totalIngredientWeightG = totalIngredientWeightG
+                    ?: recipe.totalIngredientWeightG,
                 description       = newDesc
             )
             repo.updateRecipe(updated)

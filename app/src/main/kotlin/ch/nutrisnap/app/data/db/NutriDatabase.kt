@@ -76,7 +76,7 @@ interface UserProfileDao {
         ch.nutrisnap.app.data.db.entity.FoodUsageContext::class,            // Feature 7
         ch.nutrisnap.app.data.db.entity.DetectedMealPatternEntity::class    // Feature 5
     ],
-    version = 22,
+    version = 23,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -520,6 +520,13 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_22_23 = object : Migration(22, 23) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE recipes ADD COLUMN totalIngredientWeightG REAL")
+                db.execSQL("ALTER TABLE recipes ADD COLUMN cookedWeightG REAL")
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -533,7 +540,7 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
                         MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16,
                         MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
-                        MIGRATION_20_21, MIGRATION_21_22
+                        MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23
                     )
                     .build()
                     .also { INSTANCE = it }

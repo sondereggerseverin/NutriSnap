@@ -118,8 +118,16 @@ data class Recipe(
     val collectionId: Long? = null,
     val isFavorite: Boolean = false,
     val showNutrition: Boolean = true,
-    val savedAt: Long = System.currentTimeMillis()
+    val savedAt: Long = System.currentTimeMillis(),
+    /** Summe der Zutatenmengen in g (Rohgewicht vor dem Kochen). */
+    val totalIngredientWeightG: Float? = null,
+    /** Gewicht nach dem Kochen (optional) – z.B. Nudeln mit Wasseraufnahme. */
+    val cookedWeightG: Float? = null
 ) {
+    /** Gewicht für Gramm-Tracking: gekocht falls gesetzt, sonst Roh-Zutatensumme. */
+    fun yieldWeightG(): Float? =
+        cookedWeightG?.takeIf { it > 0f } ?: totalIngredientWeightG?.takeIf { it > 0f }
+
     fun getDietTags(): List<DietTag> =
         tags.split(",").mapNotNull { tag ->
             DietTag.entries.firstOrNull { it.name == tag.trim() }
