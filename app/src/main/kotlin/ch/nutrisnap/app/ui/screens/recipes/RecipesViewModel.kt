@@ -12,6 +12,10 @@ import ch.nutrisnap.app.data.repository.RecipeRepository
 import ch.nutrisnap.app.domain.RecipeAiParser
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import ch.nutrisnap.app.domain.GroqVisionService
+import ch.nutrisnap.app.domain.RecipeGermanMetricConverter
+import ch.nutrisnap.app.ui.screens.settings.notifDataStore
+import ch.nutrisnap.app.ui.theme.KEY_AUTO_GERMAN_METRIC
+import kotlinx.coroutines.flow.first
 import android.graphics.Bitmap
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -60,7 +64,8 @@ data class RecipesUiState(
     val lastImport:       Recipe?      = null,
     val instagramBlocked: Boolean      = false,
     val blockedUrl:       String       = "",
-    val nutritionState:   NutritionState = NutritionState()
+    val nutritionState:   NutritionState = NutritionState(),
+    val isTranslating:    Boolean      = false
 )
 
 data class BudgetScaleState(
