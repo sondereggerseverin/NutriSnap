@@ -432,8 +432,10 @@ object RecipeNutritionAnalyzer {
 
                         // Feature 2: bereits einmal aufgelöste Zutat (egal ob damals lokale DB
                         // oder OFF) -> direkt aus dem Cache, ohne erneute OFF-Netzwerkanfrage.
-                        globalDictionary?.lookup(parsed.name)?.let { cached ->
-                            val cachedFood = FoodItem(
+                        // Cache-Miss -> normale OFF-Suche, neuer Treffer wird für's nächste Mal
+                        // im globalen Wörterbuch abgelegt (genau einmal, nicht doppelt).
+                        val food = globalDictionary?.lookup(parsed.name)?.let { cached ->
+                            FoodItem(
                                 name     = cached.offProductName,
                                 calories = cached.kcalPer100g.toFloat(),
                                 protein  = cached.proteinPer100g.toFloat(),
@@ -441,33 +443,18 @@ object RecipeNutritionAnalyzer {
                                 fat      = cached.fatPer100g.toFloat(),
                                 source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
                             )
-                            return@async IngredientResult(
-                                line     = line,
-                                parsed   = parsed,
-                                foodItem = cachedFood,
-                                calories = (cachedFood.calories ?: 0f) * factor,
-                                protein  = (cachedFood.protein ?: 0f) * factor,
-                                carbs    = (cachedFood.carbs   ?: 0f) * factor,
-                                fat      = (cachedFood.fat     ?: 0f) * factor,
-                                matched  = true
+                        } ?: searchOFF(parsed.name)?.also { off ->
+                            globalDictionary?.save(
+                                originalName    = parsed.name,
+                                offProductId    = "",
+                                offProductName  = off.name,
+                                kcalPer100g     = (off.calories ?: 0f).toDouble(),
+                                proteinPer100g  = (off.protein  ?: 0f).toDouble(),
+                                carbsPer100g    = (off.carbs    ?: 0f).toDouble(),
+                                fatPer100g      = (off.fat      ?: 0f).toDouble()
                             )
                         }
-
-                        val food = searchOFF(parsed.name)
                         if (food != null) {
-                            // Neuer OFF-Treffer -> fürs nächste Mal (auch für andere Rezepte
-                            // mit derselben Zutat) im globalen Wörterbuch ablegen.
-                            food.calories?.let { kcal ->
-                                globalDictionary?.save(
-                                    originalName    = parsed.name,
-                                    offProductId    = "",
-                                    offProductName  = food.name,
-                                    kcalPer100g     = kcal.toDouble(),
-                                    proteinPer100g  = (food.protein ?: 0f).toDouble(),
-                                    carbsPer100g    = (food.carbs   ?: 0f).toDouble(),
-                                    fatPer100g      = (food.fat     ?: 0f).toDouble()
-                                )
-                            }
                             IngredientResult(
                                 line     = line,
                                 parsed   = parsed,

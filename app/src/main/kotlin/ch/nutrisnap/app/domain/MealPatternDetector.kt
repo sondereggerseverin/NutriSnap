@@ -8,13 +8,8 @@ import java.time.LocalTime
 // ============================================================
 // FEATURE 5: Wiederkehrende Mahlzeiten automatisch erkennen → 1-Tap-Relog
 //
-// Integration:
-//  1. MealPatternDetector(diaryRepository, mealPatternRepository) dort instanziieren,
-//     wo täglich/beim App-Start eine Neuberechnung ausgelöst werden soll
-//     (z.B. WorkManager-Job, siehe unten, oder einfach beim App-Start im Hintergrund).
-//  2. In QuickAddFragment / DiaryFragment getSuggestionsForNow() abfragen und als
-//     Vorschlags-Banner oben anzeigen (foodItemIds -> per FoodItemRepository/
-//     CustomFoodRepository auflösen, um Namen/Portionen fürs 1-Tap-Relog zu holen).
+// Bereits integriert in DiaryViewModel (Trigger in init{}, siehe unten) und
+// DiaryScreen (Vorschlags-Banner mit 1-Tap-Relog).
 // ============================================================
 
 data class DetectedMealPattern(
@@ -113,25 +108,7 @@ class MealPatternDetector(
 }
 
 // ============================================================
-// WorkManager-Job (optional, neues File: MealPatternWorker.kt) — ohne Hilt, da das
-// Projekt kein Hilt verwendet; Repos wie überall sonst manuell aus NutriDatabase bauen:
-//
-// class MealPatternWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
-//     override suspend fun doWork(): Result {
-//         val db = NutriDatabase.getInstance(applicationContext)
-//         val detector = MealPatternDetector(
-//             DiaryRepository(db),
-//             MealPatternRepository(db.detectedMealPatternDao())
-//         )
-//         detector.detectAndSavePatterns()
-//         return Result.success()
-//     }
-// }
-//
-// In Application.onCreate():
-// WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-//     "meal_pattern_detection",
-//     ExistingPeriodicWorkPolicy.KEEP,
-//     PeriodicWorkRequestBuilder<MealPatternWorker>(1, TimeUnit.DAYS).build()
-// )
+// Trigger: DiaryViewModel.init (nicht per WorkManager) — läuft einmal pro
+// ViewModel-Instanz, also jedes Mal, wenn der Diary-Screen geöffnet wird. Für nur
+// 28 Tage Historie günstig genug, kein eigener Hintergrund-Job nötig.
 // ============================================================
