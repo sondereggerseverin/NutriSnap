@@ -352,8 +352,13 @@ class FoodItemRepository(db: NutriDatabase) {
         return remoteRepo.searchByBarcode(barcode)
     }
 
-    suspend fun saveCustomFoodWithBarcode(item: CustomFoodItem): Long =
-        customFoodDao.insert(item)
+    suspend fun saveCustomFoodWithBarcode(item: CustomFoodItem): Long {
+        val id = customFoodDao.insert(item).toInt()
+        customFoodDao.getById(id)?.let { saved ->
+            pushSafely { SupabaseSync.upsertCustomFood(saved) }
+        }
+        return id.toLong()
+    }
 
     suspend fun getById(id: Int): FoodItem?                = dao.getById(id)
     suspend fun saveCustomFood(item: FoodItem): Long       = dao.insert(item)

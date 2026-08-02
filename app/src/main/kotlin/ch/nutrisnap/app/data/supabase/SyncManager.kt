@@ -19,6 +19,90 @@ import ch.nutrisnap.app.data.repository.Sex
  */
 object SyncManager {
 
+    /**
+     * Pushed ALLE lokalen Daten in die Cloud (Tagebuch, Rezepte, Custom-Foods, Gewicht, Profil).
+     * Wird nach Login / Resume aufgerufen, damit selbst getrackte Einträge nicht nur lokal bleiben
+     * und nach Reinstall wieder per Pull verfügbar sind.
+     */
+    suspend fun pushAllLocal(db: NutriDatabase) {
+        SyncStatusHolder.opStarted()
+        var firstError: String? = null
+        runCatching { pushDiary(db) }.onFailure {
+            Log.e("NutriSync", "Push diary_entries fehlgeschlagen: ${it.message}", it)
+            firstError = firstError ?: it.message
+        }
+        runCatching { pushRecipes(db) }.onFailure {
+            Log.e("NutriSync", "Push recipes fehlgeschlagen: ${it.message}", it)
+            firstError = firstError ?: it.message
+        }
+        runCatching { pushCustomFoods(db) }.onFailure {
+            Log.e("NutriSync", "Push custom_foods fehlgeschlagen: ${it.message}", it)
+            firstError = firstError ?: it.message
+        }
+        runCatching { pushWeight(db) }.onFailure {
+            Log.e("NutriSync", "Push weight_entries fehlgeschlagen: ${it.message}", it)
+            firstError = firstError ?: it.message
+        }
+        runCatching { pushUserProfile(db) }.onFailure {
+            Log.e("NutriSync", "Push user_profiles fehlgeschlagen: ${it.message}", it)
+            firstError = firstError ?: it.message
+        }
+        if (firstError != null) SyncStatusHolder.opFailed(firstError)
+        else SyncStatusHolder.opSucceeded()
+    }
+
+    /** Push lokaler Änderungen, danach Pull von anderen Geräten. */
+    suspend fun syncAll(db: NutriDatabase) {
+        pushAllLocal(db)
+        pullAll(db)
+    }
+
+    private suspend fun pushDiary(db: NutriDatabase) {
+        val entries = db.diaryDao().getAllOnce()
+        Log.i("NutriSync", "Push diary: ${entries.size} Einträge")
+        for (entry in entries) {
+            SupabaseSync.upsertDiaryEntry(entry)
+        }
+    }
+
+    private suspend fun pushRecipes(db: NutriDatabase) {
+        val recipes = db.recipeDao().getAllOnce()
+        Log.i("NutriSync", "Push recipes: ${recipes.size}")
+        for (r in recipes) {
+            SupabaseSync.upsertRecipe(r)
+        }
+    }
+
+    private suspend fun pushCustomFoods(db: NutriDatabase) {
+        val foods = db.customFoodDao().getAllOnce()
+        Log.i("NutriSync", "Push custom_foods: ${foods.size}")
+        for (f in foods) {
+            SupabaseSync.upsertCustomFood(f)
+        }
+    }
+
+    private suspend fun pushWeight(db: NutriDatabase) {
+        val entries = db.weightDao().getAllOnce()
+        for (e in entries) {
+            SupabaseSync.upsertWeight(e)
+        }
+    }
+
+    private suspend fun pushUserProfile(db: NutriDatabase) {
+        val local = db.userProfileDao().get() ?: return
+        SupabaseSync.upsertUserProfile(
+            weightKg = local.weightKg,
+            heightCm = local.heightCm,
+            ageYears = local.ageYears,
+            dailyCalorieGoal = local.dailyCalorieGoal,
+            proteinGoalG = local.proteinGoalG,
+            carbsGoalG = local.carbsGoalG,
+            fatGoalG = local.fatGoalG,
+            activityFactor = local.activityFactor,
+            sex = local.sex
+        )
+    }
+
     suspend fun pullAll(db: NutriDatabase) {
         SyncStatusHolder.opStarted()
         var firstError: String? = null

@@ -122,9 +122,18 @@ object SupabaseSync {
     private val sb get() = SupabaseClient.client
     private fun userId() = sb.auth.currentUserOrNull()?.id
 
+    /** Wartet kurz auf Session (nach Login oft noch null beim ersten Push). */
+    private suspend fun userIdReady(retries: Int = 8): String? {
+        repeat(retries) {
+            userId()?.let { return it }
+            kotlinx.coroutines.delay(250)
+        }
+        return userId()
+    }
+
     // ── Diary ────────────────────────────────────────────────────────────
     suspend fun upsertDiaryEntry(entry: DiaryEntry) {
-        val uid = userId() ?: return
+        val uid = userIdReady() ?: return
         sb.postgrest["diary_entries"].upsert(
             DiaryEntryDto(
                 userId = uid,
@@ -171,7 +180,7 @@ object SupabaseSync {
 
     // ── Recipes ──────────────────────────────────────────────────────────
     suspend fun upsertRecipe(recipe: Recipe) {
-        val uid = userId() ?: return
+        val uid = userIdReady() ?: return
         sb.postgrest["recipes"].upsert(
             RecipeDto(
                 userId = uid,
@@ -230,7 +239,7 @@ object SupabaseSync {
      * Supabase-Tabelle: custom_foods mit UNIQUE (user_id, local_id).
      */
     suspend fun upsertCustomFood(food: CustomFoodItem) {
-        val uid = userId() ?: return
+        val uid = userIdReady() ?: return
         sb.postgrest["custom_foods"].upsert(
             CustomFoodDto(
                 userId = uid,
@@ -270,7 +279,7 @@ object SupabaseSync {
 
     // ── Weight ───────────────────────────────────────────────────────────
     suspend fun upsertWeight(entry: WeightEntry) {
-        val uid = userId() ?: return
+        val uid = userIdReady() ?: return
         sb.postgrest["weight_entries"].upsert(
             WeightEntryDto(userId = uid, dateStr = entry.dateStr, weightKg = entry.weightKg)
         ) { onConflict = "user_id,date_str" }

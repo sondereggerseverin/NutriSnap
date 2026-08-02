@@ -163,7 +163,7 @@ class MainActivity : ComponentActivity() {
                             val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
                                 if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                                     (lifecycleOwner.lifecycleScope).launch {
-                                        runCatching { ch.nutrisnap.app.data.supabase.SyncManager.pullAll(db) }
+                                        runCatching { ch.nutrisnap.app.data.supabase.SyncManager.syncAll(db) }
                                     }
                                 }
                             }
