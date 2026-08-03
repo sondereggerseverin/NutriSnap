@@ -89,11 +89,21 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
     private fun identityKey(name: String, brand: String?, barcode: String?): String =
         "${name.trim().lowercase()}|${(brand ?: "").trim().lowercase()}|${(barcode ?: "").trim()}"
 
-    /** Entfernt exakte Tagebuch-Duplikate (z.B. nach fehlerhaftem Sync/Import). */
-    fun deduplicateDiary(onDone: (Int) -> Unit = {}) {
+    /**
+     * 1) Exakte Duplikate entfernen
+     * 2) Rezept-Einträge korrigieren, bei denen Gesamt-kcal als 1 Portion gespeichert wurden
+     * onDone(removedDupes, repairedRecipeEntries)
+     */
+    fun deduplicateDiary(onDone: (removed: Int, repaired: Int) -> Unit = { _, _ -> }) {
         viewModelScope.launch {
-            val n = diaryRepo.deduplicateEntries()
-            onDone(n)
+            val removed = diaryRepo.deduplicateEntries()
+            val recipes = try {
+                db.recipeDao().getAll().first()
+            } catch (_: Exception) {
+                emptyList()
+            }
+            val repaired = diaryRepo.repairInflatedRecipeEntries(recipes)
+            onDone(removed, repaired)
         }
     }
 

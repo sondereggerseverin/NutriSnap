@@ -86,13 +86,22 @@ fun YazioImportScreen(
                     var dedupeMsg by remember { mutableStateOf<String?>(null) }
                     OutlinedButton(
                         onClick = {
-                            viewModel.deduplicateDiary { n ->
-                                dedupeMsg = if (n > 0) "$n Duplikate entfernt" else "Keine Duplikate gefunden"
+                            viewModel.deduplicateDiary { removed, repaired ->
+                                dedupeMsg = when {
+                                    removed == 0 && repaired == 0 ->
+                                        "Keine Duplikate / überhöhten Rezept-kcal gefunden"
+                                    else ->
+                                        buildString {
+                                            if (removed > 0) append("$removed Duplikate entfernt")
+                                            if (removed > 0 && repaired > 0) append(" · ")
+                                            if (repaired > 0) append("$repaired Rezept-Portionen korrigiert")
+                                        }
+                                }
                             }
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Duplikate bereinigen")
+                        Text("Duplikate & Rezept-kcal bereinigen")
                     }
                     dedupeMsg?.let {
                         Spacer(Modifier.height(8.dp))

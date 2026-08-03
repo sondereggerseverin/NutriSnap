@@ -722,9 +722,10 @@ private fun RecipeQuickAddBar(recipes: List<Recipe>, onQuickAdd: (Recipe) -> Uni
                         overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
-                    recipe.totalCalories?.let { kcal ->
+                    recipe.totalCalories?.let { total ->
+                        val per = (total / recipe.servings.coerceAtLeast(1)).toInt()
                         Text(
-                            "${kcal.toInt()} kcal/Port.",
+                            "$per kcal/Port.",
                             fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
                         )

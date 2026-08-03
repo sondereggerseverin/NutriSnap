@@ -245,6 +245,50 @@ class DiaryRepository(db: NutriDatabase) {
         return removed
     }
 
+    /**
+     * Korrigiert Tagebuch-Einträge, bei denen fälschlich die **Gesamt-Rezeptkalorien**
+     * als eine Portion gespeichert wurden (z.B. 5169 kcal statt ~500).
+     * Erkennt: Name matcht Rezept, kcal ≈ totalCalories (±3%), amount ≈ 1 Portion.
+     * @return Anzahl korrigierter Einträge
+     */
+    suspend fun repairInflatedRecipeEntries(recipes: List<Recipe>): Int {
+        if (recipes.isEmpty()) return 0
+        val byTitle = recipes
+            .filter { (it.totalCalories ?: 0f) > 200f && it.servings > 1 }
+            .associateBy { it.title.trim().lowercase() }
+        if (byTitle.isEmpty()) return 0
+
+        var fixed = 0
+        for (entry in dao.getAllOnce()) {
+            val recipe = byTitle[entry.foodName.trim().lowercase()] ?: continue
+            val total = recipe.totalCalories ?: continue
+            val serv = recipe.servings.coerceAtLeast(1)
+            // Nur wenn Eintrag ungefähr der Gesamtmenge entspricht (1:1 total)
+            if (kotlin.math.abs(entry.calories - total) > total * 0.03f) continue
+            // amountGrams: 1 Portion oder 0 (manuell)
+            val looksLikeOnePortion = entry.amountGrams in 0f..1.5f || entry.recipeGrams == null
+            if (!looksLikeOnePortion) continue
+
+            val factor = 1f / serv
+            val updated = entry.copy(
+                calories = entry.calories * factor,
+                protein = entry.protein * factor,
+                carbs = entry.carbs * factor,
+                fat = entry.fat * factor,
+                fiber = entry.fiber * factor,
+                sugar = entry.sugar * factor,
+                saturatedFat = entry.saturatedFat * factor,
+                salt = entry.salt * factor,
+                sodium = entry.sodium * factor,
+                amountGrams = 1f
+            )
+            dao.update(updated)
+            pushSafely { SupabaseSync.upsertDiaryEntry(updated) }
+            fixed++
+        }
+        return fixed
+    }
+
     companion object {
         /** Inhaltlicher Fingerprint für Dedup (Import + Sync-Pull). */
         fun contentFingerprint(entry: DiaryEntry): String =
