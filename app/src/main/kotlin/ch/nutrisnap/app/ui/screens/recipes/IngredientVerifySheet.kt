@@ -802,7 +802,6 @@ private fun MacroChip(label: String, value: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 fun IngredientIdentifySheet(
     ingredientName: String,
     onDismiss: () -> Unit,
