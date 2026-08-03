@@ -847,10 +847,12 @@ private fun DiaryEntryRow(
     entry: DiaryEntry,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onSchedule: () -> Unit = {},
     modifier: Modifier = Modifier,
     dragHandleModifier: Modifier? = null
 ) {
     var showConfirm by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
 
     val isRecipeEntry = entry.amountGrams == 0f || entry.foodItemId < 0
     val amountLabel   = if (isRecipeEntry) recipeAmountLabel(entry)
@@ -1965,7 +1967,7 @@ private fun EntryScheduleSheet(
             Button(
                 onClick = {
                     if (mode == "move") onMove(selectedDate, selectedMeal)
-                    else onCopyDays(dayCount, selectedDate, selectedMeal, includeStart = true)
+                    else onCopyDays(dayCount, selectedDate, selectedMeal, true)
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
