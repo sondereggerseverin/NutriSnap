@@ -170,7 +170,7 @@ private fun VerifyAndSaveFlow(
         initialOverrides = initialOverrides,
         onOverridesChanged = onOverridesChanged,
         onDismiss = onDismiss,
-        onConfirm = { kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium ->
+        onConfirm = { kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium, _totalWeightG ->
             pendingTotals = PendingTotals(kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium)
         }
     )
