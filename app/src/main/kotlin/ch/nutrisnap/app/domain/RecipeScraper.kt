@@ -5,20 +5,45 @@ import ch.nutrisnap.app.BuildConfig
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeScrapeResult
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 class RecipeScraper(private val context: Context) {
 
     class InstagramBlockedException(url: String) : Exception("INSTAGRAM_BLOCKED:$url")
 
+    companion object {
+        /** Caption-Cache pro normalisierter URL (Prozess-Lebensdauer). */
+        private val captionCache = ConcurrentHashMap<String, String>()
+        private fun cacheKey(url: String) = url.trim().lowercase().substringBefore("?").trimEnd('/')
+    }
+
+    private var progress: (String) -> Unit = {}
+
+    private fun isGoodCaption(text: String?): Boolean {
+        if (text.isNullOrBlank()) return false
+        val t = text.trim()
+        if (t.length < 40) return false
+        val lc = t.lowercase()
+        val recipeHints = listOf(
+            "zutaten", "ingredient", "rezept", "recipe", "anleitung", "instructions",
+            " tbsp", " tsp", " el ", " tl ", "gramm", " ml", " cup"
+        )
+        return t.length >= 80 || recipeHints.any { it in lc }
+    }
+
     private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(25, TimeUnit.SECONDS)
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(12, TimeUnit.SECONDS)
         .followRedirects(true)
         .addInterceptor { chain ->
             val req = chain.request().newBuilder()
@@ -32,14 +57,22 @@ class RecipeScraper(private val context: Context) {
         }
         .build()
 
-    suspend fun scrape(rawUrl: String): RecipeScrapeResult = withContext(Dispatchers.IO) {
+    suspend fun scrape(
+        rawUrl: String,
+        onProgress: (String) -> Unit = {}
+    ): RecipeScrapeResult = withContext(Dispatchers.IO) {
+        progress = onProgress
         runCatching {
             val url      = rawUrl.trim()
             val platform = detectPlatform(url)
+            progress("Link erkennen…")
             val recipe   = when (platform) {
                 "instagram" -> scrapeInstagram(url)
                 "tiktok"    -> scrapeTikTok(url)
-                else        -> scrapeWeb(url, platform)
+                else        -> {
+                    progress("Seite laden…")
+                    scrapeWeb(url, platform)
+                }
             }
             RecipeScrapeResult(success = true, recipe = recipe)
         }.getOrElse { e ->
@@ -63,87 +96,32 @@ class RecipeScraper(private val context: Context) {
 
     private suspend fun scrapeInstagram(url: String): Recipe {
         val shortcode = extractInstagramShortcode(url)
-        val oEmbed    = runCatching { fetchOEmbed("https://api.instagram.com/oembed/?url=${encode(url)}&omitscript=true") }.getOrNull()
+        val key = cacheKey(url)
+
+        progress("Metadaten laden…")
+        val oEmbed = runCatching {
+            fetchOEmbed("https://api.instagram.com/oembed/?url=${encode(url)}&omitscript=true")
+        }.getOrNull()
         var thumbnail = oEmbed?.get("thumbnail_url")
-        val author    = oEmbed?.get("author_name")
-        var caption   = ""
+        val author = oEmbed?.get("author_name")
 
-        caption = runCatching { InstagramWebViewScraper.extractCaption(context, url) ?: "" }.getOrElse { "" }
-
-        if (shortcode != null && (caption.isBlank() || thumbnail.isNullOrBlank())) {
-            runCatching {
-                val doc = jsoupGet("https://imginn.com/p/$shortcode/")
-                if (caption.isBlank()) {
-                    caption = doc.select(".desc, .photo-desc, [class*=desc], [class*=caption]").text()
-                        .ifBlank { doc.select("meta[property=og:description]").attr("content") }
-                }
-                if (thumbnail.isNullOrBlank()) thumbnail = extractOgImage(doc)
-            }
-        }
-        if (shortcode != null && (caption.isBlank() || thumbnail.isNullOrBlank())) {
-            runCatching {
-                val doc = jsoupGet("https://www.picuki.com/media/$shortcode")
-                if (caption.isBlank()) {
-                    caption = doc.select(".photo-description, .description, [class*=caption], [class*=desc]").text()
-                        .ifBlank { doc.select("meta[property=og:description]").attr("content") }
-                        .ifBlank { doc.select("meta[name=description]").attr("content") }
-                }
-                if (thumbnail.isNullOrBlank()) thumbnail = extractOgImage(doc)
-            }
-        }
-        if (shortcode != null && (caption.isBlank() || thumbnail.isNullOrBlank())) {
-            runCatching {
-                val doc = jsoupGet("https://www.imgsed.com/p/$shortcode")
-                if (caption.isBlank()) {
-                    caption = doc.select("meta[property=og:description]").attr("content")
-                        .ifBlank { doc.select("meta[name=description]").attr("content") }
-                }
-                if (thumbnail.isNullOrBlank()) thumbnail = extractOgImage(doc)
-            }
-        }
-        // instagramez.com — active mirror as of mid-2026
-        if (caption.isBlank() || thumbnail.isNullOrBlank()) {
-            runCatching {
-                val ezUrl = url.replace("www.instagram.com", "www.instagramez.com").replace("instagram.com", "instagramez.com")
-                val doc = jsoupGetWithUA(ezUrl,
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-                if (caption.isBlank()) {
-                    caption = doc.select("meta[property=og:description]").attr("content")
-                        .ifBlank { doc.select("meta[name=description]").attr("content") }
-                }
-                if (thumbnail.isNullOrBlank()) thumbnail = extractOgImage(doc)
-            }
-        }
-        // ddinstagram.com — keep as additional fallback
-        if (caption.isBlank() || thumbnail.isNullOrBlank()) {
-            runCatching {
-                val ddUrl = url.replace("www.instagram.com", "www.ddinstagram.com").replace("instagram.com", "ddinstagram.com")
-                val doc = jsoupGet(ddUrl)
-                if (caption.isBlank()) {
-                    caption = doc.select("meta[property=og:description]").attr("content")
-                        .ifBlank { doc.select("meta[name=description]").attr("content") }
-                }
-                if (thumbnail.isNullOrBlank()) thumbnail = extractOgImage(doc)
-            }
-        }
-        if (caption.isBlank() || thumbnail.isNullOrBlank()) {
-            runCatching {
-                val doc = jsoupGet(url)
-                if (caption.isBlank()) {
-                    caption = doc.select("meta[property=og:description]").attr("content")
-                        .ifBlank { doc.select("meta[name=description]").attr("content") }
-                }
-                if (thumbnail.isNullOrBlank()) thumbnail = extractOgImage(doc)
-            }
+        // Cache: gleiche URL nicht nochmal scrapen
+        var caption = captionCache[key].orEmpty()
+        if (isGoodCaption(caption)) {
+            progress("Aus Cache…")
+        } else {
+            progress("Seite laden (parallel)…")
+            caption = raceInstagramCaption(url, shortcode)
+            if (isGoodCaption(caption)) captionCache[key] = caption
         }
 
-        // Last resort thumbnail: Instagram's public post thumbnail endpoint
         if (thumbnail.isNullOrBlank() && shortcode != null) {
             thumbnail = "https://www.instagram.com/p/$shortcode/media/?size=l"
         }
 
         if (caption.isBlank()) throw InstagramBlockedException(url)
 
+        progress("Rezept extrahieren…")
         val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
         val parsed = if (apiKey.isNotBlank()) {
             RecipeAiParser.parse(caption, url, "instagram", thumbnail, apiKey)
@@ -157,6 +135,93 @@ class RecipeScraper(private val context: Context) {
             tags      = listOfNotNull(parsed.tags.ifBlank { null }, author?.let { "@$it" }).joinToString(",").take(200)
         )
     }
+
+    /**
+     * Startet WebView + Mirror-Seiten parallel und nimmt die erste brauchbare Caption.
+     * Gesamtdauer typisch weit unter dem alten sequentiellen ~30s-Pfad.
+     */
+    private suspend fun raceInstagramCaption(url: String, shortcode: String?): String =
+        coroutineScope {
+            data class Cap(val text: String, val source: String)
+
+            val jobs = buildList {
+                add(async {
+                    runCatching {
+                        InstagramWebViewScraper.extractCaption(context, url)?.let { Cap(it, "webview") }
+                    }.getOrNull()
+                })
+                if (shortcode != null) {
+                    add(async {
+                        runCatching {
+                            val doc = jsoupGet("https://imginn.com/p/$shortcode/")
+                            val t = doc.select(".desc, .photo-desc, [class*=desc], [class*=caption]").text()
+                                .ifBlank { doc.select("meta[property=og:description]").attr("content") }
+                            Cap(t, "imginn").takeIf { isGoodCaption(it.text) }
+                        }.getOrNull()
+                    })
+                    add(async {
+                        runCatching {
+                            val doc = jsoupGet("https://www.picuki.com/media/$shortcode")
+                            val t = doc.select(".photo-description, .description, [class*=caption], [class*=desc]").text()
+                                .ifBlank { doc.select("meta[property=og:description]").attr("content") }
+                                .ifBlank { doc.select("meta[name=description]").attr("content") }
+                            Cap(t, "picuki").takeIf { isGoodCaption(it.text) }
+                        }.getOrNull()
+                    })
+                    add(async {
+                        runCatching {
+                            val ezUrl = url.replace("www.instagram.com", "www.instagramez.com")
+                                .replace("instagram.com", "instagramez.com")
+                            val doc = jsoupGetWithUA(
+                                ezUrl,
+                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                            )
+                            val t = doc.select("meta[property=og:description]").attr("content")
+                                .ifBlank { doc.select("meta[name=description]").attr("content") }
+                            Cap(t, "instagramez").takeIf { isGoodCaption(it.text) }
+                        }.getOrNull()
+                    })
+                    add(async {
+                        runCatching {
+                            val ddUrl = url.replace("www.instagram.com", "www.ddinstagram.com")
+                                .replace("instagram.com", "ddinstagram.com")
+                            val doc = jsoupGet(ddUrl)
+                            val t = doc.select("meta[property=og:description]").attr("content")
+                                .ifBlank { doc.select("meta[name=description]").attr("content") }
+                            Cap(t, "ddinstagram").takeIf { isGoodCaption(it.text) }
+                        }.getOrNull()
+                    })
+                }
+            }
+
+            // Erste brauchbare Caption innerhalb 14s; danach bestes übriges Ergebnis
+            val winner = withTimeoutOrNull(14_000L) {
+                val pending = jobs.toMutableList()
+                while (pending.isNotEmpty()) {
+                    val done = select {
+                        pending.forEach { job ->
+                            job.onAwait { result -> job to result }
+                        }
+                    }
+                    pending.remove(done.first)
+                    val cap = done.second
+                    if (cap != null && isGoodCaption(cap.text)) return@withTimeoutOrNull cap.text
+                }
+                null
+            }
+
+            if (!winner.isNullOrBlank()) {
+                jobs.forEach { it.cancel() }
+                return@coroutineScope winner
+            }
+
+            // Fallback: bestes bereits fertiges Ergebnis
+            val best = jobs.mapNotNull { d ->
+                if (d.isCompleted) runCatching { d.getCompleted() }.getOrNull()?.text else null
+            }.filter { it.isNotBlank() }.maxByOrNull { it.length }.orEmpty()
+            jobs.forEach { it.cancel() }
+            best
+        }
 
     private fun extractOgImage(doc: Document): String? {
         val candidates = listOf(
@@ -180,114 +245,30 @@ class RecipeScraper(private val context: Context) {
     //  5. oEmbed title (lowest quality, no body text)
 
     private suspend fun scrapeTikTok(url: String): Recipe {
-        // Expand vm.tiktok.com / vt.tiktok.com short links
+        progress("Link auflösen…")
         val expandedUrl = runCatching {
             if ("vm.tiktok.com" in url || "vt.tiktok.com" in url) {
-                client.newCall(Request.Builder().url(url).get().build())
-                    .execute().use { it.request.url.toString() }
+                val req = Request.Builder().url(url).head().build()
+                client.newCall(req).execute().use { it.request.url.toString() }
             } else url
-        }.getOrElse { url }
+        }.getOrDefault(url)
+        val key = cacheKey(expandedUrl)
 
-        var caption:   String? = null
+        var caption: String? = captionCache[key]
         var thumbnail: String? = null
-        var author:    String? = null
+        var author: String? = null
 
-        // ── 1. tikwm.com API ─────────────────────────────────────────────────
-        runCatching {
-            // tikwm accepts both full URLs and short links; try both
-            for (tryUrl in listOf(expandedUrl, url).distinct()) {
-                val apiUrl = "https://www.tikwm.com/api/?url=${encode(tryUrl)}"
-                val raw = fetchStringWithUA(apiUrl,
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36")
-                val root = org.json.JSONObject(raw)
-                val code = root.optInt("code", -1)
-                val j    = root.optJSONObject("data")
-                if (code == 0 && j != null) {
-                    val t = j.optString("title", "").ifBlank { j.optString("desc", "") }.trim()
-                    // Always extract thumbnail + author BEFORE break so they're not skipped
-                    // Prefer origin_cover (stable) over cover (signed CDN URL that expires quickly)
-                    if (thumbnail == null) {
-                        val originCover = j.optString("origin_cover", "").ifBlank { null }
-                        val cover       = j.optString("cover", "").ifBlank { null }
-                        // tiktokcdn.com URLs are auth-signed and often fail in AsyncImage → skip them
-                        thumbnail = when {
-                            originCover != null && "tiktokcdn.com" !in originCover -> originCover
-                            cover != null && "tiktokcdn.com" !in cover             -> cover
-                            originCover != null -> originCover  // fallback: use even if CDN (better than nothing)
-                            else -> cover
-                        }
-                    }
-                    if (author == null) author = j.optJSONObject("author")?.optString("nickname")
-                    if (t.isNotBlank()) { caption = t; break }
-                }
-            }
+        if (isGoodCaption(caption)) {
+            progress("Aus Cache…")
+        } else {
+            progress("Seite laden (parallel)…")
+            val raced = raceTikTokCaption(expandedUrl)
+            caption = raced.first
+            thumbnail = raced.second
+            author = raced.third
+            if (isGoodCaption(caption)) captionCache[key] = caption!!
         }
 
-        // ── 2. Mirror sites with og:description ──────────────────────────────
-        if (caption.isNullOrBlank() || thumbnail == null) {
-            // snaptik — often has full descriptions in og:description
-            runCatching {
-                val doc = jsoupGetWithUA("https://snaptik.app/en?url=${encode(expandedUrl)}",
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36")
-                if (caption.isNullOrBlank()) {
-                    caption = doc.select("meta[property=og:description]").attr("content")
-                        .ifBlank { doc.select(".video-title, .description, [class*=title]").text() }
-                        .ifBlank { null }
-                }
-                if (thumbnail == null) thumbnail = extractOgImage(doc)
-            }
-        }
-
-        if (caption.isNullOrBlank() || thumbnail == null) {
-            // tikmate.online — another free mirror
-            runCatching {
-                val doc = jsoupGetWithUA("https://tikmate.online/?url=${encode(expandedUrl)}",
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36")
-                if (caption.isNullOrBlank()) {
-                    caption = doc.select("meta[property=og:description]").attr("content")
-                        .ifBlank { doc.select(".video-info, .caption, h2").text() }
-                        .ifBlank { null }
-                }
-                if (thumbnail == null) thumbnail = extractOgImage(doc)
-            }
-        }
-
-        // ── 3. Dedicated TikTok WebView scraper ──────────────────────────────
-        if (caption.isNullOrBlank()) {
-            val webViewResult = runCatching {
-                TikTokWebViewScraper.extract(context, expandedUrl)
-            }.getOrNull()
-            if (webViewResult != null) {
-                if (caption.isNullOrBlank()) caption = webViewResult.caption
-                if (author == null) author = webViewResult.author
-            }
-        }
-
-        // ── 4. Jsoup og:description ───────────────────────────────────────────
-        if (caption.isNullOrBlank() || thumbnail == null) {
-            runCatching {
-                val doc = jsoupGetWithUA(expandedUrl,
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36")
-                if (caption.isNullOrBlank()) {
-                    caption = doc.select("meta[property=og:description]").attr("content")
-                        .ifBlank { doc.select("meta[name=description]").attr("content") }
-                        .ifBlank { null }
-                }
-                if (thumbnail == null) thumbnail = extractOgImage(doc)
-            }
-        }
-
-        // ── 5. oEmbed (title only, no body) ──────────────────────────────────
-        if (caption.isNullOrBlank() || thumbnail == null) {
-            val oEmbed = runCatching {
-                fetchOEmbed("https://www.tiktok.com/oembed?url=${encode(expandedUrl)}")
-            }.getOrNull()
-            if (caption.isNullOrBlank()) caption = oEmbed?.get("title")
-            if (thumbnail == null) thumbnail = oEmbed?.get("thumbnail_url")
-            if (author == null) author = oEmbed?.get("author_name")
-        }
-
-        // Nothing worked → placeholder with edit hint
         if (caption.isNullOrBlank()) {
             return Recipe(
                 title        = "TikTok Rezept",
@@ -300,6 +281,7 @@ class RecipeScraper(private val context: Context) {
             )
         }
 
+        progress("Rezept extrahieren…")
         val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
         val parsed = if (apiKey.isNotBlank()) {
             RecipeAiParser.parse(caption!!, url, "tiktok", thumbnail, apiKey)
@@ -313,6 +295,77 @@ class RecipeScraper(private val context: Context) {
             tags      = listOfNotNull(parsed.tags.ifBlank { null }, author?.let { "@$it" }).joinToString(",").take(200)
         )
     }
+
+    /** Parallel: tikwm API, WebView, oEmbed, Jsoup — erste brauchbare Caption. */
+    private suspend fun raceTikTokCaption(expandedUrl: String): Triple<String?, String?, String?> =
+        coroutineScope {
+            data class Pack(val caption: String?, val thumb: String?, val author: String?)
+
+            val jobs = listOf(
+                async {
+                    runCatching {
+                        val apiUrl = "https://www.tikwm.com/api/?url=${encode(expandedUrl)}&hd=1"
+                        val raw = fetchString(apiUrl)
+                        val title = Regex(""""title"\s*:\s*"((?:[^"\\]|\\.)*)"""").find(raw)?.groupValues?.get(1)
+                            ?.replace("\\n", "\n")?.replace("\\\"", "\"")
+                        val cover = Regex(""""origin_cover"\s*:\s*"((?:[^"\\]|\\.)*)"""").find(raw)?.groupValues?.get(1)
+                            ?: Regex(""""cover"\s*:\s*"((?:[^"\\]|\\.)*)"""").find(raw)?.groupValues?.get(1)
+                        val auth = Regex(""""unique_id"\s*:\s*"((?:[^"\\]|\\.)*)"""").find(raw)?.groupValues?.get(1)
+                        val thumb = cover?.replace("\\u0026", "&")?.replace("\\/", "/")
+                            ?.takeIf { "tiktokcdn.com" !in it }
+                        Pack(title, thumb, auth).takeIf { isGoodCaption(it.caption) }
+                    }.getOrNull()
+                },
+                async {
+                    runCatching {
+                        val r = TikTokWebViewScraper.extract(context, expandedUrl)
+                        Pack(r.caption, null, r.author).takeIf { isGoodCaption(it.caption) }
+                    }.getOrNull()
+                },
+                async {
+                    runCatching {
+                        val oEmbed = fetchOEmbed("https://www.tiktok.com/oembed?url=${encode(expandedUrl)}")
+                        Pack(oEmbed["title"], oEmbed["thumbnail_url"], oEmbed["author_name"])
+                            .takeIf { isGoodCaption(it.caption) || !it.caption.isNullOrBlank() }
+                    }.getOrNull()
+                },
+                async {
+                    runCatching {
+                        val doc = jsoupGetWithUA(
+                            expandedUrl,
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36"
+                        )
+                        val t = doc.select("meta[property=og:description]").attr("content")
+                            .ifBlank { doc.select("meta[name=description]").attr("content") }
+                        Pack(t, extractOgImage(doc), null).takeIf { isGoodCaption(it.caption) }
+                    }.getOrNull()
+                }
+            )
+
+            val winner = withTimeoutOrNull(14_000L) {
+                val pending = jobs.toMutableList()
+                while (pending.isNotEmpty()) {
+                    val done = select {
+                        pending.forEach { job -> job.onAwait { result -> job to result } }
+                    }
+                    pending.remove(done.first)
+                    val p = done.second
+                    if (p != null && isGoodCaption(p.caption)) return@withTimeoutOrNull p
+                }
+                null
+            }
+
+            if (winner != null) {
+                jobs.forEach { it.cancel() }
+                return@coroutineScope Triple(winner.caption, winner.thumb, winner.author)
+            }
+
+            val any = jobs.mapNotNull { d ->
+                if (d.isCompleted) runCatching { d.getCompleted() }.getOrNull() else null
+            }.maxByOrNull { it.caption?.length ?: 0 }
+            jobs.forEach { it.cancel() }
+            Triple(any?.caption, any?.thumb, any?.author)
+        }
 
     // ── GENERIC WEB ────────────────────────────────────────────────────────────
 

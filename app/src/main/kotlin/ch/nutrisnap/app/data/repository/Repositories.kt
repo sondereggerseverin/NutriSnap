@@ -274,8 +274,8 @@ class RecipeRepository(db: NutriDatabase, context: Context) {
 
     suspend fun getById(id: Long) = dao.getById(id)
 
-    suspend fun importFromUrl(url: String): RecipeScrapeResult {
-        val result = scraper.scrape(url)
+    suspend fun importFromUrl(url: String, onProgress: (String) -> Unit = {}): RecipeScrapeResult {
+        val result = scraper.scrape(url, onProgress)
         if (result.success && result.recipe != null) {
             val newId = dao.insert(result.recipe)
             val saved = result.recipe.copy(id = newId)

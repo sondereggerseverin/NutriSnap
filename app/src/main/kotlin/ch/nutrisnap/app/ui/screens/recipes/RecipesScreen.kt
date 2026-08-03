@@ -278,7 +278,9 @@ fun RecipesScreen(
     if (showImportSheet) {
         ImportSheet(
             prefillUrl = if (state.instagramBlocked) state.blockedUrl else (sharedUrl ?: ""),
-            isLoading = state.isImporting, error = state.importError,
+            isLoading = state.isImporting,
+            importPhase = state.importPhase,
+            error = state.importError,
             openAtManualCaption = state.instagramBlocked,
             onImport = { url -> vm.importFromUrl(url) },
             onDismiss = { showImportSheet = false; vm.clearError(); vm.clearInstagramBlocked() }
@@ -574,8 +576,15 @@ private fun platformVisuals(platform: String?): Pair<List<Color>, androidx.compo
 // ── Import Sheet ──────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ImportSheet(prefillUrl: String, isLoading: Boolean, error: String?,
-    openAtManualCaption: Boolean = false, onImport: (String) -> Unit, onDismiss: () -> Unit) {
+fun ImportSheet(
+    prefillUrl: String,
+    isLoading: Boolean,
+    error: String?,
+    importPhase: String? = null,
+    openAtManualCaption: Boolean = false,
+    onImport: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
     val context = LocalContext.current; val vm: RecipesViewModel = viewModel()
     var url by remember(prefillUrl) { mutableStateOf(prefillUrl) }
     var showManual by remember(openAtManualCaption) { mutableStateOf(openAtManualCaption) }
@@ -661,8 +670,29 @@ fun ImportSheet(prefillUrl: String, isLoading: Boolean, error: String?,
                 if (error != null) Text(error, color=MaterialTheme.colorScheme.error, fontSize=13.sp, modifier=Modifier.padding(top=4.dp))
                 Spacer(Modifier.height(12.dp))
                 Button(onClick={onImport(url.trim())}, enabled=url.isNotBlank()&&!isLoading, modifier=Modifier.fillMaxWidth()) {
-                    if (isLoading) { CircularProgressIndicator(Modifier.size(18.dp), color=MaterialTheme.colorScheme.onPrimary, strokeWidth=2.dp); Spacer(Modifier.width(8.dp)) }
-                    Text(if (isLoading) "Importiere…" else "Importieren")
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            Modifier.size(18.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text(
+                        when {
+                            isLoading && !importPhase.isNullOrBlank() -> importPhase
+                            isLoading -> "Importiere…"
+                            else -> "Importieren"
+                        }
+                    )
+                }
+                if (isLoading && !importPhase.isNullOrBlank()) {
+                    Text(
+                        importPhase!!,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
                 }
                 if (isInstagram) {
                     Spacer(Modifier.height(8.dp))

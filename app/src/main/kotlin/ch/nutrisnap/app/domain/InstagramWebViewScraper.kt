@@ -36,7 +36,7 @@ object InstagramWebViewScraper {
      */
     @SuppressLint("SetJavaScriptEnabled")
     suspend fun extractCaption(context: Context, url: String): String? =
-        withTimeout(20_000L) {
+        withTimeout(12_000L) {
             suspendCancellableCoroutine { cont ->
                 val mainHandler = Handler(Looper.getMainLooper())
                 mainHandler.post {
@@ -75,7 +75,7 @@ object InstagramWebViewScraper {
                                         ?.takeIf { it.isNotBlank() && it != "null" }
                                     cont.resume(caption)
                                 }
-                            }, 3_500) // Instagram React needs ~3.5s to hydrate caption data
+                            }, 3_500) // Instagram React hydrate ~2s; overall timeout 12s
                         }
 
                         override fun onReceivedError(

@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 
 private data class ImportState(
     val isImporting:      Boolean = false,
+    val importPhase:      String? = null,
     val importError:      String? = null,
     val lastImport:       Recipe? = null,
     val instagramBlocked: Boolean = false,
@@ -60,6 +61,7 @@ data class RecipesUiState(
     val platformFilter:   String?      = null,   // null = alle
     val sort:             RecipeSort   = RecipeSort.NEWEST,
     val isImporting:      Boolean      = false,
+    val importPhase:      String?      = null,
     val importError:      String?      = null,
     val lastImport:       Recipe?      = null,
     val instagramBlocked: Boolean      = false,
@@ -175,6 +177,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             platformFilter   = platformFilter,
             sort             = sort,
             isImporting      = imp.isImporting,
+            importPhase      = imp.importPhase,
             importError      = imp.importError,
             lastImport       = imp.lastImport,
             instagramBlocked = imp.instagramBlocked,
@@ -194,8 +197,12 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
 
     fun importFromUrl(url: String) {
         viewModelScope.launch {
-            _importState.update { it.copy(isImporting = true, importError = null, instagramBlocked = false) }
-            val result: RecipeScrapeResult = repo.importFromUrl(url)
+            _importState.update {
+                it.copy(isImporting = true, importPhase = "Starte…", importError = null, instagramBlocked = false)
+            }
+            val result: RecipeScrapeResult = repo.importFromUrl(url) { phase ->
+                _importState.update { s -> s.copy(importPhase = phase) }
+            }
             if (result.success && result.recipe != null && shouldAutoGermanMetric()) {
                 val r = result.recipe
                 val converted = RecipeGermanMetricConverter.convertWithAi(r).getOrNull()
@@ -206,18 +213,22 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                         instructions = converted.instructions.ifBlank { r.instructions }
                     )
                     repo.updateRecipe(updated)
-                    _importState.update { it.copy(isImporting = false, lastImport = updated) }
+                    _importState.update { it.copy(isImporting = false, importPhase = null, lastImport = updated) }
                     return@launch
                 }
             }
             _importState.update { state ->
                 when {
                     result.instagramBlocked ->
-                        state.copy(isImporting = false, instagramBlocked = true, blockedUrl = url)
+                        state.copy(isImporting = false, importPhase = null, instagramBlocked = true, blockedUrl = url)
                     result.success ->
-                        state.copy(isImporting = false, lastImport = result.recipe)
+                        state.copy(isImporting = false, importPhase = null, lastImport = result.recipe)
                     else ->
-                        state.copy(isImporting = false, importError = result.error ?: "Fehler beim Importieren")
+                        state.copy(
+                            isImporting = false,
+                            importPhase = null,
+                            importError = result.error ?: "Fehler beim Importieren"
+                        )
                 }
             }
         }

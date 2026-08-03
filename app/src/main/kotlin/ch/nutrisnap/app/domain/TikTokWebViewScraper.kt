@@ -27,7 +27,7 @@ object TikTokWebViewScraper {
 
     @SuppressLint("SetJavaScriptEnabled")
     suspend fun extract(context: Context, url: String): TikTokResult =
-        withTimeout(30_000L) {
+        withTimeout(12_000L) {
             suspendCancellableCoroutine { cont ->
                 val mainHandler = Handler(Looper.getMainLooper())
                 mainHandler.post {
@@ -55,7 +55,7 @@ object TikTokWebViewScraper {
                     webView.webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView, loadedUrl: String) {
                             if (finished) return
-                            // TikTok needs more time than Instagram for JS hydration
+                            // Faster hydrate wait; overall timeout 12s
                             mainHandler.postDelayed({
                                 if (finished) return@postDelayed
                                 view.evaluateJavascript(EXTRACT_JS) { rawResult ->
@@ -89,7 +89,7 @@ object TikTokWebViewScraper {
 
                                     cont.resume(TikTokResult(caption, author))
                                 }
-                            }, 4_000) // TikTok needs 4s to fully render
+                            }, 2_000) // TikTok needs 4s to fully render
                         }
 
                         override fun onReceivedError(
