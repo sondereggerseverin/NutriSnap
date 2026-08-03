@@ -46,6 +46,7 @@ fun HomeScreen(
             contentPadding = PaddingValues(bottom = 100.dp)
         ) {
             item { HomeHeader(state) }
+            item { CalorieBreakdownCard(state) }
             item {
                 MealOverviewGrid(
                     state.meals,
@@ -609,4 +610,175 @@ private fun WeightEntryDialog(
             TextButton(onClick = onDismiss) { Text("Abbrechen") }
         }
     )
+}
+
+
+@Composable
+private fun CalorieBreakdownCard(state: HomeUiState) {
+    val b = state.calorieBreakdown
+    var expanded by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.sm),
+        shape = RoundedCornerShape(NutriRadius.lg),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+    ) {
+        Column(Modifier.padding(NutriSpacing.lg)) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "So rechnet sich dein Ziel",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 15.sp
+                    )
+                    Text(
+                        if (b != null)
+                            "${b.targetKcal} kcal · ${if (b.isTrendBased) "aus deinem Verlauf" else "Formel + Aktivität"} · ${b.confidencePercent}%"
+                        else
+                            "Statisches Ziel ${state.calorieGoal.toInt()} kcal + Sport",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Icon(
+                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (!expanded) return@Column
+
+            Spacer(Modifier.height(NutriSpacing.md))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(NutriSpacing.md))
+
+            if (b == null) {
+                BreakdownLine("Tagesziel (Profil)", "${state.calorieGoal.toInt()} kcal")
+                BreakdownLine("Heute aktiv (Health Connect)", "+${state.burnedKcal.toInt()} kcal")
+                BreakdownLine("Budget heute", "${state.adjustedGoal.toInt()} kcal", emphasize = true)
+                BreakdownLine("Gegessen", "−${state.totalCalories.toInt()} kcal")
+                BreakdownLine("Noch übrig", "${state.remaining.toInt()} kcal", emphasize = true)
+                Spacer(Modifier.height(NutriSpacing.sm))
+                Text(
+                    "Tipp: Gewicht + Mahlzeiten über ≥5 Tage tracken → adaptives Ziel aus deinem echten Verbrauch.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 15.sp
+                )
+                return@Column
+            }
+
+            Text("1. Erhaltungsbedarf (TDEE)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Spacer(Modifier.height(6.dp))
+            b.formulaBmrKcal?.let {
+                BreakdownLine("Grundumsatz BMR (Ruhe)", "$it kcal")
+            }
+            b.formulaTdeeKcal?.let {
+                BreakdownLine("Formel-TDEE (BMR × Aktivität)", "$it kcal")
+            }
+            if (b.trendTdeeKcal != null) {
+                BreakdownLine(
+                    "Trend-TDEE (Gewicht + Essen)",
+                    "${b.trendTdeeKcal} kcal" + if (b.isTrendBased) " ✓" else ""
+                )
+            } else {
+                Text(
+                    "Trend noch nicht nutzbar – mind. 5 Tage mit Gewicht und getrackten Mahlzeiten.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 15.sp
+                )
+            }
+            BreakdownLine(
+                "Verwendet",
+                "${b.maintenanceKcal} kcal (${if (b.isTrendBased) "Trend" else "Formel"})",
+                emphasize = true
+            )
+
+            if (b.weightChangeKg != null || b.avgIntakeKcal != null) {
+                Spacer(Modifier.height(NutriSpacing.md))
+                Text("Verlauf (${b.trendSpanDays} Tage, ${b.trendOverlapDays} Überlappungen)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                Spacer(Modifier.height(6.dp))
+                b.weightChangeKg?.let { w ->
+                    val label = when {
+                        w < -0.05f -> "Abgenommen"
+                        w > 0.05f -> "Zugenommen"
+                        else -> "Gewicht stabil"
+                    }
+                    val sign = if (w > 0) "+" else ""
+                    BreakdownLine(label, "$sign${"%.2f".format(w)} kg")
+                }
+                b.avgIntakeKcal?.let {
+                    BreakdownLine("Ø gegessen / Tag", "$it kcal")
+                }
+            }
+
+            Spacer(Modifier.height(NutriSpacing.md))
+            Text("2. Tagesziel", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Spacer(Modifier.height(6.dp))
+            val deficitNote = b.weeklyTargetLossKg?.let {
+                "−${b.deficitKcal} kcal (Ziel ${"%.1f".format(it)} kg/Woche)"
+            } ?: "−${b.deficitKcal} kcal (Standard ~0,5 kg/Woche)"
+            BreakdownLine("Defizit", deficitNote)
+            val bonus = b.activityBonusKcal
+            val bonusLabel = when {
+                bonus > 0 -> "+$bonus kcal (aktiver als Ø)"
+                bonus < 0 -> "$bonus kcal (ruhiger als Ø)"
+                else -> "±0 kcal"
+            }
+            BreakdownLine("Aktivitäts-Anpassung (50%)", bonusLabel)
+            b.todayActiveKcal?.let { BreakdownLine("Heute aktiv", "$it kcal") }
+            b.avgActiveKcal?.let { BreakdownLine("Ø aktiv (Fenster)", "$it kcal") }
+            BreakdownLine("Ziel heute", "${b.targetKcal} kcal", emphasize = true)
+
+            Spacer(Modifier.height(NutriSpacing.md))
+            Text("3. Stand heute", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Spacer(Modifier.height(6.dp))
+            BreakdownLine("Gegessen", "−${state.totalCalories.toInt()} kcal")
+            BreakdownLine("Noch übrig", "${state.remaining.toInt()} kcal", emphasize = true)
+
+            Spacer(Modifier.height(NutriSpacing.sm))
+            Text(
+                "Formel: TDEE ≈ Ø Essen − (ΔGewicht × 7700) / Tage. " +
+                    "Aktivität zählt nur die Abweichung vom Durchschnitt (halb gewichtet). " +
+                    "Konfidenz ${b.confidencePercent}%.",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 15.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun BreakdownLine(label: String, value: String, emphasize: Boolean = false) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            label,
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            value,
+            fontSize = 12.sp,
+            fontWeight = if (emphasize) FontWeight.Bold else FontWeight.Medium,
+            color = if (emphasize) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurface
+        )
+    }
 }

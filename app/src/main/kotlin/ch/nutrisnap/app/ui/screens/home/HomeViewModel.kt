@@ -26,6 +26,29 @@ data class MealOverview(
     val count:   Int
 )
 
+/**
+ * Offene Darlegung der Ziel-Rechnung (Home & ggf. Analyse).
+ * Alle Werte nullable/0 wenn die jeweilige Datenquelle fehlt.
+ */
+data class CalorieBreakdown(
+    val formulaBmrKcal: Int? = null,
+    val formulaTdeeKcal: Int? = null,
+    val trendTdeeKcal: Int? = null,
+    val maintenanceKcal: Int = 0,
+    val deficitKcal: Int = 0,
+    val activityBonusKcal: Int = 0,
+    val targetKcal: Int = 0,
+    val isTrendBased: Boolean = false,
+    val confidencePercent: Int = 0,
+    val weightChangeKg: Float? = null,
+    val avgIntakeKcal: Int? = null,
+    val avgActiveKcal: Int? = null,
+    val todayActiveKcal: Int? = null,
+    val trendOverlapDays: Int = 0,
+    val trendSpanDays: Int = 0,
+    val weeklyTargetLossKg: Float? = null
+)
+
 data class HomeUiState(
     val greeting:      String  = "Hallo",
     val totalCalories: Float   = 0f,
@@ -49,7 +72,9 @@ data class HomeUiState(
     // Verlaufsdaten), gilt die alte, einfache Logik: statisches Ziel + voller Kalorienverbrauch.
     val isAdaptiveTarget: Boolean = false,
     // 0-100, nur relevant wenn isAdaptiveTarget true ist.
-    val tdeeConfidence: Int = 0
+    val tdeeConfidence: Int = 0,
+    /** Vollständige Rechnung für transparente Anzeige auf dem Home-Screen. */
+    val calorieBreakdown: CalorieBreakdown? = null
 ) {
     /** Budget = Basis-Ziel + verbrannte Aktivitätskalorien (nur wenn nicht schon im adaptiven Ziel enthalten) */
     val adjustedGoal: Float get() = if (isAdaptiveTarget) calorieGoal else calorieGoal + burnedKcal
@@ -109,12 +134,40 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .takeIf { it.isNotEmpty() }
             ?.average()
 
+        // Defizit aus Wochenziel (kg) falls gesetzt, sonst Standard 500 kcal
+        val weeklyLoss = profile.weeklyTargetLossKg?.takeIf { it > 0f }
+        val deficitKcal = weeklyLoss?.let { it * AdaptiveTdeeCalculator.KCAL_PER_KG / 7.0 }
+            ?: AdaptiveTdeeCalculator.DEFAULT_DEFICIT_KCAL
+
         val adaptiveTarget = AdaptiveTdeeCalculator.computeDailyTarget(
             trend = trend,
             formulaTdee = profile.computedTdee(),
             todayActiveKcal = todayActiveKcal,
-            avgActiveKcal = avgActiveKcal
+            avgActiveKcal = avgActiveKcal,
+            deficitKcal = deficitKcal,
+            formulaBmr = profile.computedBmr()
         )
+
+        val breakdown = adaptiveTarget?.let { t ->
+            CalorieBreakdown(
+                formulaBmrKcal = t.formulaBmrKcal,
+                formulaTdeeKcal = t.formulaTdeeKcal,
+                trendTdeeKcal = t.trendTdeeKcal,
+                maintenanceKcal = t.maintenanceKcal,
+                deficitKcal = t.deficitKcal,
+                activityBonusKcal = t.activityBonusKcal,
+                targetKcal = t.targetKcal,
+                isTrendBased = t.isTrendBased,
+                confidencePercent = t.confidencePercent,
+                weightChangeKg = t.weightChangeKg,
+                avgIntakeKcal = t.avgIntakeKcal,
+                avgActiveKcal = t.avgActiveKcal,
+                todayActiveKcal = t.todayActiveKcal,
+                trendOverlapDays = t.trendOverlapDays,
+                trendSpanDays = t.trendSpanDays,
+                weeklyTargetLossKg = weeklyLoss
+            )
+        }
 
         HomeUiState(
             greeting      = greetingForHour(),
@@ -133,6 +186,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             previousWeightKg = trendWeights.dropLast(1).lastOrNull()?.weightKg,
             isAdaptiveTarget = adaptiveTarget != null,
             tdeeConfidence   = adaptiveTarget?.confidencePercent ?: 0,
+            calorieBreakdown = breakdown,
             meals         = orderedMealMeta.map { (type, label, icon, color) ->
                 val mealEntries = byMeal[type] ?: emptyList()
                 MealOverview(

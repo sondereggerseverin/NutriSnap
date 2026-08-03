@@ -17,7 +17,23 @@ data class AdaptiveCalorieTarget(
     // 0-100: how much to trust targetKcal. Trend-based grows with more overlapping
     // days and agreement with the formula estimate; formula-only is capped at a fixed
     // moderate score since it ignores this person's actual metabolic response entirely.
-    val confidencePercent: Int
+    val confidencePercent: Int,
+    /** Mifflin-St-Jeor Grundumsatz (Ruhe), falls Profil komplett. */
+    val formulaBmrKcal: Int? = null,
+    /** Formel-TDEE = BMR × Aktivitätsfaktor. */
+    val formulaTdeeKcal: Int? = null,
+    /** Aus Gewicht+Intake abgeleiteter Erhaltungsbedarf. */
+    val trendTdeeKcal: Int? = null,
+    /** Gewählter Erhaltungsbedarf vor Defizit (Trend bevorzugt). */
+    val maintenanceKcal: Int = 0,
+    /** Gewichtsänderung im Trendfenster (kg), negativ = abgenommen. */
+    val weightChangeKg: Float? = null,
+    /** Durchschnittliche Tagesaufnahme im Trendfenster. */
+    val avgIntakeKcal: Int? = null,
+    val avgActiveKcal: Int? = null,
+    val todayActiveKcal: Int? = null,
+    val trendOverlapDays: Int = 0,
+    val trendSpanDays: Int = 0
 )
 
 /** [computeTrendTdee] result, carrying how much data backed the estimate so
@@ -25,7 +41,9 @@ data class AdaptiveCalorieTarget(
 data class TrendTdeeResult(
     val tdee: Double,
     val overlapDays: Int,
-    val spanDays: Long
+    val spanDays: Long,
+    val weightChangeKg: Double = 0.0,
+    val avgIntakeKcal: Double = 0.0
 )
 
 /**
@@ -89,7 +107,13 @@ object AdaptiveTdeeCalculator {
         val avgIntake = days.map { intakeByDate.getValue(it) }.average()
 
         val tdee = avgIntake - (weightChangeKg * KCAL_PER_KG) / spanDays
-        return TrendTdeeResult(tdee = tdee, overlapDays = days.size, spanDays = spanDays)
+        return TrendTdeeResult(
+            tdee = tdee,
+            overlapDays = days.size,
+            spanDays = spanDays,
+            weightChangeKg = weightChangeKg,
+            avgIntakeKcal = avgIntake
+        )
     }
 
     // If the trend TDEE strays further than this from the formula estimate (when one is
@@ -116,7 +140,8 @@ object AdaptiveTdeeCalculator {
         formulaTdee: Double?,
         todayActiveKcal: Double?,
         avgActiveKcal: Double?,
-        deficitKcal: Double = DEFAULT_DEFICIT_KCAL
+        deficitKcal: Double = DEFAULT_DEFICIT_KCAL,
+        formulaBmr: Double? = null
     ): AdaptiveCalorieTarget? {
         val trustedTrend = trend?.takeIf {
             it.tdee >= TREND_MIN_PLAUSIBLE_KCAL &&
@@ -124,11 +149,15 @@ object AdaptiveTdeeCalculator {
                     kotlin.math.abs(it.tdee - formulaTdee) <= formulaTdee * TREND_PLAUSIBILITY_RATIO)
         }
         val maintenance = trustedTrend?.tdee ?: formulaTdee ?: return null
-        val base = maintenance - deficitKcal
+        // Defizit begrenzt: max 25% vom Erhaltungsbedarf, mind. 0
+        val safeDeficit = deficitKcal.coerceIn(0.0, maintenance * 0.25)
+        val base = maintenance - safeDeficit
 
-        val bonus = if (todayActiveKcal != null && avgActiveKcal != null && avgActiveKcal > 0) {
+        // Aktivitäts-Bonus: ± max 400 kcal, Faktor 0.5 gegen Tracker-Rauschen
+        val rawBonus = if (todayActiveKcal != null && avgActiveKcal != null && avgActiveKcal > 0) {
             (todayActiveKcal - avgActiveKcal) * ACTIVITY_ADJUSTMENT_FACTOR
         } else 0.0
+        val bonus = rawBonus.coerceIn(-400.0, 400.0)
 
         val target = (base + bonus).coerceAtLeast(SAFETY_FLOOR_KCAL)
 
@@ -137,8 +166,18 @@ object AdaptiveTdeeCalculator {
             baseKcal = base.toInt(),
             activityBonusKcal = bonus.toInt(),
             isTrendBased = trustedTrend != null,
-            deficitKcal = deficitKcal.toInt(),
-            confidencePercent = computeConfidence(trustedTrend, formulaTdee)
+            deficitKcal = safeDeficit.toInt(),
+            confidencePercent = computeConfidence(trustedTrend, formulaTdee),
+            formulaBmrKcal = formulaBmr?.toInt(),
+            formulaTdeeKcal = formulaTdee?.toInt(),
+            trendTdeeKcal = trend?.tdee?.toInt(),
+            maintenanceKcal = maintenance.toInt(),
+            weightChangeKg = trend?.weightChangeKg?.toFloat(),
+            avgIntakeKcal = trend?.avgIntakeKcal?.toInt(),
+            avgActiveKcal = avgActiveKcal?.toInt(),
+            todayActiveKcal = todayActiveKcal?.toInt(),
+            trendOverlapDays = trend?.overlapDays ?: 0,
+            trendSpanDays = trend?.spanDays?.toInt() ?: 0
         )
     }
 
