@@ -230,8 +230,34 @@ fun IngredientVerifySheet(
     val fiberComplete = verifyStates.filter { it.isVerified }
         .let { verified -> verified.isNotEmpty() && missingFiberStates.isEmpty() }
 
+    // Nested ModalBottomSheets crashen oft (Verify + Identify). Deshalb:
+    // entweder Identify ODER Verify, nie beides gleichzeitig.
+    val scanIdx = scanTarget
+    if (scanIdx != null) {
+        IngredientIdentifySheet(
+            ingredientName = verifyStates.getOrNull(scanIdx)?.result?.parsed?.name
+                ?: verifyStates.getOrNull(scanIdx)?.result?.line
+                ?: "Zutat",
+            onDismiss = { scanTarget = null },
+            onFoodSelected = { food ->
+                val idx = scanIdx
+                if (idx in verifyStates.indices) {
+                    val updated = verifyStates.toMutableList().also {
+                        it[idx] = it[idx].copy(override = food)
+                    }
+                    verifyStates = updated
+                    updateOverride(updated[idx].result.line, updated[idx].toOverride())
+                }
+                scanTarget = null
+            }
+        )
+        return
+    }
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         modifier = Modifier.fillMaxHeight(0.95f)
     ) {
         LazyColumn(
@@ -401,21 +427,6 @@ fun IngredientVerifySheet(
         }
     }
 
-    // Show scan/search/manual sheet for the target ingredient
-    scanTarget?.let { idx ->
-        IngredientIdentifySheet(
-            ingredientName = verifyStates[idx].result.parsed?.name ?: verifyStates[idx].result.line,
-            onDismiss = { scanTarget = null },
-            onFoodSelected = { food ->
-                val updated = verifyStates.toMutableList().also {
-                    it[idx] = it[idx].copy(override = food)
-                }
-                verifyStates = updated
-                updateOverride(updated[idx].result.line, updated[idx].toOverride())
-                scanTarget = null
-            }
-        )
-    }
 }
 
 // ── Single ingredient row ─────────────────────────────────────────────────────
@@ -791,6 +802,7 @@ private fun MacroChip(label: String, value: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun IngredientIdentifySheet(
     ingredientName: String,
     onDismiss: () -> Unit,
@@ -800,7 +812,11 @@ fun IngredientIdentifySheet(
     val scope = rememberCoroutineScope()
     var mode by remember { mutableStateOf<IdentifyMode>(IdentifyMode.Choose) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    val identifySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = identifySheetState
+    ) {
         when (mode) {
             IdentifyMode.Choose -> IdentifyChooseScreen(
                 ingredientName = ingredientName,

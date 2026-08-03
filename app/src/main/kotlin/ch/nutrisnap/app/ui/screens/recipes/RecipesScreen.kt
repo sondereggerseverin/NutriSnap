@@ -143,6 +143,7 @@ fun RecipesScreen(
     var showImportSheet   by remember { mutableStateOf(false) }
     var selectedRecipe    by remember { mutableStateOf<Recipe?>(null) }
     var showVerifySheet    by remember { mutableStateOf(false) }
+    var pendingVerify      by remember { mutableStateOf(false) }
     var addToDiaryRecipe  by remember { mutableStateOf<Recipe?>(null) }
     var editRecipe        by remember { mutableStateOf<Recipe?>(null) }
     var hideIncomplete    by remember { mutableStateOf(false) }
@@ -313,31 +314,40 @@ fun RecipesScreen(
 
     // ── Ingredient Verify Sheet ──────────────────────────────────────────────
     val verifyRecipe = selectedRecipe
-    val verifyResult = if (showVerifySheet) {
-        (vm.uiState.value.nutritionState.result)?.takeIf {
-            vm.uiState.value.nutritionState.recipeId == verifyRecipe?.id
+    val nutState = state.nutritionState
+    val verifyResult = nutState.result?.takeIf {
+        nutState.recipeId == verifyRecipe?.id && !nutState.isAnalyzing
+    }
+    // Nach Analyse automatisch Verify öffnen, falls angefordert
+    LaunchedEffect(nutState.result, nutState.isAnalyzing, pendingVerify, verifyRecipe?.id) {
+        if (pendingVerify && verifyRecipe != null && verifyResult != null && !nutState.isAnalyzing) {
+            showVerifySheet = true
+            pendingVerify = false
         }
-    } else null
-    if (showVerifySheet && verifyRecipe != null && verifyResult != null) {
+    }
+
+    val showVerifyNow = showVerifySheet && verifyRecipe != null && verifyResult != null
+    if (showVerifyNow) {
         IngredientVerifySheet(
-            analysisResult = verifyResult,
-            recipeName     = verifyRecipe.title,
+            analysisResult = verifyResult!!,
+            recipeName     = verifyRecipe!!.title,
             servings       = verifyRecipe.servings,
             initialOverrides = vm.getOverridesFor(verifyRecipe.id),
             onOverridesChanged = { vm.setOverridesFor(verifyRecipe.id, it) },
-            onDismiss      = { showVerifySheet = false },
+            onDismiss      = { showVerifySheet = false; pendingVerify = false },
             onConfirm      = { kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium, totalWeightG ->
                 vm.applyVerifiedNutrition(
                     verifyRecipe, kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium,
                     totalIngredientWeightG = totalWeightG
                 )
                 showVerifySheet = false
+                pendingVerify = false
             }
         )
     }
 
     // Detail-Sheet nicht gleichzeitig mit Verify-Sheet (doppeltes ModalBottomSheet = Crash)
-    if (!showVerifySheet) selectedRecipe?.let { recipe ->
+    if (!showVerifyNow) selectedRecipe?.let { recipe ->
         // Always show latest version from state
         val live = state.recipes.find { it.id == recipe.id } ?: recipe
         RecipeDetailSheet(
@@ -347,7 +357,17 @@ fun RecipesScreen(
             onAddToDiary = { r -> addToDiaryRecipe = r; selectedRecipe = null },
             onEdit       = { editRecipe = live; selectedRecipe = null },
             onAnalyze    = { vm.analyzeNutrition(live) },
-            onVerify     = { showVerifySheet = true },
+            onVerify     = {
+                val hasResult = state.nutritionState.result != null &&
+                    state.nutritionState.recipeId == live.id &&
+                    !state.nutritionState.isAnalyzing
+                if (hasResult) {
+                    showVerifySheet = true
+                } else {
+                    pendingVerify = true
+                    vm.analyzeNutrition(live)
+                }
+            },
             onRecalculateFromOverrides = { vm.recalculateFromOverrides(live) },
             hasStoredOverrides = vm.getOverridesFor(live.id).isNotEmpty(),
             onAddToShoppingList = { r ->
