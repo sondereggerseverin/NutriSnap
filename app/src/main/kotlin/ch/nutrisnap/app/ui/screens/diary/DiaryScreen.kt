@@ -328,6 +328,7 @@ fun DiaryScreen(
                                     if (result == SnackbarResult.ActionPerformed) vm.restoreEntry(entry)
                                 }
                             },
+                            onSchedule = { scheduleEntry = it },
                             onReorder = { ids -> vm.reorderEntries(ids) }
                         )
                     }
