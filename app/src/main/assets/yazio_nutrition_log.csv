@@ -44,7 +44,7 @@
 2023-08-20,dinner,Dinkelzopf,200.0g,638.0,18.2,15.0,104.0
 2023-08-20,dinner,Hamburger (patty),90.0g,189.0,16.2,13.5,0.7
 2023-08-20,dinner,"Eisbergsalat, frisch",100.0g,15.0,1.0,0.2,1.6
-2023-08-20,dinner,Schweinsnierstück plätzli,100.0g,163.0,22.7,7.8,0.1
+2023-08-20,dinner,Schweinsnierstück plätzli,100.0g,163.0,22.7,3.0,0.1
 2023-08-21,breakfast,Quarkhimmel,500.0g,265.0,43.0,2.5,22.5
 2023-08-21,breakfast,Briochezopf,50.0g,181.5,4.3,6.5,25.0
 2023-08-21,lunch,Pouletschenkel,300.0g,522.0,51.0,33.0,5.1
@@ -2109,7 +2109,7 @@
 2024-08-17,lunch,Fackelspiess Gefüllt,67.0g,188.3,10.7,13.7,1.2
 2024-08-17,lunch,"Kartoffeln (mit Schale), gekocht",400.0g,296.0,8.0,0.4,59.2
 2024-08-17,lunch,Mayonnaise light,50.0g,155.5,0.3,16.0,1.9
-2024-08-17,lunch,Schweinsnierstück plätzli,150.0g,244.5,34.0,11.7,0.1
+2024-08-17,lunch,Schweinsnierstück plätzli,150.0g,244.5,34.0,4.5,0.1
 2024-08-17,dinner,Urdinkelbrot,115.0g,289.8,12.7,3.8,48.3
 2024-08-17,dinner,Trutenbrust hauchdünn,60.0g,57.0,12.6,0.6,0.3
 2024-08-17,dinner,Nutella,10.0g,53.9,0.6,3.1,5.8
@@ -2129,6 +2129,7 @@
 2024-08-19,lunch,Poulet mit Spinat,1.0 Portion(en),2422.8,281.4,112.0,57.1
 2024-08-19,snack,Hefe nussgipfel,100.0g,389.0,8.7,17.0,48.0
 2024-08-19,dinner,Kebab de Poulet,425.0g,739.5,51.0,27.6,68.0
+2024-08-19,dinner,Protein Yogurt - Mango & Pecan,210.0g,281.4,14.1,10.1,31.5
 2024-08-19,dinner,"Karotten (Möhren), frisch",420.0g,163.8,3.4,0.8,28.6
 2024-08-19,lunch,"Erdbeeren, frisch",110.0g,39.6,0.9,0.4,6.0
 2024-08-19,lunch,"Dinkelnudeln, gekocht",250.0g,320.0,11.5,2.8,60.0
@@ -2255,7 +2256,7 @@
 2024-09-02,breakfast,Overnight Oats,1.0 Portion(en),637.5,56.4,19.9,54.2
 2024-09-02,lunch,Käsespätzle,150.0g,186.0,6.6,8.1,20.2
 2024-09-02,dinner,Naturreis mit Quinoa,100.0g,160.0,4.3,2.3,29.0
-2024-09-02,dinner,Pangasius Filet,150.0g,126.0,25.5,2.7,0.0
+2024-09-02,dinner,Pangasius Filet,150.0g,121.5,25.5,2.7,0.0
 2024-09-02,snack,Gipfeli,75.0g,196.5,0.0,10.2,20.5
 2024-09-02,lunch,Juppie Rinder Rahmgeschnetzeltes,200.0g,166.0,20.8,6.2,5.4
 2024-09-02,lunch,Rahmsauce,50.0g,189.5,0.6,18.5,5.5
@@ -3589,7 +3590,7 @@
 2025-03-01,dinner,Premium Muesli Honey & Nuts,100.0g,479.0,11.0,21.0,58.0
 2025-03-01,dinner,Milch,250.0g,115.0,8.0,3.8,12.2
 2025-03-01,snack,Whey Protein Coconut,50.0g,192.5,38.5,2.5,3.8
-2025-03-01,lunch,Schweinsnierstück plätzli,135.0g,220.1,30.6,10.5,0.1
+2025-03-01,lunch,Schweinsnierstück plätzli,135.0g,220.1,30.6,4.0,0.1
 2025-03-01,lunch,Sandwichbrot Weizen,165.0g,460.4,14.2,5.4,85.8
 2025-03-01,breakfast,Milch,300.0g,138.0,9.6,4.5,14.7
 2025-03-01,breakfast,Atlantischer Räucherlachs,135.0g,222.8,28.4,12.2,0.7
@@ -3648,7 +3649,7 @@
 2025-03-08,dinner,Kängurufilet,60.0g,72.0,13.2,1.9,0.5
 2025-03-08,dinner,Spareribs,100.0g,232.0,17.0,17.0,2.5
 2025-03-08,lunch,Thai Curry mit Reis,500.0g,580.0,11.0,34.5,80.0
-2025-03-09,lunch,Schweinsnierstück plätzli,140.0g,228.2,31.8,10.9,0.1
+2025-03-09,lunch,Schweinsnierstück plätzli,140.0g,228.2,31.8,4.2,0.1
 2025-03-09,breakfast,Quarkhimmel,500.0g,265.0,43.0,2.5,22.5
 2025-03-09,dinner,Bio Müsli Dinkel-Schoko,100.0g,411.0,12.0,12.0,60.0
 2025-03-09,dinner,"Voll Milch 3,5%",400.0g,268.0,13.2,14.8,20.0
@@ -3918,7 +3919,7 @@
 2025-04-27,breakfast,Skandinavischer Räucherlachs,25.0g,43.5,5.2,2.5,0.0
 2025-04-27,breakfast,Butter,10.0g,71.7,0.1,8.1,0.0
 2025-04-27,breakfast,Honig,15.0g,45.9,0.1,0.0,11.3
-2025-04-27,lunch,Poulet dürüm,550.0g,962.5,60.5,38.5,99.0
+2025-04-27,lunch,Poulet dürüm,550.0g,1045.0,71.5,44.0,88.0
 2025-04-27,dinner,Pouletfilet-Geschnetzeltes,100.0g,103.0,22.0,1.7,0.0
 2025-04-27,dinner,Isoclear,40.0g,138.0,32.0,0.0,1.0
 2025-04-28,lunch,Kartoffelstock,1.0 Portion(en),2767.4,67.9,61.7,453.1
@@ -4049,7 +4050,7 @@
 2025-05-18,lunch,Dinkelmehl,130.0g,453.7,14.0,1.7,89.6
 2025-05-18,lunch,Rosa Thon,155.0g,162.8,38.8,0.9,0.0
 2025-05-18,lunch,Mozzarella,100.0g,244.0,19.0,18.0,1.5
-2025-05-18,dinner,Poulet dürüm,550.0g,962.5,60.5,38.5,99.0
+2025-05-18,dinner,Poulet dürüm,550.0g,1045.0,71.5,44.0,88.0
 2025-05-19,lunch,Basmati Reis gekocht,1.0 Portion(en),3580.0,86.0,11.0,780.0
 2025-05-19,dinner,Quarkhimmel,500.0g,265.0,43.0,2.5,22.5
 2025-05-19,lunch,Pouletfilet-Geschnetzeltes,225.0g,231.8,49.5,3.8,0.0
@@ -4245,7 +4246,7 @@
 2025-06-24,dinner,Croquant Muesli - Framboise,250.0g,322.5,9.8,11.2,45.0
 2025-06-24,dinner,Spicy Beef Burito,392.0g,701.7,31.0,23.9,86.2
 2025-06-24,dinner,Cornet Chocolat,83.0g,248.0,3.8,12.0,30.0
-2025-06-24,snack,Poulet dürüm,550.0g,962.5,60.5,38.5,99.0
+2025-06-24,snack,Poulet dürüm,550.0g,1045.0,71.5,44.0,88.0
 2025-06-25,breakfast,Isoclear,30.0g,103.5,24.0,0.0,0.8
 2025-06-25,breakfast,Croquant Muesli - Framboise,250.0g,322.5,9.8,11.2,45.0
 2025-06-25,lunch,Salmon Mango Poke Bowl,390.0g,647.4,14.8,10.5,89.7
@@ -4476,7 +4477,7 @@
 2025-08-13,snack,Whey Protein Cookies & Cream,90.0g,336.6,67.0,3.9,8.0
 2025-08-13,snack,Milch,600.0g,276.0,19.2,9.0,29.4
 2025-08-14,dinner,Big Mac,884.0g,2050.9,106.1,106.1,168.0
-2025-08-14,snack,Poulet dürüm,550.0g,962.5,60.5,38.5,99.0
+2025-08-14,snack,Poulet dürüm,550.0g,1045.0,71.5,44.0,88.0
 2025-08-14,lunch,Soße Bolognese,450.0g,337.5,22.5,18.9,18.0
 2025-08-14,lunch,"Basmatireis, gekocht",350.0g,462.0,11.6,1.1,98.3
 2025-08-14,breakfast,Birchermüsli,400.0g,508.0,25.2,22.8,43.2
@@ -5556,6 +5557,7 @@
 2026-07-26,dinner,Rösti,250.0g,410.0,7.5,20.5,50.0
 2026-07-27,breakfast,Aronia mit Magerquark 2.0,1.0 Portion(en),435.1,17.3,13.6,49.4
 2026-07-27,lunch,Vegi Tortilla,1.0 Portion(en),673.7,56.5,37.5,21.8
+2026-07-27,dinner,Butter Chicken Delhi Style,500.0g,675.0,34.0,29.5,65.0
 2026-07-27,lunch,Tortilla Wraps Mehrkorn,124.0g,388.1,12.2,8.4,64.5
 2026-07-27,lunch,Sour Cream,70.0g,148.4,0.7,13.3,6.2
 2026-07-27,snack,protein bite ,40.0g,191.6,9.6,13.2,11.6
@@ -5563,5 +5565,23 @@
 2026-07-27,snack,Butterbrezeli mit Sonnenblumenkernen,100.0g,393.0,9.0,21.0,40.0
 2026-07-27,dinner,Poulet Brust filet,250.0g,257.5,55.0,4.2,0.0
 2026-07-28,breakfast,Aronia mit Magerquark 2.0,1.0 Portion(en),435.1,17.3,13.6,49.4
+2026-07-28,breakfast,Vanilla Protein Milk,230.0g,207.0,23.2,5.3,17.0
+2026-07-28,lunch,Sour Cream,70.0g,148.4,0.7,13.3,6.2
+2026-07-28,dinner,Butter Chicken Delhi Style,500.0g,675.0,34.0,29.5,65.0
+2026-07-28,snack,Ovomaltine Crunchy Biscuit,62.0g,311.9,4.4,15.1,39.4
+2026-07-28,snack,"Heidelbeeren (Blaubeeren), frisch",250.0g,115.0,1.5,1.5,15.0
+2026-07-28,dinner,Bio Senner Extra,50.0g,190.0,14.0,16.0,0.2
 2026-07-28,lunch,Poulet Brust filet,250.0g,257.5,55.0,4.2,0.0
 2026-07-28,lunch,Lasagne Bolognese (Hackfleisch Light),500.0g,680.0,31.5,24.0,80.5
+2026-07-29,lunch,Udon mit Hack Vegan,1.0 Portion(en),777.2,41.1,41.9,52.3
+2026-07-29,breakfast,Ovomaltine Drink,500.0g,385.0,15.5,10.0,58.0
+2026-07-29,breakfast,True Dates Sour Apple,80.0g,264.0,1.8,1.9,55.2
+2026-07-29,breakfast,Focus water,1500.0g,255.0,0.0,0.0,60.0
+2026-07-29,breakfast,ültje nüsse,100.0g,590.0,25.0,46.0,16.0
+2026-07-29,breakfast,Raw bio energy,50.0g,196.0,1.8,8.6,25.5
+2026-07-29,breakfast,Country Nuts,30.0g,170.7,5.4,12.3,7.5
+2026-07-29,breakfast,Mini-Hähnchenbrust Filetstücke Curry,150.0g,208.5,35.9,5.5,3.3
+2026-07-29,snack,Glace,65.0g,219.1,1.8,13.0,23.4
+2026-07-29,dinner,Skandinavischenr Räucherlachs,125.0g,202.5,25.5,11.2,0.0
+2026-07-30,breakfast,Buttergipfel,55.0g,216.2,5.0,11.0,23.6
+2026-07-30,breakfast,Protein Mix,20.0g,117.2,6.2,9.2,1.4
