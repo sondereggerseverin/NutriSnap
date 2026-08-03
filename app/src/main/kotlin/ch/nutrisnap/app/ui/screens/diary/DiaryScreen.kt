@@ -116,6 +116,8 @@ fun DiaryScreen(
     }
     var editEntry    by remember { mutableStateOf<DiaryEntry?>(null) }
     var detailEntry  by remember { mutableStateOf<DiaryEntry?>(null) }
+    var scheduleEntry by remember { mutableStateOf<DiaryEntry?>(null) }
+    var scheduleMeal by remember { mutableStateOf<MealType?>(null) }
     // Direkte Makro-Korrektur (globale Ebene): welches Feld gerade im MacroEditSheet
     // bearbeitet wird. Der zugehörige Eintrag wird bei jeder Rekomposition frisch aus
     // state.entries geholt, damit der Wert nach dem Speichern sofort aktuell ist.
@@ -271,6 +273,17 @@ fun DiaryScreen(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     IconButton(
+                                        onClick = { scheduleMeal = meal },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.ContentCopy,
+                                            contentDescription = "Mahlzeit auf mehrere Tage kopieren",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    IconButton(
                                         onClick = { expandedNutrition = if (expandedNutrition == meal) null else meal },
                                         modifier = Modifier.size(28.dp)
                                     ) {
@@ -355,6 +368,52 @@ fun DiaryScreen(
                 onDismiss = { macroEditField = null }
             )
         }
+    }
+
+    scheduleEntry?.let { entry ->
+        EntryScheduleSheet(
+            entry = entry,
+            currentDate = state.selectedDate,
+            onDismiss = { scheduleEntry = null },
+            onMove = { date, meal ->
+                vm.moveEntry(entry, date, meal) {
+                    scope.launch {
+                        snackbarHostState.showSnackbar(
+                            "Verschoben auf ${date.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM."))} · ${meal.label()}"
+                        )
+                    }
+                }
+                scheduleEntry = null
+            },
+            onCopyDays = { days, start, meal, includeStart ->
+                vm.copyEntryToDays(entry, days, start, meal, includeStart) { n ->
+                    scope.launch {
+                        snackbarHostState.showSnackbar(
+                            if (n > 0) "$n× „${entry.foodName}“ kopiert" else "Nichts kopiert"
+                        )
+                    }
+                }
+                scheduleEntry = null
+            }
+        )
+    }
+
+    scheduleMeal?.let { meal ->
+        MealCopySheet(
+            meal = meal,
+            sourceDate = state.selectedDate,
+            onDismiss = { scheduleMeal = null },
+            onConfirm = { days ->
+                vm.copyMealToDays(meal, state.selectedDate, days, includeStart = false) { n ->
+                    scope.launch {
+                        snackbarHostState.showSnackbar(
+                            if (n > 0) "$n Einträge auf $days Tage verteilt" else "Keine Einträge"
+                        )
+                    }
+                }
+                scheduleMeal = null
+            }
+        )
     }
 
     editEntry?.let { entry ->
@@ -868,6 +927,37 @@ private fun DiaryEntryRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                Box {
+                    IconButton(
+                        onClick = { showMenu = true },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.MoreVert,
+                            contentDescription = "Mehr",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Menge bearbeiten") },
+                            onClick = { showMenu = false; onEdit() },
+                            leadingIcon = { Icon(Icons.Default.Edit, null) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Verschieben / kopieren…") },
+                            onClick = { showMenu = false; onSchedule() },
+                            leadingIcon = { Icon(Icons.Default.Event, null) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Löschen") },
+                            onClick = { showMenu = false; showConfirm = true },
+                            leadingIcon = {
+                                Icon(Icons.Default.DeleteOutline, null, tint = MaterialTheme.colorScheme.error)
+                            }
+                        )
+                    }
+                }
                 if (dragHandleModifier != null) {
                     Icon(
                         Icons.Default.DragHandle, "Reihenfolge ändern",
@@ -910,6 +1000,7 @@ private fun ReorderableMealEntries(
     entries: List<DiaryEntry>,
     onEdit: (DiaryEntry) -> Unit,
     onDelete: (DiaryEntry) -> Unit,
+    onSchedule: (DiaryEntry) -> Unit = {},
     onReorder: (List<Long>) -> Unit
 ) {
     var items by remember(entries.map { it.id }) { mutableStateOf(entries) }
@@ -924,6 +1015,7 @@ private fun ReorderableMealEntries(
                 entry    = entry,
                 onEdit   = { onEdit(entry) },
                 onDelete = { onDelete(entry) },
+                onSchedule = { onSchedule(entry) },
                 modifier = Modifier
                     .zIndex(if (isDragging) 1f else 0f)
                     .graphicsLayer { translationY = if (isDragging) dragOffset else 0f },
@@ -1757,4 +1849,180 @@ private fun MealType.label() = when (this) {
     MealType.LUNCH     -> "Mittagessen"
     MealType.DINNER    -> "Abendessen"
     MealType.SNACK     -> "Snack"
+}
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EntryScheduleSheet(
+    entry: DiaryEntry,
+    currentDate: java.time.LocalDate,
+    onDismiss: () -> Unit,
+    onMove: (java.time.LocalDate, MealType) -> Unit,
+    onCopyDays: (dayCount: Int, start: java.time.LocalDate, meal: MealType?, includeStart: Boolean) -> Unit
+) {
+    var mode by remember { mutableStateOf("move") } // move | copy
+    val today = java.time.LocalDate.now()
+    var selectedDate by remember {
+        mutableStateOf(
+            runCatching { java.time.LocalDate.parse(entry.dateStr) }.getOrDefault(currentDate)
+        )
+    }
+    var selectedMeal by remember { mutableStateOf(entry.mealType) }
+    var dayCount by remember { mutableIntStateOf(5) }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .padding(horizontal = 16.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 24.dp)
+        ) {
+            Text("Verschieben / kopieren", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text(entry.foodName, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(12.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = mode == "move", onClick = { mode = "move" }, label = { Text("Verschieben") })
+                FilterChip(selected = mode == "copy", onClick = { mode = "copy" }, label = { Text("Kopieren") })
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Text("Schnell", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = { onMove(today.minusDays(1), MealType.DINNER) },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Gestern Abend", fontSize = 12.sp) }
+                OutlinedButton(
+                    onClick = { onMove(today.minusDays(1), MealType.LUNCH) },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Gestern Mittag", fontSize = 12.sp) }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Text("Tag", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    today.minusDays(1) to "Gestern",
+                    today to "Heute",
+                    today.plusDays(1) to "Morgen"
+                ).forEach { (d, label) ->
+                    FilterChip(
+                        selected = selectedDate == d,
+                        onClick = { selectedDate = d },
+                        label = { Text(label, fontSize = 12.sp) }
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Text("Mahlzeit", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MealType.entries.forEach { m ->
+                    FilterChip(
+                        selected = selectedMeal == m,
+                        onClick = { selectedMeal = m },
+                        label = { Text(m.label(), fontSize = 11.sp) }
+                    )
+                }
+            }
+
+            if (mode == "copy") {
+                Spacer(Modifier.height(12.dp))
+                Text("Anzahl Tage (Meal-Prep)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    listOf(5, 7).forEach { n ->
+                        FilterChip(
+                            selected = dayCount == n,
+                            onClick = { dayCount = n },
+                            label = { Text("$n Tage") }
+                        )
+                    }
+                    IconButton(onClick = { dayCount = (dayCount - 1).coerceAtLeast(1) }) {
+                        Icon(Icons.Default.Remove, null)
+                    }
+                    Text("$dayCount", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    IconButton(onClick = { dayCount = (dayCount + 1).coerceAtMost(14) }) {
+                        Icon(Icons.Default.Add, null)
+                    }
+                }
+                Text(
+                    "Kopiert ab ${selectedDate.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM."))} auf $dayCount Tage · ${selectedMeal.label()}",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Spacer(Modifier.height(20.dp))
+            Button(
+                onClick = {
+                    if (mode == "move") onMove(selectedDate, selectedMeal)
+                    else onCopyDays(dayCount, selectedDate, selectedMeal, includeStart = true)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (mode == "move") "Verschieben" else "Auf $dayCount Tage kopieren")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MealCopySheet(
+    meal: MealType,
+    sourceDate: java.time.LocalDate,
+    onDismiss: () -> Unit,
+    onConfirm: (dayCount: Int) -> Unit
+) {
+    var dayCount by remember { mutableIntStateOf(5) }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .padding(horizontal = 16.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 24.dp)
+        ) {
+            Text("Mahlzeit kopieren", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text(
+                "${meal.label()} · ab ${sourceDate.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM."))} auf Folgetage",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(16.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                listOf(5, 7).forEach { n ->
+                    FilterChip(selected = dayCount == n, onClick = { dayCount = n }, label = { Text("$n Tage") })
+                }
+                IconButton(onClick = { dayCount = (dayCount - 1).coerceAtLeast(2) }) {
+                    Icon(Icons.Default.Remove, null)
+                }
+                Text("$dayCount", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                IconButton(onClick = { dayCount = (dayCount + 1).coerceAtMost(14) }) {
+                    Icon(Icons.Default.Add, null)
+                }
+            }
+            Text(
+                "Alle Einträge dieser Mahlzeit werden auf die nächsten ${dayCount - 1} Tage kopiert (ohne heute nochmal).",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = { onConfirm(dayCount) }, modifier = Modifier.fillMaxWidth()) {
+                Text("Auf $dayCount Tage kopieren")
+            }
+        }
+    }
 }

@@ -245,6 +245,72 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Eintrag auf anderes Datum/Mahlzeit verschieben (z.B. falsch heute statt gestern Abend). */
+    fun moveEntry(entry: DiaryEntry, date: java.time.LocalDate, meal: MealType, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repo.updateEntry(entry.copy(dateStr = date.toString(), mealType = meal))
+            onDone()
+        }
+    }
+
+    /**
+     * Eintrag auf mehrere Tage kopieren (Meal-Prep).
+     * @param dayCount Anzahl Tage inklusive Starttag
+     * @param startDate erster Tag (meist Eintragsdatum oder heute)
+     * @param meal optional andere Mahlzeit auf allen Kopien
+     * @param includeStart wenn false, wird der Starttag übersprungen (nur Folgetage)
+     */
+    fun copyEntryToDays(
+        entry: DiaryEntry,
+        dayCount: Int,
+        startDate: java.time.LocalDate,
+        meal: MealType? = null,
+        includeStart: Boolean = true,
+        onDone: (Int) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val count = dayCount.coerceIn(1, 14)
+            var n = 0
+            for (i in 0 until count) {
+                if (!includeStart && i == 0) continue
+                val d = startDate.plusDays(i.toLong())
+                // Am Starttag mit gleichem Datum+Meal nicht duplizieren
+                if (d.toString() == entry.dateStr && (meal == null || meal == entry.mealType) && i == 0) {
+                    continue
+                }
+                val base = if (meal != null) entry.copy(mealType = meal) else entry
+                repo.duplicateEntryToDate(base, d)
+                n++
+            }
+            onDone(n)
+        }
+    }
+
+    /** Ganze Mahlzeit eines Tages auf N Folgetage kopieren. */
+    fun copyMealToDays(
+        meal: MealType,
+        sourceDate: java.time.LocalDate,
+        dayCount: Int,
+        includeStart: Boolean = false,
+        onDone: (Int) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val entries = repo.getEntriesForDateOnce(sourceDate).filter { it.mealType == meal }
+            val count = dayCount.coerceIn(1, 14)
+            var n = 0
+            for (i in 0 until count) {
+                if (!includeStart && i == 0) continue
+                val d = sourceDate.plusDays(i.toLong())
+                if (d == sourceDate) continue
+                for (e in entries) {
+                    repo.duplicateEntryToDate(e, d)
+                    n++
+                }
+            }
+            onDone(n)
+        }
+    }
+
     fun rememberLastAmount(foodName: String, grams: Float) {
         viewModelScope.launch {
             val key = floatPreferencesKey("last_amount_" + foodName.lowercase().trim().take(80).hashCode())
