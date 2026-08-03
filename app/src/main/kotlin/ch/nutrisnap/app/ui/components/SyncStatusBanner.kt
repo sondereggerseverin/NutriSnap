@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -26,20 +27,35 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.nutrisnap.app.data.supabase.SyncState
 import ch.nutrisnap.app.data.supabase.SyncStatusHolder
+import kotlinx.coroutines.delay
 
 /**
- * Zeigt den globalen Sync-Status (SyncStatusHolder) als schmalen Banner an --
- * analog zu OfflineBanner, aber fuer "synct gerade" / "Sync fehlgeschlagen".
- *
- * Bewusst NICHT bei SUCCESS/IDLE sichtbar: ein staendig aufblitzendes
- * "Synchronisiert ✓" bei jeder kleinen Diary-Aenderung waere mehr Rauschen
- * als Nutzen. Der Banner meldet sich nur wenn etwas gerade laeuft (SYNCING)
- * oder schiefgegangen ist (ERROR) -- also genau dann, wenn der Nutzer vorher
- * keine Chance hatte zu wissen, was passiert.
+ * Banner nur bei laufender Voll-Sync (pushAll/pullAll) oder Fehler.
+ * Einzel-Pushes setzen den Status nicht mehr → kein Dauer-"Synchronisiert…".
+ * Hängt der Status >45s, wird er automatisch zurückgesetzt.
  */
 @Composable
 fun SyncStatusBanner() {
     val status by SyncStatusHolder.status.collectAsState()
+
+    // Stuck-Guard: alle 10s prüfen
+    LaunchedEffect(status.state, status.activeOps) {
+        if (status.state == SyncState.SYNCING) {
+            while (true) {
+                delay(10_000)
+                SyncStatusHolder.clearStaleSyncing(45)
+            }
+        }
+    }
+
+    // ERROR nach 8s ausblenden (zurück zu IDLE)
+    LaunchedEffect(status.state) {
+        if (status.state == SyncState.ERROR) {
+            delay(8_000)
+            SyncStatusHolder.clearStaleSyncing(0) // force clear via helper if ERROR
+            // Explizit: activeOps 0 + IDLE when error aged
+        }
+    }
 
     AnimatedVisibility(
         visible = status.state == SyncState.SYNCING || status.state == SyncState.ERROR,
@@ -49,7 +65,7 @@ fun SyncStatusBanner() {
         val isError = status.state == SyncState.ERROR
         val bgColor = if (isError) Color(0xFFB00020) else Color(0xFF1E6091)
         val label = if (isError) {
-            "Sync fehlgeschlagen" + (status.lastError?.let { ": $it" } ?: "")
+            "Sync fehlgeschlagen" + (status.lastError?.let { ": ${it.take(60)}" } ?: "")
         } else {
             "Synchronisiert…"
         }

@@ -7,14 +7,8 @@ import java.time.Instant
 
 /**
  * Globaler, beobachtbarer Sync-Status.
- *
- * Vorher lief Push (Repositories.pushSafely) und Pull (SyncManager.pullAll)
- * komplett unsichtbar im Hintergrund -- ein fehlgeschlagener Sync (offline,
- * RLS-Policy, etc.) war fuer den Nutzer nicht von "alles ok" zu unterscheiden.
- *
- * Dieses Objekt wird von beiden Seiten (Push + Pull) aktualisiert und kann von
- * der UI per StateFlow beobachtet werden, um z.B. einen "Synchronisiert..."-
- * Banner oder eine Fehlermeldung anzuzeigen.
+ * Banner zeigt nur SYNCING (volle Push/Pull-Runden) und ERROR.
+ * Einzel-Pushes aktualisieren den Status nicht mehr (siehe pushSafely).
  */
 enum class SyncState { IDLE, SYNCING, SUCCESS, ERROR }
 
@@ -22,11 +16,8 @@ data class SyncStatus(
     val state: SyncState = SyncState.IDLE,
     val lastSuccessAt: Instant? = null,
     val lastError: String? = null,
-    // Zaehlt laufende Push/Pull-Operationen. Mehrere Repos koennen gleichzeitig
-    // pushen (z.B. Diary + Recipe kurz nacheinander) -- "Syncing" soll erst
-    // verschwinden wenn WIRKLICH nichts mehr laeuft, nicht nach der ersten
-    // abgeschlossenen von mehreren parallelen Operationen.
-    val activeOps: Int = 0
+    val activeOps: Int = 0,
+    val syncingSince: Instant? = null
 )
 
 object SyncStatusHolder {
@@ -34,7 +25,14 @@ object SyncStatusHolder {
     val status: StateFlow<SyncStatus> = _status
 
     fun opStarted() {
-        _status.update { it.copy(state = SyncState.SYNCING, activeOps = it.activeOps + 1) }
+        _status.update {
+            val ops = it.activeOps + 1
+            it.copy(
+                state = SyncState.SYNCING,
+                activeOps = ops,
+                syncingSince = it.syncingSince ?: Instant.now()
+            )
+        }
     }
 
     fun opSucceeded() {
@@ -44,7 +42,8 @@ object SyncStatusHolder {
                 state = if (remaining == 0) SyncState.SUCCESS else SyncState.SYNCING,
                 activeOps = remaining,
                 lastSuccessAt = Instant.now(),
-                lastError = if (remaining == 0) null else it.lastError
+                lastError = if (remaining == 0) null else it.lastError,
+                syncingSince = if (remaining == 0) null else it.syncingSince
             )
         }
     }
@@ -55,8 +54,24 @@ object SyncStatusHolder {
             it.copy(
                 state = if (remaining == 0) SyncState.ERROR else SyncState.SYNCING,
                 activeOps = remaining,
-                lastError = message ?: "Unbekannter Fehler"
+                lastError = message ?: "Unbekannter Fehler",
+                syncingSince = if (remaining == 0) null else it.syncingSince
             )
+        }
+    }
+
+    /** SYNCING/ERROR zurücksetzen. maxSeconds=0 erzwingt sofortiges Clear. */
+    fun clearStaleSyncing(maxSeconds: Long = 45) {
+        _status.update {
+            if (maxSeconds == 0L) {
+                return@update it.copy(state = SyncState.IDLE, activeOps = 0, syncingSince = null, lastError = null)
+            }
+            if (it.state != SyncState.SYNCING) return@update it
+            val since = it.syncingSince ?: return@update it
+            val age = Instant.now().epochSecond - since.epochSecond
+            if (age >= maxSeconds) {
+                it.copy(state = SyncState.IDLE, activeOps = 0, syncingSince = null)
+            } else it
         }
     }
 }

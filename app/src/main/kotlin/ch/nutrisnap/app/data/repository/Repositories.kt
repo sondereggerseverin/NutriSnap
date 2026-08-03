@@ -21,16 +21,18 @@ import java.time.LocalDate
 /** Fire-and-forget scope for pushing local changes to Supabase. A failed push
  *  (e.g. offline) never breaks the local save — it's caught and swallowed. */
 private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+/**
+ * Einzel-Push (ein Tagebuch-Eintrag, ein Rezept, …).
+ * Aktualisiert den Sync-Banner bewusst NICHT — sonst bleibt "Synchronisiert…"
+ * permanent sichtbar, weil bei jedem Tippen opStarted/opSucceeded flackert und
+ * parallele Pushes activeOps nie auf 0 bringen. Banner nur bei SyncManager.pushAllLocal/pullAll.
+ */
 private fun pushSafely(block: suspend () -> Unit) {
     syncScope.launch {
-        SyncStatusHolder.opStarted()
         runCatching { block() }
-            .onSuccess { SyncStatusHolder.opSucceeded() }
             .onFailure {
-                // Vorher komplett stumm geschluckt -> jetzt sichtbar in Logcat UND im
-                // SyncStatusHolder, damit Sync-Fehler (fehlende UNIQUE-Constraint,
-                // RLS-Policy, offline, ...) auffindbar sind statt im Nirvana zu landen.
                 Log.e("NutriSync", "Push zu Supabase fehlgeschlagen: ${it.message}", it)
+                // Nur Fehler im Banner, kein Dauer-SYNCING
                 SyncStatusHolder.opFailed(it.message)
             }
     }

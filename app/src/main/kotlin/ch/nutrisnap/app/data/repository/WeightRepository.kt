@@ -16,10 +16,12 @@ class WeightRepository(db: NutriDatabase) {
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private fun pushSafely(block: suspend () -> Unit) {
         syncScope.launch {
-            SyncStatusHolder.opStarted()
+            // Kein opStarted für Einzel-Push (Banner-Spam)
             runCatching { block() }
-                .onSuccess { SyncStatusHolder.opSucceeded() }
-                .onFailure { SyncStatusHolder.opFailed(it.message) }
+                .onFailure {
+                    android.util.Log.e("NutriSync", "Weight push failed: ${it.message}", it)
+                    SyncStatusHolder.opFailed(it.message)
+                }
         }
     }
 

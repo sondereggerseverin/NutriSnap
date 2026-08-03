@@ -163,7 +163,7 @@ fun DiaryScreen(
             Modifier.padding(padding).fillMaxSize(),
             contentPadding = PaddingValues(bottom = 100.dp)
         ) {
-            item { DateNavigator(state.selectedDate, vm::prevDay, vm::nextDay) }
+            item { DateNavigator(state.selectedDate, vm::prevDay, vm::nextDay, vm::setDate) }
             item {
                 TextButton(
                     onClick = {
@@ -814,7 +814,17 @@ private fun QuickAddBar(favorites: List<FoodItem>, onQuickAdd: (FoodItem) -> Uni
 }
 
 @Composable
-private fun DateNavigator(date: LocalDate, onPrev: () -> Unit, onNext: () -> Unit) {
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateNavigator(
+    date: LocalDate,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+    onPick: (LocalDate) -> Unit = {}
+) {
+    var showPicker by remember { mutableStateOf(false) }
+    val zone = java.time.ZoneId.systemDefault()
+
     Row(
         Modifier
             .fillMaxWidth()
@@ -822,6 +832,9 @@ private fun DateNavigator(date: LocalDate, onPrev: () -> Unit, onNext: () -> Uni
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
+        IconButton(onClick = { onPick(date.minusDays(7)) }) {
+            Icon(Icons.Default.KeyboardDoubleArrowLeft, "−7 Tage")
+        }
         IconButton(onClick = onPrev) {
             Icon(Icons.Default.ChevronLeft, "Vorheriger Tag")
         }
@@ -830,14 +843,60 @@ private fun DateNavigator(date: LocalDate, onPrev: () -> Unit, onNext: () -> Uni
             LocalDate.now().minusDays(1) -> "Gestern"
             else -> date.format(DateTimeFormatter.ofPattern("EEE, dd. MMM", Locale.GERMAN))
         }
-        Text(
-            label,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 16.sp,
-            modifier = Modifier.padding(horizontal = NutriSpacing.sm)
-        )
+        TextButton(onClick = { showPicker = true }) {
+            Icon(
+                Icons.Default.CalendarMonth,
+                contentDescription = "Kalender",
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(label, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+        }
         IconButton(onClick = onNext, enabled = date.isBefore(LocalDate.now())) {
             Icon(Icons.Default.ChevronRight, "Nächster Tag")
+        }
+        IconButton(
+            onClick = { onPick(minOf(date.plusDays(7), LocalDate.now())) },
+            enabled = date.isBefore(LocalDate.now())
+        ) {
+            Icon(Icons.Default.KeyboardDoubleArrowRight, "+7 Tage")
+        }
+    }
+
+    if (showPicker) {
+        val initialMillis = date.atStartOfDay(zone).toInstant().toEpochMilli()
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = initialMillis,
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                    val d = java.time.Instant.ofEpochMilli(utcTimeMillis)
+                        .atZone(java.time.ZoneOffset.UTC).toLocalDate()
+                    return !d.isAfter(LocalDate.now())
+                }
+            }
+        )
+        DatePickerDialog(
+            onDismissRequest = { showPicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let { ms ->
+                        val picked = java.time.Instant.ofEpochMilli(ms)
+                            .atZone(java.time.ZoneOffset.UTC).toLocalDate()
+                        onPick(picked)
+                    }
+                    showPicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPicker = false }) { Text("Abbrechen") }
+            }
+        ) {
+            DatePicker(state = pickerState, title = {
+                Text(
+                    "Tag wählen",
+                    modifier = Modifier.padding(start = 24.dp, top = 16.dp)
+                )
+            })
         }
     }
 }
