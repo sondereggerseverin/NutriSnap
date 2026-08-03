@@ -685,6 +685,7 @@ fun ManualActivitySettingsCard() {
     }
 }
 
+@Composable
 fun SamsungHealthCard() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope   = rememberCoroutineScope()
