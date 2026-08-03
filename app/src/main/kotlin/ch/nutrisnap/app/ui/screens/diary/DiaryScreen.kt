@@ -813,7 +813,6 @@ private fun QuickAddBar(favorites: List<FoodItem>, onQuickAdd: (FoodItem) -> Uni
     }
 }
 
-@Composable
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DateNavigator(
