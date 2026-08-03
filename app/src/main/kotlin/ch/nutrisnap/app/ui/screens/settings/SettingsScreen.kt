@@ -36,6 +36,7 @@ import androidx.datastore.preferences.core.edit
 import ch.nutrisnap.app.ui.theme.AppTheme
 import ch.nutrisnap.app.ui.theme.KEY_APP_THEME
 import ch.nutrisnap.app.ui.theme.KEY_AUTO_GERMAN_METRIC
+import ch.nutrisnap.app.ui.theme.KEY_MANUAL_ACTIVITY_ENABLED
 
 enum class FitnessGoal(val label: String, val emoji: String, val desc: String) {
     LOSE_WEIGHT("Abnehmen",        "\uD83D\uDD25", "–500 kcal vom TDEE · mehr Protein"),
@@ -274,6 +275,9 @@ fun SettingsScreen(
 
         // Samsung Health Data SDK
         SamsungHealthCard()
+
+        // Manuelle Aktivitätskalorien
+        ManualActivitySettingsCard()
 
         // Körperdaten
         SettingsCard(title = "Körperdaten", icon = Icons.Default.Person) {
@@ -637,6 +641,50 @@ fun HealthConnectCard() {
 }
 
 @Composable
+fun ManualActivitySettingsCard() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val enabled = prefs?.get(KEY_MANUAL_ACTIVITY_ENABLED) ?: false
+
+    SettingsCard(title = "Manuelle Aktivität", icon = Icons.Default.DirectionsRun) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                Text(
+                    "Aktivitätskalorien manuell tracken",
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 14.sp
+                )
+                Text(
+                    "Zusätzlich zu Health Connect / Samsung Health. Zählt in Ziel-Rechnung und Durchschnitt.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = { checked ->
+                    scope.launch {
+                        context.notifDataStore.edit { it[KEY_MANUAL_ACTIVITY_ENABLED] = checked }
+                    }
+                }
+            )
+        }
+        if (enabled) {
+            Spacer(Modifier.height(NutriSpacing.sm))
+            Text(
+                "Auf der Startseite kannst du für heute Aktivitätskalorien eintragen.",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
 fun SamsungHealthCard() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope   = rememberCoroutineScope()

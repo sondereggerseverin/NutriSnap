@@ -193,6 +193,13 @@ data class RecipeScrapeResult(
 @Entity(tableName = "weight_entries")
 data class WeightEntry(@PrimaryKey val dateStr: String, val weightKg: Float)
 
+/** Manuell erfasste Aktivitätskalorien pro Tag (zusätzlich zu Health Connect). */
+@Entity(tableName = "manual_activity")
+data class ManualActivityEntry(
+    @PrimaryKey val dateStr: String,  // yyyy-MM-dd
+    val activeCaloriesKcal: Float
+)
+
 // ─── Favorites ───────────────────────────────────────────────────────────────
 // Note: DB column names kept as-is for backward compatibility with Migration 2→3 SQL
 @Entity(tableName = "favorite_foods")

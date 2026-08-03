@@ -74,9 +74,10 @@ interface UserProfileDao {
         // Neue Entities (9-Feature-Patch):
         ch.nutrisnap.app.data.db.entity.GlobalIngredientMatch::class,       // Feature 2
         ch.nutrisnap.app.data.db.entity.FoodUsageContext::class,            // Feature 7
-        ch.nutrisnap.app.data.db.entity.DetectedMealPatternEntity::class    // Feature 5
+        ch.nutrisnap.app.data.db.entity.DetectedMealPatternEntity::class,   // Feature 5
+        ManualActivityEntry::class
     ],
-    version = 23,
+    version = 24,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -97,6 +98,7 @@ abstract class NutriDatabase : RoomDatabase() {
     abstract fun globalIngredientMatchDao(): GlobalIngredientMatchDao
     abstract fun foodUsageContextDao(): FoodUsageContextDao
     abstract fun detectedMealPatternDao(): DetectedMealPatternDao
+    abstract fun manualActivityDao(): ManualActivityDao
 
     companion object {
         @Volatile private var INSTANCE: NutriDatabase? = null
@@ -527,6 +529,17 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_23_24 = object : Migration(23, 24) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS manual_activity (
+                        dateStr TEXT NOT NULL PRIMARY KEY,
+                        activeCaloriesKcal REAL NOT NULL
+                    )
+                """.trimIndent())
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -540,7 +553,7 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
                         MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16,
                         MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
-                        MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23
+                        MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24
                     )
                     .build()
                     .also { INSTANCE = it }

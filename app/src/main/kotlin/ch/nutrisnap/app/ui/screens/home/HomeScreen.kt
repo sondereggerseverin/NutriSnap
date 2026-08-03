@@ -39,6 +39,7 @@ fun HomeScreen(
     val state by vm.uiState.collectAsState()
     val hcState by hcVm.uiState.collectAsState()
     var showWeightDialog by remember { mutableStateOf(false) }
+    var showActivityDialog by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
@@ -61,6 +62,15 @@ fun HomeScreen(
                 )
             }
             item { HealthCard(hcState.todayData, hcState.hasPermission, onNavigateToHealth) { showWeightDialog = true } }
+            if (state.manualActivityEnabled) {
+                item {
+                    ManualActivityCard(
+                        todayKcal = state.manualActivityKcal,
+                        totalActive = state.burnedKcal,
+                        onClick = { showActivityDialog = true }
+                    )
+                }
+            }
             item { StreakCard(state.streak) }
         }
     }
@@ -70,6 +80,13 @@ fun HomeScreen(
             currentWeight = state.lastWeightKg,
             onConfirm = { kg -> vm.logWeight(kg); showWeightDialog = false },
             onDismiss = { showWeightDialog = false }
+        )
+    }
+    if (showActivityDialog) {
+        ManualActivityDialog(
+            currentKcal = state.manualActivityKcal,
+            onConfirm = { kcal -> vm.logManualActivity(kcal); showActivityDialog = false },
+            onDismiss = { showActivityDialog = false }
         )
     }
 }
@@ -612,6 +629,93 @@ private fun WeightEntryDialog(
     )
 }
 
+@Composable
+private fun ManualActivityCard(
+    todayKcal: Float?,
+    totalActive: Float,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.sm)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(NutriRadius.lg),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(1.dp)
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(NutriSpacing.lg),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("🏃", fontSize = 22.sp)
+            Spacer(Modifier.width(NutriSpacing.md))
+            Column(Modifier.weight(1f)) {
+                Text("Manuelle Aktivität", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text(
+                    if (todayKcal != null && todayKcal > 0f)
+                        "Heute manuell: ${todayKcal.toInt()} kcal · Gesamt aktiv: ${totalActive.toInt()} kcal"
+                    else
+                        "Tippen, um Aktivitätskalorien einzutragen",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                if (todayKcal != null && todayKcal > 0f) "${todayKcal.toInt()}" else "+",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+@Composable
+private fun ManualActivityDialog(
+    currentKcal: Float?,
+    onConfirm: (Float) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var text by remember {
+        mutableStateOf(currentKcal?.takeIf { it > 0f }?.let { it.toInt().toString() } ?: "")
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Aktivität heute") },
+        text = {
+            Column {
+                Text(
+                    "Kalorien aus Sport/Bewegung, die nicht (vollständig) über Health Connect kommen. Werden zur HC-Aktivität addiert.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it.filter { ch -> ch.isDigit() || ch == ',' || ch == '.' } },
+                    label = { Text("Aktivitätskalorien (kcal)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val v = text.replace(',', '.').toFloatOrNull() ?: 0f
+                onConfirm(v.coerceAtLeast(0f))
+            }) { Text("Speichern") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Abbrechen") }
+        }
+    )
+}
+
 
 @Composable
 private fun CalorieBreakdownCard(state: HomeUiState) {
@@ -663,7 +767,10 @@ private fun CalorieBreakdownCard(state: HomeUiState) {
 
             if (b == null) {
                 BreakdownLine("Tagesziel (Profil)", "${state.calorieGoal.toInt()} kcal")
-                BreakdownLine("Heute aktiv (Health Connect)", "+${state.burnedKcal.toInt()} kcal")
+                BreakdownLine(
+                    if (state.manualActivityEnabled) "Heute aktiv (HC + manuell)" else "Heute aktiv (Health Connect)",
+                    "+${state.burnedKcal.toInt()} kcal"
+                )
                 BreakdownLine("Budget heute", "${state.adjustedGoal.toInt()} kcal", emphasize = true)
                 BreakdownLine("Gegessen", "−${state.totalCalories.toInt()} kcal")
                 BreakdownLine("Noch übrig", "${state.remaining.toInt()} kcal", emphasize = true)

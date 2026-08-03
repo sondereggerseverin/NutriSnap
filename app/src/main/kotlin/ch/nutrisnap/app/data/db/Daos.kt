@@ -133,6 +133,24 @@ interface WeightDao {
 }
 
 @Dao
+interface ManualActivityDao {
+    @Query("SELECT * FROM manual_activity WHERE dateStr = :dateStr LIMIT 1")
+    fun getForDate(dateStr: String): Flow<ManualActivityEntry?>
+
+    @Query("SELECT * FROM manual_activity WHERE dateStr >= :fromDate ORDER BY dateStr ASC")
+    fun getSince(fromDate: String): Flow<List<ManualActivityEntry>>
+
+    @Query("SELECT * FROM manual_activity WHERE dateStr >= :fromDate ORDER BY dateStr ASC")
+    suspend fun getSinceOnce(fromDate: String): List<ManualActivityEntry>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entry: ManualActivityEntry)
+
+    @Query("DELETE FROM manual_activity WHERE dateStr = :dateStr")
+    suspend fun delete(dateStr: String)
+}
+
+@Dao
 interface FavoriteFoodDao {
     @Query("SELECT * FROM favorite_foods ORDER BY addedAt DESC")
     fun getAll(): Flow<List<FavoriteFoodEntity>>

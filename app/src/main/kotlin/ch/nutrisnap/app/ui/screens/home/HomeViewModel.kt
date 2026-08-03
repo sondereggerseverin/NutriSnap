@@ -13,6 +13,8 @@ import ch.nutrisnap.app.data.repository.WeightRepository
 import ch.nutrisnap.app.domain.AdaptiveTdeeCalculator
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.KEY_MEAL_ORDER
+import ch.nutrisnap.app.ui.theme.KEY_MANUAL_ACTIVITY_ENABLED
+import ch.nutrisnap.app.data.model.ManualActivityEntry
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -74,7 +76,11 @@ data class HomeUiState(
     // 0-100, nur relevant wenn isAdaptiveTarget true ist.
     val tdeeConfidence: Int = 0,
     /** Vollständige Rechnung für transparente Anzeige auf dem Home-Screen. */
-    val calorieBreakdown: CalorieBreakdown? = null
+    val calorieBreakdown: CalorieBreakdown? = null,
+    /** Settings: manuelles Aktivitätstracking aktiv. */
+    val manualActivityEnabled: Boolean = false,
+    /** Heute manuell eingetragene Aktivitätskalorien (null = kein Eintrag). */
+    val manualActivityKcal: Float? = null
 ) {
     /** Budget = Basis-Ziel + verbrannte Aktivitätskalorien (nur wenn nicht schon im adaptiven Ziel enthalten) */
     val adjustedGoal: Float get() = if (isAdaptiveTarget) calorieGoal else calorieGoal + burnedKcal
@@ -89,6 +95,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val weightRepo  = WeightRepository(db)
     private val statsRepo   = StatsRepository(db)
     private val hcDao       = db.healthConnectDao()
+    private val manualActivityDao = db.manualActivityDao()
 
     private val _streak = MutableStateFlow(0)
 
@@ -107,7 +114,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         weightRepo.getRecent(trendWindowDays),
         diaryRepo.getWeeklySummary(LocalDate.now().minusDays(trendWindowDays.toLong())),
         hcDao.getLast30Days(),
-        app.notifDataStore.data
+        app.notifDataStore.data,
+        manualActivityDao.getSince(LocalDate.now().minusDays(29).toString())
     ) { args ->
         val entries       = args[0] as List<ch.nutrisnap.app.data.model.DiaryEntry>
         val profile        = args[1] as ch.nutrisnap.app.data.repository.UserProfile
@@ -118,6 +126,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         val dailySummaries = args[6] as List<ch.nutrisnap.app.data.db.DailySummary>
         val activityDays   = args[7] as List<ch.nutrisnap.app.data.model.HealthConnectCache>
         val prefs          = args[8] as androidx.datastore.preferences.core.Preferences
+        @Suppress("UNCHECKED_CAST")
+        val manualActivities = args[9] as List<ManualActivityEntry>
 
         val mealOrder = ch.nutrisnap.app.data.model.parseMealOrder(prefs[KEY_MEAL_ORDER])
         val orderedMealMeta = mealOrder.map { type -> MEAL_META.first { it.first == type } }
@@ -133,11 +143,32 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         val intakeByDate = dailySummaries.associate { LocalDate.parse(it.dateStr) to it.calories }
         val trend = AdaptiveTdeeCalculator.computeTrendTdee(weightByDate, intakeByDate)
 
-        val todayActiveKcal = hcCache?.activeCaloriesKcal
-        val avgActiveKcal = activityDays
-            .mapNotNull { it.activeCaloriesKcal }
-            .takeIf { it.isNotEmpty() }
-            ?.average()
+        val manualEnabled = prefs[KEY_MANUAL_ACTIVITY_ENABLED] ?: false
+        val manualByDate = manualActivities.associate {
+            LocalDate.parse(it.dateStr) to it.activeCaloriesKcal.toDouble()
+        }
+        val today = LocalDate.now()
+        val manualToday = manualByDate[today]
+        val hcToday = hcCache?.activeCaloriesKcal
+        // Effektive Aktivität heute: HC + manuell (wenn Schalter an), sonst nur HC
+        val todayActiveKcal = when {
+            manualEnabled && (hcToday != null || manualToday != null) ->
+                (hcToday ?: 0.0) + (manualToday ?: 0.0)
+            else -> hcToday
+        }
+        // Durchschnitt über HC-Tage, manuelle kcal dazugerechnet wenn aktiv
+        val avgActiveKcal = run {
+            val byDate = linkedMapOf<LocalDate, Double>()
+            for (c in activityDays) {
+                c.activeCaloriesKcal?.let { byDate[c.date] = it }
+            }
+            if (manualEnabled) {
+                for ((d, kcal) in manualByDate) {
+                    byDate[d] = (byDate[d] ?: 0.0) + kcal
+                }
+            }
+            byDate.values.takeIf { it.isNotEmpty() }?.average()
+        }
 
         // Defizit aus Wochenziel (kg) falls gesetzt, sonst Standard 500 kcal
         val weeklyLoss = profile.weeklyTargetLossKg?.takeIf { it > 0f }
@@ -192,6 +223,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             isAdaptiveTarget = adaptiveTarget != null,
             tdeeConfidence   = adaptiveTarget?.confidencePercent ?: 0,
             calorieBreakdown = breakdown,
+            manualActivityEnabled = manualEnabled,
+            manualActivityKcal = if (manualEnabled) manualToday?.toFloat() else null,
             meals         = orderedMealMeta.map { (type, label, icon, color) ->
                 val mealEntries = byMeal[type] ?: emptyList()
                 MealOverview(
@@ -207,6 +240,21 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             weightRepo.logWeight(LocalDate.now(), kg)
             refreshStreak()
+        }
+    }
+
+    fun logManualActivity(kcal: Float) {
+        viewModelScope.launch {
+            if (kcal <= 0f) {
+                manualActivityDao.delete(LocalDate.now().toString())
+            } else {
+                manualActivityDao.upsert(
+                    ManualActivityEntry(
+                        dateStr = LocalDate.now().toString(),
+                        activeCaloriesKcal = kcal
+                    )
+                )
+            }
         }
     }
 
