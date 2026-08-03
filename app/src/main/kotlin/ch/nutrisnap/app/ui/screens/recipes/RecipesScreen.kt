@@ -265,7 +265,7 @@ fun RecipesScreen(
                             ch.nutrisnap.app.ui.components.RecipeCardV2(
                                 recipe       = recipe,
                                 onClick      = { selectedRecipe = recipe },
-                                onAddToDiary = { addToDiaryRecipe = recipe },
+                                onAddToDiary = { _ -> addToDiaryRecipe = recipe },
                                 onEdit       = { editRecipe = recipe },
                                 onDelete     = { vm.deleteRecipe(recipe) }
                             )

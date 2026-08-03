@@ -3,7 +3,6 @@ package ch.nutrisnap.app.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -28,28 +27,40 @@ import ch.nutrisnap.app.ui.theme.NutriRadius
 import ch.nutrisnap.app.ui.theme.NutriSpacing
 import coil.compose.AsyncImage
 
+/** Portionen, die man aus der Liste tracken will (nicht recipe.servings!). */
 private val PORTION_STEPS = listOf(1f, 1.5f, 2f, 3f)
 
 /**
- * Rezeptkarte im FreshBatch-Stil: großes Bild, prominenter Portionen-Multiplier,
- * kompakte Makro-Zeile inkl. Ballaststoffe. Die detaillierte Nährwert-Ansicht
- * (Vitamine, Mineralstoffe) bleibt Teil des bestehenden RecipeDetailSheet und
- * wird hier bewusst nicht dupliziert.
+ * Rezeptkarte: immer **pro Portion** als Basis.
+ * Chips 1 / 1.5 / 2 / 3 = „so viele Portionen tracken“, skaliert von proteinPerServing
+ * bzw. totalCalories/servings — nie mehr versehentlich die Gesamt-Rezept-kcal.
  */
 @Composable
 fun RecipeCardV2(
     recipe: Recipe,
     onClick: () -> Unit,
-    onAddToDiary: () -> Unit,
+    onAddToDiary: (portions: Float) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    modifier: Modifier = Modifier,
-    initialServings: Float = recipe.servings.toFloat().coerceAtLeast(1f)
+    modifier: Modifier = Modifier
 ) {
-    var servings by remember(recipe.id) { mutableStateOf(initialServings) }
+    // Wie viele Portionen der User tracken will (Default: 1)
+    var portions by remember(recipe.id) { mutableFloatStateOf(1f) }
     var showConfirm by remember { mutableStateOf(false) }
+
     val baseServings = recipe.servings.coerceAtLeast(1)
-    val ratio = servings / baseServings.toFloat()
+    // Pro-Portion-Werte (proteinPerServing ist bereits pro Portion)
+    val kcalPer = recipe.totalCalories?.div(baseServings)
+    val protPer = recipe.proteinPerServing
+    val fatPer = recipe.fatPerServing
+    val carbsPer = recipe.carbsPerServing
+    val fiberPer = recipe.fiberPerServing
+
+    val kcal = kcalPer?.times(portions)
+    val protein = protPer?.times(portions)
+    val fat = fatPer?.times(portions)
+    val carbs = carbsPer?.times(portions)
+    val fiber = fiberPer?.times(portions)
 
     Card(
         modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
@@ -60,56 +71,98 @@ fun RecipeCardV2(
         Column {
             RecipeCardImage(recipe, modifier = Modifier.fillMaxWidth().height(160.dp))
 
-            Column(Modifier.padding(NutriSpacing.lg)) {
-                Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.padding(NutriSpacing.md)) {
+                Text(
+                    recipe.title,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 17.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                if (baseServings > 1) {
                     Text(
-                        recipe.title,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f)
+                        "Rezept: $baseServings Portionen · Anzeige pro Port.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp)
                     )
-                    recipe.prepTimeMinutes?.let {
-                        Text(
-                            "⏱ $it min", fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = NutriSpacing.sm, top = 2.dp)
-                        )
-                    }
                 }
 
                 Spacer(Modifier.height(NutriSpacing.sm))
-                PortionSelector(
-                    servings = servings,
-                    baseServings = baseServings,
-                    onServingsChange = { servings = it }
-                )
 
-                Spacer(Modifier.height(NutriSpacing.md))
-                RecipeMacroRow(recipe, ratio)
-
-                Text(
-                    "Die Makros gelten pro Portion",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = NutriSpacing.xs)
-                )
-
-                Spacer(Modifier.height(NutriSpacing.sm))
                 Row(
                     Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onAddToDiary, Modifier.size(36.dp)) {
-                        Icon(Icons.Default.PlaylistAdd, "Ins Tagebuch", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                    Column(Modifier.weight(1f)) {
+                        // Portionen-Auswahl nur zum Tracken
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            PORTION_STEPS.forEach { step ->
+                                val selected = portions == step
+                                Surface(
+                                    onClick = { portions = step },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (selected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(width = 40.dp, height = 32.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            if (step == step.toInt().toFloat()) step.toInt().toString()
+                                            else step.toString(),
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = if (selected) MaterialTheme.colorScheme.onPrimary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(NutriSpacing.sm))
+
+                        kcal?.let {
+                            Row(verticalAlignment = Alignment.Bottom) {
+                                Text(
+                                    "${it.toInt()} kcal",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 22.sp,
+                                    color = MacroColors.calories
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    if (portions == 1f) "/ Port." else "· ${fmtPortions(portions)} Port.",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(bottom = 3.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.md)) {
+                            protein?.let { MacroCompact("P", it, MacroColors.protein) }
+                            fat?.let { MacroCompact("F", it, MacroColors.fat) }
+                            carbs?.let { MacroCompact("KH", it, MacroColors.carbs) }
+                            fiber?.let { MacroCompact("Balla.", it, MacroColors.fiber) }
+                        }
                     }
-                    IconButton(onClick = onEdit, Modifier.size(36.dp)) {
-                        Icon(Icons.Default.Edit, "Bearbeiten", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    IconButton(onClick = { showConfirm = true }, Modifier.size(36.dp)) {
-                        Icon(Icons.Default.DeleteOutline, "Löschen", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilledIconButton(
+                            onClick = { onAddToDiary(portions) },
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Icon(Icons.Default.PlaylistAdd, contentDescription = "Ins Tagebuch")
+                        }
+                        // Link/Detail bleibt über onClick auf der Karte
                     }
                 }
             }
@@ -117,110 +170,74 @@ fun RecipeCardV2(
     }
 
     if (showConfirm) {
-        AlertDialog(onDismissRequest = { showConfirm = false },
-            title = { Text("Rezept löschen?") }, text = { Text(recipe.title) },
-            confirmButton = { TextButton(onClick = { onDelete(); showConfirm = false }) { Text("Löschen", color = MaterialTheme.colorScheme.error) } },
-            dismissButton = { TextButton(onClick = { showConfirm = false }) { Text("Abbrechen") } })
-    }
-}
-
-@Composable
-private fun RecipeCardImage(recipe: Recipe, modifier: Modifier = Modifier) {
-    val url = recipe.imageUrl
-    var loadFailed by remember(url) { mutableStateOf(false) }
-
-    if (!url.isNullOrBlank() && !loadFailed) {
-        AsyncImage(
-            model = url,
-            contentDescription = recipe.title,
-            modifier = modifier.clip(RoundedCornerShape(topStart = NutriRadius.xl, topEnd = NutriRadius.xl)),
-            contentScale = ContentScale.Crop,
-            onError = { loadFailed = true }
-        )
-    } else {
-        Box(
-            modifier = modifier
-                .clip(RoundedCornerShape(topStart = NutriRadius.xl, topEnd = NutriRadius.xl))
-                .background(Brush.linearGradient(listOf(Color(0xFF2D6A4F), Color(0xFF40916C)))),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Default.RestaurantMenu, contentDescription = null,
-                tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(40.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun PortionSelector(servings: Float, baseServings: Int, onServingsChange: (Float) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
-        PORTION_STEPS.forEach { step ->
-            val selected = servings == step
-            val label = if (step % 1f == 0f) "${step.toInt()}" else "%.1f".format(step)
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(NutriRadius.sm))
-                    .selectable(selected = selected, onClick = { onServingsChange(step) })
-                    .background(
-                        if (selected) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.surfaceVariant
-                    )
-                    .padding(horizontal = NutriSpacing.md, vertical = 6.dp)
-            ) {
-                Text(
-                    label,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (selected) MaterialTheme.colorScheme.onPrimary
-                            else MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        AlertDialog(
+            onDismissRequest = { showConfirm = false },
+            title = { Text("Rezept löschen?") },
+            text = { Text(recipe.title) },
+            confirmButton = {
+                TextButton(onClick = { onDelete(); showConfirm = false }) {
+                    Text("Löschen", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirm = false }) { Text("Abbrechen") }
             }
-        }
+        )
     }
 }
 
-@Composable
-private fun RecipeMacroRow(recipe: Recipe, ratio: Float) {
-    val baseServings = recipe.servings.coerceAtLeast(1)
-    val kcal = recipe.totalCalories?.let { it / baseServings * ratio }
-    val protein = recipe.proteinPerServing?.let { it * ratio }
-    val fat = recipe.fatPerServing?.let { it * ratio }
-    val carbs = recipe.carbsPerServing?.let { it * ratio }
-    val fiber = recipe.fiberPerServing?.let { it * ratio }
-
-    Column {
-        kcal?.let {
-            Text(
-                "${it.toInt()} kcal",
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                color = MacroColors.calories
-            )
-            Spacer(Modifier.height(NutriSpacing.sm))
-        }
-
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(NutriSpacing.md)
-        ) {
-            protein?.let { MacroCompact("P", it, "g", MacroColors.protein) }
-            fat?.let { MacroCompact("F", it, "g", MacroColors.fat) }
-            carbs?.let { MacroCompact("KH", it, "g", MacroColors.carbs) }
-            fiber?.let { MacroCompact("Balla.", it, "g", MacroColors.fiber) }
-        }
-    }
-}
+private fun fmtPortions(p: Float): String =
+    if (p == p.toInt().toFloat()) p.toInt().toString() else p.toString()
 
 @Composable
-private fun MacroCompact(label: String, value: Float, unit: String, color: Color) {
+private fun MacroCompact(label: String, value: Float, color: Color) {
     Column {
         Text(
-            "${value.toInt()}$unit",
+            "${value.toInt()}g",
             fontWeight = FontWeight.Bold,
             fontSize = 13.sp,
             color = color
         )
         Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+fun RecipeCardImage(recipe: Recipe, modifier: Modifier = Modifier) {
+    Box(modifier.clip(RoundedCornerShape(topStart = NutriRadius.xl, topEnd = NutriRadius.xl))) {
+        if (!recipe.imageUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = recipe.imageUrl,
+                contentDescription = recipe.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.RestaurantMenu,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                )
+            }
+        }
+        // Gradient am unteren Bildrand für Lesbarkeit
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(40.dp)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.35f))
+                    )
+                )
+        )
     }
 }
