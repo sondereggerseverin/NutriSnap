@@ -89,6 +89,19 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
     private fun identityKey(name: String, brand: String?, barcode: String?): String =
         "${name.trim().lowercase()}|${(brand ?: "").trim().lowercase()}|${(barcode ?: "").trim()}"
 
+    /** Lowercase + Whitespace kollabieren + trailing Satzzeichen entfernen. */
+    private fun normalizeFoodName(raw: String): String {
+        var s = raw.trim().lowercase().replace(Regex("\\s+"), " ")
+        s = s.trimEnd('.', ',', ';', ' ')
+        return s
+    }
+
+    /** Name ohne abschliessende Klammer-Marke, z.B. "Magerquark (Milfina)" -> "magerquark". */
+    private fun baseName(raw: String): String {
+        val n = normalizeFoodName(raw)
+        return n.replace(Regex("\\s*\\([^)]*\\)\\s*$"), "").trim()
+    }
+
     /**
      * 1) Exakte Duplikate entfernen
      * 2) Rezept-Einträge korrigieren, bei denen Gesamt-kcal als 1 Portion gespeichert wurden
@@ -170,10 +183,19 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
             existingKeys.add("${entry.dateStr}|${entry.foodName.trim().lowercase()}|${entry.calories.toInt()}")
         }
 
-        val foodByName = db.customFoodDao().getAllOnce()
-            .associate { it.name.trim().lowercase() to it.id }.toMutableMap()
+        // Mehrstufiges Lookup: exact name -> baseName; Rezepte normalisiert.
+        val allFoods = db.customFoodDao().getAllOnce()
+        val foodByName = mutableMapOf<String, Int>()
+        val foodByBase = mutableMapOf<String, Int>()
+        for (f in allFoods) {
+            val exact = normalizeFoodName(f.name)
+            foodByName.putIfAbsent(exact, f.id)
+            foodByBase.putIfAbsent(baseName(f.name), f.id)
+            val withoutParen = exact.replace(Regex("\\s*\\([^)]*\\)\\s*$"), "").trim()
+            foodByName.putIfAbsent(withoutParen, f.id)
+        }
         val recipeByTitle = db.recipeDao().getAll().first()
-            .associate { it.title.trim().lowercase() to it.id }
+            .associate { normalizeFoodName(it.title) to it.id }
 
         var imported = 0
         var skipped = 0
@@ -207,9 +229,13 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                 val quantityG = parseGrams(mengeRaw)
                 val key = "${date}|${mealType.name}|${product.trim().lowercase()}|${"%.1f".format(quantityG ?: 0f)}|${kcal.toInt()}"
                 if (key in existingKeys) { skipped++; continue }
-                val nameKey = product.lowercase()
-                var matchedFoodId = foodByName[nameKey]
+                val nameKey = normalizeFoodName(product)
+                val baseKey = baseName(product)
+                // Rezept hat Vorrang vor Food bei Titel-Match – verhindert, dass
+                // Rezept-Portionen als lose Lebensmittel angelegt werden.
                 val matchedRecipeId = recipeByTitle[nameKey]
+                var matchedFoodId = if (matchedRecipeId != null) null
+                    else foodByName[nameKey] ?: foodByBase[baseKey]
 
                 if (matchedFoodId == null && matchedRecipeId == null) {
                     // Weder Food noch Rezept vorhanden -> neues Food aus den CSV-Werten
@@ -230,6 +256,7 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                     )
                     matchedFoodId = newId.toInt()
                     foodByName[nameKey] = matchedFoodId
+                    foodByBase.putIfAbsent(baseKey, matchedFoodId)
                     autoCreatedFoods++
                 }
 
@@ -406,7 +433,17 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                 val arr = JSONArray(jsonText)
 
                 val existing = db.customFoodDao().getAllOnce()
-                val existingByKey = existing.associateBy { identityKey(it.name, it.brand, it.barcode) }
+                // Match-Reihenfolge: Barcode > identity(name+brand+barcode) > baseName+brand
+                val byBarcode = existing
+                    .filter { !it.barcode.isNullOrBlank() }
+                    .associateBy { it.barcode!!.trim() }
+                    .toMutableMap()
+                val byIdentity = existing
+                    .associateBy { identityKey(it.name, it.brand, it.barcode) }
+                    .toMutableMap()
+                val byBaseBrand = existing
+                    .associateBy { "${baseName(it.name)}|${(it.brand ?: "").trim().lowercase()}" }
+                    .toMutableMap()
 
                 var imported = 0
                 var updated = 0
@@ -427,14 +464,22 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                     val sugar = obj.optDouble("sugarPer100g", 0.0).toFloat()
                     val salt = obj.optDouble("saltPer100g", 0.0).toFloat()
 
-                    // displayName wird fuer Anzeige/Suche gefuehrt (Marke in Klammern);
-                    // die Dedup-Identitaet selbst laeuft getrennt ueber name+brand+barcode.
+                    // displayName fuer Anzeige/Suche (Marke in Klammern);
+                    // Dedup-Identitaet laeuft getrennt ueber name+brand+barcode.
                     val displayName = if (!brand.isNullOrBlank()) "$name ($brand)" else name
                     val key = identityKey(name, brand, barcode)
-                    val existingItem = existingByKey[key]
+                    val baseBrandKey = "${baseName(name)}|${(brand ?: "").trim().lowercase()}"
+
+                    val existingItem = when {
+                        !barcode.isNullOrBlank() && byBarcode.containsKey(barcode.trim()) ->
+                            byBarcode[barcode.trim()]
+                        byIdentity.containsKey(key) -> byIdentity[key]
+                        byBaseBrand.containsKey(baseBrandKey) -> byBaseBrand[baseBrandKey]
+                        else -> null
+                    }
 
                     if (existingItem == null) {
-                        db.customFoodDao().insert(
+                        val newId = db.customFoodDao().insert(
                             CustomFoodItem(
                                 name = displayName,
                                 calories = calories,
@@ -451,21 +496,49 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                                 source = "yazio_import"
                             )
                         )
+                        val inserted = CustomFoodItem(
+                            id = newId.toInt(),
+                            name = displayName,
+                            calories = calories,
+                            protein = protein,
+                            carbs = carbs,
+                            fat = fat,
+                            fiber = fiber,
+                            sugar = sugar,
+                            salt = salt,
+                            barcode = barcode,
+                            brand = brand,
+                            category = category,
+                            portionSizeG = 100f,
+                            source = "yazio_import"
+                        )
+                        if (!barcode.isNullOrBlank()) byBarcode[barcode.trim()] = inserted
+                        byIdentity[key] = inserted
+                        byBaseBrand[baseBrandKey] = inserted
                         imported++
                     } else {
                         val macrosDiffer = existingItem.calories != calories ||
                             existingItem.protein != protein || existingItem.carbs != carbs ||
                             existingItem.fat != fat || existingItem.fiber != fiber ||
                             existingItem.sugar != sugar || existingItem.salt != salt
-                        if (macrosDiffer) {
-                            db.customFoodDao().update(
-                                existingItem.copy(
-                                    calories = calories, protein = protein, carbs = carbs, fat = fat,
-                                    fiber = fiber, sugar = sugar, salt = salt,
-                                    category = category ?: existingItem.category,
-                                    source = "yazio_import"
-                                )
+                        // Barcode/Brand nachziehen, falls bisher fehlte (z.B. diary_only -> yazio_import)
+                        val barcodeMissing = existingItem.barcode.isNullOrBlank() && !barcode.isNullOrBlank()
+                        val brandMissing = existingItem.brand.isNullOrBlank() && !brand.isNullOrBlank()
+                        if (macrosDiffer || barcodeMissing || brandMissing) {
+                            val updatedItem = existingItem.copy(
+                                calories = calories, protein = protein, carbs = carbs, fat = fat,
+                                fiber = fiber, sugar = sugar, salt = salt,
+                                barcode = barcode ?: existingItem.barcode,
+                                brand = brand ?: existingItem.brand,
+                                category = category ?: existingItem.category,
+                                source = "yazio_import"
                             )
+                            db.customFoodDao().update(updatedItem)
+                            if (!updatedItem.barcode.isNullOrBlank()) {
+                                byBarcode[updatedItem.barcode!!.trim()] = updatedItem
+                            }
+                            byIdentity[key] = updatedItem
+                            byBaseBrand[baseBrandKey] = updatedItem
                             updated++
                         } else {
                             skipped++
