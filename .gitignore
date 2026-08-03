@@ -19,3 +19,4 @@ nutrisnap_code/
 *.py
 raw_*.json
 yazio_*.json
+!docs/yazio_export.py
