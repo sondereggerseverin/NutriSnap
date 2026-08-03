@@ -73,11 +73,24 @@ object AdaptiveTdeeCalculator {
     // of below-average — smooths out day-to-day tracker noise instead of reacting 1:1.
     const val ACTIVITY_ADJUSTMENT_FACTOR = 0.5
 
-    // Need at least this many days with *both* a weight entry and logged intake,
-    // spread over at least this many calendar days, before trusting the trend
-    // calculation over the formula fallback. Too few/too clustered points make the
-    // weight-trend estimate noise-dominated.
+    // Need at least this many days with *both* a weight reading (manual weight_entries
+    // and/or Health Connect body mass) and logged intake, spread over at least this
+    // many calendar days, before trusting the trend over the formula fallback.
     const val MIN_TREND_DAYS = 5
+
+    /**
+     * Merged Gewichtsquelle für den Trend: manuelle Einträge + Health Connect.
+     * Bei Konflikt gewinnt Health Connect (gleiche Priorität wie in der Analyse).
+     */
+    fun mergeWeightByDate(
+        manualByDate: Map<LocalDate, Float>,
+        healthConnectByDate: Map<LocalDate, Float>
+    ): Map<LocalDate, Float> {
+        if (healthConnectByDate.isEmpty()) return manualByDate
+        if (manualByDate.isEmpty()) return healthConnectByDate
+        // HC überschreibt manuell am gleichen Tag (Analyse: hc ?: manual → HC first)
+        return manualByDate + healthConnectByDate
+    }
 
     // Hard safety floor: never suggest a target below this, regardless of computed
     // deficit/activity adjustment. Guards against a tracker glitch (e.g. a bad low

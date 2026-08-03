@@ -124,7 +124,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
         val byMeal = entries.groupBy { it.mealType }
 
-        val weightByDate = trendWeights.associate { LocalDate.parse(it.dateStr) to it.weightKg }
+        val manualWeightByDate = trendWeights.associate { LocalDate.parse(it.dateStr) to it.weightKg }
+        // HC-Gewicht aus dem Cache (Waage-Sync) — gleiche Quelle wie Analyse-Gewichtsverlauf
+        val hcWeightByDate = activityDays
+            .mapNotNull { c -> c.weightKg?.let { kg -> c.date to kg.toFloat() } }
+            .toMap()
+        val weightByDate = AdaptiveTdeeCalculator.mergeWeightByDate(manualWeightByDate, hcWeightByDate)
         val intakeByDate = dailySummaries.associate { LocalDate.parse(it.dateStr) to it.calories }
         val trend = AdaptiveTdeeCalculator.computeTrendTdee(weightByDate, intakeByDate)
 

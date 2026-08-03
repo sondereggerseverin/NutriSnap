@@ -89,7 +89,11 @@ class RecipeBudgetScaler(private val db: NutriDatabase) {
         val hcCache = hcDao.getCacheForDateOnce(today)
         val activityDays = hcDao.getRangeOnce(today.minusDays(29), today)
 
-        val weightByDate = trendWeights.associate { LocalDate.parse(it.dateStr) to it.weightKg }
+        val manualWeightByDate = trendWeights.associate { LocalDate.parse(it.dateStr) to it.weightKg }
+        val hcWeightByDate = activityDays
+            .mapNotNull { c -> c.weightKg?.let { kg -> c.date to kg.toFloat() } }
+            .toMap()
+        val weightByDate = AdaptiveTdeeCalculator.mergeWeightByDate(manualWeightByDate, hcWeightByDate)
         val intakeByDate = dailySummaries.associate { LocalDate.parse(it.dateStr) to it.calories }
         val trend = AdaptiveTdeeCalculator.computeTrendTdee(weightByDate, intakeByDate)
 

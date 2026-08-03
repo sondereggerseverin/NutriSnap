@@ -692,7 +692,7 @@ private fun CalorieBreakdownCard(state: HomeUiState) {
                 )
             } else {
                 Text(
-                    "Trend noch nicht nutzbar – mind. 5 Tage mit Gewicht und getrackten Mahlzeiten.",
+                    "Trend noch nicht nutzbar – mind. 5 Tage mit Gewicht (HC oder manuell) und getrackten Mahlzeiten.",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 15.sp
