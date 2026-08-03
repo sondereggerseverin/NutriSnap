@@ -252,7 +252,7 @@ fun RecipesScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp).let {
                         PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 80.dp)
                     },
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(displayedRecipes, key = { it.id }) { recipe ->
                         if (recipe.isIncomplete()) {
