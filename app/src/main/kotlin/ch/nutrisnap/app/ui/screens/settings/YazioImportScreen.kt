@@ -82,6 +82,22 @@ fun YazioImportScreen(
                     ) {
                         Text("Tagebuch zuerst leeren")
                     }
+                    Spacer(Modifier.height(12.dp))
+                    var dedupeMsg by remember { mutableStateOf<String?>(null) }
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.deduplicateDiary { n ->
+                                dedupeMsg = if (n > 0) "$n Duplikate entfernt" else "Keine Duplikate gefunden"
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Duplikate bereinigen")
+                    }
+                    dedupeMsg?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, color = MaterialTheme.colorScheme.primary)
+                    }
                 }
                 is YazioImportState.Loading -> {
                     CircularProgressIndicator()

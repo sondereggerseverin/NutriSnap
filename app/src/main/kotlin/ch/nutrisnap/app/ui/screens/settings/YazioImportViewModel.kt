@@ -89,6 +89,14 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
     private fun identityKey(name: String, brand: String?, barcode: String?): String =
         "${name.trim().lowercase()}|${(brand ?: "").trim().lowercase()}|${(barcode ?: "").trim()}"
 
+    /** Entfernt exakte Tagebuch-Duplikate (z.B. nach fehlerhaftem Sync/Import). */
+    fun deduplicateDiary(onDone: (Int) -> Unit = {}) {
+        viewModelScope.launch {
+            val n = diaryRepo.deduplicateEntries()
+            onDone(n)
+        }
+    }
+
     fun importNutritionLog(uri: Uri) {
         viewModelScope.launch {
             _state.value = YazioImportState.Loading
@@ -179,17 +187,16 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                 val date = parseYazioDate(dateStr)
                     ?: throw DateTimeParseException("Unbekanntes Datumsformat", dateStr, 0)
 
-                val key = "${date}|${product.trim().lowercase()}|${kcal.toInt()}"
-                if (key in existingKeys) { skipped++; continue }
-
                 val mealType = when (mealStr) {
-                    "breakfast", "fruehstueck", "fruehstuck" -> MealType.BREAKFAST
+                    "breakfast", "fruehstueck", "fruehstuck", "frühstück" -> MealType.BREAKFAST
                     "lunch", "mittagessen" -> MealType.LUNCH
                     "dinner", "abendessen" -> MealType.DINNER
                     else -> MealType.SNACK
                 }
 
                 val quantityG = parseGrams(mengeRaw)
+                val key = "${date}|${mealType.name}|${product.trim().lowercase()}|${"%.1f".format(quantityG ?: 0f)}|${kcal.toInt()}"
+                if (key in existingKeys) { skipped++; continue }
                 val nameKey = product.lowercase()
                 var matchedFoodId = foodByName[nameKey]
                 val matchedRecipeId = recipeByTitle[nameKey]
@@ -236,10 +243,12 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
 
+        // Extra-Sicherheit: nach Import nochmals exakte Duplikate entfernen
+        val extraDupes = diaryRepo.deduplicateEntries()
         return YazioImportResult(
             importedDays = days.size,
             importedEntries = imported,
-            skippedEntries = skipped,
+            skippedEntries = skipped + extraDupes,
             autoCreatedFoods = autoCreatedFoods
         )
     }

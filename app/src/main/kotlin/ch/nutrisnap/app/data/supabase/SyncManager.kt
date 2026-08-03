@@ -110,6 +110,12 @@ object SyncManager {
             Log.e("NutriSync", "Pull diary_entries fehlgeschlagen: ${it.message}", it)
             firstError = firstError ?: it.message
         }
+        runCatching {
+            val n = ch.nutrisnap.app.data.repository.DiaryRepository(db).deduplicateEntries()
+            if (n > 0) Log.i("NutriSync", "Diary-Dedup nach Pull: $n entfernt")
+        }.onFailure {
+            Log.e("NutriSync", "Diary-Dedup fehlgeschlagen: ${it.message}", it)
+        }
         runCatching { pullRecipes(db) }.onFailure {
             Log.e("NutriSync", "Pull recipes fehlgeschlagen: ${it.message}", it)
             firstError = firstError ?: it.message
@@ -179,13 +185,27 @@ object SyncManager {
     private suspend fun pullDiary(db: NutriDatabase) {
         val dao = db.diaryDao()
         val remoteRows = SupabaseSync.fetchDiaryEntries()
+        // Inhaltliche Fingerprints bereits lokal vorhandener Einträge — verhindert
+        // dass Sync-Pull bei fehlendem/fehlerhaftem local_id immer neue Kopien anlegt.
+        val localFingerprints = dao.getAllOnce()
+            .map { ch.nutrisnap.app.data.repository.DiaryRepository.contentFingerprint(it) }
+            .toMutableSet()
+
         for (row in remoteRows) {
             val mealType = runCatching { MealType.valueOf(row.mealType) }.getOrDefault(MealType.SNACK)
+            val fingerprint = listOf(
+                row.dateStr,
+                mealType.name,
+                row.foodName.trim().lowercase(),
+                "%.1f".format(row.amountGrams),
+                "%.0f".format(row.calories)
+            ).joinToString("|")
+
             if (row.localId != null) {
-                // Row already linked to a local row — make sure it exists locally.
                 val existing = dao.getById(row.localId)
                 if (existing == null) {
-                    // Was deleted locally or never existed (e.g. fresh install) — recreate it.
+                    // Nur anlegen, wenn derselbe Inhalt lokal noch nicht existiert
+                    if (fingerprint in localFingerprints) continue
                     dao.insert(
                         DiaryEntry(
                             id = row.localId,
@@ -200,9 +220,14 @@ object SyncManager {
                             fat = row.fat
                         )
                     )
+                    localFingerprints.add(fingerprint)
                 }
             } else {
-                // Web-created row with no local_id yet — insert locally, then link back.
+                // Web-Zeile ohne local_id: nicht erneut einfügen, wenn Inhalt schon lokal da ist
+                if (fingerprint in localFingerprints) {
+                    // Optional: bestehenden lokalen Eintrag zurückverlinken, falls möglich
+                    continue
+                }
                 val newId = dao.insert(
                     DiaryEntry(
                         foodItemId = -999,
@@ -216,9 +241,7 @@ object SyncManager {
                         fat = row.fat
                     )
                 )
-                // Zurueckverlinken statt upsert: sonst legt der naechste Sync wegen
-                // der frisch vergebenen local_id eine ZWEITE Remote-Zeile an, statt
-                // die bestehende Web-Zeile (row.id) zu aktualisieren -> Duplikate.
+                localFingerprints.add(fingerprint)
                 if (row.id != null) SupabaseSync.linkDiaryLocalId(row.id, newId)
             }
         }

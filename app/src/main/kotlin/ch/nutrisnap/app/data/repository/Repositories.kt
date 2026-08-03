@@ -222,6 +222,41 @@ class DiaryRepository(db: NutriDatabase) {
         pushSafely { SupabaseSync.deleteDiaryEntry(entry.id) }
     }
 
+    /**
+     * Entfernt exakte Tagebuch-Duplikate (gleiches Datum, Mahlzeit, Name, Menge, kcal).
+     * Behält jeweils den Eintrag mit der kleinsten ID. Löscht auch in Supabase.
+     * @return Anzahl gelöschter Duplikate
+     */
+    suspend fun deduplicateEntries(): Int {
+        val all = dao.getAllOnce()
+        val seen = mutableSetOf<String>()
+        var removed = 0
+        // Stabil nach id sortieren, damit der älteste Eintrag bleibt
+        for (entry in all.sortedBy { it.id }) {
+            val key = contentFingerprint(entry)
+            if (key in seen) {
+                dao.delete(entry)
+                pushSafely { SupabaseSync.deleteDiaryEntry(entry.id) }
+                removed++
+            } else {
+                seen.add(key)
+            }
+        }
+        return removed
+    }
+
+    companion object {
+        /** Inhaltlicher Fingerprint für Dedup (Import + Sync-Pull). */
+        fun contentFingerprint(entry: DiaryEntry): String =
+            listOf(
+                entry.dateStr,
+                entry.mealType.name,
+                entry.foodName.trim().lowercase(),
+                "%.1f".format(entry.amountGrams),
+                "%.0f".format(entry.calories)
+            ).joinToString("|")
+    }
+
     /** Für Undo nach Löschen: legt den Eintrag mit neuer ID erneut an. */
     suspend fun restoreEntry(entry: DiaryEntry): Long {
         val id = dao.insert(entry.copy(id = 0))
