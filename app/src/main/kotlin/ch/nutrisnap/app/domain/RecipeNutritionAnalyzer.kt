@@ -168,7 +168,8 @@ object RecipeNutritionAnalyzer {
     // intentionally a much smaller guess than the old blanket "* 100" fallback,
     // since "10 portion Raffaello" should land around 200g, not 1000g.
     private val GENERIC_PIECE_UNITS = setOf(
-        "portion", "portionen", "stück", "stueck", "piece", "pieces", "scoop", "scoops"
+        "portion", "portionen", "stück", "stueck", "piece", "pieces", "scoop", "scoops",
+        "packung", "pack", "pkg", "dose", "bund", "stange", "zehe", "scheibe", "scheiben"
     )
 
     private val COUNT_WEIGHTS = mapOf(
@@ -180,7 +181,10 @@ object RecipeNutritionAnalyzer {
         "potato" to 150f, "kartoffel" to 150f,
         "avocado" to 150f, "banana" to 120f, "banane" to 120f,
         "scharlotte" to 80f, "schalotte" to 80f, "knoblauchzehe" to 3f,
-        "knoblauchzehen" to 3f
+        "knoblauchzehen" to 3f,
+        "stange" to 200f, "porree" to 200f, "lauch" to 200f,
+        "packung" to 150f, "pack" to 150f, "dose" to 200f,
+        "bund" to 50f, "scheibe" to 25f, "scheiben" to 25f
     )
 
     private fun isIngredientLine(line: String): Boolean {
@@ -245,13 +249,30 @@ object RecipeNutritionAnalyzer {
         val clean = line.trimStart('*', '-', '\u2022', '\u00b7', ' ').trim()
         if (clean.isBlank() || clean.length < 2) return null
 
-        // Erkennt zusaetzlich Unicode-Bruchzeichen ("¼ tsp", "1 ¼ cups"), die zuvor
-        // nicht erkannt wurden und auf den 100g-Fallback zurueckfielen.
+        // "150-200 ml Wasser" / "150 – 200 ml" → Mittelwert + Einheit
+        val rangeMatch = Regex(
+            """^(\d+(?:[.,]\d+)?)\s*[-–—]\s*(\d+(?:[.,]\d+)?)\s*(g|kg|ml|l|el|tl|tbsp|tsp|cup|cups)?\b\s*(.*)$""",
+            RegexOption.IGNORE_CASE
+        ).find(clean)
+        if (rangeMatch != null) {
+            val a = rangeMatch.groupValues[1].replace(',', '.').toFloatOrNull() ?: 0f
+            val b = rangeMatch.groupValues[2].replace(',', '.').toFloatOrNull() ?: 0f
+            val avg = if (a > 0f && b > 0f) (a + b) / 2f else maxOf(a, b)
+            val unit = rangeMatch.groupValues[3].lowercase()
+            val name = rangeMatch.groupValues[4].trim().ifBlank { clean }.take(50)
+            val mult = if (unit.isNotBlank()) (UNIT_TO_G[unit] ?: 1f) else 1f
+            // Ohne Einheit und avg >= 20 → bereits Gramm/ml
+            val amountG = if (unit.isBlank() && avg >= 20f) avg else avg * mult
+            return ParsedIngredient(amountG.coerceAtLeast(1f), name)
+        }
+
+        // Menge am Anfang: "300 g Tagliatelle", "1 TL Salz", "½ cup flour"
         val numRegex = Regex(
             "^((?:\\d+\\s+)?[$FRACTION_CHARS]|\\d+(?:[.,/]\\d+)?(?:\\s+and\\s+\\d+/\\d+)?)\\s*"
         )
-        val numMatch = numRegex.find(clean) ?: run {
-            // Menge am Ende: "Hähnchenbrust 350 g" / "Tagliatelle 300g"
+        val numMatch = numRegex.find(clean)
+        if (numMatch == null) {
+            // Menge am Ende: "Hähnchenbrust 350 g"
             val trailing = Regex(
                 """^(.*?)\s+((?:\d+\s+)?[$FRACTION_CHARS]|\d+(?:[.,/]\d+)?)\s*(g|kg|ml|l|el|tl|tbsp|tsp)\b\s*$""",
                 RegexOption.IGNORE_CASE
@@ -264,37 +285,61 @@ object RecipeNutritionAnalyzer {
                 return ParsedIngredient((amt * mult).coerceAtLeast(1f), foodName.take(50))
             }
             val lc = clean.lowercase()
-            val amt = if (lc.contains("spray") || lc.contains("prise") || lc.contains("pinch")) 2f else 100f
+            val amt = if (lc.contains("spray") || lc.contains("prise") || lc.contains("pinch")) 2f else 50f
             return ParsedIngredient(amt, clean.take(50))
         }
 
         val amount = parseNumber(numMatch.value.trim())
-        val rest   = clean.removePrefix(numMatch.value).trim()
+        val rest = clean.removePrefix(numMatch.value).trim()
+        val restLc = rest.lowercase()
 
+        // Einheit am Anfang von rest: "g Tagliatelle", "ml Milch"
         val unitMatch = UNIT_TO_G.entries
             .sortedByDescending { it.key.length }
-            .firstOrNull { (unit, _) -> rest.lowercase().startsWith(unit) && (rest.length == unit.length || !rest[unit.length].isLetter()) }
-
-        return if (unitMatch != null) {
-            val amountG  = amount * unitMatch.value
-            val foodName = rest.substring(unitMatch.key.length).trim().trimStart(',').trim()
-                .replace(Regex("""\s*(,|;).*"""), "").take(50)
-            ParsedIngredient(amountG.coerceAtLeast(1f), foodName.ifBlank { rest }.take(50))
-        } else {
-            val lc = rest.lowercase()
-            val countKey = COUNT_WEIGHTS.keys.sortedByDescending { it.length }
-                .firstOrNull { lc.contains(it) }
-            val gramWeight = when {
-                countKey != null -> amount * (COUNT_WEIGHTS[countKey] ?: 100f)
-                // "10 portion Raffaello", "3 Stück ..." — count-style unit but the
-                // specific food isn't in COUNT_WEIGHTS. Guess a modest per-piece
-                // weight instead of treating amount as if it were in 100g steps.
-                GENERIC_PIECE_UNITS.any { lc.startsWith(it) } -> amount * 25f
-                else -> amount * 100f
+            .firstOrNull { (unit, _) ->
+                restLc == unit || restLc.startsWith("$unit ") || restLc.startsWith("$unit,") ||
+                    restLc.startsWith("$unit.")
             }
-            val foodName = rest.replace(Regex("""\s*(,|;).*"""), "").take(50)
-            ParsedIngredient(gramWeight.coerceAtLeast(1f), foodName)
+        if (unitMatch != null) {
+            val amountG = amount * unitMatch.value
+            val foodName = rest.substring(unitMatch.key.length).trim().trimStart(',', '.').trim()
+                .replace(Regex("""\s*(,|;).*"""), "").take(50)
+            return ParsedIngredient(amountG.coerceAtLeast(1f), foodName.ifBlank { rest }.take(50))
         }
+
+        // Einheit irgendwo früh im Rest (nach optionalem Müll): " - 200 ml Wasser" sollte
+        // oben als Range greifen; hier z.B. "ml Wasser" falls amount schon abgetrennt
+        val embeddedUnit = Regex(
+            """^\s*(g|kg|ml|l|el|tl|tbsp|tsp|cup|cups)\b\s*(.*)$""",
+            RegexOption.IGNORE_CASE
+        ).find(rest)
+        if (embeddedUnit != null) {
+            val unit = embeddedUnit.groupValues[1].lowercase()
+            val mult = UNIT_TO_G[unit] ?: 1f
+            val foodName = embeddedUnit.groupValues[2].trim().take(50)
+            return ParsedIngredient((amount * mult).coerceAtLeast(1f), foodName.ifBlank { rest }.take(50))
+        }
+
+        // Zähl-Einheiten: "1 Stange Porree", "2 Packung Frischkäse"
+        val countKey = COUNT_WEIGHTS.keys.sortedByDescending { it.length }
+            .firstOrNull { restLc.contains(it) }
+        if (countKey != null) {
+            val gramWeight = amount * (COUNT_WEIGHTS[countKey] ?: 100f)
+            return ParsedIngredient(gramWeight.coerceAtLeast(1f), rest.take(50))
+        }
+        if (GENERIC_PIECE_UNITS.any { restLc.startsWith(it) || restLc.contains(" $it") }) {
+            return ParsedIngredient((amount * 50f).coerceAtLeast(1f), rest.take(50))
+        }
+
+        // WICHTIG: kein amount*100 mehr!
+        // "300 Tagliatelle" ohne "g" → 300 g annehmen wenn amount >= 20
+        // "2 Eier" ohne Treffer → bescheidene Schätzung
+        val gramWeight = when {
+            amount >= 20f -> amount          // klar Gramm/ml ohne Einheit
+            amount >= 5f -> amount * 20f     // z.B. "10 Nüsse" grob
+            else -> amount * 50f             // 1–4 Stück ohne bekannte Bezeichnung
+        }
+        return ParsedIngredient(gramWeight.coerceAtLeast(1f), rest.take(50))
     }
 
     private fun parseNumber(s: String): Float {

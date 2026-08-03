@@ -409,8 +409,13 @@ fun RecipesScreen(
 
     addToDiaryRecipe?.let { recipe ->
         // 1) Gekochtes Gewicht oder gespeicherte Zutatensumme, 2) Fallback: aus Text schätzen
-        val totalYield = recipe.yieldWeightG()
-            ?: RecipeNutritionAnalyzer.estimateTotalGrams(recipe.ingredients).takeIf { it > 0f }
+        val estimatedRaw = RecipeNutritionAnalyzer.estimateTotalGrams(recipe.ingredients).takeIf { it > 0f }
+        val saneStoredRaw = recipe.totalIngredientWeightG?.takeIf { stored ->
+            estimatedRaw == null || stored <= estimatedRaw * 2.5f
+        }
+        val totalYield = recipe.cookedWeightG?.takeIf { it > 0f }
+            ?: saneStoredRaw
+            ?: estimatedRaw
         val gramsPerServing = totalYield?.div(recipe.servings.coerceAtLeast(1))
 
         AddToDiarySheet(
@@ -943,8 +948,11 @@ fun RecipeDetailSheet(
                 var cookedText by remember(recipe.id, recipe.cookedWeightG) {
                     mutableStateOf(recipe.cookedWeightG?.takeIf { it > 0f }?.toInt()?.toString() ?: "")
                 }
-                val rawTotal = recipe.totalIngredientWeightG
-                    ?: RecipeNutritionAnalyzer.estimateTotalGrams(recipe.ingredients).takeIf { it > 0f }
+                val estimatedRaw = RecipeNutritionAnalyzer.estimateTotalGrams(recipe.ingredients).takeIf { it > 0f }
+                // Gespeicherter Wert verwerfen wenn offensichtlich kaputt (alter amount×100-Bug)
+                val rawTotal = recipe.totalIngredientWeightG?.takeIf { stored ->
+                    estimatedRaw == null || stored <= estimatedRaw * 2.5f
+                } ?: estimatedRaw
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                     shape = RoundedCornerShape(12.dp),
