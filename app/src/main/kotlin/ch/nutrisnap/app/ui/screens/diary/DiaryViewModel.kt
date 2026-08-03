@@ -263,9 +263,9 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         rememberLastAmount(food.name, grams)
     }
 
-    fun addEntry(food: FoodItem, grams: Float, meal: MealType) {
+    fun addEntry(food: FoodItem, grams: Float, meal: MealType, date: java.time.LocalDate? = null) {
         viewModelScope.launch {
-            repo.addEntry(food, grams, meal, _date.value)
+            repo.addEntry(food, grams, meal, date ?: _date.value)
             contextRanking.recordFoodUsage(food.id.toString(), food.name)
         }
     }
@@ -301,8 +301,16 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun addRecipeAsMeal(recipe: Recipe, servingsFactor: Float, meal: MealType, gramsAmount: Float? = null) {
-        viewModelScope.launch { repo.addRecipeAsMeal(recipe, servingsFactor, meal, _date.value, gramsAmount) }
+    fun addRecipeAsMeal(
+        recipe: Recipe,
+        servingsFactor: Float,
+        meal: MealType,
+        gramsAmount: Float? = null,
+        date: java.time.LocalDate? = null
+    ) {
+        viewModelScope.launch {
+            repo.addRecipeAsMeal(recipe, servingsFactor, meal, date ?: _date.value, gramsAmount)
+        }
     }
 
     fun updateEntryAmount(entry: DiaryEntry, newValue: Float) {

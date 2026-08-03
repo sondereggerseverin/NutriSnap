@@ -107,22 +107,35 @@ class DiaryRepository(db: NutriDatabase) {
         gramsAmount: Float? = null
     ): Long {
         val perServing  = recipe.servings.coerceAtLeast(1).toFloat()
+        // Gramm-Modus: Anteil am Gesamtgericht (Roh- oder Kochgewicht)
+        val yieldG = recipe.yieldWeightG()
+            ?: ch.nutrisnap.app.domain.RecipeNutritionAnalyzer.estimateTotalGrams(recipe.ingredients)
+                .takeIf { it > 0f }
+        val factor = if (gramsAmount != null && gramsAmount > 0f && yieldG != null && yieldG > 0f) {
+            gramsAmount / yieldG * perServing   // Portions-äquivalent für Makro-Skalierung
+        } else {
+            servingsFactor.coerceAtLeast(0.05f)
+        }
         val calsPerServ = recipe.totalCalories?.let { it / perServing } ?: 0f
-        val calories    = calsPerServ * servingsFactor
-        val protein     = (recipe.proteinPerServing ?: 0f) * servingsFactor
-        val carbs       = (recipe.carbsPerServing   ?: 0f) * servingsFactor
-        val fat         = (recipe.fatPerServing     ?: 0f) * servingsFactor
-        val fiber       = (recipe.fiberPerServing   ?: 0f) * servingsFactor
-        val sugar       = (recipe.sugarPerServing   ?: 0f) * servingsFactor
-        val saturatedFat = (recipe.saturatedFatPerServing ?: 0f) * servingsFactor
-        val salt        = (recipe.saltPerServing    ?: 0f) * servingsFactor
-        val sodium      = (recipe.sodiumPerServing  ?: 0f) * servingsFactor
+        val calories    = calsPerServ * factor
+        val protein     = (recipe.proteinPerServing ?: 0f) * factor
+        val carbs       = (recipe.carbsPerServing   ?: 0f) * factor
+        val fat         = (recipe.fatPerServing     ?: 0f) * factor
+        val fiber       = (recipe.fiberPerServing   ?: 0f) * factor
+        val sugar       = (recipe.sugarPerServing   ?: 0f) * factor
+        val saturatedFat = (recipe.saturatedFatPerServing ?: 0f) * factor
+        val salt        = (recipe.saltPerServing    ?: 0f) * factor
+        val sodium      = (recipe.sodiumPerServing  ?: 0f) * factor
+
+        // amountGrams: bei Gramm-Tracking die echten Gramm (Anzeige), sonst Portionsfaktor
+        val storedAmount = if (gramsAmount != null && gramsAmount > 0f) gramsAmount else factor
+        val storedRecipeGrams = if (gramsAmount != null && gramsAmount > 0f) gramsAmount else null
 
         val id = dao.insert(
             DiaryEntry(
                 foodItemId  = -(recipe.id.toInt()).coerceAtMost(-1), // negative = recipe entry
                 foodName    = recipe.title,
-                amountGrams = servingsFactor,   // stores portions, not grams
+                amountGrams = storedAmount,
                 mealType    = mealType,
                 dateStr     = date.toString(),
                 calories    = calories,
@@ -134,7 +147,7 @@ class DiaryRepository(db: NutriDatabase) {
                 saturatedFat = saturatedFat,
                 salt        = salt,
                 sodium      = sodium,
-                recipeGrams = gramsAmount
+                recipeGrams = storedRecipeGrams
             )
         )
         dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }

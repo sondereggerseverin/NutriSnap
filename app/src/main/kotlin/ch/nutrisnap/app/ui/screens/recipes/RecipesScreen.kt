@@ -423,7 +423,10 @@ fun RecipesScreen(
             gramsPerServing = gramsPerServing,
             yieldTotalG = totalYield,
             isCookedWeight = recipe.cookedWeightG != null && (recipe.cookedWeightG ?: 0f) > 0f,
-            onConfirm = { servings, grams, meal -> diaryVm.addRecipeAsMeal(recipe, servings, meal, grams); addToDiaryRecipe = null },
+            onConfirm = { servings, grams, meal, date ->
+                diaryVm.addRecipeAsMeal(recipe, servings, meal, grams, date)
+                addToDiaryRecipe = null
+            },
             onDismiss = { addToDiaryRecipe = null }
         )
     }
@@ -1443,7 +1446,7 @@ fun AddToDiarySheet(
     gramsPerServing: Float? = null,
     yieldTotalG: Float? = null,
     isCookedWeight: Boolean = false,
-    onConfirm: (servings: Float, gramsIfGramMode: Float?, meal: MealType) -> Unit,
+    onConfirm: (servings: Float, gramsIfGramMode: Float?, meal: MealType, date: java.time.LocalDate) -> Unit,
     onDismiss: () -> Unit
 ) {
     var unit by remember { mutableStateOf(if (gramsPerServing != null) DiaryQuantityUnit.GRAM else DiaryQuantityUnit.SERVING) }
@@ -1456,6 +1459,7 @@ fun AddToDiarySheet(
         )
     }
     var selectedMeal by remember { mutableStateOf(MealType.LUNCH) }
+    var selectedDate by remember { mutableStateOf(java.time.LocalDate.now()) }
 
     // Immer in Portionen umrechnen, egal welche Einheit der Nutzer eingibt — die
     // Datenschicht (addRecipeAsMeal) erwartet weiterhin einen Portionsfaktor.
@@ -1532,6 +1536,23 @@ fun AddToDiarySheet(
                     }
                 }
             }
+            Spacer(Modifier.height(8.dp))
+            Text("Tag:", fontSize=13.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val today = java.time.LocalDate.now()
+                listOf(
+                    today to "Heute",
+                    today.minusDays(1) to "Gestern",
+                    today.minusDays(2) to "Vorgestern"
+                ).forEach { (d, label) ->
+                    FilterChip(
+                        selected = selectedDate == d,
+                        onClick = { selectedDate = d },
+                        label = { Text(label, fontSize = 12.sp) }
+                    )
+                }
+            }
             estCals?.let {
                 Spacer(Modifier.height(8.dp))
                 Text("≈ ${it.toInt()} kcal", fontWeight=FontWeight.SemiBold,
@@ -1541,8 +1562,10 @@ fun AddToDiarySheet(
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick=onDismiss, Modifier.weight(1f)) { Text("Abbrechen") }
                 Button(onClick={
-                    val gramsIfGramMode = if (unit == DiaryQuantityUnit.GRAM) gramsText.toFloatOrNull() else null
-                    onConfirm(servings, gramsIfGramMode, selectedMeal)
+                    val gramsIfGramMode = if (unit == DiaryQuantityUnit.GRAM)
+                        gramsText.replace(',', '.').toFloatOrNull()
+                    else null
+                    onConfirm(servings, gramsIfGramMode, selectedMeal, selectedDate)
                 }, Modifier.weight(1f), enabled=servings>0) {
                     Icon(Icons.Default.Check,null,Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Hinzufügen")
                 }

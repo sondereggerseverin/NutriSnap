@@ -66,9 +66,16 @@ private fun formatPortionAmount(amount: Float): String {
 
 /** Anzeige für einen Rezept-Tagebucheintrag: exakte Grammzahl, wenn der Nutzer in
  *  Gramm erfasst hat (entry.recipeGrams gesetzt), sonst die Portionsanzahl. */
-private fun recipeAmountLabel(entry: DiaryEntry): String =
-    entry.recipeGrams?.let { "${it.toInt()} g" }
-        ?: formatPortionAmount(entry.amountGrams.takeIf { it > 0f } ?: 1f)
+private fun recipeAmountLabel(entry: DiaryEntry): String {
+    // Gramm-Tracking: recipeGrams oder amountGrams (wenn als Gramm gespeichert)
+    entry.recipeGrams?.takeIf { it > 0f }?.let { return "${it.toInt()} g" }
+    // amountGrams bei Rezepten = Portionen, außer es wurde bewusst in Gramm gespeichert
+    // (Heuristik: > 10 und foodItemId < 0 und keine ganzen kleinen Portionsfaktoren)
+    if (entry.foodItemId < 0 && entry.amountGrams >= 20f) {
+        return "${entry.amountGrams.toInt()} g"
+    }
+    return formatPortionAmount(entry.amountGrams.takeIf { it > 0f } ?: 1f)
+}
 
 private fun defaultMealForNow(): MealType = when (LocalTime.now().hour) {
     in 5..10  -> MealType.BREAKFAST
@@ -1069,8 +1076,38 @@ fun AddFoodSheet(
                 "Eintrag hinzufügen",
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
-                modifier = Modifier.padding(bottom = NutriSpacing.md)
+                modifier = Modifier.padding(bottom = NutriSpacing.sm)
             )
+            // Nachträglich tracken: Tag wählen (nutzt dieselbe Datums-Navigation wie das Tagebuch)
+            val diaryDate by vm.uiState.collectAsState()
+            val activeDate = diaryDate.selectedDate
+            Text("Tag", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(4.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(bottom = NutriSpacing.md)
+            ) {
+                val today = java.time.LocalDate.now()
+                listOf(
+                    today to "Heute",
+                    today.minusDays(1) to "Gestern",
+                    today.minusDays(2) to "Vorgestern"
+                ).forEach { (d, label) ->
+                    FilterChip(
+                        selected = activeDate == d,
+                        onClick = { vm.setDate(d) },
+                        label = { Text(label, fontSize = 12.sp) }
+                    )
+                }
+            }
+            if (activeDate != java.time.LocalDate.now()) {
+                Text(
+                    "Wird für ${activeDate.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))} gespeichert",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = NutriSpacing.sm)
+                )
+            }
 
             // Direkte Einstiege: Foto ist der kürzeste Weg zum Tracken per Kamera
             Row(
