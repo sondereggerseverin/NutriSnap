@@ -836,11 +836,15 @@ private fun CalorieBreakdownCard(state: HomeUiState) {
                 "−${b.deficitKcal} kcal (Ziel ${"%.1f".format(it)} kg/Woche)"
             } ?: "−${b.deficitKcal} kcal (Standard ~0,5 kg/Woche)"
             BreakdownLine("Defizit", deficitNote)
-            b.activityBonusKcal.takeIf { it != 0 }?.let {
-                BreakdownLine("Aktivität 1:1 (voll)", "+$it kcal")
+            val act = b.activityBonusKcal
+            val actLabel = when {
+                act > 0 -> "+$act kcal (über Ø, 50%)"
+                act < 0 -> "$act kcal (unter Ø, 50%)"
+                else -> "±0 kcal"
             }
+            BreakdownLine("Aktivitäts-Anpassung", actLabel)
             b.todayActiveKcal?.let { BreakdownLine("Heute aktiv (HC + manuell)", "$it kcal") }
-            b.avgActiveKcal?.let { BreakdownLine("Ø aktiv (Fenster, Info)", "$it kcal") }
+            b.avgActiveKcal?.let { BreakdownLine("Ø aktiv (Fenster)", "$it kcal") }
             b.manualActivityKcal?.let {
                 BreakdownLine("davon manuell", "$it kcal")
             }
@@ -854,9 +858,9 @@ private fun CalorieBreakdownCard(state: HomeUiState) {
 
             Spacer(Modifier.height(NutriSpacing.sm))
             Text(
-                "Formel: TDEE ≈ Ø Essen − (ΔGewicht × 7700) / Tage. " +
-                    "Aktivität (HC + manuell): volle kcal 1:1 wie vom Tracker. " +
-                    "Konfidenz ${b.confidencePercent}%.",
+                "Erhaltung bevorzugt aus Verlauf (Zufuhr vs. Trendgewicht, EWMA). " +
+                    "Wearable-kcal nur als Abweichung vom Ø × 50% (Tracker-Fehler ~20–30%, " +
+                    "sonst Doppelzählung mit TDEE). Konfidenz ${b.confidencePercent}%.",
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 15.sp

@@ -69,9 +69,21 @@ object AdaptiveTdeeCalculator {
     // next step, but out of scope for this pass.
     const val DEFAULT_DEFICIT_KCAL = 500.0
 
-    // Aktivitätskalorien (HC + manuell) zählen 1:1 in voller Höhe —
-    // so wie auf der Uhr / in Samsung Health angezeigt (z.B. 3268 kcal Radfahrt).
-    const val ACTIVITY_ADJUSTMENT_FACTOR = 1.0
+    /**
+     * Wearables überschätzen Energieverbrauch typisch um ~20–30% (Reviews zu
+     * Apple/Garmin/Fitbit). Zusätzlich steckt im TDEE (Formel-PAL oder Trend)
+     * schon die durchschnittliche Bewegung. Deshalb zählen wir nur die
+     * Abweichung vom Ø, und nur mit Faktor 0.5 — großer Sporttag bleibt spürbar,
+     * ohne TDEE + volle Tracker-kcal zu doppeln.
+     */
+    const val ACTIVITY_ADJUSTMENT_FACTOR = 0.5
+
+    /** Soft-Cap: Ruhetag darf Ziel senken, großer Tag (z.B. 100 km) anheben. */
+    const val ACTIVITY_BONUS_MIN_KCAL = -600.0
+    const val ACTIVITY_BONUS_MAX_KCAL = 2000.0
+
+    /** EWMA-α für Gewichtsglättung im Trendfenster (0.1–0.25 üblich). */
+    const val WEIGHT_EWMA_ALPHA = 0.15
 
     // Need at least this many days with *both* a weight reading (manual weight_entries
     // and/or Health Connect body mass) and logged intake, spread over at least this
@@ -97,6 +109,20 @@ object AdaptiveTdeeCalculator {
     // active-calories reading) producing an unsafely low recommendation.
     const val SAFETY_FLOOR_KCAL = 1500.0
 
+
+    /** Exponentiell gewichteter gleitender Durchschnitt für eine Zeitreihe. */
+    fun ewmaSeries(values: List<Double>, alpha: Double = WEIGHT_EWMA_ALPHA): List<Double> {
+        if (values.isEmpty()) return emptyList()
+        val out = ArrayList<Double>(values.size)
+        var prev = values.first()
+        out.add(prev)
+        for (i in 1 until values.size) {
+            prev = prev + alpha * (values[i] - prev)
+            out.add(prev)
+        }
+        return out
+    }
+
     /**
      * Derives real average TDEE from overlapping weight + intake history.
      * Returns null if there isn't enough overlapping data to trust the trend.
@@ -111,14 +137,16 @@ object AdaptiveTdeeCalculator {
         val spanDays = ChronoUnit.DAYS.between(days.first(), days.last())
         if (spanDays < MIN_TREND_DAYS - 1) return null // guard against clustered/duplicate dates
 
-        // Average the first/last two readings to damp single-day weight noise
-        // (water weight, timing of the scale, etc.) at the window's edges.
-        val startWeight = days.take(2).map { weightByDate.getValue(it) }.average()
-        val endWeight = days.takeLast(2).map { weightByDate.getValue(it) }.average()
-        val weightChangeKg = endWeight - startWeight
+        // EWMA-geglättetes Gewicht (Hacker's Diet / Trendweight-Prinzip):
+        // Tagesgewicht ist durch Wasser/Verdauung verrauscht (±1–2 kg).
+        val rawWeights = days.map { weightByDate.getValue(it).toDouble() }
+        val smoothed = ewmaSeries(rawWeights, WEIGHT_EWMA_ALPHA)
+        val weightChangeKg = smoothed.last() - smoothed.first()
 
         val avgIntake = days.map { intakeByDate.getValue(it) }.average()
 
+        // Energiebilanz rückwärts: ΔGewicht × 7700 ≈ Zufuhr − Verbrauch
+        // => TDEE ≈ Ø-Zufuhr − (ΔGewicht × 7700) / Tage
         val tdee = avgIntake - (weightChangeKg * KCAL_PER_KG) / spanDays
         return TrendTdeeResult(
             tdee = tdee,
@@ -141,9 +169,10 @@ object AdaptiveTdeeCalculator {
     const val TREND_MIN_PLAUSIBLE_KCAL = 1000.0
 
     /**
-     * Combines the base maintenance estimate (trend-based if available and plausible, else
-     * the profile's BMR*activityFactor formula), a fixed deficit, and today's full
-     * activity calories (Health Connect + manual) added 1:1 as shown by the tracker.
+     * Combines maintenance (prefer adaptive trend TDEE from intake vs. weight change;
+     * else Mifflin-St-Jeor × PAL), a moderate deficit, and a *partial* same-day
+     * activity adjustment. Wearable kcal are not added 1:1 on top of TDEE (tracker
+     * error + double-counting average activity already in TDEE).
      *
      * Returns null only if neither a trend nor a formula TDEE is available at all
      * (e.g. brand-new profile with no weight/height/age set and no history yet).
@@ -162,13 +191,18 @@ object AdaptiveTdeeCalculator {
                     kotlin.math.abs(it.tdee - formulaTdee) <= formulaTdee * TREND_PLAUSIBILITY_RATIO)
         }
         val maintenance = trustedTrend?.tdee ?: formulaTdee ?: return null
-        // Defizit begrenzt: max 25% vom Erhaltungsbedarf, mind. 0
+        // Moderates Defizit (NIH/ACSM ~500–1000 kcal/Tag); max 25% der Erhaltung
         val safeDeficit = deficitKcal.coerceIn(0.0, maintenance * 0.25)
-        // Basis ohne Sport: Erhaltung − Defizit. Sport kommt 1:1 obendrauf.
         val base = maintenance - safeDeficit
 
-        // Volle Aktivitätskcal wie in HC / Samsung / manuell angezeigt (z.B. 3268).
-        val bonus = (todayActiveKcal ?: 0.0).coerceAtLeast(0.0) * ACTIVITY_ADJUSTMENT_FACTOR
+        // Nur Abweichung vom Ø-Aktivitätsniveau, halb gewichtet (Wearable-Fehler).
+        // Beispiel: 3268 heute, Ø 800 → Roh-Delta 2468 → Bonus ~1234 (nicht +3268).
+        val rawBonus = if (todayActiveKcal != null && avgActiveKcal != null && avgActiveKcal > 0) {
+            (todayActiveKcal - avgActiveKcal) * ACTIVITY_ADJUSTMENT_FACTOR
+        } else {
+            0.0
+        }
+        val bonus = rawBonus.coerceIn(ACTIVITY_BONUS_MIN_KCAL, ACTIVITY_BONUS_MAX_KCAL)
 
         val target = (base + bonus).coerceAtLeast(SAFETY_FLOOR_KCAL)
 
