@@ -235,6 +235,7 @@ val KEY_APP_THEME = stringPreferencesKey("app_theme")
 val KEY_MEAL_ORDER = stringPreferencesKey("meal_order")
 val KEY_AUTO_GERMAN_METRIC = androidx.datastore.preferences.core.booleanPreferencesKey("auto_german_metric")
 val KEY_MANUAL_ACTIVITY_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("manual_activity_enabled")
+val KEY_AGGRESSIVE_SPORT_DAY = androidx.datastore.preferences.core.booleanPreferencesKey("aggressive_sport_day")
 
 
 // ── Typography ─────────────────────────────────────────────────────────────────

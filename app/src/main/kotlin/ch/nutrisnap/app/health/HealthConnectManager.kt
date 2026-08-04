@@ -127,18 +127,26 @@ class HealthConnectManager(context: Context) {
      *     (e.g. permission not granted yet, or Samsung Health hasn't synced).
      */
     suspend fun getActiveCaloriesForDay(date: LocalDate, bmrKcalPerDay: Double? = null): Double? {
-        val start = date.atStartOfDay(ZoneId.systemDefault()).toInstant()
-        val end   = if (date == LocalDate.now()) Instant.now()
-                    else date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
-        val range = TimeRangeFilter.between(start, end)
+        val zone = ZoneId.systemDefault()
+        // Fenster etwas weiter, Zuordnung aber strikt nach startTime-Kalendertag —
+        // so landet eine Radfahrt, die um 22:00 startet, am Starttag und nicht
+        // anteilig am Folgetag (Sync-Zeit ≠ Workout-Start).
+        val windowStart = date.minusDays(1).atStartOfDay(zone).toInstant()
+        val windowEnd = if (date == LocalDate.now()) Instant.now()
+                        else date.plusDays(2).atStartOfDay(zone).toInstant()
+        val range = TimeRangeFilter.between(windowStart, windowEnd)
+        val dayStart = date.atStartOfDay(zone).toInstant()
+        val dayEnd = date.plusDays(1).atStartOfDay(zone).toInstant()
+        val dayRange = TimeRangeFilter.between(dayStart, if (date == LocalDate.now()) Instant.now() else dayEnd)
 
-        // Tier 1: sum raw Samsung-origin records.
+        // Tier 1: sum raw Samsung-origin records, attributed by startTime local date.
         val samsungRecordsSum = runCatching {
             val resp = client.readRecords(
                 ReadRecordsRequest(ActiveCaloriesBurnedRecord::class, range)
             )
             val samsungRecords = resp.records.filter {
-                it.metadata.dataOrigin.packageName == SAMSUNG_HEALTH_PACKAGE
+                it.metadata.dataOrigin.packageName == SAMSUNG_HEALTH_PACKAGE &&
+                    it.startTime.atZone(zone).toLocalDate() == date
             }
             if (samsungRecords.isEmpty()) null
             else samsungRecords.sumOf { it.energy.inKilocalories }
@@ -150,12 +158,12 @@ class HealthConnectManager(context: Context) {
             return samsungRecordsSum
         }
 
-        // Tier 2: Samsung-filtered aggregate.
+        // Tier 2: Samsung-filtered aggregate (Kalendertag lokal).
         val samsungAggregate = runCatching {
             client.aggregate(
                 AggregateRequest(
                     metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
-                    timeRangeFilter = range,
+                    timeRangeFilter = dayRange,
                     dataOriginFilter = setOf(DataOrigin(SAMSUNG_HEALTH_PACKAGE))
                 )
             )[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories

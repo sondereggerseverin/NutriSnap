@@ -183,7 +183,9 @@ object AdaptiveTdeeCalculator {
         todayActiveKcal: Double?,
         avgActiveKcal: Double?,
         deficitKcal: Double = DEFAULT_DEFICIT_KCAL,
-        formulaBmr: Double? = null
+        formulaBmr: Double? = null,
+        /** 0.5 = Standard (Wearable-Vorsicht); 1.0 = aggressiver Sporttag. */
+        activityFactor: Double = ACTIVITY_ADJUSTMENT_FACTOR
     ): AdaptiveCalorieTarget? {
         val trustedTrend = trend?.takeIf {
             it.tdee >= TREND_MIN_PLAUSIBLE_KCAL &&
@@ -197,8 +199,9 @@ object AdaptiveTdeeCalculator {
 
         // Nur Abweichung vom Ø-Aktivitätsniveau, halb gewichtet (Wearable-Fehler).
         // Beispiel: 3268 heute, Ø 800 → Roh-Delta 2468 → Bonus ~1234 (nicht +3268).
+        val factor = activityFactor.coerceIn(0.25, 1.0)
         val rawBonus = if (todayActiveKcal != null && avgActiveKcal != null && avgActiveKcal > 0) {
-            (todayActiveKcal - avgActiveKcal) * ACTIVITY_ADJUSTMENT_FACTOR
+            (todayActiveKcal - avgActiveKcal) * factor
         } else {
             0.0
         }

@@ -837,9 +837,10 @@ private fun CalorieBreakdownCard(state: HomeUiState) {
             } ?: "−${b.deficitKcal} kcal (Standard ~0,5 kg/Woche)"
             BreakdownLine("Defizit", deficitNote)
             val act = b.activityBonusKcal
+            val pct = if (state.aggressiveSportDay) "100%" else "50%"
             val actLabel = when {
-                act > 0 -> "+$act kcal (über Ø, 50%)"
-                act < 0 -> "$act kcal (unter Ø, 50%)"
+                act > 0 -> "+$act kcal (über Ø, $pct)"
+                act < 0 -> "$act kcal (unter Ø, $pct)"
                 else -> "±0 kcal"
             }
             BreakdownLine("Aktivitäts-Anpassung", actLabel)

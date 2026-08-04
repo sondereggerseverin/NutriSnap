@@ -37,6 +37,7 @@ import ch.nutrisnap.app.ui.theme.AppTheme
 import ch.nutrisnap.app.ui.theme.KEY_APP_THEME
 import ch.nutrisnap.app.ui.theme.KEY_AUTO_GERMAN_METRIC
 import ch.nutrisnap.app.ui.theme.KEY_MANUAL_ACTIVITY_ENABLED
+import ch.nutrisnap.app.ui.theme.KEY_AGGRESSIVE_SPORT_DAY
 
 enum class FitnessGoal(val label: String, val emoji: String, val desc: String) {
     LOSE_WEIGHT("Abnehmen",        "\uD83D\uDD25", "–500 kcal vom TDEE · mehr Protein"),
@@ -65,11 +66,13 @@ private fun computeGoals(
         FitnessGoal.GAIN_WEIGHT  -> (tdee + 500).toInt()
         FitnessGoal.SPORT        -> (tdee + 300).toInt()
     }
+    // Literatur: 1.6–2.4 g/kg KG für Aktive; im Defizit eher am oberen Ende.
     val proteinG = when (goal) {
         FitnessGoal.LOSE_WEIGHT  -> weightKg * 2.2f
         FitnessGoal.BUILD_MUSCLE -> weightKg * 2.4f
-        FitnessGoal.SPORT        -> weightKg * 2.2f
-        else                     -> weightKg * 1.8f
+        FitnessGoal.SPORT        -> weightKg * 2.0f
+        FitnessGoal.GAIN_WEIGHT  -> weightKg * 1.8f
+        FitnessGoal.MAINTAIN     -> weightKg * 1.6f
     }
     val fatG = when (goal) {
         FitnessGoal.SPORT -> kcal * 0.20f / 9f
@@ -279,6 +282,8 @@ fun SettingsScreen(
         // Manuelle Aktivitätskalorien
         ManualActivitySettingsCard()
 
+        AggressiveSportDayCard()
+
         // Körperdaten
         SettingsCard(title = "Körperdaten", icon = Icons.Default.Person) {
             Text(
@@ -323,8 +328,21 @@ fun SettingsScreen(
             Spacer(Modifier.height(NutriSpacing.xs))
             GoalField("Kalorienziel (kcal)",  calorieText, KeyboardType.Number) { calorieText = it }
             GoalField("Proteinziel (g)",      proteinText, KeyboardType.Number) { proteinText = it }
+            Text(
+                "Empfehlung Aktiv: 1,6–2,4 g/kg KG (bei ${weightText.toFloatOrNull()?.let { "%.0f".format(it) } ?: "—"} kg ≈ "
+                    + "${weightText.toFloatOrNull()?.let { (it * 1.6f).toInt() } ?: "—"}–"
+                    + "${weightText.toFloatOrNull()?.let { (it * 2.4f).toInt() } ?: "—"} g)",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             GoalField("Kohlenhydratziel (g)", carbsText,   KeyboardType.Number) { carbsText   = it }
             GoalField("Fettziel (g)",         fatText,     KeyboardType.Number) { fatText     = it }
+            Text(
+                "Ballaststoffe: fest ${ch.nutrisnap.app.ui.screens.home.FIBER_GOAL_G.toInt()} g/Tag (D-A-CH-Richtwert)",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
         }
 
         // Aktivitätslevel
@@ -636,6 +654,44 @@ fun HealthConnectCard() {
                     }
                 }
             }
+        }
+    }
+}
+
+
+@Composable
+fun AggressiveSportDayCard() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val enabled = prefs?.get(KEY_AGGRESSIVE_SPORT_DAY) ?: false
+
+    SettingsCard(title = "Sporttag-Modus", icon = Icons.Default.FitnessCenter) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                Text(
+                    "Aggressiver Sporttag",
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 14.sp
+                )
+                Text(
+                    "Aktivitäts-Abweichung vom Ø zählt 100% statt 50%. Für lange Einheiten (z.B. 100 km Rad), wenn du bewusst mehr essen willst.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = { checked ->
+                    scope.launch {
+                        context.notifDataStore.edit { it[KEY_AGGRESSIVE_SPORT_DAY] = checked }
+                    }
+                }
+            )
         }
     }
 }

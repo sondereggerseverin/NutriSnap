@@ -14,6 +14,7 @@ import ch.nutrisnap.app.domain.AdaptiveTdeeCalculator
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.KEY_MEAL_ORDER
 import ch.nutrisnap.app.ui.theme.KEY_MANUAL_ACTIVITY_ENABLED
+import ch.nutrisnap.app.ui.theme.KEY_AGGRESSIVE_SPORT_DAY
 import ch.nutrisnap.app.data.model.ManualActivityEntry
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -65,7 +66,7 @@ data class HomeUiState(
     val carbsGoal:     Float   = 220f,
     val fatGoal:       Float   = 65f,
     val totalFiber:    Float   = 0f,
-    val fiberGoal:     Float   = 30f,
+    val fiberGoal:     Float   = FIBER_GOAL_G,
     val streak:        Int     = 0,
     val lastWeightKg:  Float?  = null,
     val previousWeightKg: Float? = null,
@@ -82,13 +83,18 @@ data class HomeUiState(
     /** Settings: manuelles Aktivitätstracking aktiv. */
     val manualActivityEnabled: Boolean = false,
     /** Heute manuell eingetragene Aktivitätskalorien (null = kein Eintrag). */
-    val manualActivityKcal: Float? = null
+    val manualActivityKcal: Float? = null,
+    /** true = Aktivitätsabweichung ×100% statt ×50%. */
+    val aggressiveSportDay: Boolean = false
 ) {
     /** Budget = Basis-Ziel + verbrannte Aktivitätskalorien (nur wenn nicht schon im adaptiven Ziel enthalten) */
     val adjustedGoal: Float get() = if (isAdaptiveTarget) calorieGoal else calorieGoal + burnedKcal
     /** Übrig = Budget - gegessen (nie negativ) */
     val remaining:    Float get() = (adjustedGoal - totalCalories).coerceAtLeast(0f)
 }
+
+/** D-A-CH-Richtwert Ballaststoffe ≥30 g/Tag. */
+const val FIBER_GOAL_G = 30f
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val db          = NutriDatabase.getInstance(app)
@@ -176,13 +182,17 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         val deficitKcal = weeklyLoss?.let { it * AdaptiveTdeeCalculator.KCAL_PER_KG / 7.0 }
             ?: AdaptiveTdeeCalculator.DEFAULT_DEFICIT_KCAL
 
+        val aggressiveSport = prefs[KEY_AGGRESSIVE_SPORT_DAY] ?: false
+        val activityFactor = if (aggressiveSport) 1.0 else AdaptiveTdeeCalculator.ACTIVITY_ADJUSTMENT_FACTOR
+
         val adaptiveTarget = AdaptiveTdeeCalculator.computeDailyTarget(
             trend = trend,
             formulaTdee = profile.computedTdee(),
             todayActiveKcal = todayActiveCombined,
             avgActiveKcal = avgActiveCombined,
             deficitKcal = deficitKcal,
-            formulaBmr = profile.computedBmr()
+            formulaBmr = profile.computedBmr(),
+            activityFactor = activityFactor
         )
 
         val finalTarget = adaptiveTarget?.targetKcal ?: profile.dailyCalorieGoal
@@ -232,6 +242,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             calorieBreakdown = breakdown,
             manualActivityEnabled = manualEnabled,
             manualActivityKcal = if (manualEnabled) manualToday?.toFloat() else null,
+            aggressiveSportDay = aggressiveSport,
             meals         = orderedMealMeta.map { (type, label, icon, color) ->
                 val mealEntries = byMeal[type] ?: emptyList()
                 MealOverview(
