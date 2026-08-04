@@ -69,9 +69,10 @@ object AdaptiveTdeeCalculator {
     // next step, but out of scope for this pass.
     const val DEFAULT_DEFICIT_KCAL = 500.0
 
-    // Only "give back" half of above-average activity calories, and only take back half
-    // of below-average — smooths out day-to-day tracker noise instead of reacting 1:1.
-    const val ACTIVITY_ADJUSTMENT_FACTOR = 0.5
+    // Aktivitätskalorien (HC + manuell) zählen 1:1 relativ zum Ø:
+    // heutige Aktivität − Ø-Aktivität, ohne Dämpfung und ohne ±400-Cap.
+    // Große Einheiten (z.B. 100 km Rad) erhöhen das Tagesziel entsprechend.
+    const val ACTIVITY_ADJUSTMENT_FACTOR = 1.0
 
     // Need at least this many days with *both* a weight reading (manual weight_entries
     // and/or Health Connect body mass) and logged intake, spread over at least this
@@ -142,8 +143,8 @@ object AdaptiveTdeeCalculator {
 
     /**
      * Combines the base maintenance estimate (trend-based if available and plausible, else
-     * the profile's BMR*activityFactor formula), a fixed deficit, and a damped adjustment
-     * for how today's activity compares to the recent average.
+     * the profile's BMR*activityFactor formula), a fixed deficit, and a 1:1 adjustment
+     * for how today's activity (Health Connect + manual) compares to the recent average.
      *
      * Returns null only if neither a trend nor a formula TDEE is available at all
      * (e.g. brand-new profile with no weight/height/age set and no history yet).
@@ -166,11 +167,14 @@ object AdaptiveTdeeCalculator {
         val safeDeficit = deficitKcal.coerceIn(0.0, maintenance * 0.25)
         val base = maintenance - safeDeficit
 
-        // Aktivitäts-Bonus: ± max 400 kcal, Faktor 0.5 gegen Tracker-Rauschen
-        val rawBonus = if (todayActiveKcal != null && avgActiveKcal != null && avgActiveKcal > 0) {
-            (todayActiveKcal - avgActiveKcal) * ACTIVITY_ADJUSTMENT_FACTOR
-        } else 0.0
-        val bonus = rawBonus.coerceIn(-400.0, 400.0)
+        // Aktivitäts-Bonus 1:1: (heute − Ø). Ohne Ø: volle heutige Aktivität.
+        // Kein Cap — eine 3000-kcal-Radtourung soll das Ziel spürbar anheben.
+        val bonus = when {
+            todayActiveKcal == null || todayActiveKcal <= 0 -> 0.0
+            avgActiveKcal != null && avgActiveKcal > 0 ->
+                (todayActiveKcal - avgActiveKcal) * ACTIVITY_ADJUSTMENT_FACTOR
+            else -> todayActiveKcal * ACTIVITY_ADJUSTMENT_FACTOR
+        }
 
         val target = (base + bonus).coerceAtLeast(SAFETY_FLOOR_KCAL)
 

@@ -836,17 +836,17 @@ private fun CalorieBreakdownCard(state: HomeUiState) {
                 "−${b.deficitKcal} kcal (Ziel ${"%.1f".format(it)} kg/Woche)"
             } ?: "−${b.deficitKcal} kcal (Standard ~0,5 kg/Woche)"
             BreakdownLine("Defizit", deficitNote)
-            val bonus = b.activityBonusKcal
-            val bonusLabel = when {
-                bonus > 0 -> "+$bonus kcal (aktiver als Ø)"
-                bonus < 0 -> "$bonus kcal (ruhiger als Ø)"
+            val activityDelta = b.activityBonusKcal
+            val activityDeltaLabel = when {
+                activityDelta > 0 -> "+$activityDelta kcal (über Ø)"
+                activityDelta < 0 -> "$activityDelta kcal (unter Ø)"
                 else -> "±0 kcal"
             }
-            BreakdownLine("Aktivitäts-Anpassung HC (50%)", bonusLabel)
-            b.todayActiveKcal?.let { BreakdownLine("Heute aktiv gesamt", "$it kcal") }
-            b.avgActiveKcal?.let { BreakdownLine("Ø HC-aktiv (Fenster)", "$it kcal") }
+            BreakdownLine("Aktivität 1:1 (heute − Ø)", activityDeltaLabel)
+            b.todayActiveKcal?.let { BreakdownLine("Heute aktiv (HC + manuell)", "$it kcal") }
+            b.avgActiveKcal?.let { BreakdownLine("Ø aktiv (Fenster)", "$it kcal") }
             b.manualActivityKcal?.let {
-                BreakdownLine("Manuelle Aktivität (+1:1)", "+$it kcal", emphasize = true)
+                BreakdownLine("davon manuell", "$it kcal")
             }
             BreakdownLine("Ziel heute", "${b.targetKcal} kcal", emphasize = true)
 
@@ -859,8 +859,7 @@ private fun CalorieBreakdownCard(state: HomeUiState) {
             Spacer(Modifier.height(NutriSpacing.sm))
             Text(
                 "Formel: TDEE ≈ Ø Essen − (ΔGewicht × 7700) / Tage. " +
-                    "HC-Aktivität: nur Abweichung vom Ø (halb, max ±400). " +
-                    "Manuelle Aktivität: voll (+1:1) zum Ziel. " +
+                    "Aktivität (HC + manuell): heute − Ø, 1:1 ohne Cap. " +
                     "Konfidenz ${b.confidencePercent}%.",
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

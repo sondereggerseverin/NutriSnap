@@ -146,20 +146,30 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         val trend = AdaptiveTdeeCalculator.computeTrendTdee(weightByDate, intakeByDate)
 
         val manualEnabled = prefs[KEY_MANUAL_ACTIVITY_ENABLED] ?: false
-        val manualByDate = manualActivities.associate {
-            LocalDate.parse(it.dateStr) to it.activeCaloriesKcal.toDouble()
-        }
+        val manualByDate = if (manualEnabled) {
+            manualActivities.associate {
+                LocalDate.parse(it.dateStr) to it.activeCaloriesKcal.toDouble()
+            }
+        } else emptyMap()
         val today = LocalDate.now()
-        val manualToday = if (manualEnabled) manualByDate[today] else null
+        val manualToday = manualByDate[today]
         val hcToday = hcCache?.activeCaloriesKcal
-        // Adaptive Dämpfung nur auf Health-Connect — manuelle kcal werden 1:1 addiert,
-        // sonst verschwinden 2000 Sport-kcal hinter dem ±400-Cap.
-        val avgHcOnly = activityDays
-            .mapNotNull { it.activeCaloriesKcal }
-            .takeIf { it.isNotEmpty() }
-            ?.average()
-        val displayActiveKcal = (hcToday ?: 0.0) + (manualToday ?: 0.0)
-        val manualAdd = manualToday ?: 0.0
+        // HC + manuell = eine Aktivitätsquelle, beide 1:1 in der Ziel-Rechnung
+        val todayActiveCombined = run {
+            val sum = (hcToday ?: 0.0) + (manualToday ?: 0.0)
+            sum.takeIf { it > 0.0 }
+        }
+        val avgActiveCombined = run {
+            val byDate = linkedMapOf<LocalDate, Double>()
+            for (c in activityDays) {
+                c.activeCaloriesKcal?.let { byDate[c.date] = it }
+            }
+            for ((d, kcal) in manualByDate) {
+                byDate[d] = (byDate[d] ?: 0.0) + kcal
+            }
+            byDate.values.takeIf { it.isNotEmpty() }?.average()
+        }
+        val displayActiveKcal = todayActiveCombined ?: 0.0
 
         // Defizit aus Wochenziel (kg) falls gesetzt, sonst Standard 500 kcal
         val weeklyLoss = profile.weeklyTargetLossKg?.takeIf { it > 0f }
@@ -169,15 +179,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         val adaptiveTarget = AdaptiveTdeeCalculator.computeDailyTarget(
             trend = trend,
             formulaTdee = profile.computedTdee(),
-            todayActiveKcal = hcToday,
-            avgActiveKcal = avgHcOnly,
+            todayActiveKcal = todayActiveCombined,
+            avgActiveKcal = avgActiveCombined,
             deficitKcal = deficitKcal,
             formulaBmr = profile.computedBmr()
         )
 
-        // Ziel = adaptives Ergebnis + volle manuelle Aktivität (wenn eingetragen)
-        val baseTarget = adaptiveTarget?.targetKcal ?: profile.dailyCalorieGoal
-        val finalTarget = baseTarget + manualAdd.toInt()
+        val finalTarget = adaptiveTarget?.targetKcal ?: profile.dailyCalorieGoal
 
         val breakdown = adaptiveTarget?.let { t ->
             CalorieBreakdown(
@@ -193,11 +201,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 weightChangeKg = t.weightChangeKg,
                 avgIntakeKcal = t.avgIntakeKcal,
                 avgActiveKcal = t.avgActiveKcal,
-                todayActiveKcal = displayActiveKcal.toInt().takeIf { displayActiveKcal > 0 },
+                todayActiveKcal = t.todayActiveKcal,
                 trendOverlapDays = t.trendOverlapDays,
                 trendSpanDays = t.trendSpanDays,
                 weeklyTargetLossKg = weeklyLoss,
-                manualActivityKcal = manualAdd.toInt().takeIf { it > 0 }
+                manualActivityKcal = manualToday?.toInt()?.takeIf { it > 0 }
             )
         }
 
@@ -208,8 +216,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             totalCarbs    = entries.sumOf { it.carbs.toDouble() }.toFloat(),
             totalFat      = entries.sumOf { it.fat.toDouble() }.toFloat(),
             totalFiber    = entries.sumOf { it.fiber.toDouble() }.toFloat(),
-            // Adaptiv: Ziel enthält manuelle kcal 1:1; burned nur Anzeige.
-            // Nicht-adaptiv: klassisches Ziel + burned (inkl. manuell) via adjustedGoal.
+            // Adaptiv: Ziel enthält Aktivitäts-Anpassung 1:1 (HC+manuell vs Ø).
+            // Nicht-adaptiv: klassisches Ziel + burned via adjustedGoal.
             calorieGoal   = if (adaptiveTarget != null) finalTarget.toFloat()
                             else profile.dailyCalorieGoal.toFloat(),
             burnedKcal    = displayActiveKcal.toFloat(),
