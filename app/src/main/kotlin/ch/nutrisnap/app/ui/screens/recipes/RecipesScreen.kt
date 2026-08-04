@@ -41,6 +41,12 @@ import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import ch.nutrisnap.app.domain.RecipeGermanMetricConverter
+import ch.nutrisnap.app.ui.theme.KEY_RECIPE_RATINGS
+import ch.nutrisnap.app.ui.screens.settings.notifDataStore
+import androidx.datastore.preferences.core.edit
+import androidx.compose.material.icons.filled.Star
+import kotlinx.coroutines.launch
+import org.json.JSONObject
 import ch.nutrisnap.app.domain.UrlExtractor
 import ch.nutrisnap.app.ui.components.EmptyState
 import ch.nutrisnap.app.ui.components.MicronutrientTable
@@ -63,10 +69,8 @@ private fun scaleNumbers(line: String, ratio: Float): String {
 
 // ── Structured ingredient parsing ─────────────────────────────────────────────
 private data class ParsedIngredient(val amount: String, val unit: String, val name: String)
-private val INGREDIENT_UNITS = listOf("g", "ml", "kg", "l", "tsp", "tbsp", "EL", "TL", "Stück", "Prise", "Bund", "Dose", "Packung", "Scheibe", "Zehe")
-// Unicode-Bruchzeichen (¼ ½ ⅓ ...) und blosse ASCII-Bruchschreibweisen (2/3, 1 1/8)
-// wurden bisher nicht erkannt -> solche Zeilen bekamen faelschlich ein "?"-Icon,
-// obwohl eine Menge vorhanden ist.
+/** Anzeige-Einheiten im Dropdown (kurz, lesbar). */
+private val INGREDIENT_UNITS = listOf("g", "ml", "kg", "l", "EL", "TL", "Stück", "Prise", "Bund", "Dose", "Packung", "Scheibe", "Zehe")
 private const val FRACTION_CHARS = "¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞"
 private val UNICODE_FRACTION_VALUES = mapOf(
     '¼' to 0.25f, '½' to 0.5f, '¾' to 0.75f,
@@ -75,10 +79,40 @@ private val UNICODE_FRACTION_VALUES = mapOf(
     '⅙' to 0.17f, '⅚' to 0.83f,
     '⅛' to 0.13f, '⅜' to 0.38f, '⅝' to 0.63f, '⅞' to 0.88f
 )
+/** Yazio/Import-Langformen → kurze Einheit. */
+private val UNIT_ALIASES = mapOf(
+    "g" to "g", "gram" to "g", "grams" to "g", "gramm" to "g", "gramme" to "g",
+    "kg" to "kg", "kilogram" to "kg", "kilogramm" to "kg",
+    "ml" to "ml", "milliliter" to "ml", "millilitre" to "ml", "milliliters" to "ml",
+    "l" to "l", "liter" to "l", "litre" to "l",
+    "tsp" to "TL", "teaspoon" to "TL", "tl" to "TL",
+    "tbsp" to "EL", "tablespoon" to "EL", "el" to "EL",
+    "stück" to "Stück", "stueck" to "Stück", "piece" to "Stück", "pieces" to "Stück",
+    "cookie" to "Stück", "cookies" to "Stück", "pc" to "Stück", "pcs" to "Stück",
+    "prise" to "Prise", "pinch" to "Prise",
+    "bund" to "Bund", "dose" to "Dose", "packung" to "Packung",
+    "scheibe" to "Scheibe", "slice" to "Scheibe", "zehe" to "Zehe"
+)
+private val UNIT_PATTERN = UNIT_ALIASES.keys.sortedByDescending { it.length }.joinToString("|") {
+    Regex.escape(it)
+}
 private val INGREDIENT_AMOUNT_REGEX = Regex(
     "^((?:\\d+(?:[.,]\\d+)?\\s+)?[$FRACTION_CHARS]|(?:\\d+\\s+)?\\d+/\\d+|\\d+(?:[.,]\\d+)?)" +
-        "\\s*(g|ml|kg|l|tsp|tbsp|EL|TL|[Ss]tück|[Pp]rize|[Bb]und|[Dd]ose|[Pp]ackung|[Ss]cheibe|[Zz]eh)?\\s+(.+)"
+        "\\s*($UNIT_PATTERN)?\\s+(.+)",
+    RegexOption.IGNORE_CASE
 )
+
+private fun normalizeUnit(raw: String): String {
+    if (raw.isBlank()) return "g"
+    return UNIT_ALIASES[raw.trim().lowercase()] ?: raw.trim()
+}
+
+/** "Haferflocken (null)" aus Yazio-Import entfernen. */
+private fun cleanIngredientName(raw: String): String =
+    raw.trim()
+        .replace(Regex("""\s*\(\s*null\s*\)""", RegexOption.IGNORE_CASE), "")
+        .replace(Regex("""\s*\(\s*\)"""), "")
+        .trim()
 
 /** Wandelt "1 ¼", "¼", "2/3", "1 1/8" oder "1.5" in einen reinen Dezimalstring um. */
 private fun parseAmountToken(raw: String): String {
@@ -106,23 +140,33 @@ private fun formatAmount(value: Float): String =
     if (value == value.toLong().toFloat()) value.toLong().toString() else "%.2f".format(value)
 
 private fun parseIngredientLine(line: String): ParsedIngredient {
-    val trimmed = line.trimStart('•', '-', ' ')
+    val trimmed = line.trimStart('•', '-', ' ', '*')
     val m = INGREDIENT_AMOUNT_REGEX.find(trimmed)
-    return if (m != null) {
-        ParsedIngredient(
+    if (m != null) {
+        return ParsedIngredient(
             amount = parseAmountToken(m.groupValues[1]),
-            unit = m.groupValues[2].ifBlank { "g" },
-            name = m.groupValues[3]
+            unit = normalizeUnit(m.groupValues[2]),
+            name = cleanIngredientName(m.groupValues[3])
         )
-    } else {
-        ParsedIngredient(amount = "", unit = "g", name = trimmed)
     }
+    val loose = Regex(
+        """^(\d+(?:[.,]\d+)?)\s*($UNIT_PATTERN)\s+(.+)$""",
+        RegexOption.IGNORE_CASE
+    ).find(trimmed)
+    if (loose != null) {
+        return ParsedIngredient(
+            amount = loose.groupValues[1].replace(',', '.'),
+            unit = normalizeUnit(loose.groupValues[2]),
+            name = cleanIngredientName(loose.groupValues[3])
+        )
+    }
+    return ParsedIngredient(amount = "", unit = "g", name = cleanIngredientName(trimmed))
 }
 
 private fun joinIngredientLine(parsed: ParsedIngredient): String {
     val amt = parsed.amount.trim()
-    val unit = parsed.unit.trim()
-    val name = parsed.name.trim()
+    val unit = normalizeUnit(parsed.unit)
+    val name = cleanIngredientName(parsed.name)
     return if (amt.isNotBlank()) "$amt $unit $name" else name
 }
 
@@ -145,6 +189,7 @@ fun RecipesScreen(
     var showVerifySheet    by remember { mutableStateOf(false) }
     var pendingVerify      by remember { mutableStateOf(false) }
     var addToDiaryRecipe  by remember { mutableStateOf<Recipe?>(null) }
+    var rateAfterDiary   by remember { mutableStateOf<Recipe?>(null) }
     var editRecipe        by remember { mutableStateOf<Recipe?>(null) }
     var hideIncomplete    by remember { mutableStateOf(false) }
     var showBatchSheet    by remember { mutableStateOf(false) }
@@ -447,9 +492,17 @@ fun RecipesScreen(
             isCookedWeight = recipe.cookedWeightG != null && (recipe.cookedWeightG ?: 0f) > 0f,
             onConfirm = { servings, grams, meal, date ->
                 diaryVm.addRecipeAsMeal(recipe, servings, meal, grams, date)
+                rateAfterDiary = recipe
                 addToDiaryRecipe = null
             },
             onDismiss = { addToDiaryRecipe = null }
+        )
+    }
+
+    rateAfterDiary?.let { recipe ->
+        RecipeQuickRatingDialog(
+            recipe = recipe,
+            onDismiss = { rateAfterDiary = null }
         )
     }
 
@@ -1172,7 +1225,7 @@ fun RecipeDetailSheet(
                                         value = selectedUnit,
                                         onValueChange = {},
                                         readOnly = true,
-                                        modifier = Modifier.width(70.dp).clickable { unitExpanded = true },
+                                        modifier = Modifier.width(92.dp).clickable { unitExpanded = true },
                                         singleLine = true,
                                         textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
                                         trailingIcon = {
@@ -1670,3 +1723,67 @@ private fun MealType.label() = when(this) {
     MealType.DINNER    -> "Abendessen"; MealType.SNACK -> "Snack"
 }
 
+@Composable
+private fun RecipeQuickRatingDialog(recipe: Recipe, onDismiss: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var stars by remember { mutableStateOf(0) }
+    var tasteOk by remember { mutableStateOf(false) }
+    var portionOk by remember { mutableStateOf(false) }
+    var again by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Wie war’s?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(recipe.title, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Sterne (fürs nächste Mal)", fontSize = 12.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    for (i in 1..5) {
+                        IconButton(onClick = { stars = i }, modifier = Modifier.size(36.dp)) {
+                            Icon(
+                                Icons.Default.Star,
+                                contentDescription = "$i Sterne",
+                                tint = if (i <= stars) MaterialTheme.colorScheme.primary
+                                       else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                            )
+                        }
+                    }
+                }
+                Text("Kurz-Feedback (optional)", fontSize = 12.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(selected = tasteOk, onClick = { tasteOk = !tasteOk }, label = { Text("Schmeckt", fontSize = 11.sp) })
+                    FilterChip(selected = portionOk, onClick = { portionOk = !portionOk }, label = { Text("Portion ok", fontSize = 11.sp) })
+                    FilterChip(selected = again, onClick = { again = !again }, label = { Text("Nochmal", fontSize = 11.sp) })
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = stars > 0,
+                onClick = {
+                    scope.launch {
+                        context.notifDataStore.edit { prefs ->
+                            val map = runCatching {
+                                JSONObject(prefs[KEY_RECIPE_RATINGS] ?: "{}")
+                            }.getOrElse { JSONObject() }
+                            val obj = JSONObject()
+                            obj.put("stars", stars)
+                            obj.put("tasteOk", tasteOk)
+                            obj.put("portionOk", portionOk)
+                            obj.put("again", again)
+                            obj.put("at", System.currentTimeMillis())
+                            map.put(recipe.id.toString(), obj)
+                            prefs[KEY_RECIPE_RATINGS] = map.toString()
+                        }
+                        onDismiss()
+                    }
+                }
+            ) { Text("Speichern") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Überspringen") }
+        }
+    )
+}

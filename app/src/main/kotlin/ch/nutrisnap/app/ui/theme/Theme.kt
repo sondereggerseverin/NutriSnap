@@ -236,6 +236,8 @@ val KEY_MEAL_ORDER = stringPreferencesKey("meal_order")
 val KEY_AUTO_GERMAN_METRIC = androidx.datastore.preferences.core.booleanPreferencesKey("auto_german_metric")
 val KEY_MANUAL_ACTIVITY_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("manual_activity_enabled")
 val KEY_AGGRESSIVE_SPORT_DAY = androidx.datastore.preferences.core.booleanPreferencesKey("aggressive_sport_day")
+/** JSON-Map recipeId → Sterne 1–5, z.B. {"12":4,"3":5} */
+val KEY_RECIPE_RATINGS = stringPreferencesKey("recipe_ratings_json")
 
 
 // ── Typography ─────────────────────────────────────────────────────────────────
