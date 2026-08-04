@@ -745,7 +745,7 @@ private fun CalorieBreakdownCard(state: HomeUiState) {
                     )
                     Text(
                         if (b != null)
-                            "${b.targetKcal} kcal · ${if (b.formulaBmrKcal != null) "BMR + Aktivität" else if (b.isTrendBased) "aus deinem Verlauf" else "Formel + Aktivität"} · ${b.confidencePercent}%"
+                            "${b.targetKcal} kcal · ${if (b.isTrendBased) "aus deinem Verlauf" else "Formel + Aktivität"} · ${b.confidencePercent}%"
                         else
                             "Statisches Ziel ${state.calorieGoal.toInt()} kcal + Sport",
                         fontSize = 12.sp,
@@ -839,11 +839,11 @@ private fun CalorieBreakdownCard(state: HomeUiState) {
             val act = b.activityBonusKcal
             val pct = if (state.aggressiveSportDay) "100%" else "50%"
             val actLabel = when {
-                act > 0 -> "+$act kcal (× $pct der Tracker-kcal)"
-                act < 0 -> "$act kcal"
-                else -> "±0 kcal (wenig/keine Aktivität)"
+                act > 0 -> "+$act kcal (über Ø, $pct)"
+                act < 0 -> "$act kcal (unter Ø, $pct)"
+                else -> "±0 kcal (wie Ø)"
             }
-            BreakdownLine("Aktivitäts-Zuschlag", actLabel)
+            BreakdownLine("Aktivitäts-Anpassung", actLabel)
             b.todayActiveKcal?.let { BreakdownLine("Heute aktiv (HC + manuell)", "$it kcal") }
             b.manualActivityKcal?.let {
                 BreakdownLine("davon manuell", "$it kcal")
@@ -858,9 +858,9 @@ private fun CalorieBreakdownCard(state: HomeUiState) {
 
             Spacer(Modifier.height(NutriSpacing.sm))
             Text(
-                "Basis = BMR (Ruhe) − Defizit. Aktivität (Uhr/manuell) als Tageszuschlag " +
-                    "(×${if (state.aggressiveSportDay) "100" else "50"}%). " +
-                    "Wenig Sport → niedriges Ziel, viel Sport → hohes Ziel. " +
+                "Erhaltung aus Verlauf (Zufuhr vs. Gewicht) oder Formel-TDEE. " +
+                    "Sport: Abweichung vom Ø-Aktiv × ${if (state.aggressiveSportDay) "100" else "50"}%. " +
+                    "Normaler Tag ≈ 2500, großer Sporttag deutlich mehr. " +
                     "Konfidenz ${b.confidencePercent}%.",
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

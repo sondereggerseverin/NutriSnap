@@ -168,15 +168,20 @@ object AdaptiveTdeeCalculator {
     const val TREND_MIN_PLAUSIBLE_KCAL = 1000.0
 
     /**
-     * Tagesziel für stark schwankende Aktivität (Radwoche vs. Ferien):
+     * Tagesziel:
      *
-     *   Ziel = BMR − Defizit + (heutige Aktivkcal × Faktor)
+     *   Ziel = Erhaltung − Defizit + Aktivitäts-Anpassung
      *
-     * BMR = Mifflin-St-Jeor (Ruhe). Kein fester PAL-TDEE mehr als Basis —
-     * der würde Tour und Sofa-Woche gleich behandeln. Aktivität kommt nur
-     * als Tageszuschlag (HC + manuell). Trend-TDEE bleibt Info/Konfidenz.
+     * Erhaltung (Priorität):
+     *   1) Trend-TDEE aus Gewicht + Essen (echte Kalibrierung)
+     *   2) Formel-TDEE (BMR × Aktivitätsfaktor)
+     *   3) BMR × 1.2 (minimale Alltagsbewegung), falls nichts anderes
      *
-     * Ohne BMR: Fallback auf Trend/Formel-TDEE + Abweichung vom Ø-Aktiv.
+     * Rein BMR − Defizit + Tracker war zu tief: Wearables erfassen NEAT
+     * unvollständig; bei Ø-Essen ~2850 und Trend ~3100 ist 1700 unsinnig.
+     *
+     * Aktivität: nur (heute − Ø) × Faktor — großer Sporttag hoch, normaler
+     * Tag nahe dem kalibrierten Ziel (~2500 bei deinem Profil).
      */
     fun computeDailyTarget(
         trend: TrendTdeeResult?,
@@ -195,13 +200,12 @@ object AdaptiveTdeeCalculator {
         }
 
         val bmr = formulaBmr?.takeIf { it > 0 }
-        val usingBmrBase = bmr != null
 
-        // Primär BMR; sonst Trend/Formel (enthält schon Ø-Bewegung)
+        // Erhaltung: echte Daten vor Formel vor BMR-Alltag
         val maintenance = when {
-            usingBmrBase -> bmr!!
             trustedTrend != null -> trustedTrend.tdee
-            formulaTdee != null -> formulaTdee
+            formulaTdee != null && formulaTdee > 0 -> formulaTdee
+            bmr != null -> bmr * 1.2  // leichte Alltagsbewegung, kein reiner Ruheumsatz
             else -> return null
         }
 
@@ -211,33 +215,26 @@ object AdaptiveTdeeCalculator {
         val factor = activityFactor.coerceIn(0.25, 1.0)
         val today = (todayActiveKcal ?: 0.0).coerceAtLeast(0.0)
 
-        val bonus = if (usingBmrBase) {
-            // Wenig Sport → kleiner Zuschlag; 100-km-Tag → großer Zuschlag
-            today * factor
+        // Abweichung vom Ø: Radtag ↑, Couch-Tag ↓ — TDEE enthält schon Ø-Bewegung
+        val rawBonus = if (avgActiveKcal != null && avgActiveKcal > 0) {
+            (today - avgActiveKcal) * factor
+        } else if (today > 0) {
+            // kein Ø bekannt: vorsichtiger Anteil der heutigen Tracker-kcal
+            today * factor * 0.5
         } else {
-            // Fallback: nur Abweichung vom Ø, damit TDEE nicht doppelt zählt
-            val raw = if (avgActiveKcal != null && avgActiveKcal > 0) {
-                (today - avgActiveKcal) * factor
-            } else {
-                today * factor
-            }
-            raw.coerceIn(ACTIVITY_BONUS_MIN_KCAL, ACTIVITY_BONUS_MAX_KCAL)
+            0.0
         }
+        val bonus = rawBonus.coerceIn(ACTIVITY_BONUS_MIN_KCAL, ACTIVITY_BONUS_MAX_KCAL)
 
         val target = (base + bonus).coerceAtLeast(SAFETY_FLOOR_KCAL)
 
-        val confidence = when {
-            usingBmrBase && today > 0 -> 72
-            usingBmrBase -> 62
-            else -> computeConfidence(trustedTrend, formulaTdee)
-        }
+        val confidence = computeConfidence(trustedTrend, formulaTdee)
 
         return AdaptiveCalorieTarget(
             targetKcal = target.toInt(),
             baseKcal = base.toInt(),
             activityBonusKcal = bonus.toInt(),
-            // true nur wenn Trend die Basis war (nicht bei BMR-Tagesmodell)
-            isTrendBased = !usingBmrBase && trustedTrend != null,
+            isTrendBased = trustedTrend != null,
             deficitKcal = safeDeficit.toInt(),
             confidencePercent = confidence,
             formulaBmrKcal = formulaBmr?.toInt(),
