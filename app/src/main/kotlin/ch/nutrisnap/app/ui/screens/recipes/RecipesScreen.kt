@@ -968,7 +968,7 @@ fun RecipeDetailSheet(
                             }
                         }
                         Row(Modifier.fillMaxWidth().padding(top=8.dp), horizontalArrangement=Arrangement.SpaceBetween, verticalAlignment=Alignment.CenterVertically) {
-                            Text("Metrische Einheiten", fontSize=13.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Nur Einheiten (cup→g/ml)", fontSize=13.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
                             Switch(checked=metricMode, onCheckedChange={metricMode=it}, modifier=Modifier.height(24.dp))
                         }
                         OutlinedButton(
@@ -983,7 +983,7 @@ fun RecipeDetailSheet(
                             } else {
                                 Icon(Icons.Default.AutoAwesome, null, Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("Deutsch + metrisch", fontSize = 13.sp)
+                                Text("Alles auf Deutsch + metrisch", fontSize = 13.sp)
                             }
                         }
                         TextButton(onClick = onScaleToBudget, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(top = 4.dp)) {

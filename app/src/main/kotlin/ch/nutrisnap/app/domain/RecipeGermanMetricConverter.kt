@@ -176,26 +176,146 @@ object RecipeGermanMetricConverter {
         "vanilla extract", "soy sauce", "sojasauce", "stock", "fond"
     )
 
+
+    /**
+     * Offline-Übersetzung gängiger Zutatennamen und Abschnittsüberschriften.
+     * Wird immer angewendet (auch als Nachbearbeitung nach KI).
+     */
+    private val NAME_MAP: List<Pair<Regex, String>> = listOf(
+        // Abschnitte
+        Regex("""(?i)^dough\s*:?\s*$""") to "Teig:",
+        Regex("""(?i)^filling\s*:?\s*$""") to "Füllung:",
+        Regex("""(?i)^frosting\s*:?\s*$""") to "Glasur:",
+        Regex("""(?i)^topping\s*:?\s*$""") to "Belag:",
+        Regex("""(?i)^sauce\s*:?\s*$""") to "Sauce:",
+        Regex("""(?i)^marinade\s*:?\s*$""") to "Marinade:",
+        Regex("""(?i)^batter\s*:?\s*$""") to "Teigmasse:",
+        Regex("""(?i)^glaze\s*:?\s*$""") to "Glasur:",
+        Regex("""(?i)^crust\s*:?\s*$""") to "Boden:",
+        Regex("""(?i)^streusel\s*:?\s*$""") to "Streusel:",
+        // Mehrwort-Zutaten (längere zuerst)
+        Regex("""(?i)\bcottage\s+cheese\b""") to "Hüttenkäse",
+        Regex("""(?i)\bgreek\s+yogurt\b""") to "griechischer Joghurt",
+        Regex("""(?i)\bplain\s+yogurt\b""") to "Naturjoghurt",
+        Regex("""(?i)\braw\s+milk\b""") to "Rohmilch",
+        Regex("""(?i)\bwhole\s+milk\b""") to "Vollmilch",
+        Regex("""(?i)\bskim\s+milk\b""") to "Magermilch",
+        Regex("""(?i)\balmond\s+milk\b""") to "Mandelmilch",
+        Regex("""(?i)\boat\s+milk\b""") to "Hafermilch",
+        Regex("""(?i)\braw\s+honey\b""") to "Rohhonig",
+        Regex("""(?i)\blarge\s+farm\s+fresh\s+eggs?\b""") to "grosse frische Eier",
+        Regex("""(?i)\bfarm\s+fresh\s+eggs?\b""") to "frische Eier",
+        Regex("""(?i)\blarge\s+eggs?\b""") to "grosse Eier",
+        Regex("""(?i)\bmedium\s+eggs?\b""") to "mittlere Eier",
+        Regex("""(?i)\bmelted\s+butter\b""") to "geschmolzene Butter",
+        Regex("""(?i)\bunsalted\s+butter\b""") to "ungesalzene Butter",
+        Regex("""(?i)\bsalted\s+butter\b""") to "gesalzene Butter",
+        Regex("""(?i)\borganic\s+vanilla\s+extract\b""") to "Bio-Vanilleextrakt",
+        Regex("""(?i)\bvanilla\s+extract\b""") to "Vanilleextrakt",
+        Regex("""(?i)\bvanilla\s+protein\s+powder\b""") to "Vanille-Proteinpulver",
+        Regex("""(?i)\bprotein\s+powder\b""") to "Proteinpulver",
+        Regex("""(?i)\bbaking\s+powder\b""") to "Backpulver",
+        Regex("""(?i)\bbaking\s+soda\b""") to "Natron",
+        Regex("""(?i)\breal\s+salt\b""") to "Salz",
+        Regex("""(?i)\bsea\s+salt\b""") to "Meersalz",
+        Regex("""(?i)\bground\s+cinnamon\b""") to "gemahlener Zimt",
+        Regex("""(?i)\borganic\s+ground\s+cinnamon\b""") to "Bio-Zimt, gemahlen",
+        Regex("""(?i)\bwhole\s+wheat\s+flour\b""") to "Vollkornmehl",
+        Regex("""(?i)\ball[- ]purpose\s+flour\b""") to "Weizenmehl Type 405",
+        Regex("""(?i)\bbread\s+flour\b""") to "Brotmehl",
+        Regex("""(?i)\bcoconut\s+oil\b""") to "Kokosöl",
+        Regex("""(?i)\bolive\s+oil\b""") to "Olivenöl",
+        Regex("""(?i)\bvegetable\s+oil\b""") to "Pflanzenöl",
+        Regex("""(?i)\bbrown\s+sugar\b""") to "brauner Zucker",
+        Regex("""(?i)\bpowdered\s+sugar\b""") to "Puderzucker",
+        Regex("""(?i)\bgranulated\s+sugar\b""") to "Kristallzucker",
+        Regex("""(?i)\bheavy\s+cream\b""") to "Schlagrahm",
+        Regex("""(?i)\bsour\s+cream\b""") to "Sauerrahm",
+        Regex("""(?i)\bcream\s+cheese\b""") to "Frischkäse",
+        Regex("""(?i)\bpeanut\s+butter\b""") to "Erdnussbutter",
+        Regex("""(?i)\bmaple\s+syrup\b""") to "Ahornsirup",
+        Regex("""(?i)\bsoy\s+sauce\b""") to "Sojasauce",
+        Regex("""(?i)\bgarlic\s+powder\b""") to "Knoblauchpulver",
+        Regex("""(?i)\bonion\s+powder\b""") to "Zwiebelpulver",
+        Regex("""(?i)\bblack\s+pepper\b""") to "schwarzer Pfeffer",
+        Regex("""(?i)\bred\s+onion\b""") to "rote Zwiebel",
+        Regex("""(?i)\bgreen\s+onion\b""") to "Frühlingszwiebel",
+        Regex("""(?i)\bbell\s+pepper\b""") to "Paprika",
+        Regex("""(?i)\bchicken\s+breast\b""") to "Hühnerbrust",
+        Regex("""(?i)\bground\s+beef\b""") to "Rinderhackfleisch",
+        // Einzelwörter
+        Regex("""(?i)\beggs?\b""") to "Eier",
+        Regex("""(?i)\bbutter\b""") to "Butter",
+        Regex("""(?i)\bflour\b""") to "Mehl",
+        Regex("""(?i)\bsugar\b""") to "Zucker",
+        Regex("""(?i)\bsalt\b""") to "Salz",
+        Regex("""(?i)\bpepper\b""") to "Pfeffer",
+        Regex("""(?i)\bmilk\b""") to "Milch",
+        Regex("""(?i)\bhoney\b""") to "Honig",
+        Regex("""(?i)\bcinnamon\b""") to "Zimt",
+        Regex("""(?i)\bvanilla\b""") to "Vanille",
+        Regex("""(?i)\boil\b""") to "Öl",
+        Regex("""(?i)\bwater\b""") to "Wasser",
+        Regex("""(?i)\byogurt\b""") to "Joghurt",
+        Regex("""(?i)\byoghurt\b""") to "Joghurt",
+        Regex("""(?i)\bonion\b""") to "Zwiebel",
+        Regex("""(?i)\bgarlic\b""") to "Knoblauch",
+        Regex("""(?i)\btomato(?:es)?\b""") to "Tomaten",
+        Regex("""(?i)\bcheese\b""") to "Käse",
+        Regex("""(?i)\brice\b""") to "Reis",
+        Regex("""(?i)\bpasta\b""") to "Pasta",
+        Regex("""(?i)\boats?\b""") to "Haferflocken",
+        Regex("""(?i)\balmonds?\b""") to "Mandeln",
+        Regex("""(?i)\bwalnuts?\b""") to "Walnüsse",
+        Regex("""(?i)\blemon\b""") to "Zitrone",
+        Regex("""(?i)\blime\b""") to "Limette",
+        Regex("""(?i)\borange\b""") to "Orange",
+        Regex("""(?i)\bbanana\b""") to "Banane",
+        Regex("""(?i)\bapple\b""") to "Apfel",
+        Regex("""(?i)\bspinach\b""") to "Spinat",
+        Regex("""(?i)\bbroccoli\b""") to "Brokkoli",
+        Regex("""(?i)\bcarrot\b""") to "Karotte",
+        Regex("""(?i)\bpotato(?:es)?\b""") to "Kartoffeln",
+        Regex("""(?i)\bchicken\b""") to "Huhn",
+        Regex("""(?i)\bbeef\b""") to "Rindfleisch",
+        Regex("""(?i)\bpork\b""") to "Schwein",
+        Regex("""(?i)\bsalmon\b""") to "Lachs",
+        Regex("""(?i)\berythritol\b""") to "Erythrit",
+        Regex("""(?i)\berytrit\b""") to "Erythrit",
+    )
+
+    fun translateNamesToGerman(text: String): String {
+        return text.lines().joinToString("\n") { line ->
+            var r = line
+            for ((regex, de) in NAME_MAP) {
+                r = regex.replace(r, de)
+            }
+            r
+        }
+    }
+
+    /** Offline: Einheiten metrisch + Namen deutsch (ohne KI). */
+    fun convertOfflineFull(text: String): String =
+        translateNamesToGerman(convertUnitsToMetric(text))
+
     /**
      * KI: Zutaten + Zubereitung ins Deutsche übersetzen und metrisch umrechnen.
      * Titel optional mitübersetzen.
      */
     suspend fun convertWithAi(recipe: Recipe): Result<ConvertedRecipe> {
         val prompt = """
-Du bist ein Schweizer/deutscher Koch-Assistent. Wandle das folgende Rezept ins Deutsche um und rechne alle Mengen in metrische Einheiten um.
+Du bist ein Schweizer/deutscher Koch-Assistent. Übersetze das Rezept VOLLSTÄNDIG ins Deutsche und rechne alle Mengen metrisch um.
 
-Regeln:
-- Zutatennamen auf Deutsch (z.B. cottage cheese → Hüttenkäse, greek yogurt → griechischer Joghurt, flour → Mehl).
-- FESTE Zutaten immer in Gramm (g), NICHT in ml:
-  Mehl ~120 g/cup, Zucker ~200 g/cup, Butter ~227 g/cup, Hüttenkäse ~225 g/cup,
-  Honig ~340 g/cup, Zimt/Gewürze pro TL in g, Backpulver/Natron/Salz in g.
-- FLÜSSIGE Zutaten in ml: Milch, Wasser, Öl, Extrakt, Saft, Brühe.
-- oz → g, lb → g, °F → °C.
-- Beispiel: "1 cup flour" → "120 g Mehl", "1/4 cup milk" → "60 ml Milch", "2 tbsp butter" → "28 g Butter".
-- Zubereitungsschritte auf Deutsch, klar und nummeriert.
-- Mengen realistisch runden (ganze g/ml).
-- Gruppierungen (dough:, filling:) als deutsche Überschriften (Teig:, Füllung:, Glasur:).
-- Erfinde keine Zutaten hinzu.
+PFLICHT:
+- JEDEN Zutatennamen auf Deutsch — nichts Englisches stehen lassen
+  (raw milk → Rohmilch, melted butter → geschmolzene Butter, large eggs → grosse Eier,
+   baking powder → Backpulver, baking soda → Natron, vanilla extract → Vanilleextrakt,
+   protein powder → Proteinpulver, ground cinnamon → gemahlener Zimt, flour → Mehl).
+- Abschnitte: dough → Teig, filling → Füllung, frosting/glaze → Glasur, topping → Belag.
+- ALLE Zubereitungsschritte auf Deutsch (Preheat → Vorheizen, Grease → Fetten, blend → pürieren, …).
+- FESTE Zutaten in g, FLÜSSIGE in ml (nicht cups/tbsp/oz/°F).
+- Markennamen dürfen bleiben (Milfina, …).
+- Keine Zutaten erfinden. Mengen sinnvoll runden.
 
 Originaltitel: ${recipe.title}
 Zutaten:
@@ -221,8 +341,8 @@ Antworte NUR mit JSON:
             return Result.success(
                 ConvertedRecipe(
                     title = recipe.title,
-                    ingredients = convertUnitsToMetric(recipe.ingredients),
-                    instructions = convertUnitsToMetric(recipe.instructions)
+                    ingredients = convertOfflineFull(recipe.ingredients),
+                    instructions = convertOfflineFull(recipe.instructions)
                 )
             )
         }
@@ -230,18 +350,20 @@ Antworte NUR mit JSON:
         return runCatching {
             val cleaned = raw.trim()
                 .removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
-            // Robust: JSONObject falls kotlinx strict fails
             val obj = JSONObject(cleaned)
+            val ing = obj.optString("ingredients").ifBlank { recipe.ingredients }
+            val ins = obj.optString("instructions").ifBlank { recipe.instructions }
+            // Nachbearbeitung: Reste wie "dough"/"raw milk" offline nachziehen
             ConvertedRecipe(
                 title = obj.optString("title").ifBlank { recipe.title },
-                ingredients = obj.optString("ingredients").ifBlank { convertUnitsToMetric(recipe.ingredients) },
-                instructions = obj.optString("instructions").ifBlank { convertUnitsToMetric(recipe.instructions) }
+                ingredients = convertOfflineFull(ing),
+                instructions = translateNamesToGerman(convertUnitsToMetric(ins))
             )
         }.recover {
             ConvertedRecipe(
                 title = recipe.title,
-                ingredients = convertUnitsToMetric(recipe.ingredients),
-                instructions = convertUnitsToMetric(recipe.instructions)
+                ingredients = convertOfflineFull(recipe.ingredients),
+                instructions = convertOfflineFull(recipe.instructions)
             )
         }
     }
