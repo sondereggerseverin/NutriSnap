@@ -92,7 +92,8 @@ fun SettingsScreen(
     onNavigateToYazioImport: () -> Unit = {},
     onNavigateToScan: () -> Unit = {},
     onNavigateToMealOrder: () -> Unit = {},
-    onNavigateToShoppingList: () -> Unit = {}
+    onNavigateToShoppingList: () -> Unit = {},
+    onNavigateToSupplements: () -> Unit = {}
 ) {
     val state   by vm.uiState.collectAsState()
     val profile  = state.profile
@@ -218,6 +219,11 @@ fun SettingsScreen(
                     Icon(Icons.Default.Bookmark, null, Modifier.size(16.dp))
                     Spacer(Modifier.width(NutriSpacing.xs)); Text("Vorlagen", fontSize = 12.sp)
                 }
+            }
+            Spacer(Modifier.height(NutriSpacing.sm))
+            OutlinedButton(onClick = onNavigateToSupplements, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Medication, null, Modifier.size(16.dp))
+                Spacer(Modifier.width(NutriSpacing.xs)); Text("Supplements")
             }
             Button(onClick = onNavigateToExport, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.Download, null, Modifier.size(18.dp))

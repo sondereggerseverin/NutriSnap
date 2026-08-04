@@ -75,9 +75,10 @@ interface UserProfileDao {
         ch.nutrisnap.app.data.db.entity.GlobalIngredientMatch::class,       // Feature 2
         ch.nutrisnap.app.data.db.entity.FoodUsageContext::class,            // Feature 7
         ch.nutrisnap.app.data.db.entity.DetectedMealPatternEntity::class,   // Feature 5
-        ManualActivityEntry::class
+        ManualActivityEntry::class,
+        Supplement::class
     ],
-    version = 24,
+    version = 25,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -99,6 +100,7 @@ abstract class NutriDatabase : RoomDatabase() {
     abstract fun foodUsageContextDao(): FoodUsageContextDao
     abstract fun detectedMealPatternDao(): DetectedMealPatternDao
     abstract fun manualActivityDao(): ManualActivityDao
+    abstract fun supplementDao(): SupplementDao
 
     companion object {
         @Volatile private var INSTANCE: NutriDatabase? = null
@@ -540,6 +542,33 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_24_25 = object : Migration(24, 25) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS supplements (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        brand TEXT NOT NULL DEFAULT '',
+                        category TEXT NOT NULL DEFAULT 'SONSTIGES',
+                        activeIngredients TEXT NOT NULL DEFAULT '',
+                        servingSize TEXT NOT NULL DEFAULT '',
+                        effects TEXT NOT NULL DEFAULT '',
+                        pros TEXT NOT NULL DEFAULT '',
+                        cons TEXT NOT NULL DEFAULT '',
+                        dosageRecommendation TEXT NOT NULL DEFAULT '',
+                        warnings TEXT NOT NULL DEFAULT '',
+                        expiryDateStr TEXT,
+                        status TEXT NOT NULL DEFAULT 'AKTIV',
+                        conflictGroup TEXT NOT NULL DEFAULT 'NONE',
+                        preferredTiming TEXT NOT NULL DEFAULT 'MORGENS',
+                        requiresMedicalConfirmation INTEGER NOT NULL DEFAULT 0,
+                        isSeedData INTEGER NOT NULL DEFAULT 0,
+                        createdAt INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -553,7 +582,7 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
                         MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16,
                         MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
-                        MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24
+                        MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25
                     )
                     .build()
                     .also { INSTANCE = it }

@@ -405,7 +405,8 @@ fun MainScaffold(
                     onNavigateToYazioImport   = { navController.navigate("yazio_import") },
                     onNavigateToScan          = { navController.navigate("scan_chooser") },
                     onNavigateToMealOrder     = { navController.navigate("meal_order") },
-                    onNavigateToShoppingList  = { navController.navigate("shopping_list") }
+                    onNavigateToShoppingList  = { navController.navigate("shopping_list") },
+                    onNavigateToSupplements   = { navController.navigate("supplements") }
                 )
             }
             composable(
@@ -534,6 +535,15 @@ fun MainScaffold(
                 popEnterTransition = { popEnter }, popExitTransition = { popExit }
             ) {
                 ch.nutrisnap.app.ui.screens.shopping.ShoppingListScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                "supplements",
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) {
+                ch.nutrisnap.app.ui.screens.supplements.SupplementsScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
             }
         }
     }
