@@ -656,9 +656,9 @@ private fun ManualActivityCard(
                 Text("Manuelle Aktivität", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 Text(
                     if (todayKcal != null && todayKcal > 0f)
-                        "Heute manuell: ${todayKcal.toInt()} kcal · Gesamt aktiv: ${totalActive.toInt()} kcal"
+                        "+${todayKcal.toInt()} kcal ins Ziel · gesamt aktiv ${totalActive.toInt()} kcal"
                     else
-                        "Tippen, um Aktivitätskalorien einzutragen",
+                        "Tippen, um Aktivitätskalorien einzutragen (zählen 1:1)",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -842,9 +842,12 @@ private fun CalorieBreakdownCard(state: HomeUiState) {
                 bonus < 0 -> "$bonus kcal (ruhiger als Ø)"
                 else -> "±0 kcal"
             }
-            BreakdownLine("Aktivitäts-Anpassung (50%)", bonusLabel)
-            b.todayActiveKcal?.let { BreakdownLine("Heute aktiv", "$it kcal") }
-            b.avgActiveKcal?.let { BreakdownLine("Ø aktiv (Fenster)", "$it kcal") }
+            BreakdownLine("Aktivitäts-Anpassung HC (50%)", bonusLabel)
+            b.todayActiveKcal?.let { BreakdownLine("Heute aktiv gesamt", "$it kcal") }
+            b.avgActiveKcal?.let { BreakdownLine("Ø HC-aktiv (Fenster)", "$it kcal") }
+            b.manualActivityKcal?.let {
+                BreakdownLine("Manuelle Aktivität (+1:1)", "+$it kcal", emphasize = true)
+            }
             BreakdownLine("Ziel heute", "${b.targetKcal} kcal", emphasize = true)
 
             Spacer(Modifier.height(NutriSpacing.md))
@@ -856,7 +859,8 @@ private fun CalorieBreakdownCard(state: HomeUiState) {
             Spacer(Modifier.height(NutriSpacing.sm))
             Text(
                 "Formel: TDEE ≈ Ø Essen − (ΔGewicht × 7700) / Tage. " +
-                    "Aktivität zählt nur die Abweichung vom Durchschnitt (halb gewichtet). " +
+                    "HC-Aktivität: nur Abweichung vom Ø (halb, max ±400). " +
+                    "Manuelle Aktivität: voll (+1:1) zum Ziel. " +
                     "Konfidenz ${b.confidencePercent}%.",
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
