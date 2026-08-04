@@ -225,6 +225,7 @@ private fun SupplementCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SupplementDetailScreen(
     item: Supplement,

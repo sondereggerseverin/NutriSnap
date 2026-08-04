@@ -194,7 +194,8 @@ class HealthConnectManager(context: Context) {
             if (totalResult != null && totalResult > 0.0) {
                 // Prorate the daily BMR by the elapsed fraction of the day so a
                 // partial "today" query doesn't subtract a full day's resting burn.
-                val elapsedFraction = (java.time.Duration.between(start, end).toMinutes()
+                val rangeEnd = if (date == LocalDate.now()) Instant.now() else dayEnd
+                val elapsedFraction = (java.time.Duration.between(dayStart, rangeEnd).toMinutes()
                     .coerceAtLeast(0)).toDouble() / (24 * 60)
                 val restingEstimate = bmrKcalPerDay * elapsedFraction
                 val active = (totalResult - restingEstimate).coerceAtLeast(0.0)
