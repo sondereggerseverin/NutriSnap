@@ -67,14 +67,20 @@ private fun formatPortionAmount(amount: Float): String {
 /** Anzeige für einen Rezept-Tagebucheintrag: exakte Grammzahl, wenn der Nutzer in
  *  Gramm erfasst hat (entry.recipeGrams gesetzt), sonst die Portionsanzahl. */
 private fun recipeAmountLabel(entry: DiaryEntry): String {
-    // Gramm-Tracking: recipeGrams oder amountGrams (wenn als Gramm gespeichert)
-    entry.recipeGrams?.takeIf { it > 0f }?.let { return "${it.toInt()} g" }
-    // amountGrams bei Rezepten = Portionen, außer es wurde bewusst in Gramm gespeichert
-    // (Heuristik: > 10 und foodItemId < 0 und keine ganzen kleinen Portionsfaktoren)
+    // Echte Gramm-Erfassung: sinnvoll erst ab ~10 g (1–9 g sind fast immer
+    // fälschlich als "Gramm" gespeicherte Portionsfaktoren → "1 g" Bug).
+    entry.recipeGrams?.takeIf { it >= 10f }?.let { return "${it.toInt()} g" }
     if (entry.foodItemId < 0 && entry.amountGrams >= 20f) {
         return "${entry.amountGrams.toInt()} g"
     }
-    return formatPortionAmount(entry.amountGrams.takeIf { it > 0f } ?: 1f)
+    // recipeGrams 1–9 oder amountGrams als Portionen
+    val portions = when {
+        entry.recipeGrams != null && entry.recipeGrams > 0f && entry.recipeGrams < 10f ->
+            entry.recipeGrams
+        entry.amountGrams > 0f -> entry.amountGrams
+        else -> 1f
+    }
+    return formatPortionAmount(portions)
 }
 
 private fun defaultMealForNow(): MealType = when (LocalTime.now().hour) {
@@ -841,6 +847,7 @@ private fun DateNavigator(
         val label = when (date) {
             LocalDate.now()              -> "Heute"
             LocalDate.now().minusDays(1) -> "Gestern"
+            LocalDate.now().plusDays(1)  -> "Morgen"
             else -> date.format(DateTimeFormatter.ofPattern("EEE, dd. MMM", Locale.GERMAN))
         }
         TextButton(onClick = { showPicker = true }) {
@@ -852,12 +859,14 @@ private fun DateNavigator(
             Spacer(Modifier.width(6.dp))
             Text(label, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
         }
-        IconButton(onClick = onNext, enabled = date.isBefore(LocalDate.now())) {
+        // Planung bis 30 Tage in die Zukunft erlauben
+        val maxFuture = LocalDate.now().plusDays(30)
+        IconButton(onClick = onNext, enabled = date.isBefore(maxFuture)) {
             Icon(Icons.Default.ChevronRight, "Nächster Tag")
         }
         IconButton(
-            onClick = { onPick(minOf(date.plusDays(7), LocalDate.now())) },
-            enabled = date.isBefore(LocalDate.now())
+            onClick = { onPick(minOf(date.plusDays(7), maxFuture)) },
+            enabled = date.isBefore(maxFuture)
         ) {
             Icon(Icons.Default.KeyboardDoubleArrowRight, "+7 Tage")
         }
@@ -871,7 +880,9 @@ private fun DateNavigator(
                 override fun isSelectableDate(utcTimeMillis: Long): Boolean {
                     val d = java.time.Instant.ofEpochMilli(utcTimeMillis)
                         .atZone(java.time.ZoneOffset.UTC).toLocalDate()
-                    return !d.isAfter(LocalDate.now())
+                    val max = LocalDate.now().plusDays(30)
+                    val min = LocalDate.now().minusYears(2)
+                    return !d.isAfter(max) && !d.isBefore(min)
                 }
             }
         )

@@ -109,14 +109,19 @@ class DiaryRepository(db: NutriDatabase) {
         gramsAmount: Float? = null
     ): Long {
         val perServing  = recipe.servings.coerceAtLeast(1).toFloat()
-        // Gramm-Modus: Anteil am Gesamtgericht (Roh- oder Kochgewicht)
+        // Gramm-Modus: Anteil am Gesamtgericht (Roh- oder Kochgewicht).
+        // Werte < 10 g sind praktisch immer Portionsfaktoren, die fälschlich als
+        // Gramm gelandet sind (Anzeige "1 g" bei voller Portions-kcal).
         val yieldG = recipe.yieldWeightG()
             ?: ch.nutrisnap.app.domain.RecipeNutritionAnalyzer.estimateTotalGrams(recipe.ingredients)
                 .takeIf { it > 0f }
-        val factor = if (gramsAmount != null && gramsAmount > 0f && yieldG != null && yieldG > 0f) {
-            gramsAmount / yieldG * perServing   // Portions-äquivalent für Makro-Skalierung
-        } else {
-            servingsFactor.coerceAtLeast(0.05f)
+        val realGrams = gramsAmount?.takeIf { it >= 10f }
+        val factor = when {
+            realGrams != null && yieldG != null && yieldG > 0f ->
+                realGrams / yieldG * perServing
+            gramsAmount != null && gramsAmount > 0f && gramsAmount < 10f ->
+                gramsAmount  // als Portionen interpretieren
+            else -> servingsFactor.coerceAtLeast(0.05f)
         }
         val calsPerServ = recipe.totalCalories?.let { it / perServing } ?: 0f
         val calories    = calsPerServ * factor
@@ -130,8 +135,8 @@ class DiaryRepository(db: NutriDatabase) {
         val sodium      = (recipe.sodiumPerServing  ?: 0f) * factor
 
         // amountGrams: bei Gramm-Tracking die echten Gramm (Anzeige), sonst Portionsfaktor
-        val storedAmount = if (gramsAmount != null && gramsAmount > 0f) gramsAmount else factor
-        val storedRecipeGrams = if (gramsAmount != null && gramsAmount > 0f) gramsAmount else null
+        val storedAmount = realGrams ?: factor
+        val storedRecipeGrams = realGrams
 
         val id = dao.insert(
             DiaryEntry(
