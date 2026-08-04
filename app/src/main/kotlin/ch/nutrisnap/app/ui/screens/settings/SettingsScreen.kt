@@ -679,7 +679,7 @@ fun AggressiveSportDayCard() {
                     fontSize = 14.sp
                 )
                 Text(
-                    "Aktivitäts-Abweichung vom Ø zählt 100% statt 50%. Für lange Einheiten (z.B. 100 km Rad), wenn du bewusst mehr essen willst.",
+                    "Tracker-Aktivkcal zählen 100% statt 50% auf die BMR-Basis. Für lange Einheiten (z.B. 100 km Rad), wenn du bewusst mehr essen willst.",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

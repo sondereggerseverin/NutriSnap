@@ -226,7 +226,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             totalCarbs    = entries.sumOf { it.carbs.toDouble() }.toFloat(),
             totalFat      = entries.sumOf { it.fat.toDouble() }.toFloat(),
             totalFiber    = entries.sumOf { it.fiber.toDouble() }.toFloat(),
-            // Adaptiv: Ziel enthält Aktivitäts-Anpassung 1:1 (HC+manuell vs Ø).
+            // Adaptiv: BMR − Defizit + Aktivitäts-Zuschlag (HC+manuell).
             // Nicht-adaptiv: klassisches Ziel + burned via adjustedGoal.
             calorieGoal   = if (adaptiveTarget != null) finalTarget.toFloat()
                             else profile.dailyCalorieGoal.toFloat(),
