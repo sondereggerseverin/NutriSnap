@@ -69,9 +69,8 @@ object AdaptiveTdeeCalculator {
     // next step, but out of scope for this pass.
     const val DEFAULT_DEFICIT_KCAL = 500.0
 
-    // Aktivitätskalorien (HC + manuell) zählen 1:1 relativ zum Ø:
-    // heutige Aktivität − Ø-Aktivität, ohne Dämpfung und ohne ±400-Cap.
-    // Große Einheiten (z.B. 100 km Rad) erhöhen das Tagesziel entsprechend.
+    // Aktivitätskalorien (HC + manuell) zählen 1:1 in voller Höhe —
+    // so wie auf der Uhr / in Samsung Health angezeigt (z.B. 3268 kcal Radfahrt).
     const val ACTIVITY_ADJUSTMENT_FACTOR = 1.0
 
     // Need at least this many days with *both* a weight reading (manual weight_entries
@@ -143,8 +142,8 @@ object AdaptiveTdeeCalculator {
 
     /**
      * Combines the base maintenance estimate (trend-based if available and plausible, else
-     * the profile's BMR*activityFactor formula), a fixed deficit, and a 1:1 adjustment
-     * for how today's activity (Health Connect + manual) compares to the recent average.
+     * the profile's BMR*activityFactor formula), a fixed deficit, and today's full
+     * activity calories (Health Connect + manual) added 1:1 as shown by the tracker.
      *
      * Returns null only if neither a trend nor a formula TDEE is available at all
      * (e.g. brand-new profile with no weight/height/age set and no history yet).
@@ -165,16 +164,11 @@ object AdaptiveTdeeCalculator {
         val maintenance = trustedTrend?.tdee ?: formulaTdee ?: return null
         // Defizit begrenzt: max 25% vom Erhaltungsbedarf, mind. 0
         val safeDeficit = deficitKcal.coerceIn(0.0, maintenance * 0.25)
+        // Basis ohne Sport: Erhaltung − Defizit. Sport kommt 1:1 obendrauf.
         val base = maintenance - safeDeficit
 
-        // Aktivitäts-Bonus 1:1: (heute − Ø). Ohne Ø: volle heutige Aktivität.
-        // Kein Cap — eine 3000-kcal-Radtourung soll das Ziel spürbar anheben.
-        val bonus = when {
-            todayActiveKcal == null || todayActiveKcal <= 0 -> 0.0
-            avgActiveKcal != null && avgActiveKcal > 0 ->
-                (todayActiveKcal - avgActiveKcal) * ACTIVITY_ADJUSTMENT_FACTOR
-            else -> todayActiveKcal * ACTIVITY_ADJUSTMENT_FACTOR
-        }
+        // Volle Aktivitätskcal wie in HC / Samsung / manuell angezeigt (z.B. 3268).
+        val bonus = (todayActiveKcal ?: 0.0).coerceAtLeast(0.0) * ACTIVITY_ADJUSTMENT_FACTOR
 
         val target = (base + bonus).coerceAtLeast(SAFETY_FLOOR_KCAL)
 

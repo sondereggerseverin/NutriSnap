@@ -836,15 +836,11 @@ private fun CalorieBreakdownCard(state: HomeUiState) {
                 "−${b.deficitKcal} kcal (Ziel ${"%.1f".format(it)} kg/Woche)"
             } ?: "−${b.deficitKcal} kcal (Standard ~0,5 kg/Woche)"
             BreakdownLine("Defizit", deficitNote)
-            val activityDelta = b.activityBonusKcal
-            val activityDeltaLabel = when {
-                activityDelta > 0 -> "+$activityDelta kcal (über Ø)"
-                activityDelta < 0 -> "$activityDelta kcal (unter Ø)"
-                else -> "±0 kcal"
+            b.activityBonusKcal.takeIf { it != 0 }?.let {
+                BreakdownLine("Aktivität 1:1 (voll)", "+$it kcal")
             }
-            BreakdownLine("Aktivität 1:1 (heute − Ø)", activityDeltaLabel)
             b.todayActiveKcal?.let { BreakdownLine("Heute aktiv (HC + manuell)", "$it kcal") }
-            b.avgActiveKcal?.let { BreakdownLine("Ø aktiv (Fenster)", "$it kcal") }
+            b.avgActiveKcal?.let { BreakdownLine("Ø aktiv (Fenster, Info)", "$it kcal") }
             b.manualActivityKcal?.let {
                 BreakdownLine("davon manuell", "$it kcal")
             }
@@ -859,7 +855,7 @@ private fun CalorieBreakdownCard(state: HomeUiState) {
             Spacer(Modifier.height(NutriSpacing.sm))
             Text(
                 "Formel: TDEE ≈ Ø Essen − (ΔGewicht × 7700) / Tage. " +
-                    "Aktivität (HC + manuell): heute − Ø, 1:1 ohne Cap. " +
+                    "Aktivität (HC + manuell): volle kcal 1:1 wie vom Tracker. " +
                     "Konfidenz ${b.confidencePercent}%.",
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
