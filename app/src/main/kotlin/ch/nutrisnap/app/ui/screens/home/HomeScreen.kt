@@ -309,8 +309,8 @@ private fun HomeHeader(state: HomeUiState) {
                 shape = RoundedCornerShape(bottomStart = NutriRadius.xl, bottomEnd = NutriRadius.xl)
             )
             .statusBarsPadding()
-            .padding(horizontal = NutriSpacing.md)
-            .padding(top = 6.dp, bottom = NutriSpacing.sm)
+            .padding(horizontal = 12.dp)
+            .padding(top = 4.dp, bottom = 6.dp)
     ) {
         // Top-Zeile: Begrüßung + Adaptiv/Streak (eine Zeile)
         Row(
@@ -321,19 +321,19 @@ private fun HomeHeader(state: HomeUiState) {
             Column(Modifier.weight(1f)) {
                 Text(
                     state.greeting,
-                    fontSize = 11.sp,
+                    fontSize = 10.sp,
                     color = Color.White.copy(alpha = 0.75f),
                     fontWeight = FontWeight.Medium
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         "Heute",
-                        fontSize = 17.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
                     if (state.isAdaptiveTarget) {
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(6.dp))
                         Text(
                             "Adaptiv · ${state.tdeeConfidence}%",
                             fontSize = 10.sp,
@@ -345,7 +345,7 @@ private fun HomeHeader(state: HomeUiState) {
             StreakBadge(state.streak)
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(5.dp))
 
         // Ring + dichte Kennzahlen-Karte (füllt den rechten Bereich, kein leerer Gap)
         Row(
@@ -355,8 +355,8 @@ private fun HomeHeader(state: HomeUiState) {
             MacroRing(
                 eaten = state.totalCalories,
                 goal = state.adjustedGoal,
-                size = 84.dp,
-                strokeWidth = 8.dp,
+                size = 76.dp,
+                strokeWidth = 7.dp,
                 trackColor = Color.White.copy(alpha = 0.18f),
                 progressColor = Color.White,
                 overflowColor = Color(0xFFFFD67A)
@@ -368,28 +368,28 @@ private fun HomeHeader(state: HomeUiState) {
                         } else {
                             "${state.remaining.toInt()}"
                         },
-                        fontSize = 18.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
                     Text(
                         if (overGoal) "über" else "übrig",
-                        fontSize = 10.sp,
+                        fontSize = 9.sp,
                         color = Color.White.copy(alpha = 0.75f)
                     )
                 }
             }
 
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(8.dp))
 
             // Glas-Karte: Label links, Wert rechts — dichter Block statt Luft in der Mitte
             Column(
                 Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(12.dp))
                     .background(Color.White.copy(alpha = 0.14f))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(5.dp)
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 HeaderStatLine(
                     label = "Gegessen",
@@ -423,15 +423,15 @@ private fun HomeHeader(state: HomeUiState) {
             }
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(5.dp))
 
         // Makros: eine flache Zeile (4 Spalten)
         Row(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(10.dp))
                 .background(Color.White.copy(alpha = 0.12f))
-                .padding(horizontal = 6.dp, vertical = 7.dp),
+                .padding(horizontal = 4.dp, vertical = 5.dp),
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             MacroColumn("Protein", state.totalProtein, state.proteinGoal, accent = MacroColors.protein, modifier = Modifier.weight(1f))
@@ -455,13 +455,13 @@ private fun HeaderStatLine(
     ) {
         Text(
             label,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             color = Color.White.copy(alpha = 0.65f),
             maxLines = 1
         )
         Text(
             value,
-            fontSize = 13.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             color = valueColor,
             maxLines = 1
@@ -591,8 +591,8 @@ private fun MealOverviewGrid(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            shape = RoundedCornerShape(20.dp),
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
             ),
@@ -602,7 +602,7 @@ private fun MealOverviewGrid(
                 MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
             )
         ) {
-            Column(Modifier.padding(vertical = 4.dp)) {
+            Column(Modifier.padding(vertical = 2.dp)) {
                 meals.forEachIndexed { index, meal ->
                     MealRow(
                         meal = meal,
@@ -691,11 +691,11 @@ private fun MealRow(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () -> U
     val context = LocalContext.current
     val prefs by context.notifDataStore.data.collectAsState(initial = null)
     val freshHome = (prefs?.get(KEY_FRESH_HOME) == true) || (prefs?.get(KEY_FRESH_UI) == true)
-    val iconSize = if (freshHome) 48.dp else 40.dp
+    val iconSize = if (freshHome) 40.dp else 36.dp
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = NutriSpacing.md, vertical = if (freshHome) 10.dp else 8.dp),
+            .padding(horizontal = NutriSpacing.md, vertical = if (freshHome) 6.dp else 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
@@ -711,14 +711,14 @@ private fun MealRow(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () -> U
                 .background(meal.color.copy(alpha = if (freshHome) 0.18f else 0.12f)),
             contentAlignment = Alignment.Center
         ) {
-            Text(meal.icon, fontSize = if (freshHome) 22.sp else 20.sp)
+            Text(meal.icon, fontSize = if (freshHome) 18.sp else 17.sp)
         }
-        Spacer(Modifier.width(NutriSpacing.md))
+        Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     meal.label,
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
@@ -726,24 +726,23 @@ private fun MealRow(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () -> U
                 Spacer(Modifier.width(2.dp))
                 Icon(
                     Icons.Default.ChevronRight, null,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Spacer(Modifier.height(2.dp))
             Text(
                 "${meal.kcal.toInt()} kcal · ${meal.count} ${if (meal.count == 1) "Eintrag" else "Einträge"}",
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 color = if (meal.count > 0) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         } // Ende klickbarer Bereich (öffnet Tagebuch)
-        Spacer(Modifier.width(NutriSpacing.sm))
+        Spacer(Modifier.width(6.dp))
         // Deutlicher „Hinzufügen“-Button (eigenes Klickziel, öffnet Tracking-Sheet)
         FilledTonalIconButton(
             onClick = onQuickAdd,
-            modifier = Modifier.size(44.dp),
+            modifier = Modifier.size(38.dp),
             colors = IconButtonDefaults.filledTonalIconButtonColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -752,7 +751,7 @@ private fun MealRow(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () -> U
             Icon(
                 Icons.Default.Add,
                 contentDescription = "Zu ${meal.label} hinzufügen",
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
     }
