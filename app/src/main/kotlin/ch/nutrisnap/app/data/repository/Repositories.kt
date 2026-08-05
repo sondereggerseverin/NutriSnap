@@ -336,7 +336,19 @@ class RecipeRepository(db: NutriDatabase, context: Context) {
     fun getAll():          Flow<List<Recipe>> = dao.getAll()
     fun search(q: String): Flow<List<Recipe>> = dao.search(q)
 
+    /**
+     * Speichert ein Rezept. Bei gleichem Inhalts-Fingerprint (sourceUrl oder
+     * Titel+Zutaten+kcal) wird das bestehende aktualisiert statt ein Duplikat
+     * anzulegen — verhindert 10× denselben Import.
+     */
     suspend fun saveRecipe(r: Recipe): Long {
+        val existing = findByFingerprint(contentFingerprint(r))
+        if (existing != null && (r.id == 0L || r.id == existing.id)) {
+            val merged = r.copy(id = existing.id, savedAt = existing.savedAt)
+            dao.update(merged)
+            pushSafely { SupabaseSync.upsertRecipe(merged) }
+            return existing.id
+        }
         val id = dao.insert(r)
         dao.getById(id)?.let { saved -> pushSafely { SupabaseSync.upsertRecipe(saved) } }
         return id
@@ -354,15 +366,73 @@ class RecipeRepository(db: NutriDatabase, context: Context) {
 
     suspend fun getById(id: Long) = dao.getById(id)
 
+    suspend fun getAllOnce(): List<Recipe> = dao.getAllOnce()
+
+    suspend fun findByFingerprint(fp: String): Recipe? =
+        dao.getAllOnce().firstOrNull { contentFingerprint(it) == fp }
+
+    /**
+     * Entfernt lokale Rezept-Duplikate (gleicher Fingerprint). Behält den
+     * ältesten Eintrag (kleinste id), löscht die restlichen inkl. Supabase-Push.
+     * @return Anzahl gelöschter Duplikate
+     */
+    suspend fun deduplicateRecipes(): Int {
+        val all = dao.getAllOnce()
+        val keep = linkedMapOf<String, Recipe>()
+        val toDelete = mutableListOf<Recipe>()
+        for (r in all.sortedBy { it.id }) {
+            val key = contentFingerprint(r)
+            if (key in keep) toDelete.add(r) else keep[key] = r
+        }
+        for (r in toDelete) {
+            dao.delete(r)
+            pushSafely { SupabaseSync.deleteRecipe(r.id) }
+        }
+        return toDelete.size
+    }
+
     suspend fun importFromUrl(url: String, onProgress: (String) -> Unit = {}): RecipeScrapeResult {
         val result = scraper.scrape(url, onProgress)
         if (result.success && result.recipe != null) {
-            val newId = dao.insert(result.recipe)
-            val saved = result.recipe.copy(id = newId)
-            pushSafely { SupabaseSync.upsertRecipe(saved) }
+            val id = saveRecipe(result.recipe)
+            val saved = result.recipe.copy(id = id)
             return result.copy(recipe = saved)
         }
         return result
+    }
+
+    companion object {
+        /**
+         * Inhalts-Fingerprint: bevorzugt normalisierte sourceUrl, sonst
+         * Titel + Zutaten-Anfang + kcal — stabil über Sync-Runden.
+         */
+        fun contentFingerprint(r: Recipe): String {
+            val url = r.sourceUrl?.trim()?.lowercase()?.trimEnd('/')
+            if (!url.isNullOrBlank()) return "url|$url"
+            return listOf(
+                "t",
+                r.title.trim().lowercase(),
+                r.ingredients.trim().lowercase().take(120),
+                r.totalCalories?.let { "%.0f".format(it) } ?: "-",
+                r.servings.toString()
+            ).joinToString("|")
+        }
+
+        fun contentFingerprint(
+            title: String,
+            sourceUrl: String?,
+            ingredients: String,
+            totalCalories: Float?,
+            servings: Int
+        ): String = contentFingerprint(
+            Recipe(
+                title = title,
+                sourceUrl = sourceUrl,
+                ingredients = ingredients,
+                totalCalories = totalCalories,
+                servings = servings
+            )
+        )
     }
 }
 

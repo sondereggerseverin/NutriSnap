@@ -86,6 +86,14 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         ch.nutrisnap.app.domain.RecipeNutritionAnalyzer.initGlobalDictionary(
             ch.nutrisnap.app.data.repository.GlobalIngredientDictionary(NutriDatabase.getInstance(app).globalIngredientMatchDao())
         )
+        // Einmalig Duplikate bereinigen (Sync-Pull legte früher Rezepte ohne Fingerprint
+        // mehrfach an — z.B. 10× derselbe Pfannkuchen).
+        viewModelScope.launch {
+            runCatching {
+                val n = repo.deduplicateRecipes()
+                if (n > 0) android.util.Log.i("Recipes", "Rezept-Dedup: $n Duplikate entfernt")
+            }
+        }
     }
 
     private val _budgetScaleState = MutableStateFlow(BudgetScaleState())

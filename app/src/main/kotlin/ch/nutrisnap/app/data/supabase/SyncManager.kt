@@ -120,6 +120,12 @@ object SyncManager {
             Log.e("NutriSync", "Pull recipes fehlgeschlagen: ${it.message}", it)
             firstError = firstError ?: it.message
         }
+        runCatching {
+            val n = deduplicateRecipesLocal(db)
+            if (n > 0) Log.i("NutriSync", "Rezept-Dedup nach Pull: $n entfernt")
+        }.onFailure {
+            Log.e("NutriSync", "Rezept-Dedup fehlgeschlagen: ${it.message}", it)
+        }
         runCatching { pullWeight(db) }.onFailure {
             Log.e("NutriSync", "Pull weight_entries fehlgeschlagen: ${it.message}", it)
             firstError = firstError ?: it.message
@@ -250,58 +256,97 @@ object SyncManager {
     private suspend fun pullRecipes(db: NutriDatabase) {
         val dao = db.recipeDao()
         val remoteRows = SupabaseSync.fetchRecipes()
+        // Fingerprints bereits vorhandener lokaler Rezepte — analog Diary-Pull.
+        val localFingerprints = dao.getAllOnce()
+            .map { ch.nutrisnap.app.data.repository.RecipeRepository.contentFingerprint(it) }
+            .toMutableSet()
+        // localId → schon gesehen (verhindert Doppel-Insert bei kaputten Remote-Daten)
+        val seenLocalIds = mutableSetOf<Long>()
+
         for (row in remoteRows) {
+            val fp = ch.nutrisnap.app.data.repository.RecipeRepository.contentFingerprint(
+                title = row.title,
+                sourceUrl = row.sourceUrl,
+                ingredients = row.ingredients,
+                totalCalories = row.totalCalories,
+                servings = row.servings
+            )
+            val recipeFromRow = Recipe(
+                id = row.localId ?: 0L,
+                title = row.title,
+                description = row.description,
+                imageUrl = row.imageUrl,
+                sourceUrl = row.sourceUrl,
+                platform = row.platform,
+                ingredients = row.ingredients,
+                instructions = row.instructions,
+                totalCalories = row.totalCalories,
+                proteinPerServing = row.proteinPerServing,
+                carbsPerServing = row.carbsPerServing,
+                fatPerServing = row.fatPerServing,
+                servings = row.servings,
+                prepTimeMinutes = row.prepTimeMinutes,
+                tags = row.tags,
+                isFavorite = row.isFavorite,
+                savedAt = row.savedAt
+            )
+
             if (row.localId != null) {
+                if (row.localId in seenLocalIds) continue
+                seenLocalIds.add(row.localId)
                 val existing = dao.getById(row.localId)
-                if (existing == null) {
-                    dao.insert(
-                        Recipe(
-                            id = row.localId,
-                            title = row.title,
-                            description = row.description,
-                            imageUrl = row.imageUrl,
-                            sourceUrl = row.sourceUrl,
-                            platform = row.platform,
-                            ingredients = row.ingredients,
-                            instructions = row.instructions,
-                            totalCalories = row.totalCalories,
-                            proteinPerServing = row.proteinPerServing,
-                            carbsPerServing = row.carbsPerServing,
-                            fatPerServing = row.fatPerServing,
-                            servings = row.servings,
-                            prepTimeMinutes = row.prepTimeMinutes,
-                            tags = row.tags,
-                            isFavorite = row.isFavorite,
-                            savedAt = row.savedAt
-                        )
-                    )
+                if (existing != null) {
+                    localFingerprints.add(fp)
+                    continue
                 }
+                // Inhalt schon unter anderer ID vorhanden → nur verlinken, nicht nochmal inserten
+                if (fp in localFingerprints) {
+                    if (row.id != null) SupabaseSync.linkRecipeLocalId(row.id, findLocalIdByFingerprint(dao, fp) ?: row.localId)
+                    continue
+                }
+                dao.insert(recipeFromRow.copy(id = row.localId))
+                localFingerprints.add(fp)
             } else {
-                val newId = dao.insert(
-                    Recipe(
-                        title = row.title,
-                        description = row.description,
-                        imageUrl = row.imageUrl,
-                        sourceUrl = row.sourceUrl,
-                        platform = row.platform,
-                        ingredients = row.ingredients,
-                        instructions = row.instructions,
-                        totalCalories = row.totalCalories,
-                        proteinPerServing = row.proteinPerServing,
-                        carbsPerServing = row.carbsPerServing,
-                        fatPerServing = row.fatPerServing,
-                        servings = row.servings,
-                        prepTimeMinutes = row.prepTimeMinutes,
-                        tags = row.tags,
-                        isFavorite = row.isFavorite,
-                        savedAt = row.savedAt
-                    )
-                )
-                // Zurueckverlinken statt upsert (siehe pullDiary) — verhindert, dass
-                // dieselbe Web-Rezept-Zeile bei jedem Sync erneut dupliziert wird.
+                // Web-Zeile ohne local_id: nicht erneut einfügen, wenn Inhalt schon lokal da ist
+                if (fp in localFingerprints) {
+                    val localId = findLocalIdByFingerprint(dao, fp)
+                    if (row.id != null && localId != null) {
+                        SupabaseSync.linkRecipeLocalId(row.id, localId)
+                    }
+                    continue
+                }
+                val newId = dao.insert(recipeFromRow.copy(id = 0))
+                localFingerprints.add(fp)
                 if (row.id != null) SupabaseSync.linkRecipeLocalId(row.id, newId)
             }
         }
+    }
+
+    private suspend fun findLocalIdByFingerprint(
+        dao: ch.nutrisnap.app.data.db.RecipeDao,
+        fp: String
+    ): Long? = dao.getAllOnce()
+        .firstOrNull { ch.nutrisnap.app.data.repository.RecipeRepository.contentFingerprint(it) == fp }
+        ?.id
+
+    /**
+     * Entfernt lokale Rezept-Duplikate (gleicher Inhalts-Fingerprint).
+     * Behält die kleinste id, löscht den Rest inkl. Remote-Delete.
+     */
+    private suspend fun deduplicateRecipesLocal(db: NutriDatabase): Int {
+        val dao = db.recipeDao()
+        val all = dao.getAllOnce()
+        val keep = linkedMapOf<String, Recipe>()
+        val toDelete = mutableListOf<Recipe>()
+        for (r in all.sortedBy { it.id }) {
+            val key = ch.nutrisnap.app.data.repository.RecipeRepository.contentFingerprint(r)
+            if (key in keep) toDelete.add(r) else keep[key] = r
+        }
+        for (r in toDelete) {
+            dao.delete(r)
+            runCatching { SupabaseSync.deleteRecipe(r.id) }
+        }
+        return toDelete.size
     }
 
     private suspend fun pullWeight(db: NutriDatabase) {
