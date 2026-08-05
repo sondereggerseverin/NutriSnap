@@ -386,7 +386,7 @@ private fun HomeHeader(state: HomeUiState) {
             Column(
                 Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(NutriRadius.md))
                     .background(Color.White.copy(alpha = 0.14f))
                     .padding(horizontal = 10.dp, vertical = 5.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
@@ -429,7 +429,7 @@ private fun HomeHeader(state: HomeUiState) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
+                .clip(RoundedCornerShape(NutriRadius.md))
                 .background(Color.White.copy(alpha = 0.12f))
                 .padding(horizontal = 4.dp, vertical = 5.dp),
             horizontalArrangement = Arrangement.spacedBy(2.dp)
@@ -588,42 +588,52 @@ private fun MealOverviewGrid(
             }
         }
     } else {
-        Column(
-            Modifier
+        Card(
+            modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            shape = RoundedCornerShape(NutriRadius.lg),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(1.dp)
         ) {
-            meals.forEach { meal ->
-                MealRowCard(
-                    meal = meal,
-                    onClick = { onClick(meal) },
-                    onQuickAdd = { onQuickAdd(meal) }
-                )
+            Column {
+                meals.forEachIndexed { index, meal ->
+                    MealRowItem(
+                        meal = meal,
+                        onClick = { onClick(meal) },
+                        onQuickAdd = { onQuickAdd(meal) }
+                    )
+                    if (index < meals.lastIndex) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 58.dp),
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
+                        )
+                    }
+                }
             }
         }
     }
 }
 
-/** Eigenständige, farblich akzentuierte Karte pro Mahlzeit (statt einer
- *  zusammenhängenden Liste mit Trennlinien) — bessere Unterscheidbarkeit auf
- *  dunklem Hintergrund, gleiche kompakte Zeilenhöhe wie zuvor. */
+/** Zeile innerhalb der gemeinsamen Mahlzeiten-Karte: farbiger Akzentstreifen links
+ *  sorgt für schnelle visuelle Unterscheidung, ohne 4 separate Kartenboxen mit
+ *  eigenem Rand zu brauchen (wirkte zuvor unruhig/zusammenhangslos). */
 @Composable
-private fun MealRowCard(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(NutriRadius.md),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(0.dp),
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+private fun MealRowItem(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () -> Unit) {
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+        Box(
+            Modifier
+                .width(3.dp)
+                .fillMaxHeight()
+                .padding(vertical = 10.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(meal.color)
         )
-    ) {
         Row(
             Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .weight(1f)
+                .padding(horizontal = 10.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
@@ -634,12 +644,12 @@ private fun MealRowCard(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () 
             ) {
                 Box(
                     Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(meal.color.copy(alpha = 0.22f)),
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(11.dp))
+                        .background(meal.color.copy(alpha = 0.16f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(meal.icon, fontSize = 18.sp)
+                    Text(meal.icon, fontSize = 17.sp)
                 }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
@@ -668,7 +678,7 @@ private fun MealRowCard(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () 
             Spacer(Modifier.width(6.dp))
             FilledTonalIconButton(
                 onClick = onQuickAdd,
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier.size(34.dp),
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                     containerColor = meal.color.copy(alpha = 0.16f),
                     contentColor = meal.color
@@ -677,7 +687,7 @@ private fun MealRowCard(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () 
                 Icon(
                     Icons.Default.Add,
                     contentDescription = "Zu ${meal.label} hinzufügen",
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(17.dp)
                 )
             }
         }
