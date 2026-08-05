@@ -93,6 +93,10 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 val n = repo.deduplicateRecipes()
                 if (n > 0) android.util.Log.i("Recipes", "Rezept-Dedup: $n Duplikate entfernt")
             }
+            runCatching {
+                val n = repo.repairNullTitleArtifacts()
+                if (n > 0) android.util.Log.i("Recipes", "Null-Titel bereinigt: $n Rezepte")
+            }
         }
     }
 

@@ -251,14 +251,15 @@ Rules:
             }
         }.trim()
 
-        val instructions = j.optString("instructions", "").trim()
+        // optString liefert bei JSON-null den Literal-String "null" — daher safeString.
+        val instructions = j.safeString("instructions")
         val servings = j.optInt("servings", 1).coerceAtLeast(1)
         val cals = if (j.isNull("calories_per_serving")) null
                    else j.optDouble("calories_per_serving").toFloat().takeIf { it > 0 }
         val totalCals = cals?.let { it * servings }
 
         // Build description with macros if available
-        val baseDesc = j.optString("description", "").trim()
+        val baseDesc = j.safeString("description")
         val macroLine = buildString {
             cals?.let { append("${it.toInt()} kcal") }
             val p = if (j.isNull("protein_g")) null else j.optDouble("protein_g").toFloat().takeIf { it > 0 }
@@ -282,19 +283,33 @@ Rules:
         val carbsG   = if (j.isNull("carbs_g"))   null else j.optDouble("carbs_g").toFloat().takeIf { it > 0 }
         val fatG     = if (j.isNull("fat_g"))      null else j.optDouble("fat_g").toFloat().takeIf { it > 0 }
 
+        val rawTitle = j.safeString("title", "Rezept")
         return Recipe(
-            title              = j.optString("title", "Rezept").trim().ifBlank { "Rezept" },
+            title              = rawTitle.ifBlank { "Rezept" },
             description        = description,
             ingredients        = ingredients.ifBlank { "Zutaten nicht gefunden." },
-            instructions       = instructions.ifBlank { "" },
+            instructions       = instructions,
             servings           = servings,
             totalCalories      = totalCals,
             proteinPerServing  = proteinG,
             carbsPerServing    = carbsG,
             fatPerServing      = fatG,
             prepTimeMinutes    = prepTime,
-            tags               = j.optString("tags", "").take(200)
+            tags               = j.safeString("tags").take(200)
         )
+    }
+
+    /**
+     * Android [JSONObject.optString] gibt bei JSON-null den **String** `"null"` zurück.
+     * Diese Hilfsfunktion behandelt null / "null" / "undefined" als fehlend.
+     */
+    private fun JSONObject.safeString(key: String, default: String = ""): String {
+        if (!has(key) || isNull(key)) return default
+        val v = optString(key, default).trim()
+        return if (v.isEmpty() ||
+            v.equals("null", ignoreCase = true) ||
+            v.equals("undefined", ignoreCase = true)
+        ) default else v
     }
 
     // ── Fallback (no AI) ───────────────────────────────────────────────────────

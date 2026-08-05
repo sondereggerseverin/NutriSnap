@@ -383,7 +383,7 @@ fun RecipesScreen(
             onDismissRequest = vm::clearLastImport,
             icon = { Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary) },
             title = { Text("Rezept importiert!") },
-            text = { Text(recipe.title) },
+            text = { Text(recipe.displayTitle()) },
             confirmButton = { TextButton(onClick = { selectedRecipe = recipe; vm.clearLastImport() }) { Text("Ansehen") } },
             dismissButton = { TextButton(onClick = vm::clearLastImport) { Text("OK") } }
         )
@@ -407,7 +407,7 @@ fun RecipesScreen(
     if (showVerifyNow) {
         IngredientVerifySheet(
             analysisResult = verifyResult!!,
-            recipeName     = verifyRecipe!!.title,
+            recipeName     = verifyRecipe!!.displayTitle(),
             servings       = verifyRecipe.servings,
             initialOverrides = vm.getOverridesFor(verifyRecipe.id),
             onOverridesChanged = { vm.setOverridesFor(verifyRecipe.id, it) },
@@ -456,7 +456,7 @@ fun RecipesScreen(
                         scaled.length > 2 && !scaled.first().isDigit() && !scaled.startsWith(" ")
                     if (isHeader) null else scaled.trimStart('•', '-', ' ').trim().takeIf { it.isNotBlank() }
                 }
-                shoppingVm.addRecipeIngredients(live.title, names.map { Triple(it, null, null) })
+                shoppingVm.addRecipeIngredients(live.displayTitle(), names.map { Triple(it, null, null) })
                 selectedRecipe = null
             },
             onUpdateIngredients = { newText -> vm.updateRecipe(live.copy(ingredients = newText)) },
@@ -573,7 +573,7 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
                 Icon(Icons.Default.WarningAmber, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.outline)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(recipe.title, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    Text(recipe.displayTitle(), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("Unvollständig – Caption fehlt, tippe zum Ergänzen", fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.outline)
@@ -591,7 +591,7 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
                 )
                 Column(Modifier.padding(14.dp)) {
                     Text(
-                        recipe.title,
+                        recipe.displayTitle(),
                         fontWeight = FontWeight.Bold,
                         fontSize = 17.sp,
                         maxLines = 2,
@@ -676,7 +676,7 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
             RecipeThumbnail(recipe = recipe, size = 72.dp)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(recipe.title, fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                Text(recipe.displayTitle(), fontWeight = FontWeight.Bold, fontSize = 15.sp,
                     maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (stars > 0) {
                     Spacer(Modifier.height(2.dp))
@@ -708,7 +708,7 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
     }
     if (showConfirm) {
         AlertDialog(onDismissRequest = { showConfirm = false },
-            title = { Text("Rezept löschen?") }, text = { Text(recipe.title) },
+            title = { Text("Rezept löschen?") }, text = { Text(recipe.displayTitle()) },
             confirmButton = { TextButton(onClick = { onDelete(); showConfirm = false }) { Text("Löschen", color = MaterialTheme.colorScheme.error) } },
             dismissButton = { TextButton(onClick = { showConfirm = false }) { Text("Abbrechen") } })
     }
@@ -747,7 +747,7 @@ private fun RecipeThumbnail(
 
     if (!url.isNullOrBlank() && !imageLoadFailed) {
         AsyncImage(
-            model = url, contentDescription = recipe.title,
+            model = url, contentDescription = recipe.displayTitle(),
             modifier = box.clip(shape),
             contentScale = ContentScale.Crop,
             onError = { imageLoadFailed = true }
@@ -1124,7 +1124,7 @@ fun RecipeDetailSheet(
 
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceBetween, verticalAlignment=Alignment.Top) {
-                    Text(recipe.title, fontWeight=FontWeight.Bold, fontSize=22.sp, lineHeight=28.sp, modifier=Modifier.weight(1f))
+                    Text(recipe.displayTitle(), fontWeight=FontWeight.Bold, fontSize=22.sp, lineHeight=28.sp, modifier=Modifier.weight(1f))
                     IconButton(onClick=onEdit) { Icon(Icons.Default.Edit, "Bearbeiten", tint=MaterialTheme.colorScheme.primary) }
                 }
                 Spacer(Modifier.height(6.dp))
@@ -1287,7 +1287,7 @@ fun RecipeDetailSheet(
             }
 
             // Description
-            val desc = recipe.description.lines().filterNot{it.startsWith("📊")}.joinToString("\n").trim()
+            val desc = recipe.displayDescription().lines().filterNot{it.startsWith("📊")}.joinToString("\n").trim()
             if (desc.isNotBlank()) {
                 item { SectionHeader("Beschreibung"); Spacer(Modifier.height(4.dp)); Text(desc, fontSize=14.sp, lineHeight=20.sp); Spacer(Modifier.height(16.dp)) }
             }
@@ -1710,7 +1710,7 @@ fun AddToDiarySheet(
         Column(Modifier.padding(horizontal=16.dp).navigationBarsPadding().padding(bottom=16.dp)) {
             Text("Ins Tagebuch", fontWeight=FontWeight.Bold, fontSize=18.sp)
             Spacer(Modifier.height(4.dp))
-            Text(recipe.title, fontSize=13.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(recipe.displayTitle(), fontSize=13.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
             if (yieldTotalG != null && yieldTotalG > 0f) {
                 Spacer(Modifier.height(6.dp))
                 Text(
@@ -1867,7 +1867,7 @@ private fun RecipeQuickRatingDialog(recipe: Recipe, onDismiss: () -> Unit) {
         title = { Text("Wie war’s?") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(recipe.title, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(recipe.displayTitle(), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("Sterne (fürs nächste Mal)", fontSize = 12.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     for (i in 1..5) {

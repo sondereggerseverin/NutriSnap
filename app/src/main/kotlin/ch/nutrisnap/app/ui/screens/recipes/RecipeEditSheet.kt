@@ -36,7 +36,7 @@ fun RecipeEditSheet(
 ) {
     val context = LocalContext.current
 
-    var title        by remember { mutableStateOf(recipe.title) }
+    var title        by remember { mutableStateOf(recipe.displayTitle()) }
     var description  by remember { mutableStateOf(recipe.description
         .lines().filterNot { it.startsWith("📊") }.joinToString("\n").trim()) }
     var ingredients  by remember { mutableStateOf(recipe.ingredients) }
@@ -73,7 +73,7 @@ fun RecipeEditSheet(
             if (macroLine.isNotBlank()) { if (isNotEmpty()) append("\n\n"); append(macroLine) }
         }
         return recipe.copy(
-            title           = title.ifBlank { recipe.title },
+            title           = title.ifBlank { recipe.displayTitle() },
             description     = newDesc,
             ingredients     = ingredients,
             instructions    = instructions,

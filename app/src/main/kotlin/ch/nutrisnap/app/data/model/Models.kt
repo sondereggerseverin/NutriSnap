@@ -199,6 +199,30 @@ data class Recipe(
         tags.split(",").mapNotNull { tag ->
             DietTag.entries.firstOrNull { it.name == tag.trim() }
         }
+
+    /**
+     * Anzeigetitel ohne JSON-Null-Artefakte ("null"/"undefined" von optString).
+     * Fallback: erste sinnvolle Zutatenzeile oder „Rezept“.
+     */
+    fun displayTitle(): String {
+        val t = title.trim()
+        if (t.isNotEmpty() && !t.equals("null", true) && !t.equals("undefined", true)) return t
+        val fromIngredients = ingredients.lineSequence()
+            .map { it.trim().removePrefix("•").removePrefix("-").removePrefix("*").trim() }
+            .firstOrNull { it.length in 3..60 && !it.equals("null", true) }
+        return fromIngredients ?: "Rezept"
+    }
+
+    fun displayDescription(): String {
+        val d = description.trim()
+        return if (d.isEmpty() || d.equals("null", true) || d.equals("undefined", true)) "" else d
+    }
+
+    /** Bereinigte Kopie für Speichern/Sync nach kaputtem Import. */
+    fun withoutNullArtifacts(): Recipe = copy(
+        title = displayTitle(),
+        description = displayDescription()
+    )
 }
 
 // ─── Rezept-Sammlungen ───────────────────────────────────────────────────────

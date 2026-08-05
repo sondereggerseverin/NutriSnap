@@ -342,21 +342,46 @@ class RecipeRepository(db: NutriDatabase, context: Context) {
      * anzulegen — verhindert 10× denselben Import.
      */
     suspend fun saveRecipe(r: Recipe): Long {
-        val existing = findByFingerprint(contentFingerprint(r))
-        if (existing != null && (r.id == 0L || r.id == existing.id)) {
-            val merged = r.copy(id = existing.id, savedAt = existing.savedAt)
+        val clean = r.withoutNullArtifacts()
+        val existing = findByFingerprint(contentFingerprint(clean))
+        if (existing != null && (clean.id == 0L || clean.id == existing.id)) {
+            val merged = clean.copy(id = existing.id, savedAt = existing.savedAt)
             dao.update(merged)
             pushSafely { SupabaseSync.upsertRecipe(merged) }
             return existing.id
         }
-        val id = dao.insert(r)
+        val id = dao.insert(clean)
         dao.getById(id)?.let { saved -> pushSafely { SupabaseSync.upsertRecipe(saved) } }
         return id
     }
 
     suspend fun updateRecipe(r: Recipe) {
-        dao.update(r)
-        pushSafely { SupabaseSync.upsertRecipe(r) }
+        val clean = r.withoutNullArtifacts()
+        dao.update(clean)
+        pushSafely { SupabaseSync.upsertRecipe(clean) }
+    }
+
+    /**
+     * Korrigiert gespeicherte „null“-/„undefined“-Titel und -Beschreibungen
+     * (Android JSONObject.optString-Artefakt bei LLM-Antworten).
+     * @return Anzahl bereinigter Rezepte
+     */
+    suspend fun repairNullTitleArtifacts(): Int {
+        var fixed = 0
+        for (r in dao.getAllOnce()) {
+            val t = r.title.trim()
+            val d = r.description.trim()
+            val badTitle = t.isEmpty() || t.equals("null", true) || t.equals("undefined", true)
+            val badDesc = d.equals("null", true) || d.equals("undefined", true)
+            if (!badTitle && !badDesc) continue
+            val cleaned = r.withoutNullArtifacts()
+            if (cleaned.title != r.title || cleaned.description != r.description) {
+                dao.update(cleaned)
+                pushSafely { SupabaseSync.upsertRecipe(cleaned) }
+                fixed++
+            }
+        }
+        return fixed
     }
 
     suspend fun deleteRecipe(r: Recipe) {
