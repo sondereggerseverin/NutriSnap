@@ -51,7 +51,6 @@ fun HomeScreen(
             contentPadding = PaddingValues(bottom = 100.dp)
         ) {
             item { HomeHeader(state) }
-            item { CalorieBreakdownCard(state) }
             item {
                 MealOverviewGrid(
                     state.meals,
@@ -59,6 +58,8 @@ fun HomeScreen(
                     onQuickAdd = { meal -> onNavigateToDiary(meal.type, true) }
                 )
             }
+            // Breakdown unter den Mahlzeiten, damit Ring + 4 Kacheln ohne Scrollen passen
+            item { CalorieBreakdownCard(state) }
             item {
                 QuickActionsRow(
                     onScan = onNavigateToFoodScan,
