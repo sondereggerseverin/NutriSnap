@@ -347,8 +347,11 @@ private fun HomeHeader(state: HomeUiState) {
 
         Spacer(Modifier.height(8.dp))
 
-        // Ring + Kennzahlen (Höhe ≈ alter 84-dp-Ring-Block)
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        // Ring + dichte Kennzahlen-Karte (füllt den rechten Bereich, kein leerer Gap)
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             MacroRing(
                 eaten = state.totalCalories,
                 goal = state.adjustedGoal,
@@ -377,36 +380,52 @@ private fun HomeHeader(state: HomeUiState) {
                 }
             }
 
-            Spacer(Modifier.width(NutriSpacing.md))
+            Spacer(Modifier.width(10.dp))
 
+            // Glas-Karte: Label links, Wert rechts — dichter Block statt Luft in der Mitte
             Column(
-                Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color.White.copy(alpha = 0.14f))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                HeaderMetric(
+                HeaderStatLine(
                     label = "Gegessen",
-                    value = "${state.totalCalories.toInt()}",
-                    unit = "kcal"
+                    value = "${state.totalCalories.toInt()} kcal"
                 )
                 if (state.burnedKcal > 0f) {
-                    HeaderMetric(
+                    HeaderStatLine(
                         label = "Aktiv",
-                        value = "+${state.burnedKcal.toInt()}",
-                        unit = "kcal",
+                        value = "+${state.burnedKcal.toInt()} kcal",
                         valueColor = Color(0xFFFFE08A)
                     )
                 }
-                HeaderMetric(
+                HeaderStatLine(
                     label = "Ziel",
-                    value = "${state.adjustedGoal.toInt()}",
-                    unit = "kcal"
+                    value = "${state.adjustedGoal.toInt()} kcal"
                 )
+                // Gewicht füllt die Karte sinnvoll, wenn vorhanden
+                state.lastWeightKg?.let { kg ->
+                    val delta = state.previousWeightKg?.let { prev -> kg - prev }
+                    val deltaText = when {
+                        delta == null -> null
+                        delta > 0.05f -> " · +${"%.1f".format(delta)} kg"
+                        delta < -0.05f -> " · ${"%.1f".format(delta)} kg"
+                        else -> " · ±0"
+                    }
+                    HeaderStatLine(
+                        label = "Gewicht",
+                        value = "${"%.1f".format(kg)} kg${deltaText ?: ""}"
+                    )
+                }
             }
         }
 
         Spacer(Modifier.height(8.dp))
 
-        // Makros: eine flache Zeile (4 Spalten) statt 2×2
+        // Makros: eine flache Zeile (4 Spalten)
         Row(
             Modifier
                 .fillMaxWidth()
@@ -424,34 +443,27 @@ private fun HomeHeader(state: HomeUiState) {
 }
 
 @Composable
-private fun HeaderMetric(
+private fun HeaderStatLine(
     label: String,
     value: String,
-    unit: String,
     valueColor: Color = Color.White
 ) {
     Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
+            label,
+            fontSize = 11.sp,
+            color = Color.White.copy(alpha = 0.65f),
+            maxLines = 1
+        )
+        Text(
             value,
-            fontSize = 14.sp,
+            fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             color = valueColor,
-            maxLines = 1
-        )
-        Text(
-            unit,
-            fontSize = 10.sp,
-            color = Color.White.copy(alpha = 0.55f),
-            maxLines = 1
-        )
-        Spacer(Modifier.weight(1f))
-        Text(
-            label,
-            fontSize = 10.sp,
-            color = Color.White.copy(alpha = 0.55f),
             maxLines = 1
         )
     }
