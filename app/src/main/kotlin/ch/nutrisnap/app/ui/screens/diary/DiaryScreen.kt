@@ -67,13 +67,12 @@ private fun formatPortionAmount(amount: Float): String {
 /** Anzeige für einen Rezept-Tagebucheintrag: exakte Grammzahl, wenn der Nutzer in
  *  Gramm erfasst hat (entry.recipeGrams gesetzt), sonst die Portionsanzahl. */
 private fun recipeAmountLabel(entry: DiaryEntry): String {
-    // Echte Gramm-Erfassung: sinnvoll erst ab ~10 g (1–9 g sind fast immer
-    // fälschlich als "Gramm" gespeicherte Portionsfaktoren → "1 g" Bug).
+    // Echte Gramm-Erfassung ab ~10 g. Kleinere Werte + hohe kcal = Portionen
+    // (Bug: „1 g“ bei 566 kcal Vollportion).
     entry.recipeGrams?.takeIf { it >= 10f }?.let { return "${it.toInt()} g" }
     if (entry.foodItemId < 0 && entry.amountGrams >= 20f) {
         return "${entry.amountGrams.toInt()} g"
     }
-    // recipeGrams 1–9 oder amountGrams als Portionen
     val portions = when {
         entry.recipeGrams != null && entry.recipeGrams > 0f && entry.recipeGrams < 10f ->
             entry.recipeGrams
@@ -81,6 +80,16 @@ private fun recipeAmountLabel(entry: DiaryEntry): String {
         else -> 1f
     }
     return formatPortionAmount(portions)
+}
+
+/** true wenn Menge eher Portion/Rezept als echte Gramm-Angabe ist. */
+private fun looksLikePortionEntry(entry: DiaryEntry): Boolean {
+    if (entry.foodItemId < 0) return true
+    if (entry.recipeGrams != null) return true
+    if (entry.amountGrams <= 0f) return true
+    // 1 g mit 566 kcal kann keine echte Gramm-Angabe sein
+    if (entry.amountGrams < 10f && entry.calories >= 40f) return true
+    return false
 }
 
 private fun defaultMealForNow(): MealType = when (LocalTime.now().hour) {
@@ -117,7 +126,7 @@ fun DiaryScreen(
     // und das Sheet oeffnete sich nicht mehr — deshalb wich MainActivity bislang auf
     // einen "frischen Push" ohne popUpTo aus, was den Back-Stack aufblähte und dazu
     // fuehrte, dass man von Tagebuch nicht mehr sauber zu Start zurückkam.
-    LaunchedEffect(autoOpenAdd, autoOpenScanner) {
+    LaunchedEffect(autoOpenAdd, autoOpenScanner, initialMeal) {
         if (autoOpenAdd || autoOpenScanner) showAddSheet = true
     }
     var editEntry    by remember { mutableStateOf<DiaryEntry?>(null) }
@@ -925,7 +934,7 @@ private fun DiaryEntryRow(
     var showConfirm by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
 
-    val isRecipeEntry = entry.amountGrams == 0f || entry.foodItemId < 0
+    val isRecipeEntry = looksLikePortionEntry(entry)
     val amountLabel   = if (isRecipeEntry) recipeAmountLabel(entry)
                          else "${entry.amountGrams.toInt()} g"
 
@@ -1255,8 +1264,9 @@ fun AddFoodSheet(
                 val today = java.time.LocalDate.now()
                 listOf(
                     today to "Heute",
-                    today.minusDays(1) to "Gestern",
-                    today.minusDays(2) to "Vorgestern"
+                    today.plusDays(1) to "Morgen",
+                    today.plusDays(2) to "+2 Tage",
+                    today.minusDays(1) to "Gestern"
                 ).forEach { (d, label) ->
                     FilterChip(
                         selected = activeDate == d,

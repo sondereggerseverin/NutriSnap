@@ -542,10 +542,15 @@ private fun MealRow(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () -> U
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
             .padding(horizontal = NutriSpacing.lg, vertical = if (freshHome) 14.dp else NutriSpacing.md),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        Row(
+            Modifier
+                .weight(1f)
+                .clickable(onClick = onClick),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
         Box(
             Modifier
                 .size(iconSize)
@@ -580,20 +585,22 @@ private fun MealRow(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () -> U
                 else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+        }
+        } // Ende klickbarer Bereich (öffnet Tagebuch)
         Spacer(Modifier.width(NutriSpacing.sm))
-        Box(
-            Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary)
-                .clickable(onClick = onQuickAdd),
-            contentAlignment = Alignment.Center
+        // Deutlicher „Hinzufügen“-Button (eigenes Klickziel, öffnet Tracking-Sheet)
+        FilledTonalIconButton(
+            onClick = onQuickAdd,
+            modifier = Modifier.size(44.dp),
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
         ) {
             Icon(
                 Icons.Default.Add,
-                "Zu ${meal.label} hinzufügen",
-                tint = Color.White,
-                modifier = Modifier.size(20.dp)
+                contentDescription = "Zu ${meal.label} hinzufügen",
+                modifier = Modifier.size(24.dp)
             )
         }
     }

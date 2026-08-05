@@ -331,16 +331,14 @@ fun MainScaffold(
                 HomeScreen(
                     hcVm = hcVm,
                     onNavigateToDiary = { meal, autoOpenAdd ->
-                        val route = if (meal != null) "diary?meal=${meal.name}&open=$autoOpenAdd" else "diary?open=$autoOpenAdd"
-                        // BUG-FIX: einheitliches Tab-Preserving-Pattern (wie bei allen anderen
-                        // Bottom-Nav-Zielen) statt Sonderfall-Fresh-Push. DiaryScreen reagiert
-                        // jetzt selbst per LaunchedEffect(autoOpenAdd) auf den Parameter, auch
-                        // wenn die Compose-Instanz per restoreState wiederverwendet wird. Der
-                        // Back-Stack bleibt dadurch sauber (immer nur [Home, Diary]) und die
-                        // "Start"-Navigation (Tab-Klick oder System-Back) funktioniert zuverlässig.
+                        // open=true: restoreState aus, sonst bleibt das Add-Sheet zu
+                        // (alte Compose-Instanz mit showAddSheet=false).
+                        val route = if (meal != null) "diary?meal=${meal.name}&open=$autoOpenAdd"
+                                    else "diary?open=$autoOpenAdd"
                         navController.navigate(route) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true; restoreState = true
+                            launchSingleTop = true
+                            restoreState = !autoOpenAdd
                         }
                     },
                     onNavigateToHealth = { navController.navigate("health") },
