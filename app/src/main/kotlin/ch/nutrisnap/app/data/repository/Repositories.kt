@@ -371,15 +371,22 @@ class RecipeRepository(db: NutriDatabase, context: Context) {
         for (r in dao.getAllOnce()) {
             val t = r.title.trim()
             val d = r.description.trim()
-            val badTitle = t.isEmpty() || t.equals("null", true) || t.equals("undefined", true)
-            val badDesc = d.equals("null", true) || d.equals("undefined", true)
-            if (!badTitle && !badDesc) continue
-            val cleaned = r.withoutNullArtifacts()
-            if (cleaned.title != r.title || cleaned.description != r.description) {
-                dao.update(cleaned)
-                pushSafely { SupabaseSync.upsertRecipe(cleaned) }
-                fixed++
-            }
+            val badTitle = t.isEmpty() || t.equals("null", true) || t.equals("undefined", true) ||
+                t.startsWith("<!DOCTYPE", true) || t.startsWith("<html", true) ||
+                (t.length > 80 && t.count { it == '<' } >= 3)
+            val badDesc = d.equals("null", true) || d.equals("undefined", true) ||
+                d.startsWith("<!DOCTYPE", true)
+            val badIng = r.ingredients.trimStart().startsWith("<!DOCTYPE", true) ||
+                r.ingredients.trimStart().startsWith("<html", true)
+            if (!badTitle && !badDesc && !badIng) continue
+            val cleaned = r.withoutNullArtifacts().copy(
+                title = if (badTitle) "Rezept" else r.displayTitle(),
+                description = if (badDesc) "" else r.displayDescription(),
+                ingredients = if (badIng) "Tippe ✏️ um Zutaten hinzuzufügen." else r.ingredients
+            )
+            dao.update(cleaned)
+            pushSafely { SupabaseSync.upsertRecipe(cleaned) }
+            fixed++
         }
         return fixed
     }

@@ -371,6 +371,22 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { repo.deleteRecipe(recipe) }
     }
 
+    /** Kopie zum Anpassen — neues Rezept mit Titel „… (Kopie)“. */
+    fun duplicateRecipe(recipe: Recipe) {
+        viewModelScope.launch {
+            val copy = recipe.copy(
+                id = 0,
+                title = recipe.displayTitle().let { base ->
+                    if (base.endsWith("(Kopie)")) base else "$base (Kopie)"
+                },
+                sourceUrl = null,
+                savedAt = System.currentTimeMillis(),
+                isFavorite = false
+            ).withoutNullArtifacts()
+            repo.saveRecipe(copy)
+        }
+    }
+
     /**
      * "Auswahl übernehmen" — summiert die bereits gematchten/manuell angepassten
      * Zutaten (letztes AnalysisResult + gespeicherte Overrides) neu, OHNE erneut

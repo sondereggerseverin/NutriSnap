@@ -5,6 +5,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material3.*
@@ -31,6 +34,7 @@ private val PORTION_STEPS = listOf(1f, 1.5f, 2f, 3f)
  * Kompakte Rezeptkarte für die Übersicht (viele Einträge).
  * Horizontal: Thumbnail links, Infos rechts. Makros immer pro Portion.
  * Chips 1 / 1.5 / 2 / 3 skalieren die Anzeige fürs Tracking.
+ * Menü: Kopieren (zum Anpassen) + Löschen.
  */
 @Composable
 fun RecipeCardV2(
@@ -39,9 +43,12 @@ fun RecipeCardV2(
     onAddToDiary: (portions: Float) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onDuplicate: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var portions by remember(recipe.id) { mutableFloatStateOf(1f) }
+    var menuOpen by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     val baseServings = recipe.servings.coerceAtLeast(1)
     val kcalPer = recipe.totalCalories?.div(baseServings)
@@ -82,14 +89,63 @@ fun RecipeCardV2(
 
             // Inhalt rechts
             Column(Modifier.weight(1f)) {
-                Text(
-                    recipe.title,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    lineHeight = 18.sp
-                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text(
+                        recipe.displayTitle(),
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 15.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 18.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Box {
+                        IconButton(
+                            onClick = { menuOpen = true },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = "Mehr",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = menuOpen,
+                            onDismissRequest = { menuOpen = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Kopieren zum Anpassen") },
+                                onClick = {
+                                    menuOpen = false
+                                    onDuplicate()
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.ContentCopy, null, Modifier.size(18.dp))
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Löschen", color = MaterialTheme.colorScheme.error) },
+                                onClick = {
+                                    menuOpen = false
+                                    showDeleteConfirm = true
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.DeleteOutline,
+                                        null,
+                                        Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
 
                 Spacer(Modifier.height(4.dp))
 
@@ -162,6 +218,24 @@ fun RecipeCardV2(
                 }
             }
         }
+    }
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Rezept löschen?") },
+            text = { Text(recipe.displayTitle()) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDelete()
+                    showDeleteConfirm = false
+                }) {
+                    Text("Löschen", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Abbrechen") }
+            }
+        )
     }
 }
 

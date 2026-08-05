@@ -355,8 +355,8 @@ private fun HomeHeader(state: HomeUiState) {
             MacroRing(
                 eaten = state.totalCalories,
                 goal = state.adjustedGoal,
-                size = 76.dp,
-                strokeWidth = 7.dp,
+                size = 100.dp,
+                strokeWidth = 9.dp,
                 trackColor = Color.White.copy(alpha = 0.18f),
                 progressColor = Color.White,
                 overflowColor = Color(0xFFFFD67A)
@@ -368,13 +368,13 @@ private fun HomeHeader(state: HomeUiState) {
                         } else {
                             "${state.remaining.toInt()}"
                         },
-                        fontSize = 16.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
                     Text(
                         if (overGoal) "über" else "übrig",
-                        fontSize = 9.sp,
+                        fontSize = 10.sp,
                         color = Color.White.copy(alpha = 0.75f)
                     )
                 }

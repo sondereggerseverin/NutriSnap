@@ -203,8 +203,16 @@ private fun joinIngredientLine(parsed: ParsedIngredient): String {
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
-private fun Recipe.isIncomplete(): Boolean =
-    (title == "Rezept" || title.startsWith("Rezept von")) && imageUrl.isNullOrBlank() && totalCalories == null
+private fun Recipe.isIncomplete(): Boolean {
+    val t = title.trim()
+    val isHtml = t.startsWith("<!DOCTYPE", true) || t.startsWith("<html", true) ||
+        "<script" in t.lowercase() || t.length > 120 && t.count { it == '<' } >= 3
+    if (isHtml) return true
+    val ingredientsHtml = ingredients.trimStart().startsWith("<!DOCTYPE", true) ||
+        ingredients.trimStart().startsWith("<html", true)
+    if (ingredientsHtml) return true
+    return (t == "Rezept" || t.startsWith("Rezept von")) && imageUrl.isNullOrBlank() && totalCalories == null
+}
 
 @Composable
 fun RecipesScreen(
@@ -344,7 +352,8 @@ fun RecipesScreen(
                                 onClick      = { selectedRecipe = recipe },
                                 onAddToDiary = { _ -> addToDiaryRecipe = recipe },
                                 onEdit       = { editRecipe = recipe },
-                                onDelete     = { vm.deleteRecipe(recipe) }
+                                onDelete     = { vm.deleteRecipe(recipe) },
+                                onDuplicate  = { vm.duplicateRecipe(recipe) }
                             )
                         }
                     }

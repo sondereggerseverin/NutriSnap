@@ -33,12 +33,25 @@ class RecipeScraper(private val context: Context) {
         if (text.isNullOrBlank()) return false
         val t = text.trim()
         if (t.length < 40) return false
+        // HTML/JS-Müll von Jina/Mirrors niemals als Caption akzeptieren
+        if (looksLikeHtmlOrCode(t)) return false
         val lc = t.lowercase()
         val recipeHints = listOf(
             "zutaten", "ingredient", "rezept", "recipe", "anleitung", "instructions",
             " tbsp", " tsp", " el ", " tl ", "gramm", " ml", " cup"
         )
         return t.length >= 80 || recipeHints.any { it in lc }
+    }
+
+    /** DOCTYPE, script, Cloudflare-Challenge usw. → kein Rezepttext. */
+    private fun looksLikeHtmlOrCode(text: String): Boolean {
+        val t = text.trimStart().lowercase()
+        if (t.startsWith("<!doctype") || t.startsWith("<html") || t.startsWith("<head")) return true
+        if ("</html>" in t || "</body>" in t || "<script" in t) return true
+        if ("content-security-policy" in t || "challenges.cloudflare.com" in t) return true
+        if ("window._shareddata" in t || ("document." in t && "cookie" in t)) return true
+        val tagCount = Regex("""<[a-zA-Z/!][^>]*>""").findAll(text).count()
+        return tagCount >= 5
     }
 
     private val client = OkHttpClient.Builder()
@@ -342,9 +355,10 @@ class RecipeScraper(private val context: Context) {
                 return@coroutineScope winner
             }
 
+            // Nur valide Captions — niemals den längsten HTML-Müll
             val best = jobs.mapNotNull { d ->
                 if (d.isCompleted) runCatching { d.getCompleted() }.getOrNull()?.text else null
-            }.filter { it.isNotBlank() }.maxByOrNull { it.length }.orEmpty()
+            }.filter { isGoodCaption(it) }.maxByOrNull { it.length }.orEmpty()
             jobs.forEach { it.cancel() }
             best
         }
@@ -356,7 +370,7 @@ class RecipeScraper(private val context: Context) {
             jinaUrl,
             "Mozilla/5.0 (compatible; NutriSnap/1.0; +https://nutrisnap.dev)"
         ) ?: return null
-        if (body.length < 40) return null
+        if (body.length < 40 || looksLikeHtmlOrCode(body)) return null
         // Login-Wall / leere IG-Seiten herausfiltern
         val lc = body.lowercase()
         if ("log in" in lc && "sign up" in lc && body.length < 400) return null
@@ -367,12 +381,15 @@ class RecipeScraper(private val context: Context) {
                 val l = line.trim()
                 l.startsWith("Title:") || l.startsWith("URL Source:") ||
                     l.startsWith("Markdown Content:") || l.startsWith("Warning:") ||
-                    l.startsWith("======") || l.startsWith("------")
+                    l.startsWith("======") || l.startsWith("------") ||
+                    l.startsWith("<") // HTML-Zeilen verwerfen
             }
             .joinToString("\n")
             .trim()
+        if (looksLikeHtmlOrCode(cleaned)) return null
         // Längsten zusammenhängenden Block mit Rezept-Hinweisen nehmen
-        val blocks = cleaned.split(Regex("\n{2,}")).map { it.trim() }.filter { it.length >= 40 }
+        val blocks = cleaned.split(Regex("\n{2,}")).map { it.trim() }
+            .filter { it.length >= 40 && !looksLikeHtmlOrCode(it) }
         val recipeHints = listOf("zutaten", "ingredient", "rezept", "recipe", "anleitung", " tbsp", " el ", "g ", "ml ")
         val best = blocks
             .filter { b ->
@@ -380,8 +397,8 @@ class RecipeScraper(private val context: Context) {
                 recipeHints.any { it in l } || b.length >= 120
             }
             .maxByOrNull { it.length }
-            ?: blocks.maxByOrNull { it.length }
-        return best?.take(6000)
+        // Kein Fallback auf zufälligen langen Block ohne Rezept-Hinweise
+        return best?.take(6000)?.takeIf { isGoodCaption(it) }
     }
 
     /** Instagram Legacy-JSON: /p/{code}/?__a=1&__d=dis */
