@@ -37,7 +37,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.data.model.favoriteKey
 import ch.nutrisnap.app.ui.components.EmptyState
-import ch.nutrisnap.app.ui.components.MacroBar
 import ch.nutrisnap.app.ui.components.MicronutrientTable
 import ch.nutrisnap.app.ui.components.NutritionFactsProgress
 import ch.nutrisnap.app.ui.components.SectionHeader
@@ -107,6 +106,106 @@ private fun parseGramsInput(text: String): Float? {
         .replace(Regex("""(?i)\s*(g|gramm|grams?|ml|milliliter)\s*$"""), "")
         .trim()
     return cleaned.toFloatOrNull()?.takeIf { it > 0f }
+}
+
+/** Kompakte Tagesübersicht: eine Zeile Kalorien + dünner Balken + Makro-Mini-Stats.
+ *  Ersetzt die frühere, deutlich höhere MacroBar-Karte auf dem Tagebuch-Screen. */
+@Composable
+private fun CompactDayOverview(
+    calories: Float,
+    goal: Float,
+    protein: Float,
+    carbs: Float,
+    fat: Float,
+    modifier: Modifier = Modifier
+) {
+    val progress  = (calories / goal.coerceAtLeast(1f)).coerceIn(0f, 1f)
+    val remaining = goal - calories
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(NutriRadius.lg),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(1.dp)
+    ) {
+        Column(Modifier.padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.md)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        "${calories.toInt()}",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        " / ${goal.toInt()} kcal",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 2.dp, start = 2.dp)
+                    )
+                }
+                Text(
+                    if (remaining >= 0) "${remaining.toInt()} kcal übrig" else "${-remaining.toInt()} kcal über",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (remaining >= 0) MacroColors.calories else MaterialTheme.colorScheme.error
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            LinearProgressIndicator(
+                progress   = { progress },
+                modifier   = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color      = if (progress < 1f) MacroColors.calories else MaterialTheme.colorScheme.error,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                strokeCap  = androidx.compose.ui.graphics.StrokeCap.Round
+            )
+
+            Spacer(Modifier.height(NutriSpacing.sm))
+
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                MiniMacroStat("Protein", protein, MacroColors.protein)
+                MiniMacroStat("Kohlenh.", carbs, MacroColors.carbs)
+                MiniMacroStat("Fett", fat, MacroColors.fat)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiniMacroStat(label: String, grams: Float, color: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .size(6.dp)
+                .clip(androidx.compose.foundation.shape.CircleShape)
+                .background(color)
+        )
+        Spacer(Modifier.width(5.dp))
+        Text(
+            "${grams.toInt()}g",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(Modifier.width(3.dp))
+        Text(
+            label,
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
 }
 
 @Composable
@@ -199,13 +298,13 @@ fun DiaryScreen(
                 }
             }
             item {
-                MacroBar(
+                CompactDayOverview(
                     calories = state.totalCalories,
                     goal = state.calorieGoal,
                     protein  = state.totalProtein,
                     carbs = state.totalCarbs,
                     fat      = state.totalFat,
-                    modifier = Modifier.padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.sm)
+                    modifier = Modifier.padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs)
                 )
             }
             if (mealSuggestions.isNotEmpty()) {
@@ -215,45 +314,6 @@ fun DiaryScreen(
                         onApply = { vm.applyMealSuggestion(pattern) },
                         onDismiss = { vm.dismissMealSuggestion(pattern) },
                         modifier = Modifier.padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs)
-                    )
-                }
-            }
-            if (quickAddFavorites.isNotEmpty()) {
-                item {
-                    QuickAddBar(
-                        favorites = quickAddFavorites,
-                        onQuickAdd = { food ->
-                            val grams = FoodPortionPresets.forFood(food).firstOrNull()?.grams
-                                ?: food.servingSize.takeIf { it > 0f } ?: 100f
-                            val meal = defaultMealForNow()
-                            vm.quickAddFavorite(food, grams, meal) { entry ->
-                                scope.launch {
-                                    val result = snackbarHostState.showSnackbar(
-                                        message = "\"${food.name}\" (${grams.toInt()} g) hinzugefügt",
-                                        actionLabel = "Rückgängig",
-                                        duration = SnackbarDuration.Short
-                                    )
-                                    if (result == SnackbarResult.ActionPerformed) vm.deleteEntry(entry)
-                                }
-                            }
-                        }
-                    )
-                }
-            }
-            if (recipesState.recipes.isNotEmpty()) {
-                item {
-                    RecipeQuickAddBar(
-                        recipes = recipesState.recipes,
-                        onQuickAdd = { recipe ->
-                            val meal = defaultMealForNow()
-                            vm.addRecipeAsMeal(recipe, 1f, meal)
-                            scope.launch {
-                                snackbarHostState.showSnackbar(
-                                    message = "\"${recipe.title}\" hinzugefügt",
-                                    duration = SnackbarDuration.Short
-                                )
-                            }
-                        }
                     )
                 }
             }
@@ -347,6 +407,48 @@ fun DiaryScreen(
                             onReorder = { ids -> vm.reorderEntries(ids) }
                         )
                     }
+                }
+            }
+            // Schnellzugriffe zum Hinzufügen stehen bewusst unter dem Tagebuch: wer die
+            // App öffnet, will primär sehen was schon erfasst ist, nicht erst an
+            // Vorschlägen vorbeiscrollen.
+            if (quickAddFavorites.isNotEmpty()) {
+                item {
+                    QuickAddBar(
+                        favorites = quickAddFavorites,
+                        onQuickAdd = { food ->
+                            val grams = FoodPortionPresets.forFood(food).firstOrNull()?.grams
+                                ?: food.servingSize.takeIf { it > 0f } ?: 100f
+                            val meal = defaultMealForNow()
+                            vm.quickAddFavorite(food, grams, meal) { entry ->
+                                scope.launch {
+                                    val result = snackbarHostState.showSnackbar(
+                                        message = "\"${food.name}\" (${grams.toInt()} g) hinzugefügt",
+                                        actionLabel = "Rückgängig",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                    if (result == SnackbarResult.ActionPerformed) vm.deleteEntry(entry)
+                                }
+                            }
+                        }
+                    )
+                }
+            }
+            if (recipesState.recipes.isNotEmpty()) {
+                item {
+                    RecipeQuickAddBar(
+                        recipes = recipesState.recipes,
+                        onQuickAdd = { recipe ->
+                            val meal = defaultMealForNow()
+                            vm.addRecipeAsMeal(recipe, 1f, meal)
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    message = "\"${recipe.title}\" hinzugefügt",
+                                    duration = SnackbarDuration.Short
+                                )
+                            }
+                        }
+                    )
                 }
             }
         }
