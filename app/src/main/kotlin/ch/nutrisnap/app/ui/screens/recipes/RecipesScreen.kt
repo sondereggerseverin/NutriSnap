@@ -42,6 +42,8 @@ import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import ch.nutrisnap.app.domain.RecipeGermanMetricConverter
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_RATINGS
+import ch.nutrisnap.app.ui.theme.KEY_FRESH_UI
+import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_CARDS
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import androidx.datastore.preferences.core.edit
 import androidx.compose.material.icons.filled.Star
@@ -521,14 +523,18 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
     onAddToDiary: () -> Unit, onEdit: () -> Unit) {
     var showConfirm by remember { mutableStateOf(false) }
     val incomplete = recipe.isIncomplete()
+    val context = LocalContext.current
+    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val freshCards = (prefs?.get(KEY_FRESH_RECIPE_CARDS) == true) || (prefs?.get(KEY_FRESH_UI) == true)
+    val cardShape = if (freshCards) RoundedCornerShape(20.dp) else RoundedCornerShape(14.dp)
     Card(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (freshCards) 8.dp else 6.dp).clickable(onClick = onClick),
+        shape = cardShape,
         colors = CardDefaults.cardColors(
             containerColor = if (incomplete) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                               else MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(if (incomplete) 0.dp else 2.dp)
+        elevation = CardDefaults.cardElevation(if (incomplete) 0.dp else if (freshCards) 3.dp else 2.dp)
     ) {
         if (incomplete) {
             // Kompakte Darstellung für leere Web-Importe ohne Caption/Bild/Kalorien
@@ -543,6 +549,91 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
                 }
                 IconButton(onClick = { showConfirm = true }, Modifier.size(32.dp)) {
                     Icon(Icons.Default.DeleteOutline, "Löschen", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                }
+            }
+        } else if (freshCards) {
+            Column {
+                RecipeThumbnail(
+                    recipe = recipe,
+                    modifier = Modifier.fillMaxWidth().height(168.dp),
+                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+                )
+                Column(Modifier.padding(14.dp)) {
+                    Text(
+                        recipe.title,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        recipe.totalCalories?.let {
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer
+                            ) {
+                                Text(
+                                    "${(it / recipe.servings.coerceAtLeast(1)).toInt()} kcal",
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                        recipe.proteinPerServing?.let {
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer
+                            ) {
+                                Text(
+                                    "P ${it.toInt()}g",
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                        recipe.carbsPerServing?.let {
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = MaterialTheme.colorScheme.tertiaryContainer
+                            ) {
+                                Text(
+                                    "K ${it.toInt()}g",
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                        recipe.fatPerServing?.let {
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant
+                            ) {
+                                Text(
+                                    "F ${it.toInt()}g",
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onAddToDiary, Modifier.size(36.dp)) {
+                            Icon(Icons.Default.PlaylistAdd, "Ins Tagebuch", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                        }
+                        IconButton(onClick = onEdit, Modifier.size(36.dp)) {
+                            Icon(Icons.Default.Edit, "Bearbeiten", Modifier.size(18.dp))
+                        }
+                        IconButton(onClick = { showConfirm = true }, Modifier.size(36.dp)) {
+                            Icon(Icons.Default.DeleteOutline, "Löschen", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
                 }
             }
         } else {

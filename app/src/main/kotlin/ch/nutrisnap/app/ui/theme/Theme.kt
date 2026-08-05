@@ -130,6 +130,15 @@ enum class AppTheme(
         accentLight  = Color(0xFFCFFAFE),
         background   = Color(0xFFFEFCE8)
     ),
+    SUNNY(
+        label = "Sunny", emoji = "☀️",
+        primary      = Color(0xFFF5C518),
+        primaryDark  = Color(0xFFCA8A04),
+        primaryLight = Color(0xFFFEF9C3),
+        accent       = Color(0xFFEA580C),
+        accentLight  = Color(0xFFFFEDD5),
+        background   = Color(0xFFFFFBEB)
+    ),
     SLATE_CHARCOAL(
         label = "Slate Charcoal", emoji = "\uD83D\uDDA4",
         primary      = Color(0xFF475569),
@@ -238,6 +247,10 @@ val KEY_MANUAL_ACTIVITY_ENABLED = androidx.datastore.preferences.core.booleanPre
 val KEY_AGGRESSIVE_SPORT_DAY = androidx.datastore.preferences.core.booleanPreferencesKey("aggressive_sport_day")
 /** JSON-Map recipeId → Sterne 1–5, z.B. {"12":4,"3":5} */
 val KEY_RECIPE_RATINGS = stringPreferencesKey("recipe_ratings_json")
+/** FreshBatch-inspiriertes UI (Experiment, default aus). */
+val KEY_FRESH_UI = androidx.datastore.preferences.core.booleanPreferencesKey("fresh_ui")
+val KEY_FRESH_RECIPE_CARDS = androidx.datastore.preferences.core.booleanPreferencesKey("fresh_recipe_cards")
+val KEY_FRESH_HOME = androidx.datastore.preferences.core.booleanPreferencesKey("fresh_home")
 
 
 // ── Typography ─────────────────────────────────────────────────────────────────

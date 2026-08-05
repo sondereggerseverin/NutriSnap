@@ -19,11 +19,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.ui.components.MacroRing
+import ch.nutrisnap.app.ui.screens.settings.notifDataStore
+import ch.nutrisnap.app.ui.theme.KEY_FRESH_HOME
+import ch.nutrisnap.app.ui.theme.KEY_FRESH_UI
 import ch.nutrisnap.app.ui.theme.*
 import ch.nutrisnap.app.ui.viewmodel.HealthConnectViewModel
 
@@ -465,13 +469,16 @@ private fun MealOverviewGrid(
     onClick: (MealOverview) -> Unit,
     onQuickAdd: (MealOverview) -> Unit
 ) {
+    val context = LocalContext.current
+    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val freshHome = (prefs?.get(KEY_FRESH_HOME) == true) || (prefs?.get(KEY_FRESH_UI) == true)
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.md),
-        shape = RoundedCornerShape(NutriRadius.lg),
+        shape = RoundedCornerShape(if (freshHome) 20.dp else NutriRadius.lg),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(1.dp)
+        elevation = CardDefaults.cardElevation(if (freshHome) 2.dp else 1.dp)
     ) {
         Column {
             meals.forEachIndexed { index, meal ->
@@ -495,21 +502,25 @@ private fun MealOverviewGrid(
 // überlappen und der Bildschirm braucht weniger Höhe pro Mahlzeit.
 @Composable
 private fun MealRow(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () -> Unit) {
+    val context = LocalContext.current
+    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val freshHome = (prefs?.get(KEY_FRESH_HOME) == true) || (prefs?.get(KEY_FRESH_UI) == true)
+    val iconSize = if (freshHome) 48.dp else 40.dp
     Row(
         Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.md),
+            .padding(horizontal = NutriSpacing.lg, vertical = if (freshHome) 14.dp else NutriSpacing.md),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(NutriRadius.sm))
-                .background(meal.color.copy(alpha = 0.12f)),
+                .size(iconSize)
+                .clip(RoundedCornerShape(if (freshHome) 14.dp else NutriRadius.sm))
+                .background(meal.color.copy(alpha = if (freshHome) 0.18f else 0.12f)),
             contentAlignment = Alignment.Center
         ) {
-            Text(meal.icon, fontSize = 20.sp)
+            Text(meal.icon, fontSize = if (freshHome) 22.sp else 20.sp)
         }
         Spacer(Modifier.width(NutriSpacing.md))
         Column(Modifier.weight(1f)) {

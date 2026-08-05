@@ -38,6 +38,9 @@ import ch.nutrisnap.app.ui.theme.KEY_APP_THEME
 import ch.nutrisnap.app.ui.theme.KEY_AUTO_GERMAN_METRIC
 import ch.nutrisnap.app.ui.theme.KEY_MANUAL_ACTIVITY_ENABLED
 import ch.nutrisnap.app.ui.theme.KEY_AGGRESSIVE_SPORT_DAY
+import ch.nutrisnap.app.ui.theme.KEY_FRESH_UI
+import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_CARDS
+import ch.nutrisnap.app.ui.theme.KEY_FRESH_HOME
 
 enum class FitnessGoal(val label: String, val emoji: String, val desc: String) {
     LOSE_WEIGHT("Abnehmen",        "\uD83D\uDD25", "–500 kcal vom TDEE · mehr Protein"),
@@ -202,6 +205,82 @@ fun SettingsScreen(
                     onCheckedChange = { checked ->
                         scope.launch {
                             context.notifDataStore.edit { it[KEY_AUTO_GERMAN_METRIC] = checked }
+                        }
+                    }
+                )
+            }
+        }
+
+        // Design-Experiment (FreshBatch-inspiriert, default aus)
+        SettingsCard(title = "Design-Experiment", icon = Icons.Default.AutoAwesome) {
+            Text(
+                "Optionaler Look à la Wochenplan-Apps: große Rezeptbilder, weichere Karten. Standard-Design bleibt unverändert, solange die Schalter aus sind.",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(NutriSpacing.sm))
+            val freshUi = prefs?.get(KEY_FRESH_UI) ?: false
+            val freshCards = prefs?.get(KEY_FRESH_RECIPE_CARDS) ?: false
+            val freshHome = prefs?.get(KEY_FRESH_HOME) ?: false
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f).padding(end = 8.dp)) {
+                    Text("Frisches Design (Master)", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text("Aktiviert die Unteroptionen unten", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(
+                    checked = freshUi,
+                    onCheckedChange = { checked ->
+                        scope.launch {
+                            context.notifDataStore.edit {
+                                it[KEY_FRESH_UI] = checked
+                                if (checked) {
+                                    it[KEY_FRESH_RECIPE_CARDS] = true
+                                    it[KEY_FRESH_HOME] = true
+                                }
+                            }
+                        }
+                    }
+                )
+            }
+            Spacer(Modifier.height(NutriSpacing.xs))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f).padding(end = 8.dp)) {
+                    Text("Große Rezept-Karten", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text("Bild oben, Makro-Pills, runder", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(
+                    checked = freshCards || freshUi,
+                    enabled = true,
+                    onCheckedChange = { checked ->
+                        scope.launch {
+                            context.notifDataStore.edit { it[KEY_FRESH_RECIPE_CARDS] = checked }
+                        }
+                    }
+                )
+            }
+            Spacer(Modifier.height(NutriSpacing.xs))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f).padding(end = 8.dp)) {
+                    Text("Home weicher", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text("Kompaktere Mahlzeiten-Karten, mehr Rundung", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(
+                    checked = freshHome || freshUi,
+                    onCheckedChange = { checked ->
+                        scope.launch {
+                            context.notifDataStore.edit { it[KEY_FRESH_HOME] = checked }
                         }
                     }
                 )
