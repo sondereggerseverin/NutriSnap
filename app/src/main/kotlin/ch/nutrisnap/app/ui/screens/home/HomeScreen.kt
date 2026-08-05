@@ -472,25 +472,58 @@ private fun MealOverviewGrid(
     val context = LocalContext.current
     val prefs by context.notifDataStore.data.collectAsState(initial = null)
     val freshHome = (prefs?.get(KEY_FRESH_HOME) == true) || (prefs?.get(KEY_FRESH_UI) == true)
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.md),
-        shape = RoundedCornerShape(if (freshHome) 20.dp else NutriRadius.lg),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(if (freshHome) 2.dp else 1.dp)
-    ) {
-        Column {
-            meals.forEachIndexed { index, meal ->
-                MealRow(
-                    meal = meal,
-                    onClick = { onClick(meal) },
-                    onQuickAdd = { onQuickAdd(meal) }
-                )
-                if (index != meals.lastIndex) {
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+
+    if (freshHome) {
+        // Deutlich anderer Look: Titel + einzelne runde Karten (FreshBatch-Stil)
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                "Heute auf dem Plan",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+            meals.forEach { meal ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                    ),
+                    elevation = CardDefaults.cardElevation(0.dp)
+                ) {
+                    MealRow(
+                        meal = meal,
+                        onClick = { onClick(meal) },
+                        onQuickAdd = { onQuickAdd(meal) }
                     )
+                }
+            }
+        }
+    } else {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.md),
+            shape = RoundedCornerShape(NutriRadius.lg),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(1.dp)
+        ) {
+            Column {
+                meals.forEachIndexed { index, meal ->
+                    MealRow(
+                        meal = meal,
+                        onClick = { onClick(meal) },
+                        onQuickAdd = { onQuickAdd(meal) }
+                    )
+                    if (index != meals.lastIndex) {
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                        )
+                    }
                 }
             }
         }

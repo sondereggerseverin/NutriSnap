@@ -70,6 +70,36 @@ private fun scaleNumbers(line: String, ratio: Float): String {
 }
 
 // ── Structured ingredient parsing ─────────────────────────────────────────────
+/** Sterne 1–5 aus DataStore (KEY_RECIPE_RATINGS), 0 = noch nicht bewertet. */
+private fun recipeStarsFromPrefs(prefsJson: String?, recipeId: Long): Int {
+    if (prefsJson.isNullOrBlank()) return 0
+    return runCatching {
+        val root = org.json.JSONObject(prefsJson)
+        val entry = root.opt(recipeId.toString()) ?: return 0
+        when (entry) {
+            is org.json.JSONObject -> entry.optInt("stars", 0)
+            is Number -> entry.toInt()
+            else -> 0
+        }
+    }.getOrDefault(0)
+}
+
+@Composable
+private fun RecipeStarsRow(stars: Int, modifier: Modifier = Modifier) {
+    if (stars <= 0) return
+    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+        repeat(5) { i ->
+            Icon(
+                Icons.Default.Star,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = if (i < stars) MaterialTheme.colorScheme.primary
+                       else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
+            )
+        }
+    }
+}
+
 private data class ParsedIngredient(val amount: String, val unit: String, val name: String)
 /** Anzeige-Einheiten im Dropdown (kurz, lesbar). */
 private val INGREDIENT_UNITS = listOf("g", "ml", "kg", "l", "EL", "TL", "Stück", "Prise", "Bund", "Dose", "Packung", "Scheibe", "Zehe")
@@ -526,6 +556,7 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
     val context = LocalContext.current
     val prefs by context.notifDataStore.data.collectAsState(initial = null)
     val freshCards = (prefs?.get(KEY_FRESH_RECIPE_CARDS) == true) || (prefs?.get(KEY_FRESH_UI) == true)
+    val stars = recipeStarsFromPrefs(prefs?.get(KEY_RECIPE_RATINGS), recipe.id)
     val cardShape = if (freshCards) RoundedCornerShape(20.dp) else RoundedCornerShape(14.dp)
     Card(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (freshCards) 8.dp else 6.dp).clickable(onClick = onClick),
@@ -555,7 +586,7 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
             Column {
                 RecipeThumbnail(
                     recipe = recipe,
-                    modifier = Modifier.fillMaxWidth().height(168.dp),
+                    modifier = Modifier.fillMaxWidth().height(200.dp),
                     shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
                 )
                 Column(Modifier.padding(14.dp)) {
@@ -566,6 +597,10 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
+                    if (stars > 0) {
+                        Spacer(Modifier.height(4.dp))
+                        RecipeStarsRow(stars)
+                    }
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         recipe.totalCalories?.let {
@@ -643,6 +678,10 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
             Column(Modifier.weight(1f)) {
                 Text(recipe.title, fontWeight = FontWeight.Bold, fontSize = 15.sp,
                     maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (stars > 0) {
+                    Spacer(Modifier.height(2.dp))
+                    RecipeStarsRow(stars)
+                }
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     recipe.platform?.let { PlatformChip(it) }
