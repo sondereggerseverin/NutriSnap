@@ -300,7 +300,7 @@ private fun HomeHeader(state: HomeUiState) {
                     listOf(appTheme.primary, appTheme.primaryDark)
                 )
             )
-            .padding(horizontal = NutriSpacing.xl, vertical = NutriSpacing.xxl)
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.md)
             .statusBarsPadding()
     ) {
         Row(
@@ -317,7 +317,7 @@ private fun HomeHeader(state: HomeUiState) {
                 )
                 Text(
                     "Dein Tag im Überblick",
-                    fontSize = 22.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
@@ -333,17 +333,17 @@ private fun HomeHeader(state: HomeUiState) {
             StreakBadge(state.streak)
         }
 
-        Spacer(Modifier.height(NutriSpacing.xxl))
+        Spacer(Modifier.height(NutriSpacing.sm))
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(NutriSpacing.xl)
+            horizontalArrangement = Arrangement.spacedBy(NutriSpacing.md)
         ) {
             MacroRing(
                 eaten = state.totalCalories,
                 goal = state.adjustedGoal,
-                size = 120.dp,
-                strokeWidth = 10.dp,
+                size = 96.dp,
+                strokeWidth = 8.dp,
                 trackColor = Color.White.copy(alpha = 0.2f),
                 progressColor = Color.White,
                 overflowColor = Color(0xFFFFD67A)
@@ -351,7 +351,7 @@ private fun HomeHeader(state: HomeUiState) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         "${state.remaining.toInt()}",
-                        fontSize = 24.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
@@ -474,32 +474,32 @@ private fun MealOverviewGrid(
     val freshHome = (prefs?.get(KEY_FRESH_HOME) == true) || (prefs?.get(KEY_FRESH_UI) == true)
 
     if (freshHome) {
-        // Deutlich anderer Look: Titel + einzelne runde Karten (FreshBatch-Stil)
+        // 2×2-Raster: Ring + alle 4 Mahlzeiten auf einer Bildschirmhöhe
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.md),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
                 "Heute auf dem Plan",
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
+                fontSize = 16.sp
             )
-            meals.forEach { meal ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                    ),
-                    elevation = CardDefaults.cardElevation(0.dp)
+            meals.chunked(2).forEach { rowMeals ->
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    MealRow(
-                        meal = meal,
-                        onClick = { onClick(meal) },
-                        onQuickAdd = { onQuickAdd(meal) }
-                    )
+                    rowMeals.forEach { meal ->
+                        MealTile(
+                            meal = meal,
+                            onClick = { onClick(meal) },
+                            onQuickAdd = { onQuickAdd(meal) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    if (rowMeals.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
         }
@@ -530,6 +530,68 @@ private fun MealOverviewGrid(
     }
 }
 
+/** Kompakte Kachel für 2×2-Home-Raster (alle 4 Mahlzeiten sichtbar). */
+@Composable
+private fun MealTile(
+    meal: MealOverview,
+    onClick: () -> Unit,
+    onQuickAdd: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+        ),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Column(Modifier.padding(10.dp)) {
+            Row(
+                Modifier.fillMaxWidth().clickable(onClick = onClick),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(meal.color.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(meal.icon, fontSize = 18.sp)
+                }
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        meal.label,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                    Text(
+                        "${meal.kcal.toInt()} kcal",
+                        fontSize = 11.sp,
+                        color = if (meal.count > 0) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            FilledTonalIconButton(
+                onClick = onQuickAdd,
+                modifier = Modifier.fillMaxWidth().height(36.dp),
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            ) {
+                Icon(Icons.Default.Add, "Zu ${meal.label} hinzufügen", Modifier.size(20.dp))
+            }
+        }
+    }
+}
+
 // Kompakte Listenzeile statt Grid-Karte mit überlagertem "+": alle Elemente
 // liegen im selben Row-Layout (wie bei Yazio), dadurch kann nichts mehr
 // überlappen und der Bildschirm braucht weniger Höhe pro Mahlzeit.
@@ -542,7 +604,7 @@ private fun MealRow(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () -> U
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = NutriSpacing.lg, vertical = if (freshHome) 14.dp else NutriSpacing.md),
+            .padding(horizontal = NutriSpacing.md, vertical = if (freshHome) 10.dp else 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
