@@ -299,10 +299,12 @@ private fun HomeHeader(state: HomeUiState) {
             .background(
                 Brush.verticalGradient(
                     listOf(appTheme.primary, appTheme.primaryDark)
-                )
+                ),
+                shape = RoundedCornerShape(bottomStart = NutriRadius.xl, bottomEnd = NutriRadius.xl)
             )
-            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.md)
             .statusBarsPadding()
+            .padding(horizontal = NutriSpacing.lg)
+            .padding(top = NutriSpacing.sm, bottom = NutriSpacing.lg)
     ) {
         Row(
             Modifier.fillMaxWidth(),
@@ -313,132 +315,153 @@ private fun HomeHeader(state: HomeUiState) {
                 Text(
                     "${state.greeting} \uD83D\uDC4B",
                     fontSize = 14.sp,
-                    color = Color.White.copy(alpha = 0.85f),
+                    color = Color.White.copy(alpha = 0.8f),
                     fontWeight = FontWeight.Medium
                 )
                 Text(
                     "Dein Tag im Überblick",
-                    fontSize = 18.sp,
+                    fontSize = 21.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
                 if (state.isAdaptiveTarget) {
-                    Spacer(Modifier.height(NutriSpacing.xs))
+                    Spacer(Modifier.height(4.dp))
                     Text(
                         "\uD83C\uDFAF Adaptives Ziel \u00B7 ${state.tdeeConfidence}% Konfidenz",
                         fontSize = 12.sp,
-                        color = Color.White.copy(alpha = 0.75f)
+                        color = Color.White.copy(alpha = 0.7f)
                     )
                 }
             }
             StreakBadge(state.streak)
         }
 
-        Spacer(Modifier.height(NutriSpacing.sm))
+        Spacer(Modifier.height(NutriSpacing.lg))
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(NutriSpacing.md)
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             MacroRing(
                 eaten = state.totalCalories,
                 goal = state.adjustedGoal,
-                size = 96.dp,
-                strokeWidth = 8.dp,
-                trackColor = Color.White.copy(alpha = 0.2f),
+                size = 110.dp,
+                strokeWidth = 10.dp,
+                trackColor = Color.White.copy(alpha = 0.18f),
                 progressColor = Color.White,
                 overflowColor = Color(0xFFFFD67A)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         "${state.remaining.toInt()}",
-                        fontSize = 20.sp,
+                        fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
                     Text(
                         "kcal übrig",
                         fontSize = 11.sp,
-                        color = Color.White.copy(alpha = 0.8f)
+                        color = Color.White.copy(alpha = 0.75f)
                     )
                 }
             }
 
-            Column(Modifier.weight(1f)) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    LabeledValue("${state.totalCalories.toInt()}", "gegessen")
-                    if (state.burnedKcal > 0f) {
-                        LabeledValue("+${state.burnedKcal.toInt()}", "aktiv")
-                    }
-                    LabeledValue("${state.adjustedGoal.toInt()}", "Ziel")
+            Spacer(Modifier.width(NutriSpacing.lg))
+
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                HeaderStatRow(Icons.Default.RestaurantMenu, "${state.totalCalories.toInt()} kcal", "gegessen")
+                if (state.burnedKcal > 0f) {
+                    HeaderStatRow(Icons.Default.LocalFireDepartment, "+${state.burnedKcal.toInt()} kcal", "aktiv")
                 }
-                Spacer(Modifier.height(NutriSpacing.md))
-                WhiteMacroBar("Protein", state.totalProtein, state.proteinGoal)
-                Spacer(Modifier.height(NutriSpacing.sm))
-                WhiteMacroBar("Kohlenh.", state.totalCarbs, state.carbsGoal)
-                Spacer(Modifier.height(NutriSpacing.sm))
-                WhiteMacroBar("Fett", state.totalFat, state.fatGoal)
-                Spacer(Modifier.height(NutriSpacing.sm))
-                WhiteMacroBar("Ballaststoffe", state.totalFiber, state.fiberGoal, decimals = 1)
+                HeaderStatRow(Icons.Default.Flag, "${state.adjustedGoal.toInt()} kcal", "Ziel")
+            }
+        }
+
+        Spacer(Modifier.height(NutriSpacing.lg))
+
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(NutriRadius.lg))
+                .background(Color.White.copy(alpha = 0.12f))
+                .padding(NutriSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(NutriSpacing.md)
+        ) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(NutriSpacing.md)) {
+                WhiteMacroBar("Protein", state.totalProtein, state.proteinGoal, accent = MacroColors.protein, modifier = Modifier.weight(1f))
+                WhiteMacroBar("Kohlenh.", state.totalCarbs, state.carbsGoal, accent = MacroColors.carbs, modifier = Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(NutriSpacing.md)) {
+                WhiteMacroBar("Fett", state.totalFat, state.fatGoal, accent = MacroColors.fat, modifier = Modifier.weight(1f))
+                WhiteMacroBar("Ballaststoffe", state.totalFiber, state.fiberGoal, decimals = 1, accent = MacroColors.fiber, modifier = Modifier.weight(1f))
             }
         }
     }
 }
 
 @Composable
-private fun LabeledValue(value: String, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            value,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
-        )
-        Text(
-            label,
-            fontSize = 10.sp,
-            color = Color.White.copy(alpha = 0.7f)
-        )
+private fun HeaderStatRow(icon: ImageVector, value: String, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, null, tint = Color.White, modifier = Modifier.size(15.dp))
+        }
+        Spacer(Modifier.width(NutriSpacing.sm))
+        Column {
+            Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(label, fontSize = 10.sp, color = Color.White.copy(alpha = 0.7f))
+        }
     }
 }
 
 @Composable
-private fun WhiteMacroBar(label: String, value: Float, goal: Float, decimals: Int = 0) {
+private fun WhiteMacroBar(
+    label: String,
+    value: Float,
+    goal: Float,
+    decimals: Int = 0,
+    accent: Color = Color.White,
+    modifier: Modifier = Modifier
+) {
     val pct = (value / goal.coerceAtLeast(1f)).coerceIn(0f, 1f)
-    Column {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
+    Column(modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(7.dp)
+                    .clip(CircleShape)
+                    .background(accent)
+            )
+            Spacer(Modifier.width(5.dp))
             Text(
                 label,
                 fontSize = 11.sp,
-                color = Color.White.copy(alpha = 0.8f)
-            )
-            Text(
-                if (decimals > 0) "${"%.${decimals}f".format(value)}g" else "${value.toInt()}g",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White
+                color = Color.White.copy(alpha = 0.85f)
             )
         }
-        Spacer(Modifier.height(3.dp))
+        Spacer(Modifier.height(4.dp))
+        Text(
+            if (decimals > 0) "${"%.${decimals}f".format(value)}g" else "${value.toInt()}g",
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White
+        )
+        Spacer(Modifier.height(5.dp))
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(6.dp)
+                .height(5.dp)
                 .clip(RoundedCornerShape(3.dp))
-                .background(Color.White.copy(alpha = 0.2f))
+                .background(Color.White.copy(alpha = 0.18f))
         ) {
             Box(
                 Modifier
                     .fillMaxWidth(pct)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(3.dp))
-                    .background(Color.White)
+                    .background(accent)
             )
         }
     }
@@ -450,7 +473,7 @@ private fun StreakBadge(streak: Int) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .clip(RoundedCornerShape(NutriRadius.xxl))
-            .background(Color.White.copy(alpha = 0.2f))
+            .background(Color.White.copy(alpha = 0.16f))
             .padding(horizontal = NutriSpacing.md, vertical = NutriSpacing.xs)
     ) {
         Text("\uD83D\uDD25", fontSize = 16.sp)
