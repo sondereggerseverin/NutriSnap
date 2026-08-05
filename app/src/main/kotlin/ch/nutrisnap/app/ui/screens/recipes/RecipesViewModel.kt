@@ -329,7 +329,11 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _batchState.update { it.copy(isRunning = true) }
             val queue = _batchState.value.items.filter { it.status != BatchStatus.DONE }
-            for (item in queue) {
+            for ((index, item) in queue.withIndex()) {
+                // Pause zwischen Instagram-Requests → weniger Rate-Limits / Blocks
+                if (index > 0 && "instagram.com" in item.url.lowercase()) {
+                    kotlinx.coroutines.delay(1_200L)
+                }
                 _batchState.update { st ->
                     st.copy(items = st.items.map { if (it.url == item.url) it.copy(status = BatchStatus.RUNNING) else it })
                 }

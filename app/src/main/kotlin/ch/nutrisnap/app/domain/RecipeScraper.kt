@@ -50,7 +50,8 @@ class RecipeScraper(private val context: Context) {
                 .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
                 .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
                 .header("Accept-Language", "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7")
-                .header("Accept-Encoding", "gzip, deflate, br")
+                // Wichtig: Accept-Encoding NICHT manuell setzen — sonst dekomprimiert
+                // OkHttp die Antwort nicht und Mirror/Embed-HTML kommt als Müll an.
                 .header("Cache-Control", "no-cache")
                 .build()
             chain.proceed(req)
@@ -119,7 +120,13 @@ class RecipeScraper(private val context: Context) {
             thumbnail = "https://www.instagram.com/p/$shortcode/media/?size=l"
         }
 
-        if (caption.isBlank()) throw InstagramBlockedException(url)
+        // Letzter Fallback: oEmbed-Titel (manchmal Caption-Ausschnitt)
+        if (!isGoodCaption(caption)) {
+            val oEmbedTitle = oEmbed?.get("title")?.trim().orEmpty()
+            if (isGoodCaption(oEmbedTitle)) caption = oEmbedTitle
+        }
+
+        if (!isGoodCaption(caption)) throw InstagramBlockedException(url)
 
         progress("Rezept extrahieren…")
         val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
@@ -137,20 +144,37 @@ class RecipeScraper(private val context: Context) {
     }
 
     /**
-     * Startet WebView + Mirror-Seiten parallel und nimmt die erste brauchbare Caption.
-     * Gesamtdauer typisch weit unter dem alten sequentiellen ~30s-Pfad.
+     * Startet WebView + offizielles Embed + Mirror-Seiten parallel und nimmt die
+     * erste brauchbare Caption. Gesamtdauer typisch unter ~18s.
      */
     private suspend fun raceInstagramCaption(url: String, shortcode: String?): String =
         coroutineScope {
             data class Cap(val text: String, val source: String)
 
+            val desktopUa =
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+
             val jobs = buildList {
+                // 1) WebView mit Geräte-Cookies (beste Chance bei Login auf dem Gerät)
                 add(async {
                     runCatching {
                         InstagramWebViewScraper.extractCaption(context, url)?.let { Cap(it, "webview") }
-                    }.getOrNull()
+                    }.getOrNull()?.takeIf { isGoodCaption(it.text) }
                 })
                 if (shortcode != null) {
+                    // 2) Offizielles IG-Embed (oft ohne Login für öffentliche Posts)
+                    add(async {
+                        runCatching {
+                            fetchInstagramEmbedCaption(shortcode)?.let { Cap(it, "embed") }
+                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                    })
+                    // 2b) WebView auf Embed-URL (weniger Login-Wall als /p/)
+                    add(async {
+                        runCatching {
+                            val embedUrl = "https://www.instagram.com/p/$shortcode/embed/captioned/"
+                            InstagramWebViewScraper.extractCaption(context, embedUrl)?.let { Cap(it, "webview-embed") }
+                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                    })
                     add(async {
                         runCatching {
                             val doc = jsoupGet("https://imginn.com/p/$shortcode/")
@@ -172,10 +196,7 @@ class RecipeScraper(private val context: Context) {
                         runCatching {
                             val ezUrl = url.replace("www.instagram.com", "www.instagramez.com")
                                 .replace("instagram.com", "instagramez.com")
-                            val doc = jsoupGetWithUA(
-                                ezUrl,
-                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-                            )
+                            val doc = jsoupGetWithUA(ezUrl, desktopUa)
                             val t = doc.select("meta[property=og:description]").attr("content")
                                 .ifBlank { doc.select("meta[name=description]").attr("content") }
                             Cap(t, "instagramez").takeIf { isGoodCaption(it.text) }
@@ -185,17 +206,28 @@ class RecipeScraper(private val context: Context) {
                         runCatching {
                             val ddUrl = url.replace("www.instagram.com", "www.ddinstagram.com")
                                 .replace("instagram.com", "ddinstagram.com")
-                            val doc = jsoupGet(ddUrl)
+                            val doc = jsoupGetWithUA(ddUrl, desktopUa)
                             val t = doc.select("meta[property=og:description]").attr("content")
                                 .ifBlank { doc.select("meta[name=description]").attr("content") }
+                                .ifBlank { doc.select("p, .caption, [class*=caption]").text() }
                             Cap(t, "ddinstagram").takeIf { isGoodCaption(it.text) }
+                        }.getOrNull()
+                    })
+                    // 3) Worker-Mirror (oft noch erreichbar wenn Main-Domain down)
+                    add(async {
+                        runCatching {
+                            val wUrl = "https://ddinstagram.com/p/$shortcode"
+                            val doc = jsoupGetWithUA(wUrl, desktopUa)
+                            val t = doc.select("meta[property=og:description]").attr("content")
+                                .ifBlank { doc.select("meta[name=description]").attr("content") }
+                            Cap(t, "ddinstagram-apex").takeIf { isGoodCaption(it.text) }
                         }.getOrNull()
                     })
                 }
             }
 
-            // Erste brauchbare Caption innerhalb 14s; danach bestes übriges Ergebnis
-            val winner = withTimeoutOrNull(14_000L) {
+            // Erste brauchbare Caption innerhalb 18s
+            val winner = withTimeoutOrNull(18_000L) {
                 val pending = jobs.toMutableList()
                 while (pending.isNotEmpty()) {
                     val done = select {
@@ -215,13 +247,44 @@ class RecipeScraper(private val context: Context) {
                 return@coroutineScope winner
             }
 
-            // Fallback: bestes bereits fertiges Ergebnis
             val best = jobs.mapNotNull { d ->
                 if (d.isCompleted) runCatching { d.getCompleted() }.getOrNull()?.text else null
             }.filter { it.isNotBlank() }.maxByOrNull { it.length }.orEmpty()
             jobs.forEach { it.cancel() }
             best
         }
+
+    /**
+     * Offizielle Embed-Seite: für öffentliche Posts oft ohne Login und mit Caption im HTML.
+     */
+    private fun fetchInstagramEmbedCaption(shortcode: String): String? {
+        val urls = listOf(
+            "https://www.instagram.com/p/$shortcode/embed/captioned/",
+            "https://www.instagram.com/reel/$shortcode/embed/captioned/",
+            "https://www.instagram.com/p/$shortcode/embed/"
+        )
+        for (embedUrl in urls) {
+            val html = runCatching { fetchStringWithUA(
+                embedUrl,
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            ) }.getOrNull() ?: continue
+            if (html.isBlank() || "login" in html.lowercase().take(2000) && "caption" !in html.lowercase()) continue
+            val doc = Jsoup.parse(html, embedUrl)
+            val candidates = listOf(
+                doc.select(".Caption, .CaptionContent, [class*=Caption]").text(),
+                doc.select("meta[property=og:description]").attr("content"),
+                doc.select("meta[name=description]").attr("content"),
+                // JSON im Embed-Script
+                Regex(""""text"\s*:\s*"((?:[^"\\]|\\.){40,})"""").findAll(html)
+                    .map { it.groupValues[1].replace("\\n", "\n").replace("\\\"", "\"") }
+                    .maxByOrNull { it.length }
+                    .orEmpty()
+            )
+            val best = candidates.map { it.trim() }.filter { it.length >= 40 }.maxByOrNull { it.length }
+            if (best != null && isGoodCaption(best)) return best
+        }
+        return null
+    }
 
     private fun extractOgImage(doc: Document): String? {
         val candidates = listOf(

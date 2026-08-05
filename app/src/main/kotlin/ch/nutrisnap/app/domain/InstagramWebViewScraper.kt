@@ -36,69 +36,92 @@ object InstagramWebViewScraper {
      */
     @SuppressLint("SetJavaScriptEnabled")
     suspend fun extractCaption(context: Context, url: String): String? =
-        withTimeout(12_000L) {
+        withTimeout(16_000L) {
             suspendCancellableCoroutine { cont ->
                 val mainHandler = Handler(Looper.getMainLooper())
                 mainHandler.post {
                     val webView = WebView(context.applicationContext)
+                    val isEmbed = "/embed" in url
                     webView.settings.apply {
                         javaScriptEnabled      = true
                         domStorageEnabled      = true
-                        userAgentString        = "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) " +
-                            "AppleWebKit/537.36 (KHTML, like Gecko) " +
-                            "Chrome/124.0.6367.82 Mobile Safari/537.36 Instagram/323.0.0.0"
-                        mixedContentMode       = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                        databaseEnabled        = true
+                        // Desktop-UA für Embed oft besser; Mobile+IG-UA für normale Posts
+                        userAgentString = if (isEmbed) {
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+                                "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                        } else {
+                            "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) " +
+                                "AppleWebKit/537.36 (KHTML, like Gecko) " +
+                                "Chrome/124.0.6367.82 Mobile Safari/537.36 Instagram/323.0.0.0"
+                        }
+                        mixedContentMode       = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
                         allowContentAccess     = false
                         allowFileAccess        = false
                     }
-                    // Accept cookies (needed for Instagram session sharing)
-                    CookieManager.getInstance().setAcceptCookie(true)
-                    CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
+                    // System-Cookies (Chrome/WebView-Login) mitnehmen
+                    val cm = CookieManager.getInstance()
+                    cm.setAcceptCookie(true)
+                    cm.setAcceptThirdPartyCookies(webView, true)
+                    cm.flush()
 
                     var finished = false
+                    fun finish(caption: String?) {
+                        if (finished) return
+                        finished = true
+                        runCatching { webView.destroy() }
+                        cont.resume(caption)
+                    }
 
                     webView.webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView, loadedUrl: String) {
                             if (finished) return
-                            // Short delay so React can finish rendering
+                            // Längeres Warten: IG React + Caption-Lazy-Load
+                            val delayMs = if (isEmbed) 2_500L else 4_500L
                             mainHandler.postDelayed({
                                 if (finished) return@postDelayed
                                 view.evaluateJavascript(EXTRACT_JS) { rawResult ->
-                                    if (finished) return@evaluateJavascript
-                                    finished = true
-                                    webView.destroy()
-                                    val caption = rawResult
-                                        ?.removeSurrounding("\"")
-                                        ?.replace("\\n", "\n")
-                                        ?.replace("\\\"", "\"")
-                                        ?.trim()
-                                        ?.takeIf { it.isNotBlank() && it != "null" }
-                                    cont.resume(caption)
+                                    val caption = decodeJsString(rawResult)
+                                    if (!caption.isNullOrBlank()) {
+                                        finish(caption)
+                                    } else {
+                                        // Zweiter Versuch nach weiterem Render
+                                        mainHandler.postDelayed({
+                                            if (finished) return@postDelayed
+                                            view.evaluateJavascript(EXTRACT_JS) { raw2 ->
+                                                finish(decodeJsString(raw2))
+                                            }
+                                        }, 2_000L)
+                                    }
                                 }
-                            }, 3_500) // Instagram React hydrate ~2s; overall timeout 12s
+                            }, delayMs)
                         }
 
                         override fun onReceivedError(
                             view: WebView, request: WebResourceRequest, error: WebResourceError
                         ) {
-                            if (request.isForMainFrame && !finished) {
-                                finished = true
-                                webView.destroy()
-                                cont.resume(null)
-                            }
+                            if (request.isForMainFrame && !finished) finish(null)
                         }
                     }
 
                     webView.loadUrl(url)
 
                     cont.invokeOnCancellation {
-                        mainHandler.post {
-                            if (!finished) { finished = true; webView.destroy() }
-                        }
+                        mainHandler.post { finish(null) }
                     }
                 }
             }
         }
+
+    private fun decodeJsString(rawResult: String?): String? =
+        rawResult
+            ?.removeSurrounding("\"")
+            ?.replace("\\n", "\n")
+            ?.replace("\\\"", "\"")
+            ?.replace("\\u003c", "<")
+            ?.replace("\\u003e", ">")
+            ?.trim()
+            ?.takeIf { it.isNotBlank() && it != "null" }
 
     /**
      * JavaScript injected after page load.
