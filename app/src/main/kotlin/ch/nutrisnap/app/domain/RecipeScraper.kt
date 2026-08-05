@@ -97,22 +97,28 @@ class RecipeScraper(private val context: Context) {
 
     private suspend fun scrapeInstagram(url: String): Recipe {
         val shortcode = extractInstagramShortcode(url)
-        val key = cacheKey(url)
+        // Collection-/F12-Links sind oft /p/SHORTCODE auch bei Reels.
+        // Share-Link aus der App ist korrekt /reel/… — beide Varianten versuchen.
+        val canonicalUrls = instagramCanonicalUrls(url, shortcode)
+        val key = shortcode?.let { "ig:$it" } ?: cacheKey(url)
 
         progress("Metadaten laden…")
-        val oEmbed = runCatching {
-            fetchOEmbed("https://api.instagram.com/oembed/?url=${encode(url)}&omitscript=true")
-        }.getOrNull()
+        val oEmbed = canonicalUrls.firstNotNullOfOrNull { u ->
+            runCatching {
+                fetchOEmbed("https://api.instagram.com/oembed/?url=${encode(u)}&omitscript=true")
+            }.getOrNull()?.takeIf { !it["thumbnail_url"].isNullOrBlank() || !it["title"].isNullOrBlank() }
+        }
         var thumbnail = oEmbed?.get("thumbnail_url")
         val author = oEmbed?.get("author_name")
 
-        // Cache: gleiche URL nicht nochmal scrapen
+        // Cache: gleiche Shortcode nicht nochmal scrapen (unabhängig von /p/ vs /reel/)
         var caption = captionCache[key].orEmpty()
         if (isGoodCaption(caption)) {
             progress("Aus Cache…")
         } else {
             progress("Seite laden (parallel)…")
-            caption = raceInstagramCaption(url, shortcode)
+            // WebView mit allen kanonischen URLs (reel + p), Mirrors über shortcode
+            caption = raceInstagramCaption(canonicalUrls.first(), shortcode)
             if (isGoodCaption(caption)) captionCache[key] = caption
         }
 
@@ -183,6 +189,20 @@ class RecipeScraper(private val context: Context) {
                     }.getOrNull()?.takeIf { isGoodCaption(it.text) }
                 })
                 if (shortcode != null) {
+                    // 1b) Andere Pfad-Variante: Collection-Links nutzen oft /p/ für Reels
+                    val altPath = if ("/reel/" in url.lowercase()) {
+                        "https://www.instagram.com/p/$shortcode/"
+                    } else {
+                        "https://www.instagram.com/reel/$shortcode/"
+                    }
+                    if (altPath != url.substringBefore("?").trimEnd('/') + "/") {
+                        add(async {
+                            runCatching {
+                                InstagramWebViewScraper.extractCaption(context, altPath)
+                                    ?.let { Cap(it, "webview-alt") }
+                            }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                        })
+                    }
                     // 2) Offizielles IG-Embed (oft ohne Login für öffentliche Posts)
                     add(async {
                         runCatching {
@@ -194,6 +214,12 @@ class RecipeScraper(private val context: Context) {
                         runCatching {
                             val embedUrl = "https://www.instagram.com/p/$shortcode/embed/captioned/"
                             InstagramWebViewScraper.extractCaption(context, embedUrl)?.let { Cap(it, "webview-embed") }
+                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                    })
+                    add(async {
+                        runCatching {
+                            val embedUrl = "https://www.instagram.com/reel/$shortcode/embed/captioned/"
+                            InstagramWebViewScraper.extractCaption(context, embedUrl)?.let { Cap(it, "webview-reel-embed") }
                         }.getOrNull()?.takeIf { isGoodCaption(it.text) }
                     })
                     // 2c) Legacy JSON-Endpoint (?__a=1&__d=dis) — manchmal noch offen
@@ -461,6 +487,28 @@ class RecipeScraper(private val context: Context) {
 
     private fun extractInstagramShortcode(url: String): String? =
         Regex("/(?:p|reel|tv)/([A-Za-z0-9_-]+)/?").find(url)?.groupValues?.get(1)
+
+    /**
+     * Collection-HTML liefert Reels oft als `/p/SHORTCODE`, der Share-Button
+     * als `/reel/SHORTCODE/?igsh=…`. oEmbed und WebView brauchen den passenden
+     * Medientyp — daher immer beide Varianten (plus Original).
+     */
+    private fun instagramCanonicalUrls(url: String, shortcode: String?): List<String> {
+        if (shortcode.isNullOrBlank()) return listOf(url)
+        val preferred = when {
+            "/reel/" in url.lowercase() -> "reel"
+            "/tv/" in url.lowercase() -> "tv"
+            else -> "p"
+        }
+        val other = if (preferred == "reel") "p" else "reel"
+        return listOf(
+            "https://www.instagram.com/$preferred/$shortcode/",
+            "https://www.instagram.com/$other/$shortcode/",
+            "https://www.instagram.com/reel/$shortcode/",
+            "https://www.instagram.com/p/$shortcode/",
+            url.substringBefore("?").trimEnd('/') + "/"
+        ).distinct()
+    }
 
     // ── TIKTOK ─────────────────────────────────────────────────────────────────
     // Strategy order (most reliable first):
