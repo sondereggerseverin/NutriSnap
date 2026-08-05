@@ -50,9 +50,72 @@ object RecipeAiParser {
         imageUrl:  String?,
         apiKey:    String
     ): Recipe = withContext(Dispatchers.IO) {
-        val cleaned  = cleanCaption(caption)
+        val cleaned = cleanCaption(caption)
+        val fallback = fallbackParse(cleaned, sourceUrl, platform, imageUrl)
         val aiResult = runCatching { callLlm(cleaned, apiKey) }.getOrNull()
-        aiResult ?: fallbackParse(cleaned, sourceUrl, platform, imageUrl)
+        // AI oft mit title=null / leeren Zutaten → mit Regex-Fallback mergen
+        mergeWithFallback(aiResult, fallback, cleaned)
+    }
+
+    /**
+     * Nimmt brauchbare AI-Felder, füllt Lücken aus dem Regex-Fallback
+     * (Titel, Zutaten, kcal). Verhindert generische „Rezept“-Karten ohne Inhalt.
+     */
+    private fun mergeWithFallback(ai: Recipe?, fallback: Recipe, cleanedCaption: String): Recipe {
+        if (ai == null) return fallback
+
+        fun isPlaceholderTitle(t: String) =
+            t.isBlank() ||
+                t.equals("null", true) ||
+                t.equals("undefined", true) ||
+                t.equals("Rezept", true) ||
+                t.equals("Instagram Rezept", true) ||
+                t.equals("TikTok Rezept", true)
+
+        fun isWeakIngredients(s: String) =
+            s.isBlank() ||
+                s.equals("Zutaten nicht gefunden.", true) ||
+                s.startsWith("Tippe") ||
+                s.length < 20
+
+        val titleFromCaption = extractTitle(cleanedCaption, fallback = "")
+        val title = when {
+            !isPlaceholderTitle(ai.title) -> ai.title.trim()
+            !isPlaceholderTitle(fallback.title) -> fallback.title.trim()
+            titleFromCaption.isNotBlank() -> titleFromCaption
+            else -> "Rezept"
+        }
+
+        val ingredients = when {
+            !isWeakIngredients(ai.ingredients) -> ai.ingredients
+            !isWeakIngredients(fallback.ingredients) -> fallback.ingredients
+            else -> ai.ingredients.ifBlank { fallback.ingredients }
+        }
+
+        val instructions = ai.instructions.trim()
+            .takeUnless { it.isBlank() || it.equals("null", true) }
+            ?: fallback.instructions
+
+        val description = ai.description.trim()
+            .takeUnless { it.isBlank() || it.equals("null", true) }
+            ?: fallback.description
+
+        return ai.copy(
+            title = title,
+            description = description,
+            ingredients = ingredients,
+            instructions = instructions,
+            servings = ai.servings.coerceAtLeast(1).takeIf { it > 0 } ?: fallback.servings,
+            totalCalories = ai.totalCalories?.takeIf { it > 0f } ?: fallback.totalCalories,
+            proteinPerServing = ai.proteinPerServing?.takeIf { it > 0f } ?: fallback.proteinPerServing,
+            carbsPerServing = ai.carbsPerServing?.takeIf { it > 0f } ?: fallback.carbsPerServing,
+            fatPerServing = ai.fatPerServing?.takeIf { it > 0f } ?: fallback.fatPerServing,
+            prepTimeMinutes = ai.prepTimeMinutes ?: fallback.prepTimeMinutes,
+            sourceUrl = ai.sourceUrl ?: fallback.sourceUrl,
+            platform = ai.platform ?: fallback.platform,
+            imageUrl = ai.imageUrl ?: fallback.imageUrl,
+            tags = ai.tags.ifBlank { fallback.tags }
+        )
     }
 
     /**

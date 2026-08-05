@@ -120,10 +120,12 @@ class RecipeScraper(private val context: Context) {
             thumbnail = "https://www.instagram.com/p/$shortcode/media/?size=l"
         }
 
+        val oEmbedTitle = oEmbed?.get("title")?.trim().orEmpty()
+            .let { RecipeAiParser.cleanCaption(it) }
+
         // Letzter Fallback: oEmbed-Titel (manchmal Caption-Ausschnitt)
-        if (!isGoodCaption(caption)) {
-            val oEmbedTitle = oEmbed?.get("title")?.trim().orEmpty()
-            if (isGoodCaption(oEmbedTitle)) caption = oEmbedTitle
+        if (!isGoodCaption(caption) && isGoodCaption(oEmbedTitle)) {
+            caption = oEmbedTitle
         }
 
         if (!isGoodCaption(caption)) throw InstagramBlockedException(url)
@@ -135,7 +137,26 @@ class RecipeScraper(private val context: Context) {
         } else {
             RecipeAiParser.fallbackParse(caption, url, "instagram", thumbnail)
         }
+
+        // Titel nachbessern, wenn Parser nur „Rezept“ liefert
+        val betterTitle = when {
+            parsed.title.isNotBlank() &&
+                !parsed.title.equals("Rezept", true) &&
+                !parsed.title.equals("Instagram Rezept", true) &&
+                !parsed.title.equals("null", true) -> parsed.title
+            oEmbedTitle.isNotBlank() -> {
+                RecipeAiParser.extractTitle(oEmbedTitle, fallback = "")
+                    .ifBlank {
+                        oEmbedTitle.lineSequence().map { it.trim() }
+                            .firstOrNull { it.length in 4..80 && it.any(Char::isLetter) }
+                            .orEmpty()
+                    }
+            }
+            else -> RecipeAiParser.extractTitle(caption, fallback = "Rezept")
+        }.ifBlank { "Rezept" }
+
         return parsed.copy(
+            title     = betterTitle,
             imageUrl  = thumbnail ?: parsed.imageUrl,
             sourceUrl = url,
             platform  = "instagram",
