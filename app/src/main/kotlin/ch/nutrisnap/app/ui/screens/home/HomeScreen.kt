@@ -293,19 +293,26 @@ private fun HealthStatItem(icon: String, value: String, label: String) {
 @Composable
 private fun HomeHeader(state: HomeUiState) {
     val appTheme = LocalAppTheme.current
+    val overGoal = state.totalCalories > state.adjustedGoal && state.adjustedGoal > 0f
+    val progress = (state.totalCalories / state.adjustedGoal.coerceAtLeast(1f)).coerceIn(0f, 1f)
+
     Column(
         Modifier
             .fillMaxWidth()
             .background(
                 Brush.verticalGradient(
-                    listOf(appTheme.primary, appTheme.primaryDark)
+                    listOf(
+                        appTheme.primary,
+                        appTheme.primaryDark.copy(alpha = 0.95f)
+                    )
                 ),
-                shape = RoundedCornerShape(bottomStart = NutriRadius.xl, bottomEnd = NutriRadius.xl)
+                shape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
             )
             .statusBarsPadding()
-            .padding(horizontal = NutriSpacing.md)
-            .padding(top = 6.dp, bottom = NutriSpacing.sm)
+            .padding(horizontal = 16.dp)
+            .padding(top = 10.dp, bottom = 14.dp)
     ) {
+        // ── Top: Begrüßung + Streak ──────────────────────────────────────
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -313,149 +320,242 @@ private fun HomeHeader(state: HomeUiState) {
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    "${state.greeting} \uD83D\uDC4B",
-                    fontSize = 12.sp,
-                    color = Color.White.copy(alpha = 0.8f),
+                    state.greeting,
+                    fontSize = 13.sp,
+                    color = Color.White.copy(alpha = 0.75f),
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    "Dein Tag im Überblick",
-                    fontSize = 17.sp,
+                    "Heute",
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
-                    maxLines = 1
+                    letterSpacing = (-0.3).sp
                 )
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 if (state.isAdaptiveTarget) {
                     Text(
-                        "\uD83C\uDFAF Adaptiv \u00B7 ${state.tdeeConfidence}%",
+                        "Adaptiv · ${state.tdeeConfidence}%",
                         fontSize = 11.sp,
-                        color = Color.White.copy(alpha = 0.7f)
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color.White.copy(alpha = 0.14f))
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
                     )
                 }
+                StreakBadge(state.streak)
             }
-            StreakBadge(state.streak)
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(16.dp))
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        // ── Hero: Ring + große Rest-kcal ─────────────────────────────────
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             MacroRing(
                 eaten = state.totalCalories,
                 goal = state.adjustedGoal,
-                size = 84.dp,
-                strokeWidth = 8.dp,
-                trackColor = Color.White.copy(alpha = 0.18f),
+                size = 100.dp,
+                strokeWidth = 9.dp,
+                trackColor = Color.White.copy(alpha = 0.15f),
                 progressColor = Color.White,
                 overflowColor = Color(0xFFFFD67A)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        "${state.remaining.toInt()}",
-                        fontSize = 18.sp,
+                        if (overGoal) {
+                            "+${(state.totalCalories - state.adjustedGoal).toInt()}"
+                        } else {
+                            "${state.remaining.toInt()}"
+                        },
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = Color.White,
+                        letterSpacing = (-0.5).sp
                     )
                     Text(
-                        "übrig",
+                        if (overGoal) "über Ziel" else "kcal übrig",
                         fontSize = 10.sp,
-                        color = Color.White.copy(alpha = 0.75f)
+                        color = Color.White.copy(alpha = 0.7f)
                     )
                 }
             }
 
-            Spacer(Modifier.width(NutriSpacing.md))
+            Spacer(Modifier.width(16.dp))
 
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                HeaderStatRow(Icons.Default.RestaurantMenu, "${state.totalCalories.toInt()} kcal", "gegessen")
+            // Drei klare Zahlen in einer Spalte — weniger visuelles Rauschen
+            Column(
+                Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                HeaderMetric(
+                    label = "Gegessen",
+                    value = "${state.totalCalories.toInt()}",
+                    unit = "kcal"
+                )
                 if (state.burnedKcal > 0f) {
-                    HeaderStatRow(Icons.Default.LocalFireDepartment, "+${state.burnedKcal.toInt()} kcal", "aktiv")
+                    HeaderMetric(
+                        label = "Aktiv",
+                        value = "+${state.burnedKcal.toInt()}",
+                        unit = "kcal",
+                        valueColor = Color(0xFFFFE08A)
+                    )
                 }
-                HeaderStatRow(Icons.Default.Flag, "${state.adjustedGoal.toInt()} kcal", "Ziel")
+                HeaderMetric(
+                    label = "Ziel",
+                    value = "${state.adjustedGoal.toInt()}",
+                    unit = "kcal"
+                )
+                // Dünner Fortschrittsbalken unter den Zahlen
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Color.White.copy(alpha = 0.15f))
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth(progress)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(
+                                if (overGoal) Color(0xFFFFD67A) else Color.White.copy(alpha = 0.9f)
+                            )
+                    )
+                }
             }
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(14.dp))
 
-        Column(
+        // ── Makros: 4 gleichmäßige Spalten ────────────────────────────────
+        Row(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(18.dp))
                 .background(Color.White.copy(alpha = 0.12f))
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+                .padding(horizontal = 8.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                WhiteMacroBar("Protein", state.totalProtein, state.proteinGoal, accent = MacroColors.protein, modifier = Modifier.weight(1f))
-                WhiteMacroBar("Kohlenh.", state.totalCarbs, state.carbsGoal, accent = MacroColors.carbs, modifier = Modifier.weight(1f))
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                WhiteMacroBar("Fett", state.totalFat, state.fatGoal, accent = MacroColors.fat, modifier = Modifier.weight(1f))
-                WhiteMacroBar("Ballaststoffe", state.totalFiber, state.fiberGoal, decimals = 1, accent = MacroColors.fiber, modifier = Modifier.weight(1f))
-            }
+            MacroColumn(
+                label = "Protein",
+                value = state.totalProtein,
+                goal = state.proteinGoal,
+                accent = MacroColors.protein,
+                modifier = Modifier.weight(1f)
+            )
+            MacroColumn(
+                label = "Kohlenh.",
+                value = state.totalCarbs,
+                goal = state.carbsGoal,
+                accent = MacroColors.carbs,
+                modifier = Modifier.weight(1f)
+            )
+            MacroColumn(
+                label = "Fett",
+                value = state.totalFat,
+                goal = state.fatGoal,
+                accent = MacroColors.fat,
+                modifier = Modifier.weight(1f)
+            )
+            MacroColumn(
+                label = "Ballast.",
+                value = state.totalFiber,
+                goal = state.fiberGoal,
+                decimals = 1,
+                accent = MacroColors.fiber,
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
 
 @Composable
-private fun HeaderStatRow(icon: ImageVector, value: String, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier
-                .size(24.dp)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.16f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icon, null, tint = Color.White, modifier = Modifier.size(13.dp))
-        }
-        Spacer(Modifier.width(6.dp))
-        Column {
-            Text(value, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
-            Text(label, fontSize = 9.sp, color = Color.White.copy(alpha = 0.7f))
-        }
+private fun HeaderMetric(
+    label: String,
+    value: String,
+    unit: String,
+    valueColor: Color = Color.White
+) {
+    Row(
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            value,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = valueColor,
+            letterSpacing = (-0.3).sp
+        )
+        Text(
+            unit,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = Color.White.copy(alpha = 0.55f),
+            modifier = Modifier.padding(bottom = 2.dp)
+        )
+        Spacer(Modifier.weight(1f))
+        Text(
+            label,
+            fontSize = 11.sp,
+            color = Color.White.copy(alpha = 0.55f),
+            modifier = Modifier.padding(bottom = 2.dp)
+        )
     }
 }
 
 @Composable
-private fun WhiteMacroBar(
+private fun MacroColumn(
     label: String,
     value: Float,
     goal: Float,
     decimals: Int = 0,
-    accent: Color = Color.White,
+    accent: Color,
     modifier: Modifier = Modifier
 ) {
     val pct = (value / goal.coerceAtLeast(1f)).coerceIn(0f, 1f)
-    Column(modifier) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(accent)
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(label, fontSize = 10.sp, color = Color.White.copy(alpha = 0.85f), maxLines = 1)
-            }
-            Text(
-                if (decimals > 0) "${"%.${decimals}f".format(value)}g" else "${value.toInt()}g",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-        }
-        Spacer(Modifier.height(3.dp))
+    val valueText = if (decimals > 0) "%.${decimals}f".format(value) else value.toInt().toString()
+    Column(
+        modifier = modifier.padding(horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            Modifier
+                .size(7.dp)
+                .clip(CircleShape)
+                .background(accent)
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "${valueText}g",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            maxLines = 1
+        )
+        Text(
+            label,
+            fontSize = 10.sp,
+            color = Color.White.copy(alpha = 0.6f),
+            maxLines = 1
+        )
+        Spacer(Modifier.height(6.dp))
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(4.dp)
+                .height(3.dp)
                 .clip(RoundedCornerShape(2.dp))
-                .background(Color.White.copy(alpha = 0.18f))
+                .background(Color.White.copy(alpha = 0.15f))
         ) {
             Box(
                 Modifier
@@ -473,15 +573,15 @@ private fun StreakBadge(streak: Int) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .clip(RoundedCornerShape(NutriRadius.xxl))
+            .clip(RoundedCornerShape(20.dp))
             .background(Color.White.copy(alpha = 0.16f))
-            .padding(horizontal = NutriSpacing.md, vertical = NutriSpacing.xs)
+            .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
-        Text("\uD83D\uDD25", fontSize = 16.sp)
-        Spacer(Modifier.width(NutriSpacing.xs))
+        Text("\uD83D\uDD25", fontSize = 13.sp)
+        Spacer(Modifier.width(4.dp))
         Text(
             "$streak",
-            fontSize = 14.sp,
+            fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             color = Color.White
         )
@@ -532,12 +632,18 @@ private fun MealOverviewGrid(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.md),
-            shape = RoundedCornerShape(NutriRadius.lg),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(1.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = CardDefaults.cardElevation(0.dp),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+            )
         ) {
-            Column {
+            Column(Modifier.padding(vertical = 4.dp)) {
                 meals.forEachIndexed { index, meal ->
                     MealRow(
                         meal = meal,
@@ -546,7 +652,8 @@ private fun MealOverviewGrid(
                     )
                     if (index != meals.lastIndex) {
                         HorizontalDivider(
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
                         )
                     }
                 }
