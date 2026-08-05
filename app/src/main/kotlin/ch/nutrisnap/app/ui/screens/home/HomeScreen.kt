@@ -585,7 +585,6 @@ private fun MealRow(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () -> U
                 else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        }
         } // Ende klickbarer Bereich (öffnet Tagebuch)
         Spacer(Modifier.width(NutriSpacing.sm))
         // Deutlicher „Hinzufügen“-Button (eigenes Klickziel, öffnet Tracking-Sheet)
