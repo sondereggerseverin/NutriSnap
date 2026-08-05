@@ -588,34 +588,97 @@ private fun MealOverviewGrid(
             }
         }
     } else {
-        Card(
-            modifier = Modifier
+        Column(
+            Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(0.dp),
-            border = androidx.compose.foundation.BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
-            )
+                .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Column(Modifier.padding(vertical = 2.dp)) {
-                meals.forEachIndexed { index, meal ->
-                    MealRow(
-                        meal = meal,
-                        onClick = { onClick(meal) },
-                        onQuickAdd = { onQuickAdd(meal) }
-                    )
-                    if (index != meals.lastIndex) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
+            meals.forEach { meal ->
+                MealRowCard(
+                    meal = meal,
+                    onClick = { onClick(meal) },
+                    onQuickAdd = { onQuickAdd(meal) }
+                )
+            }
+        }
+    }
+}
+
+/** Eigenständige, farblich akzentuierte Karte pro Mahlzeit (statt einer
+ *  zusammenhängenden Liste mit Trennlinien) — bessere Unterscheidbarkeit auf
+ *  dunklem Hintergrund, gleiche kompakte Zeilenhöhe wie zuvor. */
+@Composable
+private fun MealRowCard(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(NutriRadius.md),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(0.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+        )
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                Modifier
+                    .weight(1f)
+                    .clickable(onClick = onClick),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(meal.color.copy(alpha = 0.22f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(meal.icon, fontSize = 18.sp)
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            meal.label,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.width(2.dp))
+                        Icon(
+                            Icons.Default.ChevronRight, null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    Text(
+                        "${meal.kcal.toInt()} kcal · ${meal.count} ${if (meal.count == 1) "Eintrag" else "Einträge"}",
+                        fontSize = 11.sp,
+                        color = if (meal.count > 0) meal.color else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
+            }
+            Spacer(Modifier.width(6.dp))
+            FilledTonalIconButton(
+                onClick = onQuickAdd,
+                modifier = Modifier.size(36.dp),
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = meal.color.copy(alpha = 0.16f),
+                    contentColor = meal.color
+                )
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Zu ${meal.label} hinzufügen",
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }
@@ -632,10 +695,12 @@ private fun MealTile(
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-        ),
-        elevation = CardDefaults.cardElevation(0.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(0.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+        )
     ) {
         Column(Modifier.padding(horizontal = 8.dp, vertical = 8.dp)) {
             Row(
@@ -645,8 +710,8 @@ private fun MealTile(
                 Box(
                     Modifier
                         .size(32.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(meal.color.copy(alpha = 0.18f)),
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(meal.color.copy(alpha = 0.22f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(meal.icon, fontSize = 16.sp)
@@ -663,7 +728,7 @@ private fun MealTile(
                     Text(
                         "${meal.kcal.toInt()} kcal",
                         fontSize = 10.sp,
-                        color = if (meal.count > 0) MaterialTheme.colorScheme.primary
+                        color = if (meal.count > 0) meal.color
                         else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -673,86 +738,12 @@ private fun MealTile(
                 onClick = onQuickAdd,
                 modifier = Modifier.fillMaxWidth().height(32.dp),
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    containerColor = meal.color.copy(alpha = 0.16f),
+                    contentColor = meal.color
                 )
             ) {
                 Icon(Icons.Default.Add, "Zu ${meal.label} hinzufügen", Modifier.size(20.dp))
             }
-        }
-    }
-}
-
-// Kompakte Listenzeile statt Grid-Karte mit überlagertem "+": alle Elemente
-// liegen im selben Row-Layout (wie bei Yazio), dadurch kann nichts mehr
-// überlappen und der Bildschirm braucht weniger Höhe pro Mahlzeit.
-@Composable
-private fun MealRow(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () -> Unit) {
-    val context = LocalContext.current
-    val prefs by context.notifDataStore.data.collectAsState(initial = null)
-    val freshHome = (prefs?.get(KEY_FRESH_HOME) == true) || (prefs?.get(KEY_FRESH_UI) == true)
-    val iconSize = if (freshHome) 40.dp else 36.dp
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = NutriSpacing.md, vertical = if (freshHome) 6.dp else 5.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(
-            Modifier
-                .weight(1f)
-                .clickable(onClick = onClick),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-        Box(
-            Modifier
-                .size(iconSize)
-                .clip(RoundedCornerShape(if (freshHome) 14.dp else NutriRadius.sm))
-                .background(meal.color.copy(alpha = if (freshHome) 0.18f else 0.12f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(meal.icon, fontSize = if (freshHome) 18.sp else 17.sp)
-        }
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    meal.label,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.width(2.dp))
-                Icon(
-                    Icons.Default.ChevronRight, null,
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Text(
-                "${meal.kcal.toInt()} kcal · ${meal.count} ${if (meal.count == 1) "Eintrag" else "Einträge"}",
-                fontSize = 11.sp,
-                color = if (meal.count > 0) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        } // Ende klickbarer Bereich (öffnet Tagebuch)
-        Spacer(Modifier.width(6.dp))
-        // Deutlicher „Hinzufügen“-Button (eigenes Klickziel, öffnet Tracking-Sheet)
-        FilledTonalIconButton(
-            onClick = onQuickAdd,
-            modifier = Modifier.size(38.dp),
-            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-        ) {
-            Icon(
-                Icons.Default.Add,
-                contentDescription = "Zu ${meal.label} hinzufügen",
-                modifier = Modifier.size(20.dp)
-            )
         }
     }
 }
@@ -931,7 +922,7 @@ private fun CalorieBreakdownCard(state: HomeUiState) {
         shape = RoundedCornerShape(NutriRadius.lg),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
     ) {
-        Column(Modifier.padding(NutriSpacing.lg)) {
+        Column(Modifier.padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.md)) {
             Row(
                 Modifier
                     .fillMaxWidth()
