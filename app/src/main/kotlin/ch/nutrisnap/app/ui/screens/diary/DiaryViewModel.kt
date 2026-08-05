@@ -379,46 +379,35 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Mengenänderung. [newValue] ist immer in derselben Einheit wie die Anzeige:
+     * Gramm bei Lebensmitteln, Portionsfaktor bei Rezepten/Manuell, bzw. der
+     * aus Gramm zurückgerechnete Portionsfaktor bei gram-getrackten Rezepten
+     * (siehe EditEntryDialog).
+     *
+     * Manuelle Einträge (amountGrams == 0): newValue = Portionsmultiplikator
+     * relativ zur aktuellen „1 Portion“-Basis der gespeicherten Makros — nicht kcal.
+     */
     fun updateEntryAmount(entry: DiaryEntry, newValue: Float) {
+        if (newValue <= 0f) return
         viewModelScope.launch {
-            if (entry.amountGrams <= 0f) {
-                val ratio = if (entry.calories > 0f) newValue / entry.calories else 1f
-                repo.updateEntry(entry.copy(
-                    calories = newValue,
-                    protein  = entry.protein * ratio,
-                    carbs    = entry.carbs   * ratio,
-                    fat      = entry.fat     * ratio,
-                    fiber    = entry.fiber   * ratio,
-                    sugar        = entry.sugar        * ratio,
-                    saturatedFat = entry.saturatedFat * ratio,
-                    salt         = entry.salt         * ratio,
-                    sodium       = entry.sodium       * ratio,
-                    originalCalories = entry.originalCalories?.let { it * ratio },
-                    originalProtein  = entry.originalProtein?.let { it * ratio },
-                    originalCarbs    = entry.originalCarbs?.let { it * ratio },
-                    originalFat      = entry.originalFat?.let { it * ratio },
-                    originalFiber    = entry.originalFiber?.let { it * ratio }
-                ))
-            } else {
-                val factor = newValue / entry.amountGrams
-                repo.updateEntry(entry.copy(
-                    amountGrams = newValue,
-                    calories    = entry.calories * factor,
-                    protein     = entry.protein  * factor,
-                    carbs       = entry.carbs    * factor,
-                    fat         = entry.fat      * factor,
-                    fiber       = entry.fiber    * factor,
-                    sugar        = entry.sugar        * factor,
-                    saturatedFat = entry.saturatedFat * factor,
-                    salt         = entry.salt         * factor,
-                    sodium       = entry.sodium       * factor,
-                    recipeGrams  = entry.recipeGrams?.let { it * factor },
-                    originalCalories = entry.originalCalories?.let { it * factor },
-                    originalProtein  = entry.originalProtein?.let { it * factor },
-                    originalCarbs    = entry.originalCarbs?.let { it * factor },
-                    originalFat      = entry.originalFat?.let { it * factor },
-                    originalFiber    = entry.originalFiber?.let { it * factor }
-                ))
+            when {
+                // Manuell / Legacy ohne Menge: Portionsfaktor relativ zu 1.0
+                entry.amountGrams <= 0f -> {
+                    val factor = newValue.coerceAtLeast(0.01f)
+                    repo.updateEntry(
+                        entry.scaledBy(factor).copy(amountGrams = factor)
+                    )
+                }
+                else -> {
+                    val factor = newValue / entry.amountGrams
+                    repo.updateEntry(
+                        entry.scaledBy(factor).copy(
+                            amountGrams = newValue,
+                            recipeGrams = entry.recipeGrams?.let { it * factor }
+                        )
+                    )
+                }
             }
         }
     }

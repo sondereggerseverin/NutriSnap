@@ -63,13 +63,13 @@ private fun formatPortionAmount(amount: Float): String {
     return "$text Portion${if (amount == 1f) "" else "en"}"
 }
 
-/** Anzeige für einen Rezept-Tagebucheintrag: exakte Grammzahl, wenn der Nutzer in
- *  Gramm erfasst hat (entry.recipeGrams gesetzt), sonst die Portionsanzahl. */
+/** Anzeige für Rezept-/Manual-Einträge: Gramm wenn gram-getrackt, sonst Portionen. */
 private fun recipeAmountLabel(entry: DiaryEntry): String {
-    // Echte Gramm-Erfassung ab ~10 g. Kleinere Werte + hohe kcal = Portionen
-    // (Bug: „1 g“ bei 566 kcal Vollportion).
-    entry.recipeGrams?.takeIf { it >= 10f }?.let { return "${it.toInt()} g" }
-    if (entry.foodItemId < 0 && entry.amountGrams >= 20f) {
+    if (entry.isGramTrackedRecipe) {
+        return "${entry.recipeGrams!!.toInt()} g"
+    }
+    // Legacy: amountGrams fälschlich als Gramm statt Portionsfaktor gespeichert
+    if (entry.isRecipeEntry && entry.amountGrams >= 20f && entry.recipeGrams == null) {
         return "${entry.amountGrams.toInt()} g"
     }
     val portions = when {
@@ -82,14 +82,7 @@ private fun recipeAmountLabel(entry: DiaryEntry): String {
 }
 
 /** true wenn Menge eher Portion/Rezept als echte Gramm-Angabe ist. */
-private fun looksLikePortionEntry(entry: DiaryEntry): Boolean {
-    if (entry.foodItemId < 0) return true
-    if (entry.recipeGrams != null) return true
-    if (entry.amountGrams <= 0f) return true
-    // 1 g mit 566 kcal kann keine echte Gramm-Angabe sein
-    if (entry.amountGrams < 10f && entry.calories >= 40f) return true
-    return false
-}
+private fun looksLikePortionEntry(entry: DiaryEntry): Boolean = entry.isPortionTracked
 
 private fun defaultMealForNow(): MealType = when (LocalTime.now().hour) {
     in 5..10  -> MealType.BREAKFAST
@@ -551,25 +544,26 @@ private fun EditEntryDialog(
     onDelete: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val isRecipe = entry.amountGrams == 0f || entry.foodItemId < 0
-    // Bei Gramm-Erfassung eines Rezepts (recipeGrams gesetzt) rechnet der Dialog
-    // in Gramm statt Portionen; amountGrams bleibt intern weiterhin der
-    // Portionsfaktor für die Nährwert-Skalierung.
-    val isGramTracked = entry.recipeGrams != null
+    // Gramm-Tracking nur bei echten Rezept-Gramm (≥10); sonst Portionen für Rezept/Manual.
+    val isGramTracked = entry.isGramTrackedRecipe
+    val isPortionUnit = entry.isPortionTracked && !isGramTracked
     // "baseValue" ist die Menge in der Einheit, in der amountText editiert wird.
-    val baseValue = if (isGramTracked) entry.recipeGrams!! else entry.amountGrams
+    val baseValue = when {
+        isGramTracked -> entry.recipeGrams!!
+        entry.amountGrams > 0f -> entry.amountGrams
+        else -> 1f // Manual ohne Menge = 1 Portion Basis
+    }
     var amountText by remember { mutableStateOf(
         when {
             isGramTracked -> entry.recipeGrams!!.toInt().toString()
-            // Echter Rezept-Eintrag (Portionen): amountGrams speichert den tatsächlichen Portionsfaktor.
-            entry.amountGrams > 0f && entry.foodItemId < 0 ->
+            entry.amountGrams > 0f && isPortionUnit ->
                 if (entry.amountGrams == entry.amountGrams.toInt().toFloat()) entry.amountGrams.toInt().toString()
                 else entry.amountGrams.toString()
-            isRecipe -> "1" // manueller Eintrag (amountGrams == 0, keine Portionsangabe)
+            isPortionUnit -> "1" // Manual: relative Portionsbasis
             else -> entry.amountGrams.toInt().toString()
         }
     ) }
-    val unit = if (isGramTracked) "g" else if (isRecipe) "Port." else "g"
+    val unit = if (isGramTracked) "g" else if (isPortionUnit) "Port." else "g"
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -592,7 +586,7 @@ private fun EditEntryDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 val amount = parseGramsInput(amountText) ?: 0f
-                if (amount > 0 && baseValue > 0) {
+                if (amount > 0f && baseValue > 0f) {
                     val factor = amount / baseValue
                     Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.md)) {
                         Text(
@@ -610,11 +604,14 @@ private fun EditEntryDialog(
         confirmButton = {
             Button(onClick = {
                 val v = parseGramsInput(amountText)
-                if (v != null && v > 0) {
-                    // Bei Gramm-Erfassung: eingegebene Gramm in den äquivalenten
-                    // Portionsfaktor zurückrechnen (updateEntryAmount erwartet
-                    // stets einen Wert in derselben Einheit wie entry.amountGrams).
-                    val toSave = if (isGramTracked) v / entry.recipeGrams!! * entry.amountGrams else v
+                if (v != null && v > 0f) {
+                    // Bei Gramm-Erfassung: eingegebene Gramm → äquivalenter Portionsfaktor
+                    // (updateEntryAmount skaliert immer über amountGrams).
+                    val toSave = if (isGramTracked && entry.recipeGrams != null && entry.recipeGrams > 0f) {
+                        v / entry.recipeGrams * entry.amountGrams
+                    } else {
+                        v
+                    }
                     onSave(toSave)
                 }
             }) { Text("Speichern") }
@@ -725,9 +722,9 @@ private fun EntryDetailSheet(
                     Icon(Icons.Default.Edit, "Menge bearbeiten")
                 }
             }
-            val isRecipe = entry.amountGrams == 0f || entry.foodItemId < 0
+            val showPortionLabel = entry.isPortionTracked || entry.isRecipeEntry
             Text(
-                if (isRecipe) recipeAmountLabel(entry)
+                if (showPortionLabel) recipeAmountLabel(entry)
                 else "${entry.amountGrams.toInt()} g",
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -764,7 +761,7 @@ private fun EntryDetailSheet(
             if (micros.isNotEmpty()) {
                 HorizontalDivider(Modifier.padding(vertical = NutriSpacing.md))
                 MicronutrientTable(micros, ratio = 1f)
-            } else if (!isRecipe) {
+            } else if (entry.isFoodEntry) {
                 Spacer(Modifier.height(NutriSpacing.md))
                 Text(
                     "Keine Mikronährstoffe für diesen Eintrag verfügbar.",

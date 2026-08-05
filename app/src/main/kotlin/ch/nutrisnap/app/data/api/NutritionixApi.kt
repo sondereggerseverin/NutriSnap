@@ -100,8 +100,9 @@ class NutritionixApi(
                     sugar = f.g("nf_sugars"),
                     addedSugars = f.g("nf_added_sugars"),
                     saturatedFat = f.g("nf_saturated_fat"),
-                    sodium = f.g("nf_sodium"),
-                    potassium = f.g("nf_potassium"),
+                    // Nutritionix liefert Natrium/Kalium in mg → intern Gramm
+                    sodium = f.g("nf_sodium")?.div(1000f),
+                    potassium = f.g("nf_potassium")?.div(1000f),
                     servingSize = f.optDouble("serving_weight_grams", 100.0).toFloat(),
                     servingUnit = f.optString("serving_unit", "g"),
                     source = FoodSource.NUTRITIONIX,

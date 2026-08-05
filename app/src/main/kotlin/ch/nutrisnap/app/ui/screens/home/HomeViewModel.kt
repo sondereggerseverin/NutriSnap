@@ -16,6 +16,7 @@ import ch.nutrisnap.app.ui.theme.KEY_MEAL_ORDER
 import ch.nutrisnap.app.ui.theme.KEY_MANUAL_ACTIVITY_ENABLED
 import ch.nutrisnap.app.ui.theme.KEY_AGGRESSIVE_SPORT_DAY
 import ch.nutrisnap.app.data.model.ManualActivityEntry
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -107,24 +108,44 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _streak = MutableStateFlow(0)
 
-    init { refreshStreak() }
+    /**
+     * Aktuelles Kalenderdatum — wird minütlich geprüft, damit Home nach Mitternacht
+     * nicht am Vortag hängen bleibt (früher: LocalDate.now() nur beim ViewModel-Start).
+     */
+    private val _today = MutableStateFlow(LocalDate.now())
+
+    init {
+        refreshStreak()
+        viewModelScope.launch {
+            while (true) {
+                val now = LocalDate.now()
+                if (_today.value != now) {
+                    _today.value = now
+                    refreshStreak()
+                }
+                kotlinx.coroutines.delay(60_000)
+            }
+        }
+    }
 
     // Rolling window for the adaptive trend: long enough to smooth out noise, short
     // enough to reflect a recent change in routine (e.g. ramping up ride volume).
     private val trendWindowDays = 21
 
-    val uiState: StateFlow<HomeUiState> = combine(
-        diaryRepo.getEntriesForDate(LocalDate.now()),
-        profileRepo.get(),
-        weightRepo.getRecent(1),
-        _streak,
-        hcDao.getCacheForDate(LocalDate.now()),
-        weightRepo.getRecent(trendWindowDays),
-        diaryRepo.getWeeklySummary(LocalDate.now().minusDays(trendWindowDays.toLong())),
-        hcDao.getLast30Days(),
-        app.notifDataStore.data,
-        manualActivityDao.getSince(LocalDate.now().minusDays(29).toString())
-    ) { args ->
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val uiState: StateFlow<HomeUiState> = _today.flatMapLatest { today ->
+        combine(
+            diaryRepo.getEntriesForDate(today),
+            profileRepo.get(),
+            weightRepo.getRecent(1),
+            _streak,
+            hcDao.getCacheForDate(today),
+            weightRepo.getRecent(trendWindowDays),
+            diaryRepo.getWeeklySummary(today.minusDays(trendWindowDays.toLong())),
+            hcDao.getLast30Days(),
+            app.notifDataStore.data,
+            manualActivityDao.getSince(today.minusDays(29).toString())
+        ) { args ->
         val entries       = args[0] as List<ch.nutrisnap.app.data.model.DiaryEntry>
         val profile        = args[1] as ch.nutrisnap.app.data.repository.UserProfile
         val weights        = args[2] as List<ch.nutrisnap.app.data.model.WeightEntry>
@@ -157,7 +178,6 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 LocalDate.parse(it.dateStr) to it.activeCaloriesKcal.toDouble()
             }
         } else emptyMap()
-        val today = LocalDate.now()
         val manualToday = manualByDate[today]
         val hcToday = hcCache?.activeCaloriesKcal
         // HC + manuell = eine Aktivitätsquelle, beide 1:1 in der Ziel-Rechnung
@@ -252,6 +272,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 )
             }
         )
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
     fun logWeight(kg: Float) {

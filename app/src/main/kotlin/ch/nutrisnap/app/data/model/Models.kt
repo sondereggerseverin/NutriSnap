@@ -54,6 +54,73 @@ data class DiaryEntry(
 
 enum class MealType { BREAKFAST, LUNCH, DINNER, SNACK }
 
+/**
+ * Art eines Tagebuch-Eintrags. Ersetzt Heuristiken wie
+ * `foodItemId < 0` / `amountGrams == 0`.
+ *
+ * - FOOD: normales Lebensmittel (amountGrams = Gramm)
+ * - RECIPE: Rezept (amountGrams = Portionsfaktor; optional recipeGrams = Anzeige in g)
+ * - MANUAL: manuell erfasste kcal/Makros (foodItemId = -999)
+ */
+enum class DiaryEntryKind { FOOD, RECIPE, MANUAL }
+
+/** foodItemId-Marker für manuell erfasste Einträge (kein FoodItem in der DB). */
+const val MANUAL_FOOD_ITEM_ID: Int = -999
+
+val DiaryEntry.kind: DiaryEntryKind
+    get() = when {
+        foodItemId == MANUAL_FOOD_ITEM_ID -> DiaryEntryKind.MANUAL
+        foodItemId < 0 -> DiaryEntryKind.RECIPE
+        else -> DiaryEntryKind.FOOD
+    }
+
+val DiaryEntry.isManualEntry: Boolean get() = kind == DiaryEntryKind.MANUAL
+val DiaryEntry.isRecipeEntry: Boolean get() = kind == DiaryEntryKind.RECIPE
+val DiaryEntry.isFoodEntry: Boolean get() = kind == DiaryEntryKind.FOOD
+
+/**
+ * true, wenn die Menge als Portion (nicht als Gramm) zu interpretieren ist.
+ * Deckt auch Legacy-Fälle (amountGrams ≈ 1 bei hoher kcal).
+ */
+val DiaryEntry.isPortionTracked: Boolean
+    get() = when {
+        isManualEntry -> true
+        isRecipeEntry -> recipeGrams == null || recipeGrams < 10f
+        recipeGrams != null -> true
+        amountGrams <= 0f -> true
+        // Legacy: „1 g“ bei ~vollen Portions-kcal kann keine echte Gramm-Angabe sein
+        amountGrams < 10f && calories >= 40f -> true
+        else -> false
+    }
+
+/** true, wenn Rezept-Menge in Gramm erfasst wurde (recipeGrams ≥ 10). */
+val DiaryEntry.isGramTrackedRecipe: Boolean
+    get() = isRecipeEntry && recipeGrams != null && recipeGrams >= 10f
+
+/**
+ * Skaliert alle Nährwerte (und optionale Original-Snapshots) um [factor].
+ * amountGrams / recipeGrams werden bewusst nicht angefasst — der Aufrufer setzt sie.
+ */
+fun DiaryEntry.scaledBy(factor: Float): DiaryEntry {
+    if (factor == 1f) return this
+    return copy(
+        calories = calories * factor,
+        protein = protein * factor,
+        carbs = carbs * factor,
+        fat = fat * factor,
+        fiber = fiber * factor,
+        sugar = sugar * factor,
+        saturatedFat = saturatedFat * factor,
+        salt = salt * factor,
+        sodium = sodium * factor,
+        originalCalories = originalCalories?.let { it * factor },
+        originalProtein = originalProtein?.let { it * factor },
+        originalCarbs = originalCarbs?.let { it * factor },
+        originalFat = originalFat?.let { it * factor },
+        originalFiber = originalFiber?.let { it * factor }
+    )
+}
+
 /** Die fünf Makro-/Nährwertfelder, die per direkter Korrektur (ohne Zutaten-Umweg)
  *  überschrieben werden können. */
 enum class MacroField(val label: String, val unit: String) {

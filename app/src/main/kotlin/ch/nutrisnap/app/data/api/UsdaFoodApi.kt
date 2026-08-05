@@ -106,10 +106,12 @@ class UsdaFoodApi(private val apiKey: String) {
                     205 -> carbs = value
                     204 -> fat = value
                     291 -> fiber = value
-                    307 -> sodium = value
+                    // USDA liefert Natrium/Kalium in mg — intern speichern wir Gramm
+                    // (MICRO_META rechnet für die Anzeige ×1000 zurück nach mg).
+                    307 -> sodium = value / 1000f
                     269 -> sugar = value
                     606 -> saturatedFat = value
-                    306 -> potassium = value
+                    306 -> potassium = value / 1000f
                     539, 1235 -> addedSugars = value
                 }
             }

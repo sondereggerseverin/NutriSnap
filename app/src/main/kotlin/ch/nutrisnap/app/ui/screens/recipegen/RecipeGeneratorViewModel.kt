@@ -309,7 +309,7 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             diaryRepo.insertAndSync(
                 DiaryEntry(
-                    foodItemId  = -999,
+                    foodItemId  = ch.nutrisnap.app.data.model.MANUAL_FOOD_ITEM_ID,
                     foodName    = meal.title,
                     amountGrams = 0f,
                     mealType    = meal.mealType.toMealTypeOrDefault(),
@@ -331,7 +331,7 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
             plan.meals.forEach { meal ->
                 diaryRepo.insertAndSync(
                     DiaryEntry(
-                        foodItemId  = -999,
+                        foodItemId  = ch.nutrisnap.app.data.model.MANUAL_FOOD_ITEM_ID,
                         foodName    = meal.title,
                         amountGrams = 0f,
                         mealType    = meal.mealType.toMealTypeOrDefault(),
@@ -460,7 +460,7 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
             val factor = servings.coerceAtLeast(1).toFloat() / recipe.servings.coerceAtLeast(1).toFloat()
             diaryRepo.insertAndSync(
                 DiaryEntry(
-                    foodItemId  = -999,
+                    foodItemId  = ch.nutrisnap.app.data.model.MANUAL_FOOD_ITEM_ID,
                     foodName    = recipe.title,
                     amountGrams = 0f,
                     mealType    = mealType,

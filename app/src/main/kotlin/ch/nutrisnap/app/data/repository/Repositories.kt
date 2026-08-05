@@ -110,17 +110,16 @@ class DiaryRepository(db: NutriDatabase) {
     ): Long {
         val perServing  = recipe.servings.coerceAtLeast(1).toFloat()
         // Gramm-Modus: Anteil am Gesamtgericht (Roh- oder Kochgewicht).
-        // Werte < 10 g sind praktisch immer Portionsfaktoren, die fälschlich als
-        // Gramm gelandet sind (Anzeige "1 g" bei voller Portions-kcal).
+        // Nur explizite Gramm-Angaben ≥ 10 g; kleinere Werte sind Portionsfaktoren
+        // (nie als Gramm speichern — sonst „1 g“ bei voller Portions-kcal).
         val yieldG = recipe.yieldWeightG()
             ?: ch.nutrisnap.app.domain.RecipeNutritionAnalyzer.estimateTotalGrams(recipe.ingredients)
                 .takeIf { it > 0f }
         val realGrams = gramsAmount?.takeIf { it >= 10f }
         val factor = when {
             realGrams != null && yieldG != null && yieldG > 0f ->
-                realGrams / yieldG * perServing
-            gramsAmount != null && gramsAmount > 0f && gramsAmount < 10f ->
-                gramsAmount  // als Portionen interpretieren
+                (realGrams / yieldG * perServing).coerceAtLeast(0.05f)
+            // Kein stiller Portions-Fallback aus „Gramm < 10“: Aufrufer muss servingsFactor setzen
             else -> servingsFactor.coerceAtLeast(0.05f)
         }
         val calsPerServ = recipe.totalCalories?.let { it / perServing } ?: 0f
@@ -134,8 +133,8 @@ class DiaryRepository(db: NutriDatabase) {
         val salt        = (recipe.saltPerServing    ?: 0f) * factor
         val sodium      = (recipe.sodiumPerServing  ?: 0f) * factor
 
-        // amountGrams: bei Gramm-Tracking die echten Gramm (Anzeige), sonst Portionsfaktor
-        val storedAmount = realGrams ?: factor
+        // amountGrams = immer Portionsfaktor (Skalierung); recipeGrams = Anzeige in g
+        val storedAmount = factor
         val storedRecipeGrams = realGrams
 
         val id = dao.insert(
@@ -163,7 +162,8 @@ class DiaryRepository(db: NutriDatabase) {
 
     /**
      * Manual entry: user types name + kcal + optional macros directly.
-     * foodItemId = -999 marks manual entries. amountGrams = 0 (no gram-based amount).
+     * foodItemId = [MANUAL_FOOD_ITEM_ID] marks manual entries. amountGrams = 0
+     * (Portionsbasis 1 beim ersten Edit).
      */
     suspend fun addManualEntry(
         name: String,
@@ -184,7 +184,7 @@ class DiaryRepository(db: NutriDatabase) {
     ): Long {
         val id = dao.insert(
             DiaryEntry(
-                foodItemId  = -999,
+                foodItemId  = MANUAL_FOOD_ITEM_ID,
                 foodName    = name,
                 amountGrams = amountGrams,
                 mealType    = mealType,
@@ -277,18 +277,7 @@ class DiaryRepository(db: NutriDatabase) {
             if (!looksLikeOnePortion) continue
 
             val factor = 1f / serv
-            val updated = entry.copy(
-                calories = entry.calories * factor,
-                protein = entry.protein * factor,
-                carbs = entry.carbs * factor,
-                fat = entry.fat * factor,
-                fiber = entry.fiber * factor,
-                sugar = entry.sugar * factor,
-                saturatedFat = entry.saturatedFat * factor,
-                salt = entry.salt * factor,
-                sodium = entry.sodium * factor,
-                amountGrams = 1f
-            )
+            val updated = entry.scaledBy(factor).copy(amountGrams = 1f)
             dao.update(updated)
             pushSafely { SupabaseSync.upsertDiaryEntry(updated) }
             fixed++
@@ -297,14 +286,19 @@ class DiaryRepository(db: NutriDatabase) {
     }
 
     companion object {
-        /** Inhaltlicher Fingerprint für Dedup (Import + Sync-Pull). */
+        /**
+         * Inhaltlicher Fingerprint für Dedup (Import + Sync-Pull).
+         * foodItemId und feinere Rundung reduzieren False-Positives bei ähnlichen Mengen.
+         */
         fun contentFingerprint(entry: DiaryEntry): String =
             listOf(
                 entry.dateStr,
                 entry.mealType.name,
+                entry.foodItemId.toString(),
                 entry.foodName.trim().lowercase(),
-                "%.1f".format(entry.amountGrams),
-                "%.0f".format(entry.calories)
+                "%.2f".format(entry.amountGrams),
+                "%.1f".format(entry.calories),
+                entry.recipeGrams?.let { "%.1f".format(it) } ?: "-"
             ).joinToString("|")
     }
 

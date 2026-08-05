@@ -209,7 +209,7 @@ object SyncManager {
                     dao.insert(
                         DiaryEntry(
                             id = row.localId,
-                            foodItemId = -999,
+                            foodItemId = ch.nutrisnap.app.data.model.MANUAL_FOOD_ITEM_ID,
                             foodName = row.foodName,
                             amountGrams = row.amountGrams,
                             mealType = mealType,
@@ -230,7 +230,7 @@ object SyncManager {
                 }
                 val newId = dao.insert(
                     DiaryEntry(
-                        foodItemId = -999,
+                        foodItemId = ch.nutrisnap.app.data.model.MANUAL_FOOD_ITEM_ID,
                         foodName = row.foodName,
                         amountGrams = row.amountGrams,
                         mealType = mealType,
