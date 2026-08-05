@@ -36,7 +36,7 @@ object InstagramWebViewScraper {
      */
     @SuppressLint("SetJavaScriptEnabled")
     suspend fun extractCaption(context: Context, url: String): String? =
-        withTimeout(16_000L) {
+        withTimeout(18_000L) {
             suspendCancellableCoroutine { cont ->
                 val mainHandler = Handler(Looper.getMainLooper())
                 mainHandler.post {

@@ -42,8 +42,8 @@ class RecipeScraper(private val context: Context) {
     }
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(8, TimeUnit.SECONDS)
-        .readTimeout(12, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(18, TimeUnit.SECONDS) // Jina/Mirror brauchen oft länger als IG-Embed
         .followRedirects(true)
         .addInterceptor { chain ->
             val req = chain.request().newBuilder()
@@ -144,8 +144,8 @@ class RecipeScraper(private val context: Context) {
     }
 
     /**
-     * Startet WebView + offizielles Embed + Mirror-Seiten parallel und nimmt die
-     * erste brauchbare Caption. Gesamtdauer typisch unter ~18s.
+     * Startet WebView + Embed + Mirror + Reader-Proxies parallel und nimmt die
+     * erste brauchbare Caption. Gesamtdauer typisch unter ~22s.
      */
     private suspend fun raceInstagramCaption(url: String, shortcode: String?): String =
         coroutineScope {
@@ -173,6 +173,46 @@ class RecipeScraper(private val context: Context) {
                         runCatching {
                             val embedUrl = "https://www.instagram.com/p/$shortcode/embed/captioned/"
                             InstagramWebViewScraper.extractCaption(context, embedUrl)?.let { Cap(it, "webview-embed") }
+                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                    })
+                    // 2c) Legacy JSON-Endpoint (?__a=1&__d=dis) — manchmal noch offen
+                    add(async {
+                        runCatching {
+                            fetchInstagramLegacyJsonCaption(shortcode)?.let { Cap(it, "legacy-json") }
+                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                    })
+                    // 2d) Öffentliche GraphQL-Shortcode-Query
+                    add(async {
+                        runCatching {
+                            fetchInstagramGraphqlCaption(shortcode)?.let { Cap(it, "graphql") }
+                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                    })
+                    // 3) Jina Reader — öffentlicher Page-to-Markdown-Proxy, oft an Login-Wall vorbei
+                    add(async {
+                        runCatching {
+                            fetchJinaReaderCaption("https://www.instagram.com/p/$shortcode/")
+                                ?.let { Cap(it, "jina-p") }
+                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                    })
+                    add(async {
+                        runCatching {
+                            fetchJinaReaderCaption("https://www.instagram.com/reel/$shortcode/")
+                                ?.let { Cap(it, "jina-reel") }
+                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                    })
+                    add(async {
+                        runCatching {
+                            fetchJinaReaderCaption("https://www.instagram.com/p/$shortcode/embed/captioned/")
+                                ?.let { Cap(it, "jina-embed") }
+                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                    })
+                    // 4) AllOrigins als CORS-Proxy aufs Embed
+                    add(async {
+                        runCatching {
+                            val embed = "https://www.instagram.com/p/$shortcode/embed/captioned/"
+                            val proxied = "https://api.allorigins.win/raw?url=${encode(embed)}"
+                            val html = fetchStringWithUA(proxied, desktopUa)
+                            extractCaptionFromHtml(html, embed)?.let { Cap(it, "allorigins-embed") }
                         }.getOrNull()?.takeIf { isGoodCaption(it.text) }
                     })
                     add(async {
@@ -213,7 +253,6 @@ class RecipeScraper(private val context: Context) {
                             Cap(t, "ddinstagram").takeIf { isGoodCaption(it.text) }
                         }.getOrNull()
                     })
-                    // 3) Worker-Mirror (oft noch erreichbar wenn Main-Domain down)
                     add(async {
                         runCatching {
                             val wUrl = "https://ddinstagram.com/p/$shortcode"
@@ -223,11 +262,20 @@ class RecipeScraper(private val context: Context) {
                             Cap(t, "ddinstagram-apex").takeIf { isGoodCaption(it.text) }
                         }.getOrNull()
                     })
+                    // Weitere Mirror (Worker-Frontends)
+                    add(async {
+                        runCatching {
+                            val doc = jsoupGetWithUA("https://www.instagrapi.com/p/$shortcode", desktopUa)
+                            val t = doc.select("meta[property=og:description]").attr("content")
+                                .ifBlank { doc.select("[class*=caption], .caption, p").text() }
+                            Cap(t, "instagrapi").takeIf { isGoodCaption(it.text) }
+                        }.getOrNull()
+                    })
                 }
             }
 
-            // Erste brauchbare Caption innerhalb 18s
-            val winner = withTimeoutOrNull(18_000L) {
+            // Erste brauchbare Caption innerhalb 22s
+            val winner = withTimeoutOrNull(22_000L) {
                 val pending = jobs.toMutableList()
                 while (pending.isNotEmpty()) {
                     val done = select {
@@ -253,6 +301,100 @@ class RecipeScraper(private val context: Context) {
             jobs.forEach { it.cancel() }
             best
         }
+
+    /** Jina Reader: holt die Seite serverseitig und liefert Markdown/Text. */
+    private fun fetchJinaReaderCaption(targetUrl: String): String? {
+        val jinaUrl = "https://r.jina.ai/${targetUrl.trim()}"
+        val body = fetchStringWithUA(
+            jinaUrl,
+            "Mozilla/5.0 (compatible; NutriSnap/1.0; +https://nutrisnap.dev)"
+        ) ?: return null
+        if (body.length < 40) return null
+        // Login-Wall / leere IG-Seiten herausfiltern
+        val lc = body.lowercase()
+        if ("log in" in lc && "sign up" in lc && body.length < 400) return null
+        // Caption aus Markdown/Text extrahieren
+        val cleaned = body
+            .lineSequence()
+            .filterNot { line ->
+                val l = line.trim()
+                l.startsWith("Title:") || l.startsWith("URL Source:") ||
+                    l.startsWith("Markdown Content:") || l.startsWith("Warning:") ||
+                    l.startsWith("======") || l.startsWith("------")
+            }
+            .joinToString("\n")
+            .trim()
+        // Längsten zusammenhängenden Block mit Rezept-Hinweisen nehmen
+        val blocks = cleaned.split(Regex("\n{2,}")).map { it.trim() }.filter { it.length >= 40 }
+        val recipeHints = listOf("zutaten", "ingredient", "rezept", "recipe", "anleitung", " tbsp", " el ", "g ", "ml ")
+        val best = blocks
+            .filter { b ->
+                val l = b.lowercase()
+                recipeHints.any { it in l } || b.length >= 120
+            }
+            .maxByOrNull { it.length }
+            ?: blocks.maxByOrNull { it.length }
+        return best?.take(6000)
+    }
+
+    /** Instagram Legacy-JSON: /p/{code}/?__a=1&__d=dis */
+    private fun fetchInstagramLegacyJsonCaption(shortcode: String): String? {
+        val urls = listOf(
+            "https://www.instagram.com/p/$shortcode/?__a=1&__d=dis",
+            "https://www.instagram.com/reel/$shortcode/?__a=1&__d=dis"
+        )
+        for (u in urls) {
+            val body = runCatching {
+                fetchStringWithUA(
+                    u,
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                )
+            }.getOrNull() ?: continue
+            if (body.isBlank() || !body.trimStart().startsWith("{")) continue
+            val caption = Regex(""""text"\s*:\s*"((?:[^"\\]|\\.){40,})"""")
+                .findAll(body)
+                .map { it.groupValues[1].replace("\\n", "\n").replace("\\\"", "\"") }
+                .maxByOrNull { it.length }
+            if (!caption.isNullOrBlank()) return caption
+        }
+        return null
+    }
+
+    /**
+     * Öffentliche GraphQL-Query (query_hash für shortcode media).
+     * Funktioniert nicht immer, aber oft noch für öffentliche Posts.
+     */
+    private fun fetchInstagramGraphqlCaption(shortcode: String): String? {
+        val variables = """{"shortcode":"$shortcode","child_comment_count":0,"fetch_comment_count":0,"parent_comment_count":0,"has_threaded_comments":false}"""
+        val queryUrl =
+            "https://www.instagram.com/graphql/query/?query_hash=9f8827793ef34641b2ca9877130b1d0&variables=${encode(variables)}"
+        val body = runCatching {
+            fetchStringWithUA(
+                queryUrl,
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            )
+        }.getOrNull() ?: return null
+        if (body.isBlank() || "login" in body.lowercase().take(300)) return null
+        return Regex(""""text"\s*:\s*"((?:[^"\\]|\\.){40,})"""")
+            .findAll(body)
+            .map { it.groupValues[1].replace("\\n", "\n").replace("\\\"", "\"") }
+            .maxByOrNull { it.length }
+    }
+
+    private fun extractCaptionFromHtml(html: String, baseUri: String): String? {
+        if (html.isBlank()) return null
+        val doc = Jsoup.parse(html, baseUri)
+        val candidates = listOf(
+            doc.select(".Caption, .CaptionContent, [class*=Caption]").text(),
+            doc.select("meta[property=og:description]").attr("content"),
+            doc.select("meta[name=description]").attr("content"),
+            Regex(""""text"\s*:\s*"((?:[^"\\]|\\.){40,})"""").findAll(html)
+                .map { it.groupValues[1].replace("\\n", "\n").replace("\\\"", "\"") }
+                .maxByOrNull { it.length }
+                .orEmpty()
+        )
+        return candidates.map { it.trim() }.filter { it.length >= 40 }.maxByOrNull { it.length }
+    }
 
     /**
      * Offizielle Embed-Seite: für öffentliche Posts oft ohne Login und mit Caption im HTML.

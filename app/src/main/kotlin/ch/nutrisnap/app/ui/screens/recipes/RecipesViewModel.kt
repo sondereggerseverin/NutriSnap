@@ -323,28 +323,38 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearBatch() { _batchState.value = BatchImportState() }
 
-    /** Importiert alle noch offenen Items sequenziell (schont Insta/TikTok-Endpunkte, vermeidet Rate-Limits). */
+    /**
+     * Importiert offene Items sequenziell. Instagram: längere Pause + ein automatischer
+     * Retry bei Block (Rate-Limit / Login-Wall oft nach kurzer Wartezeit weg).
+     */
     fun runBatchImport() {
         if (_batchState.value.isRunning) return
         viewModelScope.launch {
             _batchState.update { it.copy(isRunning = true) }
             val queue = _batchState.value.items.filter { it.status != BatchStatus.DONE }
             for ((index, item) in queue.withIndex()) {
-                // Pause zwischen Instagram-Requests → weniger Rate-Limits / Blocks
-                if (index > 0 && "instagram.com" in item.url.lowercase()) {
-                    kotlinx.coroutines.delay(1_200L)
+                val isIg = "instagram.com" in item.url.lowercase() || "instagr.am" in item.url.lowercase()
+                if (index > 0 && isIg) {
+                    kotlinx.coroutines.delay(2_800L)
                 }
                 _batchState.update { st ->
                     st.copy(items = st.items.map { if (it.url == item.url) it.copy(status = BatchStatus.RUNNING) else it })
                 }
-                val result = repo.importFromUrl(item.url)
+                var result = repo.importFromUrl(item.url)
+                if (!result.success && result.instagramBlocked && isIg) {
+                    kotlinx.coroutines.delay(3_500L)
+                    result = repo.importFromUrl(item.url)
+                }
                 _batchState.update { st ->
                     st.copy(items = st.items.map {
                         if (it.url != item.url) it
                         else when {
-                            result.success            -> it.copy(status = BatchStatus.DONE, resultTitle = result.recipe?.title)
-                            result.instagramBlocked    -> it.copy(status = BatchStatus.ERROR, error = "Instagram blockiert – manuell einfügen nötig")
-                            else                       -> it.copy(status = BatchStatus.ERROR, error = result.error ?: "Fehler")
+                            result.success -> it.copy(status = BatchStatus.DONE, resultTitle = result.recipe?.title)
+                            result.instagramBlocked -> it.copy(
+                                status = BatchStatus.ERROR,
+                                error = "Instagram blockiert – manuell einfügen nötig"
+                            )
+                            else -> it.copy(status = BatchStatus.ERROR, error = result.error ?: "Fehler")
                         }
                     })
                 }
