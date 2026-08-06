@@ -444,7 +444,9 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
                             android.util.Log.w("ZenMuxImage", "Bild fehlgeschlagen: ${e.message}")
                             it.copy(
                                 isGeneratingImage = false,
-                                imageError = e.message?.take(120) ?: "Bildgenerierung fehlgeschlagen"
+                                imageError = (e.message ?: "Bildgenerierung fehlgeschlagen")
+                                    .replace(Regex("""\s+"""), " ")
+                                    .take(100)
                             )
                         }
                     )

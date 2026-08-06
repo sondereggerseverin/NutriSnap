@@ -62,9 +62,15 @@ class ZenMuxImageService(private val context: Context) {
                 )
             }
 
+            // 4) Pollinations (kostenlos, kein Key) – immer als letzter Fallback
+            generateViaPollinations(prompt).fold(
+                onSuccess = { return@withContext Result.success(it) },
+                onFailure = { errors += "Pollinations: ${it.message}" }
+            )
+
             val msg = when {
-                errors.isEmpty() -> "Kein Bild-API-Key konfiguriert (GEMINI/ZENMUX)"
-                else -> errors.joinToString(" · ").take(180)
+                errors.isEmpty() -> "Kein Bild-API-Key konfiguriert"
+                else -> errors.joinToString(" · ").take(160)
             }
             Log.e("RecipeImage", "Bildgenerierung fehlgeschlagen: $msg")
             Result.failure(Exception(msg))
@@ -215,6 +221,41 @@ class ZenMuxImageService(private val context: Context) {
                 lastErr = Exception("$model: keine Bilddaten")
             }
             Result.failure(lastErr ?: Exception("ZenMux Gemini Bild fehlgeschlagen"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+
+    /** Kostenloser Fallback ohne API-Key (Flux via Pollinations). */
+    private fun generateViaPollinations(prompt: String): Result<String> {
+        return try {
+            // Kurzer, englischer Food-Prompt für bessere Bildqualität
+            val short = prompt
+                .replace(Regex("""(?i)Professionelles, appetitliches Food-Fotografie-Bild von:\s*"""), "")
+                .replace(Regex("""Draufsicht.*"""), "")
+                .trim()
+                .take(200)
+            val encoded = java.net.URLEncoder.encode(
+                "professional food photography, plated dish, natural light, top view, appetizing, no text, no watermark: $short",
+                Charsets.UTF_8.name()
+            )
+            val url = "https://image.pollinations.ai/prompt/$encoded?width=1024&height=1024&nologo=true&enhance=true"
+            val request = Request.Builder()
+                .url(url)
+                .addHeader("User-Agent", "NutriSnap/1.1")
+                .get()
+                .build()
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                return Result.failure(Exception("${response.code}"))
+            }
+            val bytes = response.body?.bytes()
+                ?: return Result.failure(Exception("leerer Body"))
+            if (bytes.size < 1000) {
+                return Result.failure(Exception("Antwort zu klein (${bytes.size} B)"))
+            }
+            Result.success(saveBytes(bytes))
         } catch (e: Exception) {
             Result.failure(e)
         }
