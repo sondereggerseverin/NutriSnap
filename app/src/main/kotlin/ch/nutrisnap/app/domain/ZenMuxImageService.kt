@@ -73,36 +73,50 @@ class ZenMuxImageService(private val context: Context) {
     private fun generateViaGemini(prompt: String): Result<String> {
         return try {
             val apiKey = BuildConfig.GEMINI_API_KEY
+            // Aktuelle Nano-Banana / Gemini-Image-Modelle (Stand 2026)
             val models = listOf(
                 "gemini-2.5-flash-image",
-                "gemini-2.0-flash-preview-image-generation"
+                "gemini-3.1-flash-image",
+                "gemini-3.1-flash-image-preview"
+            )
+            // responseModalities Varianten – Docs sind inkonsistent
+            val modalityVariants = listOf(
+                JSONArray().put("Image"),
+                JSONArray().put("TEXT").put("IMAGE"),
+                JSONArray().put("IMAGE")
             )
             var lastErr: Exception? = null
             for (model in models) {
-                val url =
-                    "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
-                val body = JSONObject().apply {
-                    put("contents", JSONArray().put(JSONObject().apply {
-                        put("parts", JSONArray().put(JSONObject().apply { put("text", prompt) }))
-                    }))
-                    put("generationConfig", JSONObject().apply {
-                        put("responseModalities", JSONArray().put("TEXT").put("IMAGE"))
-                    })
-                }.toString()
+                for (modalities in modalityVariants) {
+                    val url =
+                        "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent"
+                    val body = JSONObject().apply {
+                        put("contents", JSONArray().put(JSONObject().apply {
+                            put("parts", JSONArray().put(JSONObject().apply { put("text", prompt) }))
+                        }))
+                        put("generationConfig", JSONObject().apply {
+                            put("responseModalities", modalities)
+                        })
+                    }.toString()
 
-                val request = Request.Builder()
-                    .url(url)
-                    .post(body.toRequestBody("application/json".toMediaType()))
-                    .build()
-                val response = client.newCall(request).execute()
-                val bodyStr = response.body?.string().orEmpty()
-                if (!response.isSuccessful) {
-                    lastErr = Exception("$model → ${response.code}: ${bodyStr.take(120)}")
-                    continue
+                    val request = Request.Builder()
+                        .url(url)
+                        .addHeader("x-goog-api-key", apiKey)
+                        .addHeader("Content-Type", "application/json")
+                        .post(body.toRequestBody("application/json".toMediaType()))
+                        .build()
+                    val response = client.newCall(request).execute()
+                    val bodyStr = response.body?.string().orEmpty()
+                    if (!response.isSuccessful) {
+                        lastErr = Exception("$model → ${response.code}")
+                        // 404 = Modell existiert nicht → nächstes Modell, nicht nächste Modalität
+                        if (response.code == 404) break
+                        continue
+                    }
+                    val bytes = extractGeminiImageBytes(bodyStr)
+                    if (bytes != null) return Result.success(saveBytes(bytes))
+                    lastErr = Exception("$model: keine Bilddaten (${bodyStr.take(80)})")
                 }
-                val bytes = extractGeminiImageBytes(bodyStr)
-                if (bytes != null) return Result.success(saveBytes(bytes))
-                lastErr = Exception("$model: keine Bilddaten in Antwort")
             }
             Result.failure(lastErr ?: Exception("Gemini Bild fehlgeschlagen"))
         } catch (e: Exception) {
