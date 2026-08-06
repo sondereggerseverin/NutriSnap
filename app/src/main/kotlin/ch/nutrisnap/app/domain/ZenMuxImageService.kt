@@ -334,20 +334,20 @@ class ZenMuxImageService(private val context: Context) {
             .joinToString(", ")
 
         return buildString {
-            append("Professional food photography, photorealistic magazine cover quality of: $dish. ")
+            append("Natural handheld food photo of: $dish, shot on a real camera, not AI-generated looking. ")
             append("$styleHint. ")
             if (ings.isNotBlank()) append("Key visible ingredients: $ings. ")
             append(
-                "Single bowl or plate only, perfectly centered, rustic wooden table surface, " +
-                    "soft natural window side lighting, gentle shadows, shallow depth of field, " +
-                    "tight crop focusing on the food, rich colors, appetizing texture detail, " +
-                    "steam or slight sheen where appropriate, Michelin-restaurant plating. "
+                "Single bowl or plate on a worn wooden table, slight natural asymmetry, " +
+                    "soft window light from the side, realistic shadows, gentle depth of field, " +
+                    "true-to-life colors, visible food texture (sauce gloss, noodle strands, char), " +
+                    "slight steam optional, casual home-cook or neighborhood restaurant plating. "
             )
             append(
-                "Must match the named dish exactly — correct ingredients and appearance. " +
-                    "No people, no hands, no cutlery in foreground, no restaurant diners, " +
-                    "no text, no watermark, no logo, no plastic look, no oversaturated neon colors, " +
-                    "no peas-and-corn Western cafeteria style."
+                "Must match the named dish exactly. " +
+                    "Avoid: plastic skin, waxy surfaces, oversaturated neon colors, perfect symmetry, " +
+                    "CGI look, stock-photo sterility, people, hands, cutlery in foreground, text, watermark, logo, " +
+                    "peas-and-corn cafeteria style."
             )
         }
     }
