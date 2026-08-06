@@ -18,8 +18,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Generiert Rezeptbilder. Reihenfolge:
- * 1. Cloudflare Workers AI FLUX.1 [schnell] (~170/Tag free)
- * 2. Gemini Image (falls Quota)
+ * 1. Gemini Image (beste Food-Qualität, Free-Tier ~250–500/Tag)
+ * 2. Cloudflare Workers AI FLUX.1 [schnell] (~170/Tag free)
  * 3. Pollinations Flux (kein Key)
  * 4. ZenMux (falls Key Rechte hat)
  */
@@ -39,21 +39,21 @@ class ZenMuxImageService(private val context: Context) {
 
             val errors = mutableListOf<String>()
 
-            // 1) Cloudflare Workers AI – FLUX.1 schnell (bestes Free-Tier)
+            // 1) Gemini Image – beste Food-Foto-Qualität (Free-Tier ausreichend)
+            if (BuildConfig.GEMINI_API_KEY.isNotBlank()) {
+                generateViaGemini(prompt).fold(
+                    onSuccess = { return@withContext Result.success(it) },
+                    onFailure = { errors += "Gemini: ${it.message}" }
+                )
+            }
+
+            // 2) Cloudflare Workers AI – FLUX.1 schnell (zuverlässiger Free-Fallback)
             if (BuildConfig.CLOUDFLARE_ACCOUNT_ID.isNotBlank() &&
                 BuildConfig.CLOUDFLARE_API_TOKEN.isNotBlank()
             ) {
                 generateViaCloudflare(prompt).fold(
                     onSuccess = { return@withContext Result.success(it) },
                     onFailure = { errors += "CF: ${it.message}" }
-                )
-            }
-
-            // 2) Gemini Image
-            if (BuildConfig.GEMINI_API_KEY.isNotBlank()) {
-                generateViaGemini(prompt).fold(
-                    onSuccess = { return@withContext Result.success(it) },
-                    onFailure = { errors += "Gemini: ${it.message}" }
                 )
             }
 
@@ -281,45 +281,73 @@ class ZenMuxImageService(private val context: Context) {
 
 
     /**
-     * Baut einen englischen Food-Photo-Prompt – Modelle (Flux/Gemini) reagieren
+     * Baut einen englischen Food-Photo-Prompt – Modelle (Gemini/Flux) reagieren
      * darauf deutlich besser als auf deutsche Fliesstexte.
      */
     private fun buildFoodPrompt(title: String, description: String, ingredientsHint: String): String {
         val dish = title.trim().ifBlank { "homemade meal" }
-        // Kurze, gerichtsspezifische Hinweise aus Titel/Beschreibung
-        val lower = "$title $description".lowercase()
+        val lower = "$title $description $ingredientsHint".lowercase()
+            .replace("ä", "ae").replace("ö", "oe").replace("ü", "ue")
+
         val styleHint = when {
+            // Indonesisch – Bami/Mie = Nudeln, Nasi = Reis
+            "bami goreng" in lower || "bamigoreng" in lower || "mie goreng" in lower ||
+                "miegoreng" in lower || "bamie" in lower ->
+                "authentic Indonesian bami goreng (fried noodles), dark glossy kecap manis coated " +
+                    "wheat noodles, chicken strips, shrimp, bean sprouts, fried egg on top, " +
+                    "fresh cucumber and lime on the side, crispy shallots, chili slices — " +
+                    "not rice, not yellow plain noodles"
+            "nasi goreng" in lower || "nasigoreng" in lower || "gebratener reis" in lower ->
+                "authentic Indonesian nasi goreng, dark brown wok-fried rice with caramelized " +
+                    "kecap manis, scrambled egg, chicken or shrimp, green onions, cucumber slices, " +
+                    "fried shallots — rich brown color, not plain yellow rice, not pale"
+            "pad thai" in lower || "padthai" in lower ->
+                "authentic Thai pad thai, flat rice noodles, tamarind sauce, peanuts, bean sprouts, lime"
             "thai" in lower && ("rot" in lower || "red" in lower) ->
                 "authentic Thai red curry (gaeng phed) with rich red coconut milk sauce, " +
                     "chicken pieces, Thai basil, red chilies — not orange soup, not Western stew"
-            "thai" in lower && ("grün" in lower || "green" in lower) ->
+            "thai" in lower && ("gruen" in lower || "green" in lower) ->
                 "authentic Thai green curry (gaeng khiao wan) with green coconut curry sauce"
             "thai" in lower -> "authentic Thai restaurant dish, coconut curry style"
-            "nasi goreng" in lower || "gebratener reis" in lower ->
-                "authentic Indonesian nasi goreng, brown wok-fried rice with egg and vegetables, not plain yellow rice"
             "curry" in lower -> "authentic restaurant curry, thick sauce, not thin soup"
-            "bowl" in lower -> "composed grain bowl, neatly arranged toppings"
-            else -> "authentic restaurant presentation of this exact dish"
+            "bowl" in lower || "poke" in lower || "buddha" in lower ->
+                "composed grain bowl, neatly arranged colorful toppings, fresh and vibrant"
+            "pasta" in lower || "spaghetti" in lower || "penne" in lower || "tagliatelle" in lower ->
+                "restaurant-style Italian pasta, glossy sauce coating the noodles, fresh herbs"
+            "pizza" in lower -> "artisan pizza, blistered crust, melted cheese, overhead shot"
+            "burger" in lower || "hamburger" in lower ->
+                "juicy gourmet burger, stacked high, sesame bun, melted cheese, side of fries"
+            "sushi" in lower || "sashimi" in lower || "maki" in lower ->
+                "elegant Japanese sushi platter, fresh fish, wasabi, pickled ginger, dark slate plate"
+            "steak" in lower || "rind" in lower || "beef" in lower ->
+                "perfectly seared steak, medium rare, resting on plate with herb butter"
+            "suppe" in lower || "soup" in lower || "eintopf" in lower ->
+                "hearty restaurant soup in a deep bowl, steam rising, fresh garnish on top"
+            else -> "authentic restaurant presentation of this exact dish, appetizing and detailed"
         }
+
         val ings = ingredientsHint
             .lines()
-            .map { it.replace(Regex("""^[\\d.,/\\s]+[a-zA-Zµ]*\\s*"""), "").trim() }
+            .map { it.replace(Regex("""^[\d.,/\s]+[a-zA-Zµ]*\s*"""), "").trim() }
             .filter { it.length in 2..40 }
-            .take(5)
+            .take(6)
             .joinToString(", ")
+
         return buildString {
-            append("Photorealistic food magazine photo of: $dish. ")
+            append("Professional food photography, photorealistic magazine cover quality of: $dish. ")
             append("$styleHint. ")
-            if (ings.isNotBlank()) append("Visible ingredients: $ings. ")
+            if (ings.isNotBlank()) append("Key visible ingredients: $ings. ")
             append(
-                "Single bowl or plate only, centered, rustic wooden table, " +
-                    "soft natural side light, shallow depth of field, " +
-                    "tight crop on the food, restaurant quality. "
+                "Single bowl or plate only, perfectly centered, rustic wooden table surface, " +
+                    "soft natural window side lighting, gentle shadows, shallow depth of field, " +
+                    "tight crop focusing on the food, rich colors, appetizing texture detail, " +
+                    "steam or slight sheen where appropriate, Michelin-restaurant plating. "
             )
             append(
-                "Must match the named dish exactly. " +
-                    "No people, no hands, no restaurant background diners, " +
-                    "no text, no watermark, no logo, no peas-and-corn Western soup look."
+                "Must match the named dish exactly — correct ingredients and appearance. " +
+                    "No people, no hands, no cutlery in foreground, no restaurant diners, " +
+                    "no text, no watermark, no logo, no plastic look, no oversaturated neon colors, " +
+                    "no peas-and-corn Western cafeteria style."
             )
         }
     }
