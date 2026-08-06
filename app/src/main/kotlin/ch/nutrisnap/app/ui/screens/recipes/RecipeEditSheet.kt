@@ -108,8 +108,12 @@ fun RecipeEditSheet(
                 }
             }
             HorizontalDivider()
-            Text("Kategorie", fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
-                modifier = Modifier.padding(horizontal = 16.dp, top = 12.dp, bottom = 6.dp))
+            Text(
+                text = "Kategorie",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 16.dp, top = 12.dp, bottom = 6.dp)
+            )
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -122,7 +126,9 @@ fun RecipeEditSheet(
                     FilterChip(
                         selected = category == cat,
                         onClick = { category = cat },
-                        label = { Text("${cat.emoji} ${cat.label}", fontSize = 12.sp) }
+                        label = {
+                            Text(cat.emoji + " " + cat.label, style = MaterialTheme.typography.labelMedium)
+                        }
                     )
                 }
             }

@@ -274,8 +274,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
      * als Basis dient und nur die Needles filtern.
      */
     fun searchByIngredients(raw: String, category: RecipeCategory? = null) {
-        val needles = raw.split(',', '
-', ';')
+        val needles = raw.split(Regex("[,;\n]"))
             .map { it.trim() }
             .filter { it.length >= 2 }
             .distinct()
