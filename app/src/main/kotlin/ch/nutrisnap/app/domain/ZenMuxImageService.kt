@@ -281,73 +281,72 @@ class ZenMuxImageService(private val context: Context) {
 
 
     /**
-     * Baut einen englischen Food-Photo-Prompt – Modelle (Gemini/Flux) reagieren
-     * darauf deutlich besser als auf deutsche Fliesstexte.
+     * Baut einen englischen Food-Photo-Prompt im Stil echter Handy-Fotos
+     * (Zuhause / einfaches Restaurant) – nicht Food-Blog / Studio.
      */
     private fun buildFoodPrompt(title: String, description: String, ingredientsHint: String): String {
         val dish = title.trim().ifBlank { "homemade meal" }
         val lower = "$title $description $ingredientsHint".lowercase()
             .replace("ä", "ae").replace("ö", "oe").replace("ü", "ue")
 
-        val styleHint = when {
-            // Indonesisch – Bami/Mie = Nudeln, Nasi = Reis
+        // Was genau auf dem Teller liegen muss – zuerst Identität, dann Stil
+        val whatOnPlate = when {
             "bami goreng" in lower || "bamigoreng" in lower || "mie goreng" in lower ||
                 "miegoreng" in lower || "bamie" in lower ->
-                "authentic Indonesian bami goreng (fried noodles), dark glossy kecap manis coated " +
-                    "wheat noodles, chicken strips, shrimp, bean sprouts, fried egg on top, " +
-                    "fresh cucumber and lime on the side, crispy shallots, chili slices — " +
-                    "not rice, not yellow plain noodles"
+                "Indonesian bami goreng: dark brown fried egg noodles with chicken strips and shrimp, " +
+                    "topped with a fried egg, cucumber slices and lime — NOT rice, NOT pasta spaghetti"
             "nasi goreng" in lower || "nasigoreng" in lower || "gebratener reis" in lower ->
-                "authentic Indonesian nasi goreng, dark brown wok-fried rice with caramelized " +
-                    "kecap manis, scrambled egg, chicken or shrimp, green onions, cucumber slices, " +
-                    "fried shallots — rich brown color, not plain yellow rice, not pale"
+                "Indonesian nasi goreng: dark brown fried rice with kecap manis, egg, chicken or shrimp — NOT noodles"
+            "naan" in lower && !("butter chicken" in lower || "curry" in lower) ->
+                "ONLY garlic naan bread on a simple plate, golden brown spots, soft and puffy — " +
+                    "NO pasta, NO noodles, NO curry, NO sauce bowl"
+            "butter chicken" in lower || "butterchicken" in lower || "murgh makhani" in lower ->
+                "butter chicken: orange-red creamy tomato chicken curry in a bowl or skillet, " +
+                    "optionally with plain rice OR naan on the side — NO spaghetti, NO pasta"
+            "thunfisch" in lower || "tuna" in lower ->
+                "tuna vegetable skillet: chunks of tuna with mixed vegetables in a light tomato or chili-lime sauce " +
+                    "in a frying pan or on a plate — NO butter chicken, NO naan, NO pasta"
             "pad thai" in lower || "padthai" in lower ->
-                "authentic Thai pad thai, flat rice noodles, tamarind sauce, peanuts, bean sprouts, lime"
-            "thai" in lower && ("rot" in lower || "red" in lower) ->
-                "authentic Thai red curry (gaeng phed) with rich red coconut milk sauce, " +
-                    "chicken pieces, Thai basil, red chilies — not orange soup, not Western stew"
+                "pad thai with flat rice noodles, not wheat pasta"
             "thai" in lower && ("gruen" in lower || "green" in lower) ->
-                "authentic Thai green curry (gaeng khiao wan) with green coconut curry sauce"
-            "thai" in lower -> "authentic Thai restaurant dish, coconut curry style"
-            "curry" in lower -> "authentic restaurant curry, thick sauce, not thin soup"
-            "bowl" in lower || "poke" in lower || "buddha" in lower ->
-                "composed grain bowl, neatly arranged colorful toppings, fresh and vibrant"
-            "pasta" in lower || "spaghetti" in lower || "penne" in lower || "tagliatelle" in lower ->
-                "restaurant-style Italian pasta, glossy sauce coating the noodles, fresh herbs"
-            "pizza" in lower -> "artisan pizza, blistered crust, melted cheese, overhead shot"
-            "burger" in lower || "hamburger" in lower ->
-                "juicy gourmet burger, stacked high, sesame bun, melted cheese, side of fries"
-            "sushi" in lower || "sashimi" in lower || "maki" in lower ->
-                "elegant Japanese sushi platter, fresh fish, wasabi, pickled ginger, dark slate plate"
-            "steak" in lower || "rind" in lower || "beef" in lower ->
-                "perfectly seared steak, medium rare, resting on plate with herb butter"
-            "suppe" in lower || "soup" in lower || "eintopf" in lower ->
-                "hearty restaurant soup in a deep bowl, steam rising, fresh garnish on top"
-            else -> "authentic restaurant presentation of this exact dish, appetizing and detailed"
+                "Thai green curry with coconut milk, chicken, Thai eggplant, basil — green sauce, not orange"
+            "thai" in lower && ("rot" in lower || "red" in lower) ->
+                "Thai red curry with coconut milk, not Western stew"
+            "hacktaetschli" in lower || "hacktätschli" in lower || "meatball" in lower || "frikadelle" in lower ->
+                "Swiss-style pan-fried meatballs with roasted potato cubes and tomato-mozzarella salad on a dark plate"
+            "lachs" in lower || "salmon" in lower ->
+                "baked salmon fillet with roasted potatoes and broccoli, meal-prep style in a glass container or on a plate"
+            "pfannkuchen" in lower || "pancake" in lower ->
+                "stack of homemade pancakes with cooked cherries or berries on a white plate"
+            "pasta" in lower || "spaghetti" in lower || "penne" in lower || "nudeln" in lower ->
+                "home-cooked pasta with the sauce from the recipe, simple white plate"
+            "pizza" in lower -> "homemade pizza on a plate, not studio shot"
+            else -> "exactly the dish named \"$dish\", nothing else substituted"
         }
 
         val ings = ingredientsHint
             .lines()
             .map { it.replace(Regex("""^[\d.,/\s]+[a-zA-Zµ]*\s*"""), "").trim() }
             .filter { it.length in 2..40 }
-            .take(6)
+            .take(5)
             .joinToString(", ")
 
         return buildString {
-            append("Natural handheld food photo of: $dish, shot on a real camera, not AI-generated looking. ")
-            append("$styleHint. ")
-            if (ings.isNotBlank()) append("Key visible ingredients: $ings. ")
+            // Identität zuerst – Modelle priorisieren oft den Anfang
+            append("Phone photo of homemade food: $dish. ")
+            append("$whatOnPlate. ")
+            if (ings.isNotBlank()) append("Main ingredients visible: $ings. ")
             append(
-                "Single bowl or plate on a worn wooden table, slight natural asymmetry, " +
-                    "soft window light from the side, realistic shadows, gentle depth of field, " +
-                    "true-to-life colors, visible food texture (sauce gloss, noodle strands, char), " +
-                    "slight steam optional, casual home-cook or neighborhood restaurant plating. "
+                "Style like a real casual phone snapshot at home or a simple restaurant: " +
+                    "plain white plate or everyday bowl on a wooden table or kitchen counter, " +
+                    "imperfect homemade plating, sauce may drip a little, natural mixed indoor light, " +
+                    "slightly messy but appetizing, realistic textures, muted true colors, " +
+                    "shot from above or 45-degree angle, no professional studio setup. "
             )
             append(
-                "Must match the named dish exactly. " +
-                    "Avoid: plastic skin, waxy surfaces, oversaturated neon colors, perfect symmetry, " +
-                    "CGI look, stock-photo sterility, people, hands, cutlery in foreground, text, watermark, logo, " +
-                    "peas-and-corn cafeteria style."
+                "CRITICAL: show ONLY this dish — do not invent pasta, naan, or other foods not in the recipe. " +
+                    "No hands, no fingers, no people, no cutlery held in frame, no text, no watermark, " +
+                    "no plastic CGI look, no glossy food-blog perfection, no oversaturated colors."
             )
         }
     }
