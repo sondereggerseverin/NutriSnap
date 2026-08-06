@@ -248,32 +248,35 @@ Falls kein Rezepttitel erkennbar ist, erfinde einen passenden deutschen Namen.
 Du bist ein erfahrener Ernährungsberater und Koch.
 $taskDescription
 
-Berechne die Nährwerte EXAKT basierend auf echten Zutatenmengen.
-Referenzwerte pro 100g: Hühnerbrust=165kcal/31gP, Parmesan=431kcal/38gP,
-Ricotta=174kcal/11gP, Hackfleisch=250kcal/17gP, Pasta=350kcal/13gP,
-Reis=130kcal/3gP, Ei=155kcal/13gP, Butter=717kcal/1gP.
+$COMPLETE_INGREDIENT_RULES
 
-Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
-{
-  "title": "Rezeptname",
-  "description": "Kurze Beschreibung",
-  "structuredIngredients": [
-    {"name": "Hühnerbrust", "amount": "200g", "calories": 330, "protein": 62.0, "carbs": 0.0, "fat": 7.0}
-  ],
-  "ingredients": ["200g Hühnerbrust"],
-  "steps": ["Schritt 1", "Schritt 2"],
-  "servings": 4,
-  "prepTimeMinutes": 30,
-  "calories": 650,
-  "protein": 55.0,
-  "carbs": 45.0,
-  "fat": 25.0
-}
+$NUTRITION_RULES
 
-calories/protein/carbs/fat auf Toplevel = Werte PRO PORTION.
-Werte in structuredIngredients = GESAMT für die gesamte Zutatenmenge.
+$JSON_SCHEMA_HINT
 """.trimIndent()
     }
+
+    private val COMPLETE_INGREDIENT_RULES = """
+VOLLSTÄNDIGE ZUTATENLISTE (Pflicht):
+- Liste JEDE Zutat mit Menge, die im Gericht landet — nicht nur die „Hauptzutaten“.
+- Immer mit angeben, wenn im Gericht üblich: Speiseöl/Butter/Ghee, Zwiebel, Knoblauch,
+  Ingwer, Tomatenmark, Bouillon/Brühe, Milch/Sahne/Joghurt, alle Gewürze (einzeln mit Menge,
+  z.B. „1 TL Kurkuma“, „½ TL Garam Masala“), Salz, Pfeffer, frische Kräuter.
+- Auch kleine Mengen tracken: 1 EL Öl ≈ 14 g / ~120 kcal — das darf nicht fehlen.
+- Keine Schritte mit Zutaten, die nicht in structuredIngredients stehen
+  (z.B. wenn Schritt „Zwiebel anbraten“ sagt → Zwiebel muss in der Liste sein).
+- Typisches Curry/Pfannengericht: 8–15 Zutatenzeilen, nicht 2–3.
+""".trimIndent()
+
+    private val NUTRITION_RULES = """
+NÄHRWERTE:
+- structuredIngredients: kcal/P/KH/F = GESAMT für die genannte Menge (nicht pro 100 g).
+- Toplevel calories/protein/carbs/fat = PRO PORTION (= Summe aller structuredIngredients / servings).
+- Referenz pro 100 g: Hühnerbrust 165 kcal/31 g P/3,6 g F; Reis gekocht 130/2,7/0,3;
+  Reis roh 350/7/1; Butter 717/0,9/81; Olivenöl 884/0/100; Zwiebel 40/1/0,1;
+  Knoblauch 149/6/0,5; Tomatenmark 82/4/0,5; Vollmilch 64/3,4/3,6.
+- Plausibilität: 400 g Hühnerbrust allein ≈ 660 kcal — Toplevel-Portionen müssen dazu passen.
+""".trimIndent()
 
     private val JSON_SCHEMA_HINT = """
 Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
@@ -281,17 +284,24 @@ Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
   "title": "Rezeptname",
   "description": "Kurze Beschreibung",
   "structuredIngredients": [
-    {"name": "Zutat", "amount": "100g", "calories": 100, "protein": 10.0, "carbs": 5.0, "fat": 2.0}
+    {"name": "Hühnerbrust", "amount": "400g", "calories": 660, "protein": 124.0, "carbs": 0.0, "fat": 14.4},
+    {"name": "Speiseöl", "amount": "1 EL", "calories": 120, "protein": 0.0, "carbs": 0.0, "fat": 14.0},
+    {"name": "Zwiebel", "amount": "1 Stück", "calories": 40, "protein": 1.0, "carbs": 9.0, "fat": 0.1},
+    {"name": "Garam Masala", "amount": "1 TL", "calories": 8, "protein": 0.3, "carbs": 1.5, "fat": 0.3}
   ],
-  "ingredients": ["100g Zutat"],
-  "steps": ["Schritt 1"],
-  "servings": 2,
+  "ingredients": ["400g Hühnerbrust", "1 EL Speiseöl", "1 Zwiebel", "1 TL Garam Masala"],
+  "steps": ["Schritt 1", "Schritt 2"],
+  "servings": 4,
   "prepTimeMinutes": 30,
-  "calories": 300,
-  "protein": 25.0,
-  "carbs": 35.0,
-  "fat": 10.0
+  "calories": 207,
+  "protein": 31.3,
+  "carbs": 2.6,
+  "fat": 7.2
 }
+
+calories/protein/carbs/fat auf Toplevel = Werte PRO PORTION.
+Werte in structuredIngredients = GESAMT für die gesamte Zutatenmenge.
+ingredients[] muss dieselben Positionen wie structuredIngredients abdecken (amount + name).
 """.trimIndent()
 
     private fun buildIngredientsPrompt(ingredients: List<String>, note: String): String {
@@ -305,15 +315,14 @@ $list
 $noteBlock
 
 Erstelle ein realistisches, alltagstaugliches Rezept, das MÖGLICHST VIELE dieser Zutaten verwendet.
-Du darfst übliche Grundzutaten annehmen, die in fast jedem Haushalt vorhanden sind (Salz, Pfeffer, Öl, Wasser, Gewürze),
-auch wenn sie nicht in der Liste stehen. Falls für ein rundes Gericht 1-2 zusätzliche Zutaten fehlen, die typischerweise
-im Haushalt vorhanden sind, kannst du sie ergänzen — aber baue das Rezept primär um die vorhandenen Zutaten herum.
+Du darfst übliche Grundzutaten annehmen (Salz, Pfeffer, Öl, Wasser, Gewürze, Zwiebel, Knoblauch),
+auch wenn sie nicht in der Liste stehen — und MUSST sie mit Menge und Nährwerten listen.
+Falls für ein rundes Gericht 1–2 weitere typische Haushaltszutaten fehlen, darfst du sie ergänzen.
 Erfinde KEINE exotischen Zutaten, die die Person offensichtlich nicht hat.
 
-Berechne die Nährwerte EXAKT basierend auf echten Zutatenmengen.
-Referenzwerte pro 100g: Hühnerbrust=165kcal/31gP, Parmesan=431kcal/38gP,
-Ricotta=174kcal/11gP, Hackfleisch=250kcal/17gP, Pasta=350kcal/13gP,
-Reis=130kcal/3gP, Ei=155kcal/13gP, Butter=717kcal/1gP.
+$COMPLETE_INGREDIENT_RULES
+
+$NUTRITION_RULES
 
 $JSON_SCHEMA_HINT
 """.trimIndent()
@@ -339,10 +348,9 @@ Erfinde ein leckeres, alltagstaugliches Gericht, dessen Nährwerte PRO PORTION s
 (Toleranz ca. ±10%). Bevorzuge eine ausgewogene, proteinreiche Mahlzeit. Wenn das Budget sehr klein ist (< 300 kcal),
 schlage einen Snack statt einer ganzen Mahlzeit vor. Setze "servings" auf 1, damit die Toplevel-Werte direkt einer Portion entsprechen.
 
-Berechne die Nährwerte EXAKT basierend auf echten Zutatenmengen.
-Referenzwerte pro 100g: Hühnerbrust=165kcal/31gP, Parmesan=431kcal/38gP,
-Ricotta=174kcal/11gP, Hackfleisch=250kcal/17gP, Pasta=350kcal/13gP,
-Reis=130kcal/3gP, Ei=155kcal/13gP, Butter=717kcal/1gP.
+$COMPLETE_INGREDIENT_RULES
+
+$NUTRITION_RULES
 
 $JSON_SCHEMA_HINT
 """.trimIndent()
@@ -575,7 +583,40 @@ $JSON_SCHEMA_HINT
     }
 
     private suspend fun tryProvider(prompt: String): Result<GeneratedRecipe> =
-        callLlm(prompt, maxTokens = 2000).mapCatching { json.decodeFromString<GeneratedRecipe>(it) }
+        callLlm(prompt, maxTokens = 3500).mapCatching {
+            val parsed = json.decodeFromString<GeneratedRecipe>(it)
+            reconcileNutrition(parsed)
+        }
+
+    /**
+     * Wenn die Summe der strukturierten Zutaten deutlich über den Toplevel-Makros
+     * liegt (Modell hat Portionen unterschätzt), Toplevel aus der Summe neu setzen.
+     */
+    private fun reconcileNutrition(recipe: GeneratedRecipe): GeneratedRecipe {
+        val ings = recipe.effectiveIngredients()
+        if (ings.isEmpty()) return recipe
+        val sumKcal = ings.sumOf { it.calories.toDouble() }.toFloat()
+        val sumP = ings.sumOf { it.protein.toDouble() }.toFloat()
+        val sumC = ings.sumOf { it.carbs.toDouble() }.toFloat()
+        val sumF = ings.sumOf { it.fat.toDouble() }.toFloat()
+        val servings = recipe.servings.coerceAtLeast(1)
+        if (sumKcal < 50f) return recipe
+        val perKcal = sumKcal / servings
+        val perP = sumP / servings
+        val perC = sumC / servings
+        val perF = sumF / servings
+        // Nur überschreiben wenn Summe klar höher oder Toplevel unplausibel niedrig
+        val topKcal = recipe.calories
+        if (topKcal <= 0f || perKcal > topKcal * 1.15f) {
+            return recipe.copy(
+                calories = perKcal,
+                protein = perP,
+                carbs = perC,
+                fat = perF
+            )
+        }
+        return recipe
+    }
 
     private suspend fun tryDayPlanProvider(prompt: String): Result<DayPlan> =
         callLlm(prompt, maxTokens = 3000).mapCatching { json.decodeFromString<DayPlan>(it) }

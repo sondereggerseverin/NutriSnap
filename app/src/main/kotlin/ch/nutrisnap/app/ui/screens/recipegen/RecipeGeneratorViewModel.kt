@@ -49,6 +49,8 @@ data class RecipeGenUiState(
     val savedToDiary: Boolean = false,
     val savedAsRecipe: Boolean = false,
     val isGeneratingImage: Boolean = false,
+    /** Lokales file://-Bild nach ZenMux, sobald fertig. */
+    val recipeImageUrl: String? = null,
     val history: List<GeneratedRecipeEntity> = emptyList(),
     // Zutaten-Modus
     val ingredientChips: List<String> = emptyList(),
@@ -156,13 +158,14 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
     fun generate(userInput: String) {
         if (userInput.isBlank()) return
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null, recipe = null, openHistoryId = null, savedToDiary = false, savedAsRecipe = false) }
+            _state.update { it.copy(isLoading = true, error = null, recipe = null, recipeImageUrl = null, openHistoryId = null, savedToDiary = false, savedAsRecipe = false) }
             val s = _state.value
             service.generateRecipe(userInput, s.cookingMethod, s.applianceModel).fold(
                 onSuccess = { recipe ->
                     val newId = dao.insert(recipe.toEntity())
                     _state.update { it.copy(isLoading = false, recipe = recipe, openHistoryId = newId.toInt()) }
                     dao.trimHistory()
+                    generateImageForCurrentRecipe(recipe)
                 },
                 onFailure = { e ->
                     _state.update { it.copy(isLoading = false, error = e.message ?: "Unbekannter Fehler") }
@@ -213,13 +216,14 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
         val ingredients = _state.value.ingredientChips
         if (ingredients.isEmpty()) return
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null, recipe = null, openHistoryId = null, savedToDiary = false, savedAsRecipe = false) }
+            _state.update { it.copy(isLoading = true, error = null, recipe = null, recipeImageUrl = null, openHistoryId = null, savedToDiary = false, savedAsRecipe = false) }
             val s = _state.value
             service.generateFromIngredients(ingredients, note, s.cookingMethod, s.applianceModel).fold(
                 onSuccess = { recipe ->
                     val newId = dao.insert(recipe.toEntity())
                     _state.update { it.copy(isLoading = false, recipe = recipe, openHistoryId = newId.toInt()) }
                     dao.trimHistory()
+                    generateImageForCurrentRecipe(recipe)
                 },
                 onFailure = { e ->
                     _state.update { it.copy(isLoading = false, error = e.message ?: "Unbekannter Fehler") }
@@ -233,13 +237,14 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
     fun generateFillUp(mealLabel: String) {
         val budget = _state.value.fillUpBudget
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null, recipe = null, openHistoryId = null, savedToDiary = false, savedAsRecipe = false) }
+            _state.update { it.copy(isLoading = true, error = null, recipe = null, recipeImageUrl = null, openHistoryId = null, savedToDiary = false, savedAsRecipe = false) }
             val s = _state.value
             service.generateFillUp(budget.calories, budget.protein, budget.carbs, budget.fat, mealLabel, s.cookingMethod, s.applianceModel).fold(
                 onSuccess = { recipe ->
                     val newId = dao.insert(recipe.toEntity())
                     _state.update { it.copy(isLoading = false, recipe = recipe, openHistoryId = newId.toInt()) }
                     dao.trimHistory()
+                    generateImageForCurrentRecipe(recipe)
                 },
                 onFailure = { e ->
                     _state.update { it.copy(isLoading = false, error = e.message ?: "Unbekannter Fehler") }
@@ -363,6 +368,7 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
                     val newId = dao.insert(recipe.toEntity())
                     _state.update { it.copy(isLoading = false, recipe = recipe, openHistoryId = newId.toInt()) }
                     dao.trimHistory()
+                    generateImageForCurrentRecipe(recipe)
                 },
                 onFailure = { e ->
                     _state.update { it.copy(isLoading = false, error = e.message ?: "Unbekannter Fehler") }
@@ -420,18 +426,33 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
         updateRecipe(current.copy(structuredIngredients = newIngredients))
     }
 
+    /** Startet ZenMux-Bild im Hintergrund und schreibt URL in den State. */
+    private fun generateImageForCurrentRecipe(recipe: GeneratedRecipe) {
+        viewModelScope.launch {
+            _state.update { it.copy(isGeneratingImage = true) }
+            val uri = imageService.generateRecipeImage(recipe.title, recipe.description).getOrNull()
+            _state.update {
+                // Nur übernehmen, wenn noch dasselbe Rezept offen ist
+                if (it.recipe?.title == recipe.title) {
+                    it.copy(isGeneratingImage = false, recipeImageUrl = uri ?: it.recipeImageUrl)
+                } else {
+                    it.copy(isGeneratingImage = false)
+                }
+            }
+        }
+    }
+
     /** Speichert das KI-Rezept dauerhaft im Rezepte-Tab (Kochbuch).
-     *  Erzeugt vorher per ZenMux ein KI-Bild fürs Rezept (statt des orangen
-     *  Platzhalters). Schlägt die Bildgenerierung fehl (kein API-Key, offline,
-     *  API-Fehler), wird das Rezept trotzdem ganz normal ohne Bild gespeichert. */
+     *  Nutzt bereits generiertes Bild oder erzeugt eines per ZenMux. */
     fun saveAsRecipe() {
         val r = _state.value.recipe ?: return
         viewModelScope.launch {
             _state.update { it.copy(isGeneratingImage = true) }
-            val generatedImageUri = imageService
-                .generateRecipeImage(r.title, r.description)
-                .getOrNull()
+            val generatedImageUri = _state.value.recipeImageUrl
+                ?: imageService.generateRecipeImage(r.title, r.description).getOrNull()
 
+            // Toplevel-Makros sind PRO PORTION → totalCalories = Portion × servings
+            val servings = r.servings.coerceAtLeast(1)
             recipeRepo.saveRecipe(
                 Recipe(
                     title             = r.title,
@@ -441,16 +462,25 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
                         if (ing.amount.isNotBlank()) "${ing.amount} ${ing.name}" else ing.name
                     },
                     instructions      = r.steps.joinToString("\n"),
-                    totalCalories     = r.calories,
+                    totalCalories     = r.calories * servings,
                     proteinPerServing = r.protein,
                     carbsPerServing   = r.carbs,
                     fatPerServing     = r.fat,
-                    servings          = r.servings,
+                    servings          = servings,
                     prepTimeMinutes   = r.prepTimeMinutes,
-                    platform          = "ki"
+                    platform          = "ki",
+                    mealCategory      = ch.nutrisnap.app.data.model.RecipeCategory
+                        .guess(r.title, r.effectiveIngredients().joinToString(" ") { it.name }, r.description)
+                        .name
                 )
             )
-            _state.update { it.copy(savedAsRecipe = true, isGeneratingImage = false) }
+            _state.update {
+                it.copy(
+                    savedAsRecipe = true,
+                    isGeneratingImage = false,
+                    recipeImageUrl = generatedImageUri ?: it.recipeImageUrl
+                )
+            }
         }
     }
 

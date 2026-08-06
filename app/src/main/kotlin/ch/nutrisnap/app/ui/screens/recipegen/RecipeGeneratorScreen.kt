@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import androidx.compose.foundation.layout.FlowRow
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.GeneratedRecipeEntity
@@ -210,6 +211,7 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
                 item {
                     RecipeResultCard(
                         recipe = recipe,
+                        imageUrl = state.recipeImageUrl,
                         isSavingImage = state.isGeneratingImage,
                         onAddToDiary = { showDiarySheet = true },
                         onSaveAsRecipe = { vm.saveAsRecipe() },
@@ -895,6 +897,7 @@ private fun RecipeMethodAdaptRow(
 @Composable
 private fun RecipeResultCard(
     recipe: GeneratedRecipe,
+    imageUrl: String? = null,
     isSavingImage: Boolean = false,
     onAddToDiary: () -> Unit,
     onSaveAsRecipe: () -> Unit,
@@ -918,7 +921,43 @@ private fun RecipeResultCard(
     var servingsText by remember(recipe, isEditing) { mutableStateOf(recipe.servings.toString()) }
 
     Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
+        Column {
+            // KI-Bild (ZenMux) oder Ladezustand
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(180.dp)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                when {
+                    !imageUrl.isNullOrBlank() -> {
+                        AsyncImage(
+                            model = imageUrl,
+                            contentDescription = recipe.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    isSavingImage -> {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.height(8.dp))
+                            Text("Bild wird erzeugt…", fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    else -> {
+                        Icon(
+                            Icons.Default.Restaurant,
+                            contentDescription = null,
+                            modifier = Modifier.size(40.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                        )
+                    }
+                }
+            }
+            Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
                     if (isEditing) {
@@ -1083,6 +1122,7 @@ private fun RecipeResultCard(
                     Spacer(Modifier.width(6.dp))
                     Text("Tagebuch")
                 }
+            }
             }
         }
     }
