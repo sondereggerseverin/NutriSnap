@@ -1230,7 +1230,7 @@ fun RecipeDetailSheet(
                     recipe.platform?.let { MetaBadge("📌 $it") }
                 }
                 Spacer(Modifier.height(10.dp))
-                NutrientSummaryStrip(recipe, ratio)
+                NutrientSummaryStrip(recipe)
                 Spacer(Modifier.height(12.dp))
             }
 
@@ -1920,9 +1920,10 @@ fun AddToDiarySheet(
     }
 }
 
-/** Kompakte Nährwert-Zeile pro Portion, angelehnt an swissmilk.ch ("1 Portion enthält: ..."). */
+/** Kompakte Nährwert-Zeile pro Portion, angelehnt an swissmilk.ch ("1 Portion enthält: ...").
+ *  Immer die Basis-Portion des Rezepts – unabhängig vom Portionen-Stepper. */
 @Composable
-private fun NutrientSummaryStrip(recipe: Recipe, ratio: Float) {
+private fun NutrientSummaryStrip(recipe: Recipe) {
     val calsPerServ = recipe.totalCalories?.let { it / recipe.servings.coerceAtLeast(1) }
     val prot = recipe.proteinPerServing
     val carb = recipe.carbsPerServing
@@ -1930,10 +1931,10 @@ private fun NutrientSummaryStrip(recipe: Recipe, ratio: Float) {
     if (calsPerServ == null && prot == null && carb == null && fat == null) return
 
     val parts = buildList {
-        calsPerServ?.let { add("${(it * ratio).toInt()} kcal") }
-        fat?.let { add("${(it * ratio).toInt()} g Fett") }
-        carb?.let { add("${(it * ratio).toInt()} g Kohlenhydrate") }
-        prot?.let { add("${(it * ratio).toInt()} g Eiweiss") }
+        calsPerServ?.let { add("${it.toInt()} kcal") }
+        fat?.let { add("${it.toInt()} g Fett") }
+        carb?.let { add("${it.toInt()} g Kohlenhydrate") }
+        prot?.let { add("${it.toInt()} g Eiweiss") }
     }
     if (parts.isEmpty()) return
 
