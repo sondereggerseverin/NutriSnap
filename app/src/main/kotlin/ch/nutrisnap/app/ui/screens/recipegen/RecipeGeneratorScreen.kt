@@ -19,6 +19,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
@@ -878,18 +879,28 @@ private fun RecipeMethodAdaptRow(
     isAdapting: Boolean,
     onAdapt: (CookingMethod) -> Unit
 ) {
-    Column {
-        Text("Zubereitung für: ${current.label}", fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CookingMethod.entries.filter { it != current }.forEach { target ->
-                OutlinedButton(onClick = { onAdapt(target) }, enabled = !isAdapting) {
-                    if (isAdapting) {
-                        CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
-                    } else {
-                        Text("→ ${target.label}", fontSize = 12.sp)
-                    }
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            current.label,
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
+        CookingMethod.entries.filter { it != current }.forEach { target ->
+            OutlinedButton(
+                onClick = { onAdapt(target) },
+                enabled = !isAdapting,
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                modifier = Modifier.height(32.dp)
+            ) {
+                if (isAdapting) {
+                    CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("→ ${target.label}", fontSize = 11.sp, maxLines = 1)
                 }
             }
         }
@@ -925,13 +936,13 @@ private fun RecipeResultCard(
     var fatText      by remember(recipe, isEditing) { mutableStateOf(recipe.fat.toInt().toString()) }
     var servingsText by remember(recipe, isEditing) { mutableStateOf(recipe.servings.toString()) }
 
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
         Column {
-            // KI-Bild (ZenMux) oder Ladezustand
+            // Kompakteres Hero-Bild (Swissmilk: Fokus ohne Bildschirm zu füllen)
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(180.dp)
+                    .height(150.dp)
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
@@ -952,23 +963,23 @@ private fun RecipeResultCard(
                     }
                     isSavingImage -> {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.height(8.dp))
+                            CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.height(6.dp))
                             Text("Bild wird erzeugt…", fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     else -> {
                         Column(horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(16.dp)) {
+                            modifier = Modifier.padding(12.dp)) {
                             Icon(
                                 Icons.Default.Restaurant,
                                 contentDescription = null,
-                                modifier = Modifier.size(40.dp),
+                                modifier = Modifier.size(36.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                             )
                             if (!imageError.isNullOrBlank()) {
-                                Spacer(Modifier.height(8.dp))
+                                Spacer(Modifier.height(6.dp))
                                 Text(
                                     "Kein Bild: $imageError",
                                     fontSize = 11.sp,
@@ -980,172 +991,225 @@ private fun RecipeResultCard(
                     }
                 }
             }
-            Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.Top) {
-                Column(Modifier.weight(1f)) {
-                    if (isEditing) {
-                        OutlinedTextField(
-                            value = titleText, onValueChange = { titleText = it },
-                            label = { Text("Titel") }, singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    } else {
-                        Text(recipe.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        if (recipe.description.isNotBlank()) {
-                            Text(recipe.description, style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 4.dp))
+            Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Column(Modifier.weight(1f)) {
+                        if (isEditing) {
+                            OutlinedTextField(
+                                value = titleText, onValueChange = { titleText = it },
+                                label = { Text("Titel") }, singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        } else {
+                            Text(
+                                recipe.title,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (recipe.description.isNotBlank()) {
+                                Text(
+                                    recipe.description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+                            }
                         }
                     }
-                }
-                IconButton(onClick = {
-                    if (isEditing) {
-                        onUpdate(
-                            recipe.copy(
-                                title    = titleText.ifBlank { recipe.title },
-                                calories = caloriesText.toFloatOrNull() ?: recipe.calories,
-                                protein  = proteinText.toFloatOrNull()  ?: recipe.protein,
-                                carbs    = carbsText.toFloatOrNull()    ?: recipe.carbs,
-                                fat      = fatText.toFloatOrNull()      ?: recipe.fat,
-                                servings = servingsText.toIntOrNull()   ?: recipe.servings
-                            )
+                    IconButton(
+                        onClick = {
+                            if (isEditing) {
+                                onUpdate(
+                                    recipe.copy(
+                                        title    = titleText.ifBlank { recipe.title },
+                                        calories = caloriesText.toFloatOrNull() ?: recipe.calories,
+                                        protein  = proteinText.toFloatOrNull()  ?: recipe.protein,
+                                        carbs    = carbsText.toFloatOrNull()    ?: recipe.carbs,
+                                        fat      = fatText.toFloatOrNull()      ?: recipe.fat,
+                                        servings = servingsText.toIntOrNull()   ?: recipe.servings
+                                    )
+                                )
+                            }
+                            isEditing = !isEditing
+                        },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            if (isEditing) Icons.Default.Check else Icons.Default.Edit,
+                            if (isEditing) "Speichern" else "Bearbeiten",
+                            modifier = Modifier.size(20.dp)
                         )
                     }
-                    isEditing = !isEditing
-                }) {
-                    Icon(if (isEditing) Icons.Default.Check else Icons.Default.Edit,
-                        if (isEditing) "Speichern" else "Bearbeiten")
                 }
-            }
-            Spacer(Modifier.height(8.dp))
 
-            if (!isEditing) {
-                RecipeMethodAdaptRow(
-                    current = cookingMethod,
-                    applianceModel = applianceModel,
-                    isAdapting = isAdaptingMethod,
-                    onAdapt = onAdaptToMethod
-                )
-                Spacer(Modifier.height(8.dp))
-            }
-
-            if (isEditing) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    EditMacroField("kcal", caloriesText) { caloriesText = it }
-                    EditMacroField("P g", proteinText) { proteinText = it }
-                    EditMacroField("K g", carbsText) { carbsText = it }
-                    EditMacroField("F g", fatText) { fatText = it }
-                }
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = servingsText, onValueChange = { servingsText = it },
-                    label = { Text("Portionen") }, singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.width(120.dp)
-                )
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    MacroChip("${recipe.calories.roundToInt()} kcal", MaterialTheme.colorScheme.primaryContainer)
-                    MacroChip("P ${recipe.protein.toInt()}g", MaterialTheme.colorScheme.secondaryContainer)
-                    MacroChip("K ${recipe.carbs.toInt()}g", MaterialTheme.colorScheme.tertiaryContainer)
-                    MacroChip("F ${recipe.fat.toInt()}g", MaterialTheme.colorScheme.surfaceVariant)
-                }
-                Text("${recipe.servings} Port. · ${recipe.prepTimeMinutes} Min.",
-                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp))
-            }
-
-            HorizontalDivider(Modifier.padding(vertical = 12.dp))
-
-            Text("Zutaten", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 4.dp))
-            val ingredients = recipe.effectiveIngredients()
-            if (isEditing) {
-                ingredients.forEachIndexed { i, ing ->
-                    EditableIngredientRow(
-                        ingredient = ing,
-                        onChange = { onUpdateIngredient(i, it) },
-                        onDelete = { onRemoveIngredient(i) }
+                if (isEditing) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        EditMacroField("kcal", caloriesText) { caloriesText = it }
+                        EditMacroField("P g", proteinText) { proteinText = it }
+                        EditMacroField("K g", carbsText) { carbsText = it }
+                        EditMacroField("F g", fatText) { fatText = it }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = servingsText, onValueChange = { servingsText = it },
+                        label = { Text("Portionen") }, singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.width(120.dp)
+                    )
+                } else {
+                    // Swissmilk-Meta: Zeit + Portionen in einer Zeile
+                    Text(
+                        "${recipe.prepTimeMinutes} Min.  ·  ${recipe.servings} Port.",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                    // Eine Nährwert-Zeile statt vier Chips
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                    ) {
+                        Text(
+                            "1 Portion: ${recipe.calories.roundToInt()} kcal, " +
+                                "${recipe.fat.toInt()} g Fett, " +
+                                "${recipe.carbs.toInt()} g KH, " +
+                                "${recipe.protein.toInt()} g Eiweiss",
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+                        )
+                    }
+                    // Geräte-Umschalter kompakter (weniger Höhe)
+                    Spacer(Modifier.height(6.dp))
+                    RecipeMethodAdaptRow(
+                        current = cookingMethod,
+                        applianceModel = applianceModel,
+                        isAdapting = isAdaptingMethod,
+                        onAdapt = onAdaptToMethod
                     )
                 }
-                TextButton(onClick = {
-                    onUpdateIngredient(ingredients.size, RecipeIngredient(name = "Neue Zutat"))
-                }) {
-                    Icon(Icons.Default.Add, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Zutat hinzufügen")
-                }
-            } else {
-                ingredients.forEachIndexed { i, ing ->
-                    Row(Modifier.padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = i in checkedIngredients,
-                            onCheckedChange = { checked ->
-                                checkedIngredients = if (checked) checkedIngredients + i else checkedIngredients - i
-                            },
-                            modifier = Modifier.size(24.dp)
+
+                HorizontalDivider(Modifier.padding(vertical = 10.dp))
+
+                Text("Zutaten", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                Spacer(Modifier.height(4.dp))
+                val ingredients = recipe.effectiveIngredients()
+                if (isEditing) {
+                    ingredients.forEachIndexed { i, ing ->
+                        EditableIngredientRow(
+                            ingredient = ing,
+                            onChange = { onUpdateIngredient(i, it) },
+                            onDelete = { onRemoveIngredient(i) }
                         )
-                        Spacer(Modifier.width(8.dp))
-                        Column(Modifier.weight(1f)) {
+                    }
+                    TextButton(onClick = {
+                        onUpdateIngredient(ingredients.size, RecipeIngredient(name = "Neue Zutat"))
+                    }) {
+                        Icon(Icons.Default.Add, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Zutat hinzufügen")
+                    }
+                } else {
+                    ingredients.forEachIndexed { i, ing ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 1.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = i in checkedIngredients,
+                                onCheckedChange = { checked ->
+                                    checkedIngredients =
+                                        if (checked) checkedIngredients + i else checkedIngredients - i
+                                },
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
                             Text(
-                                if (ing.amount.isNotBlank()) "${ing.amount} ${ing.name}" else ing.name,
-                                fontSize = 14.sp,
+                                if (ing.amount.isNotBlank()) "${ing.amount}  ${ing.name}" else ing.name,
+                                fontSize = 13.sp,
+                                lineHeight = 18.sp,
+                                modifier = Modifier.weight(1f),
                                 color = if (i in checkedIngredients)
                                     MaterialTheme.colorScheme.onSurfaceVariant
                                 else MaterialTheme.colorScheme.onSurface
                             )
                             if (ing.calories > 0) {
-                                Text("${ing.calories.roundToInt()} kcal", fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    "${ing.calories.roundToInt()}",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                     }
                 }
-            }
 
-            HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                HorizontalDivider(Modifier.padding(vertical = 10.dp))
 
-            Text("Zubereitung", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 4.dp))
-            recipe.steps.forEachIndexed { i, step ->
-                Row(Modifier.padding(vertical = 4.dp)) {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier.size(22.dp)
+                Text("Zubereitung", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                Spacer(Modifier.height(4.dp))
+                recipe.steps.forEachIndexed { i, step ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 3.dp),
+                        verticalAlignment = Alignment.Top
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text("${i + 1}", fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(22.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    "${i + 1}",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text(step, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.weight(1f))
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = onSaveAsRecipe,
+                        enabled = !isSavingImage,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        if (isSavingImage) {
+                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Bild…")
+                        } else {
+                            Icon(Icons.Default.MenuBook, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Als Rezept")
                         }
                     }
-                    Spacer(Modifier.width(10.dp))
-                    Text(step, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                }
-            }
-
-            HorizontalDivider(Modifier.padding(vertical = 12.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = onSaveAsRecipe,
-                    enabled = !isSavingImage,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    if (isSavingImage) {
-                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Button(onClick = onAddToDiary, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.BookmarkAdd, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Bild wird erstellt…")
-                    } else {
-                        Icon(Icons.Default.MenuBook, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Als Rezept")
+                        Text("Tagebuch")
                     }
                 }
-                Button(onClick = onAddToDiary, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.BookmarkAdd, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Tagebuch")
-                }
-            }
             }
         }
     }
