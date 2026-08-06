@@ -112,7 +112,7 @@ fun RecipeEditSheet(
                 text = "Kategorie",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 16.dp, top = 12.dp, bottom = 6.dp)
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 6.dp)
             )
             Row(
                 Modifier
