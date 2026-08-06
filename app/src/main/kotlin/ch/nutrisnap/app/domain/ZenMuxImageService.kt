@@ -46,24 +46,19 @@ class ZenMuxImageService(private val context: Context) {
                 )
             }
 
-            // 2) ZenMux OpenAI Images
+            // 2) Pollinations Flux (kostenlos, oft beste Qualität bei uns)
+            generateViaPollinations(prompt).fold(
+                onSuccess = { return@withContext Result.success(it) },
+                onFailure = { errors += "Pollinations: ${it.message}" }
+            )
+
+            // 3) ZenMux nur falls Pollinations ausfällt
             if (BuildConfig.ZENMUX_API_KEY.isNotBlank()) {
                 generateViaZenMuxOpenAi(prompt).fold(
                     onSuccess = { return@withContext Result.success(it) },
                     onFailure = { errors += "ZenMux-OA: ${it.message}" }
                 )
-                // 3) ZenMux free Gemini image model
-                generateViaZenMuxGemini(prompt).fold(
-                    onSuccess = { return@withContext Result.success(it) },
-                    onFailure = { errors += "ZenMux-Gem: ${it.message}" }
-                )
             }
-
-            // 4) Pollinations (kostenlos, kein Key) – immer als letzter Fallback
-            generateViaPollinations(prompt).fold(
-                onSuccess = { return@withContext Result.success(it) },
-                onFailure = { errors += "Pollinations: ${it.message}" }
-            )
 
             val msg = when {
                 errors.isEmpty() -> "Kein Bild-API-Key konfiguriert"
@@ -230,25 +225,40 @@ class ZenMuxImageService(private val context: Context) {
      */
     private fun buildFoodPrompt(title: String, description: String, ingredientsHint: String): String {
         val dish = title.trim().ifBlank { "homemade meal" }
-        val desc = description.trim().take(160)
+        // Kurze, gerichtsspezifische Hinweise aus Titel/Beschreibung
+        val lower = "$title $description".lowercase()
+        val styleHint = when {
+            "thai" in lower && ("rot" in lower || "red" in lower) ->
+                "authentic Thai red curry (gaeng phed) with rich red coconut milk sauce, " +
+                    "chicken pieces, Thai basil, red chilies — not orange soup, not Western stew"
+            "thai" in lower && ("grün" in lower || "green" in lower) ->
+                "authentic Thai green curry (gaeng khiao wan) with green coconut curry sauce"
+            "thai" in lower -> "authentic Thai restaurant dish, coconut curry style"
+            "nasi goreng" in lower || "gebratener reis" in lower ->
+                "authentic Indonesian nasi goreng, brown wok-fried rice with egg and vegetables, not plain yellow rice"
+            "curry" in lower -> "authentic restaurant curry, thick sauce, not thin soup"
+            "bowl" in lower -> "composed grain bowl, neatly arranged toppings"
+            else -> "authentic restaurant presentation of this exact dish"
+        }
         val ings = ingredientsHint
             .lines()
-            .map { it.replace(Regex("""^[\d.,/\s]+[a-zA-Z]*\s*"""), "").trim() }
+            .map { it.replace(Regex("""^[\\d.,/\\s]+[a-zA-Zµ]*\\s*"""), "").trim() }
             .filter { it.length in 2..40 }
-            .take(6)
+            .take(5)
             .joinToString(", ")
         return buildString {
-            append("Ultra-realistic professional food photography of $dish, ")
-            if (desc.isNotBlank()) append("$desc, ")
-            if (ings.isNotBlank()) append("main ingredients visible: $ings, ")
+            append("Photorealistic food magazine photo of: $dish. ")
+            append("$styleHint. ")
+            if (ings.isNotBlank()) append("Visible ingredients: $ings. ")
             append(
-                "served on a ceramic plate, 45-degree angle, shallow depth of field, " +
-                    "soft natural window light, restaurant plating, highly detailed, " +
-                    "appetizing steam if hot, authentic colors, food magazine style. "
+                "Single bowl or plate only, centered, rustic wooden table, " +
+                    "soft natural side light, shallow depth of field, " +
+                    "tight crop on the food, restaurant quality. "
             )
             append(
-                "Strict: no hands, no people, no chopsticks held by a person, " +
-                    "no text, no watermark, no logo, no collage, no plastic look."
+                "Must match the named dish exactly. " +
+                    "No people, no hands, no restaurant background diners, " +
+                    "no text, no watermark, no logo, no peas-and-corn Western soup look."
             )
         }
     }
@@ -256,11 +266,13 @@ class ZenMuxImageService(private val context: Context) {
     /** Kostenloser Fallback ohne API-Key (Flux via Pollinations). */
     private fun generateViaPollinations(prompt: String): Result<String> {
         return try {
-            val encoded = java.net.URLEncoder.encode(prompt.take(450), Charsets.UTF_8.name())
-            // model=flux = beste Qualität; private=true verhindert Prompt-Logging
+            // Seed aus Prompt → ähnliche Gerichte wirken konsistenter
+            val seed = (prompt.hashCode().toLong() and 0x7fffffffL)
+            val encoded = java.net.URLEncoder.encode(prompt.take(500), Charsets.UTF_8.name())
             val url =
                 "https://image.pollinations.ai/prompt/$encoded" +
-                    "?width=1024&height=1024&nologo=true&enhance=true&model=flux&safe=false"
+                    "?width=1024&height=1024&nologo=true&enhance=true" +
+                    "&model=flux&seed=$seed&safe=false"
             val request = Request.Builder()
                 .url(url)
                 .addHeader("User-Agent", "NutriSnap/1.1")
