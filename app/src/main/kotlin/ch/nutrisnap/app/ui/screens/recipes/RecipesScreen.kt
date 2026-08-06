@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.model.Recipe
+import ch.nutrisnap.app.data.model.RecipeCategory
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import ch.nutrisnap.app.domain.RecipeGermanMetricConverter
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_RATINGS
@@ -233,6 +234,7 @@ fun RecipesScreen(
     var editRecipe        by remember { mutableStateOf<Recipe?>(null) }
     var hideIncomplete    by remember { mutableStateOf(false) }
     var showBatchSheet    by remember { mutableStateOf(false) }
+    var showCookSheet     by remember { mutableStateOf(false) }
     val batchState by vm.batchState.collectAsState()
     val budgetScaleState by vm.budgetScaleState.collectAsState()
 
@@ -247,6 +249,11 @@ fun RecipesScreen(
     Scaffold(
         floatingActionButton = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                SmallFloatingActionButton(onClick = { showCookSheet = true },
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer) {
+                    Icon(Icons.Default.Kitchen, "Was koche ich?")
+                }
+                Spacer(Modifier.height(8.dp))
                 SmallFloatingActionButton(onClick = { showBatchSheet = true },
                     containerColor = MaterialTheme.colorScheme.secondaryContainer) {
                     Icon(Icons.Default.PlaylistAdd, "Mehrere Rezepte importieren")
@@ -261,12 +268,59 @@ fun RecipesScreen(
     ) { padding ->
         Column(Modifier.padding(padding)) {
             OutlinedTextField(
-                value = state.query, onValueChange = vm::setQuery,
+                value = state.query, onValueChange = {
+                    vm.setQuery(it)
+                    if (it.isNotBlank()) vm.clearCookFilters()
+                },
                 label = { Text("Rezepte durchsuchen") },
                 leadingIcon = { Icon(Icons.Default.Search, null) },
+                trailingIcon = {
+                    IconButton(onClick = { showCookSheet = true }) {
+                        Icon(Icons.Default.Kitchen, "Was koche ich?")
+                    }
+                },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 singleLine = true, shape = RoundedCornerShape(12.dp)
             )
+
+            // ── Kategorien ───────────────────────────────────────────────────
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 4.dp)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                FilterChip(
+                    selected = state.categoryFilter == null,
+                    onClick = { vm.setCategoryFilter(null) },
+                    label = { Text("Alle", fontSize = 12.sp) }
+                )
+                RecipeCategory.entries.forEach { cat ->
+                    FilterChip(
+                        selected = state.categoryFilter == cat,
+                        onClick = {
+                            vm.setCategoryFilter(if (state.categoryFilter == cat) null else cat)
+                        },
+                        label = { Text("${cat.emoji} ${cat.label}", fontSize = 12.sp) }
+                    )
+                }
+            }
+
+            if (state.ingredientNeedles.isNotEmpty()) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Zutaten: " + state.ingredientNeedles.joinToString(", "),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    TextButton(onClick = { vm.clearCookFilters() }) { Text("Zurücksetzen", fontSize = 12.sp) }
+                }
+            }
 
             // ── Filter & Sortierung ──────────────────────────────────────────
             Row(
@@ -371,6 +425,18 @@ fun RecipesScreen(
             openAtManualCaption = state.instagramBlocked,
             onImport = { url -> vm.importFromUrl(url) },
             onDismiss = { showImportSheet = false; vm.clearError(); vm.clearInstagramBlocked() }
+        )
+    }
+
+    if (showCookSheet) {
+        CookWithWhatIHaveSheet(
+            onDismiss = { showCookSheet = false },
+            onSearch = { ingredients, category, targetKcal ->
+                vm.searchByIngredients(ingredients, category)
+                showCookSheet = false
+                // targetKcal wird beim Öffnen eines Rezepts über Budget-Scale genutzt —
+                // speichern wir lokal nicht; User tippt „Auf Restbudget“ oder wir scalen optional.
+            }
         )
     }
 
@@ -1138,6 +1204,10 @@ fun RecipeDetailSheet(
                 }
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    val cat = recipe.category()
+                    if (recipe.mealCategory.isNotBlank() || cat != ch.nutrisnap.app.data.model.RecipeCategory.OTHER) {
+                        MetaBadge("${cat.emoji} ${cat.label}")
+                    }
                     recipe.prepTimeMinutes?.let { MetaBadge("⏱ $it min") }
                     recipe.platform?.let { MetaBadge("📌 $it") }
                 }
@@ -1925,4 +1995,85 @@ private fun RecipeQuickRatingDialog(recipe: Recipe, onDismiss: () -> Unit) {
             TextButton(onClick = onDismiss) { Text("Überspringen") }
         }
     )
+}
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CookWithWhatIHaveSheet(
+    onDismiss: () -> Unit,
+    onSearch: (ingredients: String, category: RecipeCategory?, targetKcal: Float?) -> Unit
+) {
+    var ingredients by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf<RecipeCategory?>(null) }
+    var kcalText by remember { mutableStateOf("") }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp)
+        ) {
+            Text("Was koche ich?", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            Text(
+                "Zutaten eingeben, die du hast oder nutzen willst — wir filtern deine Rezepte.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
+            )
+            OutlinedTextField(
+                value = ingredients,
+                onValueChange = { ingredients = it },
+                label = { Text("Zutaten (z.B. Cottage Cheese, Banane)") },
+                placeholder = { Text("Komma oder neue Zeile") },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
+                minLines = 3
+            )
+            Text("Kategorie (optional)", fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                FilterChip(
+                    selected = category == null,
+                    onClick = { category = null },
+                    label = { Text("Egal") }
+                )
+                RecipeCategory.entries.filter { it != RecipeCategory.OTHER }.forEach { cat ->
+                    FilterChip(
+                        selected = category == cat,
+                        onClick = { category = if (category == cat) null else cat },
+                        label = { Text("${cat.emoji} ${cat.label}", fontSize = 12.sp) }
+                    )
+                }
+            }
+            OutlinedTextField(
+                value = kcalText,
+                onValueChange = { kcalText = it.filter { ch -> ch.isDigit() } },
+                label = { Text("Ziel-kcal pro Portion (optional)") },
+                placeholder = { Text("z.B. 500 — Skalierung im Rezept") },
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
+            Text(
+                "Kalorien skalierst du im geöffneten Rezept („Auf Restbudget“ / Ziel-kcal).",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+            Button(
+                onClick = {
+                    val kcal = kcalText.toFloatOrNull()
+                    onSearch(ingredients, category, kcal)
+                },
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                enabled = ingredients.isNotBlank() || category != null
+            ) {
+                Icon(Icons.Default.Search, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Rezepte finden")
+            }
+        }
+    }
 }

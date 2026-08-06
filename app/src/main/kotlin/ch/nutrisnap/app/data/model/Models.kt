@@ -159,6 +159,50 @@ enum class DietTag(val label: String, val emoji: String) {
     QUICK("Schnell (<30 Min)", "⏱️")
 }
 
+/** Mahlzeit-Kategorie für Sortierung/Filter (Frühstück, Dessert, …). */
+enum class RecipeCategory(val label: String, val emoji: String) {
+    BREAKFAST("Frühstück", "🌅"),
+    MAIN("Hauptgericht", "🍽️"),
+    SIDE_SNACK("Beilage / Snack", "🥗"),
+    DESSERT("Dessert", "🍰"),
+    DRINK("Getränk", "🥤"),
+    SAUCE("Sauce / Dip", "🫙"),
+    OTHER("Sonstiges", "📋");
+
+    companion object {
+        fun fromStored(value: String?): RecipeCategory {
+            if (value.isNullOrBlank()) return OTHER
+            return entries.firstOrNull { it.name.equals(value.trim(), ignoreCase = true) } ?: OTHER
+        }
+
+        /** Heuristik aus Titel/Zutaten – für Import und leere Kategorien. */
+        fun guess(title: String, ingredients: String = "", description: String = ""): RecipeCategory {
+            val t = "$title\n$description\n$ingredients".lowercase()
+            val dessert = listOf(
+                "dessert", "nachtisch", "kuchen", "brownie", "cookie", "keks", "pudding",
+                "eis ", "ice cream", "mousse", "cheesecake", "tiramisu", "süß", "süss",
+                "schoko", "chocolate", "muffin", "cupcake"
+            )
+            val breakfast = listOf(
+                "frühstück", "fruehstueck", "breakfast", "overnight", "chia", "porridge",
+                "oats", "hafer", "müsli", "muesli", "granola", "pancake", "pfannkuchen",
+                "french toast", "smoothie bowl", "joghurt bowl", "yogurt bowl"
+            )
+            val drink = listOf("smoothie", "shake", "saft", "juice", "latte", "matcha drink", "protein shake")
+            val sauce = listOf("sauce", "soße", "sosse", "dressing", "dip ", "mayo", "pesto")
+            val snack = listOf("snack", "beilage", "side ", "wrap (klein)", "energy ball", "riegel")
+            when {
+                dessert.any { it in t } -> return DESSERT
+                breakfast.any { it in t } -> return BREAKFAST
+                drink.any { it in t } && "bowl" !in t -> return DRINK
+                sauce.any { it in t } && "pasta" !in t && "nudeln" !in t -> return SAUCE
+                snack.any { it in t } -> return SIDE_SNACK
+                else -> return MAIN
+            }
+        }
+    }
+}
+
 // ─── Recipes ─────────────────────────────────────────────────────────────────
 @Entity(tableName = "recipes")
 data class Recipe(
@@ -182,6 +226,8 @@ data class Recipe(
     val servings: Int = 1,
     val prepTimeMinutes: Int? = null,
     val tags: String = "",          // Komma-separierte DietTag-Namen
+    /** RecipeCategory.name – leer = noch nicht gesetzt. */
+    val mealCategory: String = "",
     val collectionId: Long? = null,
     val isFavorite: Boolean = false,
     val showNutrition: Boolean = true,
@@ -199,6 +245,12 @@ data class Recipe(
         tags.split(",").mapNotNull { tag ->
             DietTag.entries.firstOrNull { it.name == tag.trim() }
         }
+
+    fun category(): RecipeCategory = RecipeCategory.fromStored(mealCategory)
+
+    fun withGuessedCategoryIfEmpty(): Recipe =
+        if (mealCategory.isNotBlank()) this
+        else copy(mealCategory = RecipeCategory.guess(title, ingredients, description).name)
 
     /**
      * Anzeigetitel ohne JSON-Null-Artefakte ("null"/"undefined" von optString).

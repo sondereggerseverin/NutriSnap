@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.Recipe
+import ch.nutrisnap.app.data.model.RecipeCategory
 import ch.nutrisnap.app.data.model.RecipeScrapeResult
 import ch.nutrisnap.app.data.repository.RecipeBudgetScaleResult
 import ch.nutrisnap.app.data.repository.RecipeBudgetScaler
@@ -59,6 +60,8 @@ data class RecipesUiState(
     val recipes:          List<Recipe> = emptyList(),
     val query:            String       = "",
     val platformFilter:   String?      = null,   // null = alle
+    val categoryFilter:   RecipeCategory? = null, // null = alle Kategorien
+    val ingredientNeedles: List<String> = emptyList(), // alle müssen vorkommen
     val sort:             RecipeSort   = RecipeSort.NEWEST,
     val isImporting:      Boolean      = false,
     val importPhase:      String?      = null,
@@ -97,6 +100,16 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 val n = repo.repairNullTitleArtifacts()
                 if (n > 0) android.util.Log.i("Recipes", "Null-Titel bereinigt: $n Rezepte")
             }
+            runCatching {
+                var n = 0
+                for (r in repo.getAllOnce()) {
+                    if (r.mealCategory.isBlank()) {
+                        repo.updateRecipe(r.withGuessedCategoryIfEmpty())
+                        n++
+                    }
+                }
+                if (n > 0) android.util.Log.i("Recipes", "Kategorien gesetzt: $n Rezepte")
+            }
         }
     }
 
@@ -120,6 +133,19 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearBudgetScale() { _budgetScaleState.value = BudgetScaleState() }
 
+    /** Portion auf festes kcal-Ziel skalieren (z.B. aus „Was koche ich?“). */
+    fun scaleToTargetKcal(recipe: Recipe, targetKcal: Float) {
+        viewModelScope.launch {
+            _budgetScaleState.value = BudgetScaleState(isLoading = true)
+            runCatching { budgetScaler.scaleToTargetKcal(recipe, targetKcal, allowUpscale = true) }
+                .onSuccess { r ->
+                    _budgetScaleState.value = if (r != null) BudgetScaleState(result = r)
+                    else BudgetScaleState(error = "Keine Kalorienangabe — zuerst Nährwerte berechnen.")
+                }
+                .onFailure { e -> _budgetScaleState.value = BudgetScaleState(error = e.message ?: "Fehler") }
+        }
+    }
+
     /** Übersetzt Zutaten + Zubereitung ins Deutsche und rechnet auf metrische Einheiten um. */
     fun translateToGermanMetric(recipe: Recipe) {
         if (_isTranslating.value) return
@@ -140,6 +166,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _query          = MutableStateFlow("")
     private val _platformFilter = MutableStateFlow<String?>(null)
+    private val _categoryFilter = MutableStateFlow<RecipeCategory?>(null)
+    private val _ingredientNeedles = MutableStateFlow<List<String>>(emptyList())
     private val _sort           = MutableStateFlow(RecipeSort.NEWEST)
     private val _importState    = MutableStateFlow(ImportState())
     private val _nutritionState = MutableStateFlow(NutritionState())
@@ -155,52 +183,112 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val uiState: StateFlow<RecipesUiState> = combine(
+    private val recipeListFlow: Flow<List<Recipe>> = combine(
         _query.flatMapLatest { q ->
             if (q.isBlank()) repo.getAll() else repo.search(q)
         },
-        _query,
         _platformFilter,
-        _sort,
-        _importState,
-        _nutritionState,
-        _isTranslating
-    ) { values ->
-        @Suppress("UNCHECKED_CAST")
-        val recipes        = values[0] as List<Recipe>
-        val q              = values[1] as String
-        val platformFilter = values[2] as String?
-        val sort           = values[3] as RecipeSort
-        val imp            = values[4] as ImportState
-        val nut            = values[5] as NutritionState
-        val translating    = values[6] as Boolean
-
-        val filtered = if (platformFilter == null) recipes
-            else recipes.filter { (it.platform ?: "web").lowercase() == platformFilter }
-        val sorted = when (sort) {
-            RecipeSort.NEWEST   -> filtered.sortedByDescending { it.savedAt }
-            RecipeSort.NAME     -> filtered.sortedBy { it.title.lowercase() }
-            RecipeSort.CALORIES -> filtered.sortedByDescending { it.totalCalories ?: -1f }
+        _categoryFilter,
+        _ingredientNeedles,
+        _sort
+    ) { recipes, platformFilter, categoryFilter, needles, sort ->
+        var filtered = recipes
+        if (platformFilter != null) {
+            filtered = filtered.filter { (it.platform ?: "web").lowercase() == platformFilter }
         }
+        if (categoryFilter != null) {
+            filtered = filtered.filter { it.category() == categoryFilter }
+        }
+        if (needles.isNotEmpty()) {
+            filtered = filtered
+                .filter { r ->
+                    val hay = "${r.title}\n${r.ingredients}\n${r.description}\n${r.tags}".lowercase()
+                    needles.all { n -> n.lowercase() in hay }
+                }
+                .sortedByDescending { r ->
+                    val hay = "${r.title}\n${r.ingredients}".lowercase()
+                    needles.count { it.lowercase() in hay }
+                }
+        } else {
+            filtered = when (sort) {
+                RecipeSort.NEWEST -> filtered.sortedByDescending { it.savedAt }
+                RecipeSort.NAME -> filtered.sortedBy { it.title.lowercase() }
+                RecipeSort.CALORIES -> filtered.sortedByDescending { it.totalCalories ?: -1f }
+            }
+        }
+        filtered
+    }
 
+    private data class FilterMeta(
+        val query: String,
+        val platformFilter: String?,
+        val categoryFilter: RecipeCategory?,
+        val needles: List<String>,
+        val sort: RecipeSort
+    )
+
+    private val filterMetaFlow = combine(
+        _query, _platformFilter, _categoryFilter, _ingredientNeedles, _sort
+    ) { q, p, c, n, s -> FilterMeta(q, p, c, n, s) }
+
+    private val importNutFlow = combine(_importState, _nutritionState, _isTranslating) { imp, nut, tr ->
+        Triple(imp, nut, tr)
+    }
+
+    val uiState: StateFlow<RecipesUiState> = combine(
+        recipeListFlow,
+        filterMetaFlow,
+        importNutFlow
+    ) { recipes, meta, triple ->
+        val (imp, nut, translating) = triple
         RecipesUiState(
-            recipes          = sorted,
-            query            = q,
-            platformFilter   = platformFilter,
-            sort             = sort,
-            isImporting      = imp.isImporting,
-            importPhase      = imp.importPhase,
-            importError      = imp.importError,
-            lastImport       = imp.lastImport,
-            instagramBlocked = imp.instagramBlocked,
-            blockedUrl       = imp.blockedUrl,
-            nutritionState   = nut,
-            isTranslating    = translating
+            recipes           = recipes,
+            query             = meta.query,
+            platformFilter    = meta.platformFilter,
+            categoryFilter    = meta.categoryFilter,
+            ingredientNeedles = meta.needles,
+            sort              = meta.sort,
+            isImporting       = imp.isImporting,
+            importPhase       = imp.importPhase,
+            importError       = imp.importError,
+            lastImport        = imp.lastImport,
+            instagramBlocked  = imp.instagramBlocked,
+            blockedUrl        = imp.blockedUrl,
+            nutritionState    = nut,
+            isTranslating     = translating
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RecipesUiState())
 
+
     fun setQuery(q: String) { _query.value = q }
     fun setPlatformFilter(p: String?) { _platformFilter.value = p }
+    fun setCategoryFilter(c: RecipeCategory?) { _categoryFilter.value = c }
+    fun clearCookFilters() {
+        _ingredientNeedles.value = emptyList()
+        // Kategorie bleibt, User kann separat zurücksetzen
+    }
+
+    /**
+     * „Was koche ich?“: Zutaten (Komma/Zeilen) müssen im Rezept vorkommen.
+     * Optional Kategorie-Filter. Query-Feld wird geleert, damit die volle Liste
+     * als Basis dient und nur die Needles filtern.
+     */
+    fun searchByIngredients(raw: String, category: RecipeCategory? = null) {
+        val needles = raw.split(',', '
+', ';')
+            .map { it.trim() }
+            .filter { it.length >= 2 }
+            .distinct()
+        _query.value = ""
+        _ingredientNeedles.value = needles
+        if (category != null) _categoryFilter.value = category
+    }
+
+    fun setRecipeCategory(recipe: Recipe, category: RecipeCategory) {
+        viewModelScope.launch {
+            repo.updateRecipe(recipe.copy(mealCategory = category.name))
+        }
+    }
     fun setSort(s: RecipeSort) { _sort.value = s }
     fun clearError()        { _importState.update { it.copy(importError = null) } }
     fun clearLastImport()   { _importState.update { it.copy(lastImport = null) } }

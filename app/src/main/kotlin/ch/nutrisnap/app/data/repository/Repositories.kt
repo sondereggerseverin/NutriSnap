@@ -342,7 +342,7 @@ class RecipeRepository(db: NutriDatabase, context: Context) {
      * anzulegen — verhindert 10× denselben Import.
      */
     suspend fun saveRecipe(r: Recipe): Long {
-        val clean = r.withoutNullArtifacts()
+        val clean = r.withoutNullArtifacts().withGuessedCategoryIfEmpty()
         val existing = findByFingerprint(contentFingerprint(clean))
         if (existing != null && (clean.id == 0L || clean.id == existing.id)) {
             val merged = clean.copy(id = existing.id, savedAt = existing.savedAt)
@@ -356,7 +356,7 @@ class RecipeRepository(db: NutriDatabase, context: Context) {
     }
 
     suspend fun updateRecipe(r: Recipe) {
-        val clean = r.withoutNullArtifacts()
+        val clean = r.withoutNullArtifacts().let { if (it.mealCategory.isBlank()) it.withGuessedCategoryIfEmpty() else it }
         dao.update(clean)
         pushSafely { SupabaseSync.upsertRecipe(clean) }
     }

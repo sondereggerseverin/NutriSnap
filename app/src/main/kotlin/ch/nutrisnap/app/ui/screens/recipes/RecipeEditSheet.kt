@@ -7,6 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -25,6 +27,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.nutrisnap.app.data.model.Recipe
+import ch.nutrisnap.app.data.model.RecipeCategory
 import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,6 +46,12 @@ fun RecipeEditSheet(
     var instructions by remember { mutableStateOf(recipe.instructions) }
     var servingsText by remember { mutableStateOf(recipe.servings.toString()) }
     var prepText     by remember { mutableStateOf(recipe.prepTimeMinutes?.toString() ?: "") }
+    var category     by remember {
+        mutableStateOf(
+            recipe.category().takeUnless { recipe.mealCategory.isBlank() }
+                ?: RecipeCategory.guess(recipe.title, recipe.ingredients, recipe.description)
+        )
+    }
 
     // Photo state — starts with existing imageUrl, can be replaced with local URI
     var imageUri     by remember { mutableStateOf<Uri?>(recipe.imageUrl?.let { Uri.parse(it) }) }
@@ -79,7 +88,8 @@ fun RecipeEditSheet(
             instructions    = instructions,
             servings        = servings,
             prepTimeMinutes = prep,
-            imageUrl        = imageUrl
+            imageUrl        = imageUrl,
+            mealCategory    = category.name
         )
     }
 
@@ -98,6 +108,24 @@ fun RecipeEditSheet(
                 }
             }
             HorizontalDivider()
+            Text("Kategorie", fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                modifier = Modifier.padding(horizontal = 16.dp, top = 12.dp, bottom = 6.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                RecipeCategory.entries.forEach { cat ->
+                    FilterChip(
+                        selected = category == cat,
+                        onClick = { category = cat },
+                        label = { Text("${cat.emoji} ${cat.label}", fontSize = 12.sp) }
+                    )
+                }
+            }
 
             LazyColumn(
                 contentPadding = PaddingValues(16.dp),

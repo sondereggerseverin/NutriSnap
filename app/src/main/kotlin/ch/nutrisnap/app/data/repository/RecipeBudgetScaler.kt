@@ -78,9 +78,54 @@ class RecipeBudgetScaler(private val db: NutriDatabase) {
     private val maxScaleFactor = 1f
 
     suspend fun scaleToRemainingBudget(recipe: Recipe): RecipeBudgetScaleResult? {
+        val remaining = computeRemainingKcal() ?: return scaleToTargetKcal(recipe, 0f)
+        return scaleToTargetKcal(recipe, remaining, allowUpscale = false)
+    }
+
+    /**
+     * Skaliert eine Portion auf [targetKcal]. Bei allowUpscale=true auch über 1×
+     * (z.B. „ich habe 600 kcal fürs Abendessen“).
+     */
+    fun scaleToTargetKcal(
+        recipe: Recipe,
+        targetKcal: Float,
+        allowUpscale: Boolean = true
+    ): RecipeBudgetScaleResult? {
         val kcalPerServing = recipe.totalCalories?.let { it / recipe.servings.coerceAtLeast(1) }
         if (kcalPerServing == null || kcalPerServing <= 0f) return null
+        if (targetKcal <= 0f) return null
 
+        val maxF = if (allowUpscale) 3f else maxScaleFactor
+        val scaleFactor = (targetKcal / kcalPerServing).coerceIn(minScaleFactor, maxF)
+
+        val scaledIngredients = recipe.ingredients.lines()
+            .filter { it.isNotBlank() }
+            .map { line ->
+                val parsed = RecipeNutritionAnalyzer.parseIngredientLine(line)
+                ScaledIngredientLine(
+                    originalLine = line,
+                    name = parsed?.name,
+                    originalAmountG = parsed?.amountG,
+                    scaledAmountG = parsed?.amountG?.times(scaleFactor),
+                    parsed = parsed != null
+                )
+            }
+
+        return RecipeBudgetScaleResult(
+            recipe = recipe,
+            remainingKcal = targetKcal,
+            kcalPerOriginalServing = kcalPerServing,
+            scaleFactor = scaleFactor,
+            scaledServings = recipe.servings * scaleFactor,
+            scaledKcal = kcalPerServing * scaleFactor,
+            scaledProtein = (recipe.proteinPerServing ?: 0f) * scaleFactor,
+            scaledCarbs = (recipe.carbsPerServing ?: 0f) * scaleFactor,
+            scaledFat = (recipe.fatPerServing ?: 0f) * scaleFactor,
+            ingredients = scaledIngredients
+        )
+    }
+
+    private suspend fun computeRemainingKcal(): Float? {
         val today = LocalDate.now()
         val profile = profileRepo.get().first()
         val trendWeights = weightRepo.getRecent(trendWindowDays).first()
@@ -110,39 +155,9 @@ class RecipeBudgetScaler(private val db: NutriDatabase) {
             avgActiveKcal = avgActiveKcal
         )
 
-        // Gleiche Logik wie HomeUiState.adjustedGoal: bei adaptivem Ziel ist der
-        // Aktivitätsbonus schon eingerechnet, sonst wird er separat addiert.
         val baseGoal = adaptiveTarget?.targetKcal?.toFloat() ?: profile.dailyCalorieGoal.toFloat()
         val adjustedGoal = if (adaptiveTarget != null) baseGoal else baseGoal + (todayActiveKcal?.toFloat() ?: 0f)
         val consumed = todayEntries.sumOf { it.calories.toDouble() }.toFloat()
-        val remaining = (adjustedGoal - consumed).coerceAtLeast(0f)
-
-        val scaleFactor = (remaining / kcalPerServing).coerceIn(minScaleFactor, maxScaleFactor)
-
-        val scaledIngredients = recipe.ingredients.lines()
-            .filter { it.isNotBlank() }
-            .map { line ->
-                val parsed = RecipeNutritionAnalyzer.parseIngredientLine(line)
-                ScaledIngredientLine(
-                    originalLine = line,
-                    name = parsed?.name,
-                    originalAmountG = parsed?.amountG,
-                    scaledAmountG = parsed?.amountG?.times(scaleFactor),
-                    parsed = parsed != null
-                )
-            }
-
-        return RecipeBudgetScaleResult(
-            recipe = recipe,
-            remainingKcal = remaining,
-            kcalPerOriginalServing = kcalPerServing,
-            scaleFactor = scaleFactor,
-            scaledServings = recipe.servings * scaleFactor,
-            scaledKcal = kcalPerServing * scaleFactor,
-            scaledProtein = (recipe.proteinPerServing ?: 0f) * scaleFactor,
-            scaledCarbs = (recipe.carbsPerServing ?: 0f) * scaleFactor,
-            scaledFat = (recipe.fatPerServing ?: 0f) * scaleFactor,
-            ingredients = scaledIngredients
-        )
+        return (adjustedGoal - consumed).coerceAtLeast(0f)
     }
 }

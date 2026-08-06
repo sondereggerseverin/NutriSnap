@@ -89,7 +89,17 @@ interface RecipeDao {
     @Query("SELECT * FROM recipes ORDER BY savedAt DESC")
     fun getAll(): Flow<List<Recipe>>
 
-    @Query("SELECT * FROM recipes WHERE title LIKE '%' || :query || '%' OR tags LIKE '%' || :query || '%' ORDER BY savedAt DESC")
+    @Query(
+        """
+        SELECT * FROM recipes WHERE
+            title LIKE '%' || :query || '%'
+            OR tags LIKE '%' || :query || '%'
+            OR ingredients LIKE '%' || :query || '%'
+            OR description LIKE '%' || :query || '%'
+            OR mealCategory LIKE '%' || :query || '%'
+        ORDER BY savedAt DESC
+        """
+    )
     fun search(query: String): Flow<List<Recipe>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
