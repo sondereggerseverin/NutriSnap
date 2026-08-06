@@ -17,7 +17,8 @@ object RecipeGermanMetricConverter {
     data class ConvertedRecipe(
         val ingredients: String = "",
         val instructions: String = "",
-        val title: String = ""
+        val title: String = "",
+        val description: String = ""
     )
 
     /**
@@ -281,6 +282,88 @@ object RecipeGermanMetricConverter {
         Regex("""(?i)\bpork\b""") to "Schwein",
         Regex("""(?i)\bsalmon\b""") to "Lachs",
         Regex("""(?i)\berythritol\b""") to "Erythrit",
+        Regex("""(?i)\bfat[- ]free\b""") to "fettarm",
+        Regex("""(?i)\bnon[- ]fat\b""") to "fettfrei",
+        Regex("""(?i)\blow[- ]fat\b""") to "fettarm",
+        Regex("""(?i)\bwhipped\b""") to "aufgeschlagen",
+        Regex("""(?i)\bcream cheese\b""") to "Frischkäse",
+        Regex("""(?i)\bgreek yogurt\b""") to "griechischer Joghurt",
+        Regex("""(?i)\bgreek yoghurt\b""") to "griechischer Joghurt",
+        Regex("""(?i)\bprotein powder\b""") to "Proteinpulver",
+        Regex("""(?i)\bsweetener\b""") to "Süssungsmittel",
+        Regex("""(?i)\bpudding mix\b""") to "Puddingpulver",
+        Regex("""(?i)\bsugar[- ]free\b""") to "zuckerfrei",
+        Regex("""(?i)\bzero calorie\b""") to "kalorienfrei",
+        Regex("""(?i)\beggs?\b""") to "Ei",
+        Regex("""(?i)\bbiscuit\b""") to "Keks",
+        Regex("""(?i)\bspread\b""") to "Aufstrich",
+        Regex("""(?i)\bmix all the ingredients\b""") to "Alle Zutaten vermengen",
+        Regex("""(?i)\bpour the mixture\b""") to "Die Mischung giessen",
+        Regex("""(?i)\bpreheat\b""") to "Vorheizen",
+        Regex("""(?i)\bbake\b""") to "Backen",
+        Regex("""(?i)\buntil cool\b""") to "bis abgekühlt",
+        Regex("""(?i)\bcake baking dish\b""") to "Kuchenform",
+        Regex("""(?i)\blightly greased\b""") to "leicht gefettet",
+        Regex("""(?i)\blined\b""") to "ausgelegt",
+        Regex("""(?i)\bbaking dish\b""") to "Backform",
+        Regex("""(?i)\blarge tray\b""") to "grosses Blech",
+        Regex("""(?i)\bmelted\b""") to "geschmolzen",
+        Regex("""(?i)\bcrushed\b""") to "zerkrümelt",
+        Regex("""(?i)\bhigh protein\b""") to "proteinreich",
+        Regex("""(?i)\bfat loss\b""") to "Fettabbau",
+        Regex("""(?i)\bper serving\b""") to "pro Portion",
+        Regex("""(?i)\bfat[- ]free\b""") to "fettarm",
+        Regex("""(?i)\bnon[- ]fat\b""") to "fettfrei",
+        Regex("""(?i)\blow[- ]fat\b""") to "fettarm",
+        Regex("""(?i)\bwhipped\b""") to "aufgeschlagen",
+        Regex("""(?i)\bcream cheese\b""") to "Frischkäse",
+        Regex("""(?i)\bgreek yogurt\b""") to "griechischer Joghurt",
+        Regex("""(?i)\bgreek yoghurt\b""") to "griechischer Joghurt",
+        Regex("""(?i)\bprotein powder\b""") to "Proteinpulver",
+        Regex("""(?i)\bsweetener\b""") to "Süssungsmittel",
+        Regex("""(?i)\bpudding mix\b""") to "Puddingpulver",
+        Regex("""(?i)\bsugar[- ]free\b""") to "zuckerfrei",
+        Regex("""(?i)\bzero calorie\b""") to "kalorienfrei",
+        Regex("""(?i)\beggs?\b""") to "Ei",
+        Regex("""(?i)\bbiscuit\b""") to "Keks",
+        Regex("""(?i)\bspread\b""") to "Aufstrich",
+        Regex("""(?i)\bmix all the ingredients\b""") to "Alle Zutaten vermengen",
+        Regex("""(?i)\bpour the mixture\b""") to "Die Mischung giessen",
+        Regex("""(?i)\bpreheat\b""") to "Vorheizen",
+        Regex("""(?i)\bbake\b""") to "Backen",
+        Regex("""(?i)\buntil cool\b""") to "bis abgekühlt",
+        Regex("""(?i)\blightly greased\b""") to "leicht gefettet",
+        Regex("""(?i)\bbaking dish\b""") to "Backform",
+        Regex("""(?i)\bmelted\b""") to "geschmolzen",
+        Regex("""(?i)\bcrushed\b""") to "zerkrümelt",
+        Regex("""(?i)\bhigh protein\b""") to "proteinreich",
+        Regex("""(?i)\bper serving\b""") to "pro Portion",
+        Regex("""(?i)\bfat[- ]free\b""") to "fettarm",
+        Regex("""(?i)\bnon[- ]fat\b""") to "fettfrei",
+        Regex("""(?i)\blow[- ]fat\b""") to "fettarm",
+        Regex("""(?i)\bwhipped\b""") to "aufgeschlagen",
+        Regex("""(?i)\bcream cheese\b""") to "Frischkäse",
+        Regex("""(?i)\bgreek yogurt\b""") to "griechischer Joghurt",
+        Regex("""(?i)\bgreek yoghurt\b""") to "griechischer Joghurt",
+        Regex("""(?i)\bprotein powder\b""") to "Proteinpulver",
+        Regex("""(?i)\bsweetener\b""") to "Süssungsmittel",
+        Regex("""(?i)\bpudding mix\b""") to "Puddingpulver",
+        Regex("""(?i)\bsugar[- ]free\b""") to "zuckerfrei",
+        Regex("""(?i)\bzero calorie\b""") to "kalorienfrei",
+        Regex("""(?i)\beggs?\b""") to "Ei",
+        Regex("""(?i)\bbiscuit\b""") to "Keks",
+        Regex("""(?i)\bspread\b""") to "Aufstrich",
+        Regex("""(?i)\bmix all the ingredients\b""") to "Alle Zutaten vermengen",
+        Regex("""(?i)\bpour the mixture\b""") to "Die Mischung giessen",
+        Regex("""(?i)\bpreheat\b""") to "Vorheizen",
+        Regex("""(?i)\bbake\b""") to "Backen",
+        Regex("""(?i)\buntil cool\b""") to "bis abgekühlt",
+        Regex("""(?i)\blightly greased\b""") to "leicht gefettet",
+        Regex("""(?i)\bbaking dish\b""") to "Backform",
+        Regex("""(?i)\bmelted\b""") to "geschmolzen",
+        Regex("""(?i)\bcrushed\b""") to "zerkrümelt",
+        Regex("""(?i)\bhigh protein\b""") to "proteinreich",
+        Regex("""(?i)\bper serving\b""") to "pro Portion",
         Regex("""(?i)\berytrit\b""") to "Erythrit",
     )
 
@@ -318,6 +401,9 @@ PFLICHT:
 - Keine Zutaten erfinden. Mengen sinnvoll runden.
 
 Originaltitel: ${recipe.title}
+Beschreibung:
+${recipe.description}
+
 Zutaten:
 ${recipe.ingredients}
 
@@ -327,8 +413,9 @@ ${recipe.instructions}
 Antworte NUR mit JSON:
 {
   "title": "Deutscher Titel",
+  "description": "Deutsche Beschreibung",
   "ingredients": "Zeile pro Zutat...",
-  "instructions": "1. ...\\n2. ..."
+  "instructions": "1. ...\n2. ..."
 }
 """.trimIndent()
 
@@ -340,7 +427,8 @@ Antworte NUR mit JSON:
             // Fallback: offline nur Einheiten
             return Result.success(
                 ConvertedRecipe(
-                    title = recipe.title,
+                    title = translateNamesToGerman(recipe.title),
+                    description = translateNamesToGerman(recipe.description),
                     ingredients = convertOfflineFull(recipe.ingredients),
                     instructions = convertOfflineFull(recipe.instructions)
                 )
@@ -354,14 +442,17 @@ Antworte NUR mit JSON:
             val ing = obj.optString("ingredients").ifBlank { recipe.ingredients }
             val ins = obj.optString("instructions").ifBlank { recipe.instructions }
             // Nachbearbeitung: Reste wie "dough"/"raw milk" offline nachziehen
+            val desc = obj.optString("description").ifBlank { recipe.description }
             ConvertedRecipe(
                 title = obj.optString("title").ifBlank { recipe.title },
+                description = translateNamesToGerman(desc),
                 ingredients = convertOfflineFull(ing),
                 instructions = translateNamesToGerman(convertUnitsToMetric(ins))
             )
         }.recover {
             ConvertedRecipe(
-                title = recipe.title,
+                title = translateNamesToGerman(recipe.title),
+                description = translateNamesToGerman(recipe.description),
                 ingredients = convertOfflineFull(recipe.ingredients),
                 instructions = convertOfflineFull(recipe.instructions)
             )

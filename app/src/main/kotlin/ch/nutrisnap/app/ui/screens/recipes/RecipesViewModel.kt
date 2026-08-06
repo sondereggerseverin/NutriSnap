@@ -163,6 +163,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 val converted = RecipeGermanMetricConverter.convertWithAi(recipe).getOrThrow()
                 val updated = recipe.copy(
                     title = converted.title.ifBlank { recipe.title },
+                    description = converted.description.ifBlank { recipe.description },
                     ingredients = converted.ingredients.ifBlank { recipe.ingredients },
                     instructions = converted.instructions.ifBlank { recipe.instructions }
                 )
@@ -320,13 +321,14 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                     if (converted != null) {
                         val updated = r.copy(
                             title = converted.title.ifBlank { r.title },
+                            description = converted.description.ifBlank { r.description },
                             ingredients = converted.ingredients.ifBlank { r.ingredients },
                             instructions = converted.instructions.ifBlank { r.instructions },
                             mealCategory = r.mealCategory.ifBlank {
                                 ch.nutrisnap.app.data.model.RecipeCategory.guess(
                                     converted.title.ifBlank { r.title },
                                     converted.ingredients.ifBlank { r.ingredients },
-                                    r.description
+                                    converted.description.ifBlank { r.description }
                                 ).name
                             }
                         )
