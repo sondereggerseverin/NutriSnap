@@ -24,6 +24,10 @@ android {
             "\"${System.getenv("GEMINI_API_KEY") ?: ""}\""  )
         buildConfigField("String", "ZENMUX_API_KEY",
             "\"${System.getenv("ZENMUX_API_KEY") ?: ""}\""  )
+        buildConfigField("String", "CLOUDFLARE_ACCOUNT_ID",
+            "\"${System.getenv("CLOUDFLARE_ACCOUNT_ID") ?: ""}\""  )
+        buildConfigField("String", "CLOUDFLARE_API_TOKEN",
+            "\"${System.getenv("CLOUDFLARE_API_TOKEN") ?: ""}\""  )
         buildConfigField("String", "USDA_API_KEY",
             "\"${System.getenv("USDA_API_KEY") ?: ""}\""  )
         buildConfigField("String", "NUTRITIONIX_APP_ID",

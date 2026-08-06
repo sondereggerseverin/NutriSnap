@@ -79,6 +79,56 @@ class ZenMuxImageService(private val context: Context) {
             Result.failure(Exception(msg))
         }
 
+
+    /**
+     * Cloudflare Workers AI – @cf/black-forest-labs/flux-1-schnell
+     * Free tier: ~10'000 Neurons/Tag ≈ 170 Bilder.
+     */
+    private fun generateViaCloudflare(prompt: String): Result<String> {
+        return try {
+            val accountId = BuildConfig.CLOUDFLARE_ACCOUNT_ID
+            val token = BuildConfig.CLOUDFLARE_API_TOKEN
+            val model = "@cf/black-forest-labs/flux-1-schnell"
+            val url =
+                "https://api.cloudflare.com/client/v4/accounts/$accountId/ai/run/$model"
+            val seed = (prompt.hashCode().toLong() and 0x7fffffffL)
+            val body = JSONObject().apply {
+                put("prompt", prompt.take(2048))
+                put("seed", seed)
+                put("num_steps", 6)
+            }.toString()
+
+            val request = Request.Builder()
+                .url(url)
+                .addHeader("Authorization", "Bearer $token")
+                .addHeader("Content-Type", "application/json")
+                .post(body.toRequestBody("application/json".toMediaType()))
+                .build()
+            val response = client.newCall(request).execute()
+            val bodyStr = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                return Result.failure(Exception("${response.code}: ${bodyStr.take(100)}"))
+            }
+            val root = JSONObject(bodyStr)
+            if (root.has("errors") && root.optJSONArray("errors")?.length() ?: 0 > 0) {
+                val err = root.optJSONArray("errors")?.optJSONObject(0)?.optString("message")
+                return Result.failure(Exception(err ?: bodyStr.take(100)))
+            }
+            val result = root.optJSONObject("result") ?: root
+            val b64 = result.optString("image")
+            if (b64.isBlank()) {
+                return Result.failure(Exception("keine image-Daten in CF-Antwort"))
+            }
+            val bytes = Base64.decode(b64, Base64.DEFAULT)
+            if (bytes.size < 1000) {
+                return Result.failure(Exception("Bild zu klein (${bytes.size} B)"))
+            }
+            Result.success(saveBytes(bytes))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     private fun generateViaGemini(prompt: String): Result<String> {
         return try {
             val apiKey = BuildConfig.GEMINI_API_KEY
