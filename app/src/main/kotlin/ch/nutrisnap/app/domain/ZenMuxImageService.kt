@@ -28,16 +28,13 @@ class ZenMuxImageService(private val context: Context) {
         .readTimeout(120, TimeUnit.SECONDS)
         .build()
 
-    suspend fun generateRecipeImage(title: String, description: String): Result<String> =
+    suspend fun generateRecipeImage(
+        title: String,
+        description: String,
+        ingredientsHint: String = ""
+    ): Result<String> =
         withContext(Dispatchers.IO) {
-            val prompt = buildString {
-                append("Professionelles, appetitliches Food-Fotografie-Bild von: $title.")
-                if (description.isNotBlank()) append(" $description.")
-                append(
-                    " Draufsicht, natürliches Licht, auf einem Teller angerichtet, " +
-                        "realistischer Food-Blog-Stil, keine Personen, kein Text im Bild."
-                )
-            }
+            val prompt = buildFoodPrompt(title, description, ingredientsHint)
 
             val errors = mutableListOf<String>()
 
@@ -227,20 +224,43 @@ class ZenMuxImageService(private val context: Context) {
     }
 
 
+    /**
+     * Baut einen englischen Food-Photo-Prompt – Modelle (Flux/Gemini) reagieren
+     * darauf deutlich besser als auf deutsche Fliesstexte.
+     */
+    private fun buildFoodPrompt(title: String, description: String, ingredientsHint: String): String {
+        val dish = title.trim().ifBlank { "homemade meal" }
+        val desc = description.trim().take(160)
+        val ings = ingredientsHint
+            .lines()
+            .map { it.replace(Regex("""^[\d.,/\s]+[a-zA-Z]*\s*"""), "").trim() }
+            .filter { it.length in 2..40 }
+            .take(6)
+            .joinToString(", ")
+        return buildString {
+            append("Ultra-realistic professional food photography of $dish, ")
+            if (desc.isNotBlank()) append("$desc, ")
+            if (ings.isNotBlank()) append("main ingredients visible: $ings, ")
+            append(
+                "served on a ceramic plate, 45-degree angle, shallow depth of field, " +
+                    "soft natural window light, restaurant plating, highly detailed, " +
+                    "appetizing steam if hot, authentic colors, food magazine style. "
+            )
+            append(
+                "Strict: no hands, no people, no chopsticks held by a person, " +
+                    "no text, no watermark, no logo, no collage, no plastic look."
+            )
+        }
+    }
+
     /** Kostenloser Fallback ohne API-Key (Flux via Pollinations). */
     private fun generateViaPollinations(prompt: String): Result<String> {
         return try {
-            // Kurzer, englischer Food-Prompt für bessere Bildqualität
-            val short = prompt
-                .replace(Regex("""(?i)Professionelles, appetitliches Food-Fotografie-Bild von:\s*"""), "")
-                .replace(Regex("""Draufsicht.*"""), "")
-                .trim()
-                .take(200)
-            val encoded = java.net.URLEncoder.encode(
-                "professional food photography, plated dish, natural light, top view, appetizing, no text, no watermark: $short",
-                Charsets.UTF_8.name()
-            )
-            val url = "https://image.pollinations.ai/prompt/$encoded?width=1024&height=1024&nologo=true&enhance=true"
+            val encoded = java.net.URLEncoder.encode(prompt.take(450), Charsets.UTF_8.name())
+            // model=flux = beste Qualität; private=true verhindert Prompt-Logging
+            val url =
+                "https://image.pollinations.ai/prompt/$encoded" +
+                    "?width=1024&height=1024&nologo=true&enhance=true&model=flux&safe=false"
             val request = Request.Builder()
                 .url(url)
                 .addHeader("User-Agent", "NutriSnap/1.1")
@@ -252,7 +272,7 @@ class ZenMuxImageService(private val context: Context) {
             }
             val bytes = response.body?.bytes()
                 ?: return Result.failure(Exception("leerer Body"))
-            if (bytes.size < 1000) {
+            if (bytes.size < 2000) {
                 return Result.failure(Exception("Antwort zu klein (${bytes.size} B)"))
             }
             Result.success(saveBytes(bytes))

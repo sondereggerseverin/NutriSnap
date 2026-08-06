@@ -431,7 +431,8 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
     private fun generateImageForCurrentRecipe(recipe: GeneratedRecipe) {
         viewModelScope.launch {
             _state.update { it.copy(isGeneratingImage = true, imageError = null) }
-            val result = imageService.generateRecipeImage(recipe.title, recipe.description)
+            val ingHint = recipe.effectiveIngredients().take(8).joinToString("\n") { it.name }
+            val result = imageService.generateRecipeImage(recipe.title, recipe.description, ingHint)
             _state.update {
                 if (it.recipe?.title != recipe.title) {
                     it.copy(isGeneratingImage = false)
@@ -462,7 +463,11 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _state.update { it.copy(isGeneratingImage = true) }
             val generatedImageUri = _state.value.recipeImageUrl
-                ?: imageService.generateRecipeImage(r.title, r.description).getOrNull()
+                ?: imageService.generateRecipeImage(
+                    r.title,
+                    r.description,
+                    r.effectiveIngredients().take(8).joinToString("\n") { it.name }
+                ).getOrNull()
 
             // Toplevel-Makros sind PRO PORTION → totalCalories = Portion × servings
             val servings = r.servings.coerceAtLeast(1)
