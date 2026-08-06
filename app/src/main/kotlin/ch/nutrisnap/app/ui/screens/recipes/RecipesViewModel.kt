@@ -310,18 +310,30 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             val result: RecipeScrapeResult = repo.importFromUrl(url) { phase ->
                 _importState.update { s -> s.copy(importPhase = phase) }
             }
-            if (result.success && result.recipe != null && shouldAutoGermanMetric()) {
+            if (result.success && result.recipe != null) {
                 val r = result.recipe
-                val converted = RecipeGermanMetricConverter.convertWithAi(r).getOrNull()
-                if (converted != null) {
-                    val updated = r.copy(
-                        title = converted.title.ifBlank { r.title },
-                        ingredients = converted.ingredients.ifBlank { r.ingredients },
-                        instructions = converted.instructions.ifBlank { r.instructions }
-                    )
-                    repo.updateRecipe(updated)
-                    _importState.update { it.copy(isImporting = false, importPhase = null, lastImport = updated) }
-                    return@launch
+                val platform = (r.platform ?: "").lowercase()
+                val shouldTranslate = shouldAutoGermanMetric() ||
+                    platform in setOf("instagram", "tiktok", "bild")
+                if (shouldTranslate) {
+                    val converted = RecipeGermanMetricConverter.convertWithAi(r).getOrNull()
+                    if (converted != null) {
+                        val updated = r.copy(
+                            title = converted.title.ifBlank { r.title },
+                            ingredients = converted.ingredients.ifBlank { r.ingredients },
+                            instructions = converted.instructions.ifBlank { r.instructions },
+                            mealCategory = r.mealCategory.ifBlank {
+                                ch.nutrisnap.app.data.model.RecipeCategory.guess(
+                                    converted.title.ifBlank { r.title },
+                                    converted.ingredients.ifBlank { r.ingredients },
+                                    r.description
+                                ).name
+                            }
+                        )
+                        repo.updateRecipe(updated)
+                        _importState.update { it.copy(isImporting = false, importPhase = null, lastImport = updated) }
+                        return@launch
+                    }
                 }
             }
             _importState.update { state ->
