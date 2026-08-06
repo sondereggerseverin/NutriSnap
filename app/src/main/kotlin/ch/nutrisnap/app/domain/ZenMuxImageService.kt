@@ -18,9 +18,10 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Generiert Rezeptbilder. Reihenfolge:
- * 1. Gemini 2.5 Flash Image (GEMINI_API_KEY) – zuverlässig, schon im Projekt
- * 2. ZenMux OpenAI-kompatibel (gpt-image-2) falls Key vorhanden
- * 3. ZenMux free Gemini-Image über Vertex-kompatiblen Endpoint
+ * 1. Cloudflare Workers AI FLUX.1 [schnell] (~170/Tag free)
+ * 2. Gemini Image (falls Quota)
+ * 3. Pollinations Flux (kein Key)
+ * 4. ZenMux (falls Key Rechte hat)
  */
 class ZenMuxImageService(private val context: Context) {
     private val client = OkHttpClient.Builder()
@@ -38,7 +39,17 @@ class ZenMuxImageService(private val context: Context) {
 
             val errors = mutableListOf<String>()
 
-            // 1) Gemini native image (bevorzugt – Key ist schon aktiv)
+            // 1) Cloudflare Workers AI – FLUX.1 schnell (bestes Free-Tier)
+            if (BuildConfig.CLOUDFLARE_ACCOUNT_ID.isNotBlank() &&
+                BuildConfig.CLOUDFLARE_API_TOKEN.isNotBlank()
+            ) {
+                generateViaCloudflare(prompt).fold(
+                    onSuccess = { return@withContext Result.success(it) },
+                    onFailure = { errors += "CF: ${it.message}" }
+                )
+            }
+
+            // 2) Gemini Image
             if (BuildConfig.GEMINI_API_KEY.isNotBlank()) {
                 generateViaGemini(prompt).fold(
                     onSuccess = { return@withContext Result.success(it) },
@@ -46,17 +57,17 @@ class ZenMuxImageService(private val context: Context) {
                 )
             }
 
-            // 2) Pollinations Flux (kostenlos, oft beste Qualität bei uns)
+            // 3) Pollinations (kein Key)
             generateViaPollinations(prompt).fold(
                 onSuccess = { return@withContext Result.success(it) },
                 onFailure = { errors += "Pollinations: ${it.message}" }
             )
 
-            // 3) ZenMux nur falls Pollinations ausfällt
+            // 4) ZenMux
             if (BuildConfig.ZENMUX_API_KEY.isNotBlank()) {
                 generateViaZenMuxOpenAi(prompt).fold(
                     onSuccess = { return@withContext Result.success(it) },
-                    onFailure = { errors += "ZenMux-OA: ${it.message}" }
+                    onFailure = { errors += "ZenMux: ${it.message}" }
                 )
             }
 
