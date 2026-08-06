@@ -808,6 +808,18 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
  * via AsyncImage; otherwise shows a platform-tinted gradient with a fork/knife
  * icon, so cards never look "empty" the way a missing-image gap used to.
  */
+
+/** Coil-Modell: lokale file://- oder Absolute-Pfade als File, sonst URL-String. */
+private fun coilModel(url: String): Any {
+    val path = when {
+        url.startsWith("file://") -> url.removePrefix("file://")
+        url.startsWith("/") && !url.startsWith("http") -> url
+        else -> return url
+    }
+    val f = java.io.File(path)
+    return if (f.exists()) f else url
+}
+
 @Composable
 private fun RecipeThumbnail(
     recipe:   Recipe,
@@ -822,7 +834,7 @@ private fun RecipeThumbnail(
 
     if (!url.isNullOrBlank() && !imageLoadFailed) {
         AsyncImage(
-            model = url, contentDescription = recipe.displayTitle(),
+            model = coilModel(url), contentDescription = recipe.displayTitle(),
             modifier = box.clip(shape),
             contentScale = ContentScale.Crop,
             onError = { imageLoadFailed = true }

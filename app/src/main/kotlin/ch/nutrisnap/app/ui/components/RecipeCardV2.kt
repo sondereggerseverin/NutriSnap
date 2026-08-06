@@ -262,7 +262,10 @@ fun RecipeCardImage(recipe: Recipe, modifier: Modifier = Modifier) {
     ) {
         if (showImage) {
             AsyncImage(
-                model = url,
+                model = if (url.startsWith("file://") || (url.startsWith("/") && !url.startsWith("http"))) {
+                    val f = java.io.File(url.removePrefix("file://"))
+                    if (f.exists()) f else url
+                } else url,
                 contentDescription = recipe.title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),

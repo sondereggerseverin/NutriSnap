@@ -214,6 +214,7 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
                     RecipeResultCard(
                         recipe = recipe,
                         imageUrl = state.recipeImageUrl,
+                        imageError = state.imageError,
                         isSavingImage = state.isGeneratingImage,
                         onAddToDiary = { showDiarySheet = true },
                         onSaveAsRecipe = { vm.saveAsRecipe() },
@@ -900,6 +901,7 @@ private fun RecipeMethodAdaptRow(
 private fun RecipeResultCard(
     recipe: GeneratedRecipe,
     imageUrl: String? = null,
+    imageError: String? = null,
     isSavingImage: Boolean = false,
     onAddToDiary: () -> Unit,
     onSaveAsRecipe: () -> Unit,
@@ -935,7 +937,13 @@ private fun RecipeResultCard(
                 when {
                     !imageUrl.isNullOrBlank() -> {
                         AsyncImage(
-                            model = imageUrl,
+                            model = run {
+                                val u = imageUrl!!
+                                if (u.startsWith("file://") || (u.startsWith("/") && !u.startsWith("http"))) {
+                                    val f = java.io.File(u.removePrefix("file://"))
+                                    if (f.exists()) f else u
+                                } else u
+                            },
                             contentDescription = recipe.title,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
@@ -950,12 +958,24 @@ private fun RecipeResultCard(
                         }
                     }
                     else -> {
-                        Icon(
-                            Icons.Default.Restaurant,
-                            contentDescription = null,
-                            modifier = Modifier.size(40.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(16.dp)) {
+                            Icon(
+                                Icons.Default.Restaurant,
+                                contentDescription = null,
+                                modifier = Modifier.size(40.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            )
+                            if (!imageError.isNullOrBlank()) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "Kein Bild: $imageError",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.error,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
                     }
                 }
             }

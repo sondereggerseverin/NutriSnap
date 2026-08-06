@@ -177,20 +177,34 @@ enum class RecipeCategory(val label: String, val emoji: String) {
 
         /** Heuristik aus Titel/Zutaten – für Import und leere Kategorien. */
         fun guess(title: String, ingredients: String = "", description: String = ""): RecipeCategory {
+            // „süß“ allein trifft fälschlich „Süßkartoffel“ — deshalb keine nackten süß/süss.
             val t = "$title\n$description\n$ingredients".lowercase()
+                .replace("süßkartoffel", "suesskartoffel")
+                .replace("süsskartoffel", "suesskartoffel")
+                .replace("sweet potato", "suesskartoffel")
+
+            val savoryMain = listOf(
+                "hackfleisch", "hähnchen", "haehnchen", "hühner", "huehner", "chicken",
+                "rind", "schwein", "lachs", "fisch", "garnele", "tofu", "curry",
+                "pfanne", "pfannen", "bowl", "pasta", "nudeln", "risotto", "eintopf",
+                "suppe", "gulasch", "braten", "steak", "masala", "chili", "taco", "wrap"
+            )
             val dessert = listOf(
                 "dessert", "nachtisch", "kuchen", "brownie", "cookie", "keks", "pudding",
-                "eis ", "ice cream", "mousse", "cheesecake", "tiramisu", "süß", "süss",
-                "schoko", "chocolate", "muffin", "cupcake"
+                "eiscreme", "ice cream", "mousse", "cheesecake", "tiramisu",
+                "schokolade", "chocolate", "muffin", "cupcake", "süßspeise", "suessspeise"
             )
             val breakfast = listOf(
                 "frühstück", "fruehstueck", "breakfast", "overnight", "chia", "porridge",
-                "oats", "hafer", "müsli", "muesli", "granola", "pancake", "pfannkuchen",
+                "oats", "haferflocken", "müsli", "muesli", "granola", "pancake", "pfannkuchen",
                 "french toast", "smoothie bowl", "joghurt bowl", "yogurt bowl"
             )
             val drink = listOf("smoothie", "shake", "saft", "juice", "latte", "matcha drink", "protein shake")
             val sauce = listOf("sauce", "soße", "sosse", "dressing", "dip ", "mayo", "pesto")
-            val snack = listOf("snack", "beilage", "side ", "wrap (klein)", "energy ball", "riegel")
+            val snack = listOf("snack", "beilage", "side dish", "energy ball", "proteinriegel")
+
+            // Herzhaftes Gericht schlägt Dessert/Frühstück (z.B. Süßkartoffel-Hack-Pfanne)
+            if (savoryMain.any { it in t }) return MAIN
             when {
                 dessert.any { it in t } -> return DESSERT
                 breakfast.any { it in t } -> return BREAKFAST

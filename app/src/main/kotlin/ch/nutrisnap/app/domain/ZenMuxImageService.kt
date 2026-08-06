@@ -67,14 +67,28 @@ class ZenMuxImageService(private val context: Context) {
                 }
 
                 val root = JSONObject(bodyStr)
-                val b64 = root.getJSONArray("data").getJSONObject(0).getString("b64_json")
-                val bytes = Base64.decode(b64, Base64.DEFAULT)
-
+                val data0 = root.getJSONArray("data").getJSONObject(0)
                 val dir = File(context.filesDir, "recipe_images").apply { mkdirs() }
                 val file = File(dir, "${UUID.randomUUID()}.png")
-                file.writeBytes(bytes)
 
-                Result.success(file.toURI().toString())
+                when {
+                    data0.has("b64_json") && !data0.isNull("b64_json") -> {
+                        val bytes = Base64.decode(data0.getString("b64_json"), Base64.DEFAULT)
+                        file.writeBytes(bytes)
+                    }
+                    data0.has("url") && !data0.isNull("url") -> {
+                        val imgUrl = data0.getString("url")
+                        val imgBytes = client.newCall(Request.Builder().url(imgUrl).build())
+                            .execute().body?.bytes()
+                            ?: return@withContext Result.failure(Exception("Bild-URL leer"))
+                        file.writeBytes(imgBytes)
+                    }
+                    else -> return@withContext Result.failure(
+                        Exception("ZenMux: weder b64_json noch url in Antwort")
+                    )
+                }
+
+                Result.success("file://${file.absolutePath}")
             } catch (e: Exception) {
                 Log.e("ZenMuxImage", "Bildgenerierung fehlgeschlagen: ${e.message}", e)
                 Result.failure(e)

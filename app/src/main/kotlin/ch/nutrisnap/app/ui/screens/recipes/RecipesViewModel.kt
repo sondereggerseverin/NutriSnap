@@ -103,12 +103,20 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             runCatching {
                 var n = 0
                 for (r in repo.getAllOnce()) {
-                    if (r.mealCategory.isBlank()) {
-                        repo.updateRecipe(r.withGuessedCategoryIfEmpty())
+                    val guessed = ch.nutrisnap.app.data.model.RecipeCategory.guess(
+                        r.title, r.ingredients, r.description
+                    )
+                    // Leer ODER fälschlich Dessert bei herzhaftem Gericht neu setzen
+                    val needs =
+                        r.mealCategory.isBlank() ||
+                        (r.category() == ch.nutrisnap.app.data.model.RecipeCategory.DESSERT &&
+                            guessed == ch.nutrisnap.app.data.model.RecipeCategory.MAIN)
+                    if (needs && guessed.name != r.mealCategory) {
+                        repo.updateRecipe(r.copy(mealCategory = guessed.name))
                         n++
                     }
                 }
-                if (n > 0) android.util.Log.i("Recipes", "Kategorien gesetzt: $n Rezepte")
+                if (n > 0) android.util.Log.i("Recipes", "Kategorien korrigiert: $n Rezepte")
             }
         }
     }

@@ -51,6 +51,7 @@ data class RecipeGenUiState(
     val isGeneratingImage: Boolean = false,
     /** Lokales file://-Bild nach ZenMux, sobald fertig. */
     val recipeImageUrl: String? = null,
+    val imageError: String? = null,
     val history: List<GeneratedRecipeEntity> = emptyList(),
     // Zutaten-Modus
     val ingredientChips: List<String> = emptyList(),
@@ -158,7 +159,7 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
     fun generate(userInput: String) {
         if (userInput.isBlank()) return
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null, recipe = null, recipeImageUrl = null, openHistoryId = null, savedToDiary = false, savedAsRecipe = false) }
+            _state.update { it.copy(isLoading = true, error = null, recipe = null, recipeImageUrl = null, imageError = null, openHistoryId = null, savedToDiary = false, savedAsRecipe = false) }
             val s = _state.value
             service.generateRecipe(userInput, s.cookingMethod, s.applianceModel).fold(
                 onSuccess = { recipe ->
@@ -216,7 +217,7 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
         val ingredients = _state.value.ingredientChips
         if (ingredients.isEmpty()) return
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null, recipe = null, recipeImageUrl = null, openHistoryId = null, savedToDiary = false, savedAsRecipe = false) }
+            _state.update { it.copy(isLoading = true, error = null, recipe = null, recipeImageUrl = null, imageError = null, openHistoryId = null, savedToDiary = false, savedAsRecipe = false) }
             val s = _state.value
             service.generateFromIngredients(ingredients, note, s.cookingMethod, s.applianceModel).fold(
                 onSuccess = { recipe ->
@@ -237,7 +238,7 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
     fun generateFillUp(mealLabel: String) {
         val budget = _state.value.fillUpBudget
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null, recipe = null, recipeImageUrl = null, openHistoryId = null, savedToDiary = false, savedAsRecipe = false) }
+            _state.update { it.copy(isLoading = true, error = null, recipe = null, recipeImageUrl = null, imageError = null, openHistoryId = null, savedToDiary = false, savedAsRecipe = false) }
             val s = _state.value
             service.generateFillUp(budget.calories, budget.protein, budget.carbs, budget.fat, mealLabel, s.cookingMethod, s.applianceModel).fold(
                 onSuccess = { recipe ->
@@ -429,14 +430,24 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
     /** Startet ZenMux-Bild im Hintergrund und schreibt URL in den State. */
     private fun generateImageForCurrentRecipe(recipe: GeneratedRecipe) {
         viewModelScope.launch {
-            _state.update { it.copy(isGeneratingImage = true) }
-            val uri = imageService.generateRecipeImage(recipe.title, recipe.description).getOrNull()
+            _state.update { it.copy(isGeneratingImage = true, imageError = null) }
+            val result = imageService.generateRecipeImage(recipe.title, recipe.description)
             _state.update {
-                // Nur übernehmen, wenn noch dasselbe Rezept offen ist
-                if (it.recipe?.title == recipe.title) {
-                    it.copy(isGeneratingImage = false, recipeImageUrl = uri ?: it.recipeImageUrl)
-                } else {
+                if (it.recipe?.title != recipe.title) {
                     it.copy(isGeneratingImage = false)
+                } else {
+                    result.fold(
+                        onSuccess = { uri ->
+                            it.copy(isGeneratingImage = false, recipeImageUrl = uri, imageError = null)
+                        },
+                        onFailure = { e ->
+                            android.util.Log.w("ZenMuxImage", "Bild fehlgeschlagen: ${e.message}")
+                            it.copy(
+                                isGeneratingImage = false,
+                                imageError = e.message?.take(120) ?: "Bildgenerierung fehlgeschlagen"
+                            )
+                        }
+                    )
                 }
             }
         }
