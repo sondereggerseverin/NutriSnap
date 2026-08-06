@@ -1205,16 +1205,22 @@ fun RecipeDetailSheet(
         ) {
 
             item {
-                RecipeThumbnail(recipe = recipe, modifier = Modifier.fillMaxWidth().height(220.dp), shape = RoundedCornerShape(14.dp))
-                Spacer(Modifier.height(14.dp))
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    RecipeThumbnail(recipe = recipe, modifier = Modifier.fillMaxWidth().height(240.dp), shape = RoundedCornerShape(18.dp))
+                }
+                Spacer(Modifier.height(16.dp))
             }
 
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceBetween, verticalAlignment=Alignment.Top) {
-                    Text(recipe.displayTitle(), fontWeight=FontWeight.Bold, fontSize=22.sp, lineHeight=28.sp, modifier=Modifier.weight(1f))
+                    Text(recipe.displayTitle(), fontWeight=FontWeight.ExtraBold, fontSize=25.sp, lineHeight=31.sp, modifier=Modifier.weight(1f))
                     IconButton(onClick=onEdit) { Icon(Icons.Default.Edit, "Bearbeiten", tint=MaterialTheme.colorScheme.primary) }
                 }
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                     val cat = recipe.category()
                     if (recipe.mealCategory.isNotBlank() || cat != ch.nutrisnap.app.data.model.RecipeCategory.OTHER) {
@@ -1223,22 +1229,27 @@ fun RecipeDetailSheet(
                     recipe.prepTimeMinutes?.let { MetaBadge("⏱ $it min") }
                     recipe.platform?.let { MetaBadge("📌 $it") }
                 }
+                Spacer(Modifier.height(10.dp))
+                NutrientSummaryStrip(recipe, ratio)
                 Spacer(Modifier.height(12.dp))
             }
 
             // Portionen + Metric stepper
             item {
                 Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant),
-                    shape=RoundedCornerShape(12.dp), modifier=Modifier.fillMaxWidth()) {
+                    shape=RoundedCornerShape(16.dp), modifier=Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceBetween, verticalAlignment=Alignment.CenterVertically) {
                             Text("Portionen", fontWeight=FontWeight.SemiBold, fontSize=14.sp)
-                            Row(verticalAlignment=Alignment.CenterVertically, horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                                IconButton(onClick={if(servings>1)servings--}, Modifier.size(36.dp)) { Icon(Icons.Default.Remove,"-",Modifier.size(18.dp)) }
-                                Text("$servings", fontWeight=FontWeight.Bold, fontSize=18.sp,
-                                    modifier=Modifier.widthIn(min=32.dp),
-                                    style=LocalTextStyle.current.copy(textAlign=TextAlign.Center))
-                                IconButton(onClick={servings++}, Modifier.size(36.dp)) { Icon(Icons.Default.Add,"+",Modifier.size(18.dp)) }
+                            Surface(shape=RoundedCornerShape(50), color=MaterialTheme.colorScheme.surface) {
+                                Row(verticalAlignment=Alignment.CenterVertically, horizontalArrangement=Arrangement.spacedBy(2.dp),
+                                    modifier=Modifier.padding(horizontal=4.dp, vertical=2.dp)) {
+                                    IconButton(onClick={if(servings>1)servings--}, Modifier.size(34.dp)) { Icon(Icons.Default.Remove,"-",Modifier.size(16.dp)) }
+                                    Text("$servings", fontWeight=FontWeight.Bold, fontSize=17.sp,
+                                        modifier=Modifier.widthIn(min=28.dp),
+                                        style=LocalTextStyle.current.copy(textAlign=TextAlign.Center))
+                                    IconButton(onClick={servings++}, Modifier.size(34.dp)) { Icon(Icons.Default.Add,"+",Modifier.size(16.dp)) }
+                                }
                             }
                         }
                         Row(Modifier.fillMaxWidth().padding(top=8.dp), horizontalArrangement=Arrangement.SpaceBetween, verticalAlignment=Alignment.CenterVertically) {
@@ -1563,17 +1574,14 @@ fun RecipeDetailSheet(
                 val steps = recipe.instructions.split(Regex("""\n+""")).map{it.trim()}
                     .filter{it.isNotBlank() && !it.matches(Regex("""\d+\.?"""))}
                 items(steps.size) { idx ->
-                    val step = steps[idx]; val isNum = step.matches(Regex("""^\d+[.)]\s.*"""))
-                    Row(Modifier.fillMaxWidth().padding(vertical=4.dp), verticalAlignment=Alignment.Top) {
-                        if (!isNum) {
-                            Surface(shape=RoundedCornerShape(50), color=MaterialTheme.colorScheme.secondaryContainer, modifier=Modifier.size(22.dp)) {
-                                Box(contentAlignment=Alignment.Center) { Text("${idx+1}", fontSize=11.sp, fontWeight=FontWeight.Bold, color=MaterialTheme.colorScheme.onSecondaryContainer) }
-                            }
-                            Spacer(Modifier.width(8.dp))
+                    val step = steps[idx].replaceFirst(Regex("""^\d+[.)]\s*"""), "")
+                    Row(Modifier.fillMaxWidth().padding(vertical=6.dp), verticalAlignment=Alignment.Top) {
+                        Surface(shape=RoundedCornerShape(50), color=MaterialTheme.colorScheme.primaryContainer, modifier=Modifier.size(26.dp)) {
+                            Box(contentAlignment=Alignment.Center) { Text("${idx+1}", fontSize=12.sp, fontWeight=FontWeight.Bold, color=MaterialTheme.colorScheme.onPrimaryContainer) }
                         }
-                        Text(step, fontSize=14.sp, lineHeight=20.sp, modifier=Modifier.weight(1f))
+                        Spacer(Modifier.width(10.dp))
+                        Text(step, fontSize=14.sp, lineHeight=21.sp, modifier=Modifier.weight(1f))
                     }
-                    Spacer(Modifier.height(4.dp))
                 }
                 item { Spacer(Modifier.height(16.dp)) }
             }
@@ -1909,6 +1917,39 @@ fun AddToDiarySheet(
     Surface(shape=RoundedCornerShape(20.dp), color=MaterialTheme.colorScheme.secondaryContainer) {
         Text(text, fontSize=11.sp, modifier=Modifier.padding(horizontal=8.dp, vertical=3.dp),
             color=MaterialTheme.colorScheme.onSecondaryContainer)
+    }
+}
+
+/** Kompakte Nährwert-Zeile pro Portion, angelehnt an swissmilk.ch ("1 Portion enthält: ..."). */
+@Composable
+private fun NutrientSummaryStrip(recipe: Recipe, ratio: Float) {
+    val calsPerServ = recipe.totalCalories?.let { it / recipe.servings.coerceAtLeast(1) }
+    val prot = recipe.proteinPerServing
+    val carb = recipe.carbsPerServing
+    val fat  = recipe.fatPerServing
+    if (calsPerServ == null && prot == null && carb == null && fat == null) return
+
+    val parts = buildList {
+        calsPerServ?.let { add("${(it * ratio).toInt()} kcal") }
+        fat?.let { add("${(it * ratio).toInt()} g Fett") }
+        carb?.let { add("${(it * ratio).toInt()} g Kohlenhydrate") }
+        prot?.let { add("${(it * ratio).toInt()} g Eiweiss") }
+    }
+    if (parts.isEmpty()) return
+
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            "1 Portion enthält: ${parts.joinToString(", ")}",
+            fontSize = 12.5.sp,
+            lineHeight = 17.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp)
+        )
     }
 }
 private fun formatSmall(value: Float): String =
