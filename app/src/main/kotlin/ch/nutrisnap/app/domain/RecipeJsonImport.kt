@@ -29,8 +29,7 @@ object RecipeJsonImport {
         val prep = if (json.has("prepTimeMinutes") && !json.isNull("prepTimeMinutes"))
             json.optInt("prepTimeMinutes").takeIf { it > 0 } else null
 
-        // totalCalories im Schema = kcal pro Portion (Anzeige: 1 Portion enthält …)
-        val calPerServ = floatOrNull("totalCalories")
+        // totalCalories = kcal fürs ganze Rezept (UI teilt durch servings → pro Portion)
         val servings = json.optInt("servings", 1).coerceAtLeast(1)
 
         return Recipe(
@@ -43,7 +42,7 @@ object RecipeJsonImport {
             instructions      = json.optString("instructions", ""),
             servings          = servings,
             prepTimeMinutes   = prep,
-            totalCalories     = calPerServ?.let { it * servings },
+            totalCalories     = floatOrNull("totalCalories"),
             proteinPerServing = floatOrNull("proteinPerServing"),
             carbsPerServing   = floatOrNull("carbsPerServing"),
             fatPerServing     = floatOrNull("fatPerServing"),
