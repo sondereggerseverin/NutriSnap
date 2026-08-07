@@ -24,19 +24,31 @@ object RecipeJsonImport {
         fun floatOrNull(key: String): Float? =
             if (json.has(key) && !json.isNull(key)) json.optDouble(key).toFloat() else null
 
+        val imageUrl = json.optString("imageUrl", "").trim().takeIf { it.startsWith("http") }
+        val sourceUrl = json.optString("sourceUrl", "").trim().takeIf { it.startsWith("http") }
+        val prep = if (json.has("prepTimeMinutes") && !json.isNull("prepTimeMinutes"))
+            json.optInt("prepTimeMinutes").takeIf { it > 0 } else null
+
+        // totalCalories im Schema = kcal pro Portion (Anzeige: 1 Portion enthält …)
+        val calPerServ = floatOrNull("totalCalories")
+        val servings = json.optInt("servings", 1).coerceAtLeast(1)
+
         return Recipe(
             title             = json.optString("title").ifBlank { "Rezept von Claude" },
             description       = json.optString("description", ""),
-            platform          = "ki",
+            imageUrl          = imageUrl,
+            sourceUrl         = sourceUrl,
+            platform          = json.optString("platform", "ki").ifBlank { "ki" },
             ingredients       = json.optString("ingredients", ""),
             instructions      = json.optString("instructions", ""),
-            servings          = json.optInt("servings", 1).coerceAtLeast(1),
-            totalCalories     = floatOrNull("totalCalories"),
+            servings          = servings,
+            prepTimeMinutes   = prep,
+            totalCalories     = calPerServ?.let { it * servings },
             proteinPerServing = floatOrNull("proteinPerServing"),
             carbsPerServing   = floatOrNull("carbsPerServing"),
             fatPerServing     = floatOrNull("fatPerServing"),
             fiberPerServing   = floatOrNull("fiberPerServing"),
-            tags              = "Claude"
+            tags              = json.optString("tags", "Claude").ifBlank { "Claude" }
         )
     }
 }
