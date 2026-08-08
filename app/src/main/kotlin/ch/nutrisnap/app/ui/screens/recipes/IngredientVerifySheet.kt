@@ -151,6 +151,23 @@ fun computeVerifiedTotals(states: List<IngredientVerifyState>): VerifiedTotals {
     )
 }
 
+/** Anzeigetext: aktuelle Menge + Produktname (ohne interne Keys/Timestamps). */
+fun formatVerifyLineTitle(state: IngredientVerifyState): String {
+    val g = state.effectiveAmountG
+    val amountStr = if (g >= 10f) "${g.toInt()} g" else "${"%.1f".format(g)} g"
+    val rawName = state.effectiveFood?.name?.takeIf { it.isNotBlank() }
+        ?: state.result.parsed?.name?.takeIf { it.isNotBlank() }
+        ?: state.result.line
+    val name = rawName
+        .trimStart('•', '-', ' ', '➕')
+        .replace(Regex("""^added_\d+_"""), "")
+        .replace(Regex("""\s*\(\d{10,}\)"""), "")
+        .replace(Regex("""(?i)^\d+([.,]\d+)?\s*(g|ml|kg|el|tl|cup|tbsp|tsp)?\s+"""), "")
+        .trim()
+        .ifBlank { rawName.trim() }
+    return "$amountStr $name"
+}
+
 // ── Main Sheet ────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -247,7 +264,8 @@ fun IngredientVerifySheet(
             onFoodSelected = { food ->
                 if (isAddNew) {
                     val amountG = 100f
-                    val line = "➕ ${food.name} (${System.currentTimeMillis()})"
+                    // Interner Key stabil & eindeutig; Anzeige ohne Timestamp
+                    val line = "added_${System.currentTimeMillis()}_${food.name}"
                     val result = RecipeNutritionAnalyzer.IngredientResult(
                         line = line,
                         parsed = RecipeNutritionAnalyzer.ParsedIngredient(amountG, food.name),
@@ -442,13 +460,7 @@ fun IngredientVerifySheet(
                         val totalWeight = verifyStates.sumOf { it.effectiveAmountG.toDouble() }.toFloat()
                             .takeIf { it > 0f }
                         val ingredientsText = verifyStates.joinToString("\n") { s ->
-                            val g = s.effectiveAmountG
-                            val amountStr = if (g >= 10f) "${g.toInt()} g" else "${"%.1f".format(g)} g"
-                            val name = s.effectiveFood?.name?.takeIf { it.isNotBlank() }
-                                ?: s.result.parsed?.name?.takeIf { it.isNotBlank() }
-                                ?: s.result.line.trimStart('•', '-', ' ', '➕').trim()
-                                    .substringBefore(" (")
-                            "$amountStr $name"
+                            formatVerifyLineTitle(s)
                         }
                         onConfirm(
                             totalKcal / servDiv,
@@ -571,10 +583,10 @@ private fun IngredientVerifyRow(
                 )
             }
 
-            // Name + source
+            // Name + source — effektive Menge (350→450) sofort in der Zeile
             Column(Modifier.weight(1f)) {
                 Text(
-                    text = state.result.line.trimStart('•', '-', ' '),
+                    text = formatVerifyLineTitle(state),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,

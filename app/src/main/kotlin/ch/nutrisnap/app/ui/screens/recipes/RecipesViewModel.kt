@@ -583,7 +583,14 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 " · ${carbsPerServ.toInt()}g Kohlenhydrate" +
                 " · ${fatPerServ.toInt()}g Fett (verifiziert)"
             val baseDesc = recipe.description.lines()
-                .filterNot { it.startsWith("📊") }.joinToString("\n").trim()
+                .filterNot { line ->
+                    val t = line.trim()
+                    t.startsWith("📊") ||
+                        t.startsWith("Pro Stück:", ignoreCase = true) ||
+                        t.startsWith("Pro Portion:", ignoreCase = true) ||
+                        (t.contains("kcal", ignoreCase = true) && t.contains("Protein", ignoreCase = true))
+                }
+                .joinToString("\n").trim()
             val newDesc = if (baseDesc.isNotBlank()) "$baseDesc\n\n$macroLine" else macroLine
             val updated = recipe.copy(
                 totalCalories     = kcalPerServ * recipe.servings,
