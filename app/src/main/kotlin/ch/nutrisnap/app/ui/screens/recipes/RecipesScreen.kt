@@ -902,9 +902,21 @@ fun ImportSheet(
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal=16.dp).navigationBarsPadding().padding(bottom=8.dp)) {
             if (!showManual) {
-                Text("Rezept importieren", fontWeight=FontWeight.Bold, fontSize=20.sp)
+                Text(
+                    "Rezept importieren",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
                 Spacer(Modifier.height(4.dp))
-                Text("Instagram, TikTok oder Webseite", fontSize=13.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "Instagram, TikTok oder Webseite",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
                 Spacer(Modifier.height(16.dp))
 
                 // Instagram-specific import button
@@ -916,7 +928,9 @@ fun ImportSheet(
                     )
                 ) {
                     Column(
-                        Modifier.padding(16.dp),
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Icon(
@@ -925,9 +939,21 @@ fun ImportSheet(
                             modifier = Modifier.size(32.dp)
                         )
                         Spacer(Modifier.height(8.dp))
-                        Text("Rezepte aus Instagram importieren", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text(
+                            "Rezepte aus Instagram importieren",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                         Spacer(Modifier.height(4.dp))
-                        Text("Link kopieren und unten einfügen", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "Link kopieren und unten einfügen",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -949,7 +975,8 @@ fun ImportSheet(
                     "Screenshot oder Foto einer Rezeptkarte auswählen",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp)
                 )
 
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
