@@ -18,10 +18,11 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Generiert Rezeptbilder. Reihenfolge:
- * 1. Gemini Image (beste Food-Qualität, Free-Tier ~250–500/Tag)
- * 2. Cloudflare Workers AI FLUX.1 [schnell] (~170/Tag free)
- * 3. Pollinations Flux (kein Key)
- * 4. ZenMux (falls Key Rechte hat)
+ * 1. Grok Imagine (xAI) – beste Food-Qualität, wenn GROK_API_KEY gesetzt
+ * 2. Gemini Image (Free-Tier ~250–500/Tag)
+ * 3. Cloudflare Workers AI FLUX.1 [schnell]
+ * 4. Pollinations Flux (kein Key)
+ * 5. ZenMux (falls Key Rechte hat)
  */
 class ZenMuxImageService(private val context: Context) {
     private val client = OkHttpClient.Builder()
@@ -39,7 +40,15 @@ class ZenMuxImageService(private val context: Context) {
 
             val errors = mutableListOf<String>()
 
-            // 1) Gemini Image – beste Food-Foto-Qualität (Free-Tier ausreichend)
+            // 1) Grok Imagine (xAI) – Primary, wenn Key vorhanden
+            if (BuildConfig.GROK_API_KEY.isNotBlank()) {
+                generateViaGrok(prompt).fold(
+                    onSuccess = { return@withContext Result.success(it) },
+                    onFailure = { errors += "Grok: ${it.message}" }
+                )
+            }
+
+            // 2) Gemini Image – Free-Tier Fallback
             if (BuildConfig.GEMINI_API_KEY.isNotBlank()) {
                 generateViaGemini(prompt).fold(
                     onSuccess = { return@withContext Result.success(it) },
@@ -47,7 +56,7 @@ class ZenMuxImageService(private val context: Context) {
                 )
             }
 
-            // 2) Cloudflare Workers AI – FLUX.1 schnell (zuverlässiger Free-Fallback)
+            // 3) Cloudflare Workers AI – FLUX.1 schnell
             if (BuildConfig.CLOUDFLARE_ACCOUNT_ID.isNotBlank() &&
                 BuildConfig.CLOUDFLARE_API_TOKEN.isNotBlank()
             ) {
@@ -57,13 +66,13 @@ class ZenMuxImageService(private val context: Context) {
                 )
             }
 
-            // 3) Pollinations (kein Key)
+            // 4) Pollinations (kein Key)
             generateViaPollinations(prompt).fold(
                 onSuccess = { return@withContext Result.success(it) },
                 onFailure = { errors += "Pollinations: ${it.message}" }
             )
 
-            // 4) ZenMux
+            // 5) ZenMux
             if (BuildConfig.ZENMUX_API_KEY.isNotBlank()) {
                 generateViaZenMuxOpenAi(prompt).fold(
                     onSuccess = { return@withContext Result.success(it) },
@@ -78,6 +87,74 @@ class ZenMuxImageService(private val context: Context) {
             Log.e("RecipeImage", "Bildgenerierung fehlgeschlagen: $msg")
             Result.failure(Exception(msg))
         }
+
+    /**
+     * xAI Grok Imagine – OpenAI-kompatible Image API.
+     * Modelle: grok-imagine-image (~$0.02), grok-imagine-image-quality (~$0.05–0.07).
+     */
+    private fun generateViaGrok(prompt: String): Result<String> {
+        return try {
+            val models = listOf("grok-imagine-image", "grok-imagine-image-quality")
+            var lastErr: Exception? = null
+            for (model in models) {
+                val requestJson = JSONObject().apply {
+                    put("model", model)
+                    put("prompt", prompt)
+                    put("n", 1)
+                    put("response_format", "b64_json")
+                }.toString()
+                val request = Request.Builder()
+                    .url("https://api.x.ai/v1/images/generations")
+                    .addHeader("Authorization", "Bearer ${BuildConfig.GROK_API_KEY}")
+                    .addHeader("Content-Type", "application/json")
+                    .post(requestJson.toRequestBody("application/json".toMediaType()))
+                    .build()
+                val response = client.newCall(request).execute()
+                val bodyStr = response.body?.string().orEmpty()
+                if (!response.isSuccessful) {
+                    lastErr = Exception("$model → ${response.code}: ${bodyStr.take(120)}")
+                    Log.w("RecipeImage", "Grok $model fehlgeschlagen: ${response.code}")
+                    continue
+                }
+                val data = JSONObject(bodyStr).optJSONArray("data")
+                    ?: run {
+                        lastErr = Exception("$model: kein data-Array")
+                        continue
+                    }
+                if (data.length() == 0) {
+                    lastErr = Exception("$model: leeres data")
+                    continue
+                }
+                val data0 = data.getJSONObject(0)
+                when {
+                    data0.has("b64_json") && !data0.isNull("b64_json") -> {
+                        val bytes = Base64.decode(data0.getString("b64_json"), Base64.DEFAULT)
+                        if (bytes.size < 2000) {
+                            lastErr = Exception("$model: Bild zu klein")
+                            continue
+                        }
+                        Log.i("RecipeImage", "Grok Imagine OK ($model, ${bytes.size} B)")
+                        return Result.success(saveBytes(bytes))
+                    }
+                    data0.has("url") && !data0.isNull("url") -> {
+                        val imgUrl = data0.getString("url")
+                        val imgBytes = client.newCall(Request.Builder().url(imgUrl).build())
+                            .execute().body?.bytes()
+                        if (imgBytes == null || imgBytes.size < 2000) {
+                            lastErr = Exception("$model: URL-Download fehlgeschlagen")
+                            continue
+                        }
+                        Log.i("RecipeImage", "Grok Imagine OK via URL ($model, ${imgBytes.size} B)")
+                        return Result.success(saveBytes(imgBytes))
+                    }
+                    else -> lastErr = Exception("$model: weder b64_json noch url")
+                }
+            }
+            Result.failure(lastErr ?: Exception("Grok Imagine fehlgeschlagen"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
 
     /**
