@@ -1710,129 +1710,127 @@ private fun NutritionAnalysisCard(
 
     val hasMacros = calsPerServ != null || protPerServ != null
 
+    var showDetails by remember { mutableStateOf(false) }
+    val hasDetails = fiberPerServ != null || sugarPerServ != null || satFatPerServ != null ||
+        saltPerServ != null || result != null
+
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-        shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(Modifier.padding(12.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("📊 Nährwerte", fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer)
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "📊 Nährwerte",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
                 if (!isAnalyzing) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Manuelle Overrides summieren, ohne OFF/USDA erneut zu fragen
                         if (hasStoredOverrides && isForThis) {
-                            TextButton(onClick = onRecalculateFromOverrides, contentPadding = PaddingValues(4.dp)) {
-                                Icon(Icons.Default.Sync, null, Modifier.size(14.dp))
-                                Spacer(Modifier.width(4.dp))
+                            TextButton(onClick = onRecalculateFromOverrides, contentPadding = PaddingValues(2.dp)) {
                                 Text("Auswahl", fontSize = 11.sp)
                             }
                         }
-                        // Immer sichtbar, wenn Makros da sind — Zutaten prüfen/anpassen
-                        // ohne zwingend die komplette DB-Suche ("Neu berechnen")
                         if (hasMacros) {
-                            TextButton(onClick = onVerify, contentPadding = PaddingValues(4.dp)) {
-                                Icon(Icons.Default.QrCodeScanner, null, Modifier.size(14.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("Verifizieren", fontSize = 11.sp)
+                            TextButton(onClick = onVerify, contentPadding = PaddingValues(2.dp)) {
+                                Icon(Icons.Default.QrCodeScanner, null, Modifier.size(13.dp))
+                                Spacer(Modifier.width(2.dp))
+                                Text("Verify", fontSize = 11.sp)
                             }
                         }
-                        TextButton(onClick = onAnalyze, contentPadding = PaddingValues(4.dp)) {
-                            Icon(Icons.Default.Calculate, null, Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text(if (hasMacros) "Neu berechnen" else "Berechnen", fontSize = 11.sp)
+                        TextButton(onClick = onAnalyze, contentPadding = PaddingValues(2.dp)) {
+                            Text(if (hasMacros) "Neu" else "Berechnen", fontSize = 11.sp)
                         }
                     }
                 }
             }
 
             if (isAnalyzing) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    Text("Suche Zutaten in Datenbank & schätze Rest per KI…", fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer)
-                }
-                Spacer(Modifier.height(8.dp))
-            } else if (hasMacros) {
-                Spacer(Modifier.height(8.dp))
-                // Per-serving row (scaled by servings stepper)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    calsPerServ?.let { MacroItem("Kalorien", "${(it*ratio).toInt()}", "kcal") }
-                    protPerServ?.let { MacroItem("Protein",  "${(it*ratio).toInt()}", "g") }
-                    carbPerServ?.let { MacroItem("Kohlenhy.", "${(it*ratio).toInt()}", "g") }
-                    fatPerServ?.let  { MacroItem("Fett",     "${(it*ratio).toInt()}", "g") }
-                }
-                if (fiberPerServ != null || sugarPerServ != null || satFatPerServ != null || saltPerServ != null) {
-                    Spacer(Modifier.height(6.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f))
-                    Spacer(Modifier.height(6.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        fiberPerServ?.let {
-                            SubNutrientRow("Ballaststoffe", "%.1f g".format(it * ratio),
-                                highlight = true)
-                        }
-                        if (result != null && !result.fiberComplete) {
-                            Text(
-                                "Ballaststoffe unvollständig – manuell prüfen",
-                                fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                        sugarPerServ?.let { SubNutrientRow("davon Zucker", "${(it * ratio).toInt()} g") }
-                        satFatPerServ?.let { SubNutrientRow("davon gesättigte Fettsäuren", "${(it * ratio).toInt()} g") }
-                        saltPerServ?.let {
-                            val mg = sodiumPerServ?.let { na -> (na * ratio * 1000f).toInt() }
-                                ?: (it * ratio * 1000f / 2.5f).toInt() // Näherung falls kein direkter Natrium-Wert: Na ≈ Salz/2.5
-                            SubNutrientRow("Salz", "${formatSmall(it * ratio)} g (Natrium ≈ $mg mg)")
-                        }
-                    }
-                }
-                // Analyse-Details (nur wenn frische DB-Suche vorliegt)
-                result?.let { r ->
-                    Spacer(Modifier.height(8.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha=0.2f))
-                    Spacer(Modifier.height(4.dp))
-                    val baseText = "${r.matchedCount}/${r.totalCount} Zutaten gefunden · Gesamt: ${r.totalCalories.toInt()} kcal"
-                    Text(baseText, fontSize = 10.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha=0.7f))
-                    if (r.estimatedCount > 0) {
-                        Text("✨ ${r.estimatedCount} davon per KI geschätzt (kein DB-Treffer)",
-                            fontSize = 10.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha=0.7f))
-                    }
-                    if (r.totalMicros.isNotEmpty()) {
-                        Spacer(Modifier.height(8.dp))
-                        var showMicros by remember { mutableStateOf(false) }
-                        TextButton(onClick = { showMicros = !showMicros }, contentPadding = PaddingValues(4.dp)) {
-                            Text(if (showMicros) "Nährwerte ausblenden" else "Alle Nährwerte anzeigen", fontSize = 12.sp)
-                        }
-                        if (showMicros) {
-                            val perServing = r.totalMicros.mapValues { it.value / recipe.servings.coerceAtLeast(1) }
-                            MicronutrientTable(perServing, ratio, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
-                        }
-                    }
-                }
-                // Verifizieren immer, sobald Makros da sind (auch ohne frische Analyse)
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = onVerify,
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(vertical = 6.dp)
-                ) {
-                    Icon(Icons.Default.QrCodeScanner, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
+                    CircularProgressIndicator(
+                        Modifier.size(14.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                     Text(
-                        if (result != null) "Zutaten einzeln verifizieren"
-                        else "Verifizieren (gespeicherte Werte anpassen)",
-                        fontSize = 13.sp
+                        "Zutaten werden gesucht…",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
-            } else {
-                Spacer(Modifier.height(8.dp))
-                Text("Tippe auf \"Berechnen\" um Nährwerte aus der OpenFoodFacts-Datenbank zu ermitteln.",
-                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    lineHeight = 16.sp)
+            } else if (hasMacros) {
                 Spacer(Modifier.height(4.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    calsPerServ?.let { MacroItem("kcal", "${(it * ratio).toInt()}", "") }
+                    protPerServ?.let { MacroItem("P", "${(it * ratio).toInt()}", "g") }
+                    carbPerServ?.let { MacroItem("K", "${(it * ratio).toInt()}", "g") }
+                    fatPerServ?.let { MacroItem("F", "${(it * ratio).toInt()}", "g") }
+                }
+                // Mikro + Details nur aufklappbar — spart Platz
+                if (hasDetails) {
+                    TextButton(
+                        onClick = { showDetails = !showDetails },
+                        contentPadding = PaddingValues(0.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            if (showDetails) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            null,
+                            Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            buildString {
+                                fiberPerServ?.let { append("Ballast ${"%.0f".format(it * ratio)}g · ") }
+                                append(if (showDetails) "weniger" else "Details")
+                            }.trimEnd(' ', '·'),
+                            fontSize = 11.sp
+                        )
+                    }
+                    if (showDetails) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            fiberPerServ?.let {
+                                SubNutrientRow("Ballaststoffe", "%.1f g".format(it * ratio), highlight = true)
+                            }
+                            if (result != null && !result.fiberComplete) {
+                                Text(
+                                    "Ballaststoffe unvollständig (DB oft ohne Fiber-Wert)",
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                            sugarPerServ?.let { SubNutrientRow("Zucker", "${(it * ratio).toInt()} g") }
+                            satFatPerServ?.let { SubNutrientRow("ges. Fett", "${(it * ratio).toInt()} g") }
+                            saltPerServ?.let {
+                                val mg = sodiumPerServ?.let { na -> (na * ratio * 1000f).toInt() }
+                                    ?: (it * ratio * 1000f / 2.5f).toInt()
+                                SubNutrientRow("Salz", "${formatSmall(it * ratio)} g (Na ≈ $mg mg)")
+                            }
+                            result?.let { r ->
+                                Text(
+                                    "${r.matchedCount}/${r.totalCount} Zutaten gefunden" +
+                                        if (r.estimatedCount > 0) " · ${r.estimatedCount} KI-geschätzt" else "",
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                Text(
+                    "„Berechnen“ für Nährwerte aus der Datenbank.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             }
         }
     }
