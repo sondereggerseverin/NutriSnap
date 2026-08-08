@@ -50,10 +50,17 @@ fun HomeScreen(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 100.dp)
         ) {
-            item { HomeHeader(state) }
+            item {
+                HomeHeader(
+                    state = state,
+                    onShowYesterday = { vm.showYesterday() },
+                    onShowToday = { vm.showToday() }
+                )
+            }
             item {
                 MealOverviewGrid(
                     state.meals,
+                    isViewingToday = state.isViewingToday,
                     onClick = { meal -> onNavigateToDiary(meal.type, meal.count == 0) },
                     onQuickAdd = { meal -> onNavigateToDiary(meal.type, true) }
                 )
@@ -295,7 +302,11 @@ private fun HealthStatItem(icon: String, value: String, label: String) {
  * damit Ring + alle 4 Mahlzeiten wieder ohne Scrollen auf den Screen passen.
  */
 @Composable
-private fun HomeHeader(state: HomeUiState) {
+private fun HomeHeader(
+    state: HomeUiState,
+    onShowYesterday: () -> Unit = {},
+    onShowToday: () -> Unit = {}
+) {
     val appTheme = LocalAppTheme.current
     val overGoal = state.totalCalories > state.adjustedGoal && state.adjustedGoal > 0f
 
@@ -312,7 +323,7 @@ private fun HomeHeader(state: HomeUiState) {
             .padding(horizontal = 12.dp)
             .padding(top = 4.dp, bottom = 6.dp)
     ) {
-        // Top-Zeile: Begrüßung + Adaptiv/Streak (eine Zeile)
+        // Top-Zeile: Begrüßung + Heute/Gestern-Chip + Streak (keine Extra-Höhe)
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -327,12 +338,28 @@ private fun HomeHeader(state: HomeUiState) {
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "Heute",
+                        if (state.isViewingToday) "Heute" else "Gestern",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
-                    if (state.isAdaptiveTarget) {
+                    Spacer(Modifier.width(8.dp))
+                    Surface(
+                        onClick = {
+                            if (state.isViewingToday) onShowYesterday() else onShowToday()
+                        },
+                        shape = RoundedCornerShape(50),
+                        color = Color.White.copy(alpha = 0.18f)
+                    ) {
+                        Text(
+                            if (state.isViewingToday) "Gestern" else "Heute",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                    if (state.isAdaptiveTarget && state.isViewingToday) {
                         Spacer(Modifier.width(6.dp))
                         Text(
                             "Adaptiv · ${state.tdeeConfidence}%",
@@ -550,6 +577,7 @@ private fun StreakBadge(streak: Int) {
 @Composable
 private fun MealOverviewGrid(
     meals: List<MealOverview>,
+    isViewingToday: Boolean = true,
     onClick: (MealOverview) -> Unit,
     onQuickAdd: (MealOverview) -> Unit
 ) {
@@ -566,7 +594,7 @@ private fun MealOverviewGrid(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                "Heute auf dem Plan",
+                if (isViewingToday) "Heute auf dem Plan" else "Gestern auf dem Plan",
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp
             )

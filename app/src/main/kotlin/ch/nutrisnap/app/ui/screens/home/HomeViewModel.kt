@@ -86,7 +86,10 @@ data class HomeUiState(
     /** Heute manuell eingetragene Aktivitätskalorien (null = kein Eintrag). */
     val manualActivityKcal: Float? = null,
     /** true = Aktivitätsabweichung ×100% statt ×50%. */
-    val aggressiveSportDay: Boolean = false
+    val aggressiveSportDay: Boolean = false,
+    /** Angezeigter Tag (heute oder gestern). */
+    val selectedDate: LocalDate = LocalDate.now(),
+    val isViewingToday: Boolean = true
 ) {
     /** Budget = Basis-Ziel + verbrannte Aktivitätskalorien (nur wenn nicht schon im adaptiven Ziel enthalten) */
     val adjustedGoal: Float get() = if (isAdaptiveTarget) calorieGoal else calorieGoal + burnedKcal
@@ -109,18 +112,23 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val _streak = MutableStateFlow(0)
 
     /**
-     * Aktuelles Kalenderdatum — wird minütlich geprüft, damit Home nach Mitternacht
-     * nicht am Vortag hängen bleibt (früher: LocalDate.now() nur beim ViewModel-Start).
+     * Angezeigter Tag (heute/gestern). Kalendertag wird minütlich geprüft:
+     * nur wenn man „heute“ anschaut, springt die Ansicht nach Mitternacht mit.
      */
-    private val _today = MutableStateFlow(LocalDate.now())
+    private val _selectedDate = MutableStateFlow(LocalDate.now())
+    private val _calendarToday = MutableStateFlow(LocalDate.now())
 
     init {
         refreshStreak()
         viewModelScope.launch {
             while (true) {
                 val now = LocalDate.now()
-                if (_today.value != now) {
-                    _today.value = now
+                if (_calendarToday.value != now) {
+                    val previousToday = _calendarToday.value
+                    _calendarToday.value = now
+                    if (_selectedDate.value == previousToday) {
+                        _selectedDate.value = now
+                    }
                     refreshStreak()
                 }
                 kotlinx.coroutines.delay(60_000)
@@ -128,25 +136,34 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun showYesterday() {
+        _selectedDate.value = LocalDate.now().minusDays(1)
+    }
+
+    fun showToday() {
+        _selectedDate.value = LocalDate.now()
+    }
+
     // Rolling window for the adaptive trend: long enough to smooth out noise, short
     // enough to reflect a recent change in routine (e.g. ramping up ride volume).
     private val trendWindowDays = 21
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val uiState: StateFlow<HomeUiState> = _today.flatMapLatest { today ->
+    val uiState: StateFlow<HomeUiState> = _selectedDate.flatMapLatest { selected ->
         combine(
-            diaryRepo.getEntriesForDate(today),
+            diaryRepo.getEntriesForDate(selected),
             profileRepo.get(),
             weightRepo.getRecent(1),
             _streak,
-            hcDao.getCacheForDate(today),
+            hcDao.getCacheForDate(selected),
             weightRepo.getRecent(trendWindowDays),
-            diaryRepo.getWeeklySummary(today.minusDays(trendWindowDays.toLong())),
+            diaryRepo.getWeeklySummary(selected.minusDays(trendWindowDays.toLong())),
             hcDao.getLast30Days(),
             app.notifDataStore.data,
-            manualActivityDao.getSince(today.minusDays(29).toString())
+            manualActivityDao.getSince(selected.minusDays(29).toString())
         ) { args ->
         val entries       = args[0] as List<ch.nutrisnap.app.data.model.DiaryEntry>
+        val viewingToday  = selected == LocalDate.now()
         val profile        = args[1] as ch.nutrisnap.app.data.repository.UserProfile
         val weights        = args[2] as List<ch.nutrisnap.app.data.model.WeightEntry>
         val streak         = args[3] as Int
@@ -178,7 +195,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 LocalDate.parse(it.dateStr) to it.activeCaloriesKcal.toDouble()
             }
         } else emptyMap()
-        val manualToday = manualByDate[today]
+        val manualToday = manualByDate[selected]
         val hcToday = hcCache?.activeCaloriesKcal
         // HC + manuell = eine Aktivitätsquelle, beide 1:1 in der Ziel-Rechnung
         val todayActiveCombined = run {
@@ -263,6 +280,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             manualActivityEnabled = manualEnabled,
             manualActivityKcal = if (manualEnabled) manualToday?.toFloat() else null,
             aggressiveSportDay = aggressiveSport,
+            selectedDate = selected,
+            isViewingToday = viewingToday,
             meals         = orderedMealMeta.map { (type, label, icon, color) ->
                 val mealEntries = byMeal[type] ?: emptyList()
                 MealOverview(
