@@ -18,23 +18,36 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
-/** Fire-and-forget scope for pushing local changes to Supabase. A failed push
- *  (e.g. offline) never breaks the local save — it's caught and swallowed. */
+/** Fire-and-forget scope for pushing local changes to Supabase. Local save
+ *  bleibt immer erfolgreich; Cloud-Push läuft parallel mit Retry. */
 private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
 /**
- * Einzel-Push (ein Tagebuch-Eintrag, ein Rezept, …).
- * Aktualisiert den Sync-Banner bewusst NICHT — sonst bleibt "Synchronisiert…"
- * permanent sichtbar, weil bei jedem Tippen opStarted/opSucceeded flackert und
- * parallele Pushes activeOps nie auf 0 bringen. Banner nur bei SyncManager.pushAllLocal/pullAll.
+ * Einzel-Push mit bis zu 4 Versuchen (Session/Netz kurz flackern oft).
+ * Banner nur bei finalem Fehler — kein Dauer-„Synchronisiert…“ pro Tipp.
  */
 private fun pushSafely(block: suspend () -> Unit) {
     syncScope.launch {
-        runCatching { block() }
-            .onFailure {
-                Log.e("NutriSync", "Push zu Supabase fehlgeschlagen: ${it.message}", it)
-                // Nur Fehler im Banner, kein Dauer-SYNCING
-                SyncStatusHolder.opFailed(it.message)
+        var lastError: Throwable? = null
+        repeat(4) { attempt ->
+            val result = runCatching { block() }
+            if (result.isSuccess) {
+                if (attempt > 0) {
+                    Log.i("NutriSync", "Push OK nach ${attempt + 1}. Versuch")
+                }
+                return@launch
             }
+            lastError = result.exceptionOrNull()
+            Log.w(
+                "NutriSync",
+                "Push Versuch ${attempt + 1}/4 fehlgeschlagen: ${lastError?.message}"
+            )
+            kotlinx.coroutines.delay(400L * (attempt + 1))
+        }
+        Log.e("NutriSync", "Push endgültig fehlgeschlagen: ${lastError?.message}", lastError)
+        SyncStatusHolder.opFailed(
+            lastError?.message?.take(120) ?: "Cloud-Sync fehlgeschlagen"
+        )
     }
 }
 

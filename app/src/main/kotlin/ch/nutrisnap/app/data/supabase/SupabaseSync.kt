@@ -132,8 +132,14 @@ object SupabaseSync {
     }
 
     // ── Diary ────────────────────────────────────────────────────────────
+    /**
+     * Speichert einen Tagebuch-Eintrag in der Cloud.
+     * Bei fehlender Session oder API-Fehler: Exception (kein stilles return),
+     * damit pushSafely retryen und den Fehler anzeigen kann.
+     */
     suspend fun upsertDiaryEntry(entry: DiaryEntry) {
-        val uid = userIdReady() ?: return
+        val uid = userIdReady(retries = 12)
+            ?: error("Keine Session – „${entry.foodName}“ nicht in Cloud gespeichert")
         sb.postgrest["diary_entries"].upsert(
             DiaryEntryDto(
                 userId = uid,
@@ -151,7 +157,8 @@ object SupabaseSync {
     }
 
     suspend fun deleteDiaryEntry(localId: Long) {
-        val uid = userId() ?: return
+        val uid = userIdReady(retries = 8)
+            ?: error("Keine Session – Cloud-Löschung local_id=$localId übersprungen")
         sb.postgrest["diary_entries"].delete {
             filter {
                 eq("user_id", uid)
