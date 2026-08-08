@@ -573,7 +573,9 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         satFatPerServ: Float? = null,
         saltPerServ: Float? = null,
         sodiumPerServ: Float? = null,
-        totalIngredientWeightG: Float? = null
+        totalIngredientWeightG: Float? = null,
+        /** Verifizierte Zutaten (gescannte Produkte + Mengen) ersetzen den alten Text. */
+        ingredientsText: String? = null
     ) {
         viewModelScope.launch {
             val macroLine = "📊 Pro Portion: ${kcalPerServ.toInt()} kcal" +
@@ -588,9 +590,6 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 proteinPerServing = protPerServ,
                 carbsPerServing   = carbsPerServ,
                 fatPerServing     = fatPerServ,
-                // Bisher wurden diese Werte hier verworfen, obwohl die Verifizierungs-
-                // sheet sie bereits pro Zutat berechnet — dadurch fiel Ballaststoffe
-                // nach dem Verifizieren auf den (oft leeren) analyzeNutrition-Stand zurück.
                 fiberPerServing        = fiberPerServ  ?: recipe.fiberPerServing,
                 sugarPerServing        = sugarPerServ  ?: recipe.sugarPerServing,
                 saturatedFatPerServing = satFatPerServ ?: recipe.saturatedFatPerServing,
@@ -598,10 +597,12 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 sodiumPerServing       = sodiumPerServ ?: recipe.sodiumPerServing,
                 totalIngredientWeightG = totalIngredientWeightG
                     ?: recipe.totalIngredientWeightG,
-                description       = newDesc
+                description       = newDesc,
+                ingredients       = ingredientsText?.takeIf { it.isNotBlank() } ?: recipe.ingredients
             )
             repo.updateRecipe(updated)
-            // Clear so IngredientVerifySheet re-initialises fresh if reopened
+            // Overrides löschen – Zutatenliste ist jetzt die Quelle der Wahrheit
+            _ingredientOverrides.update { it - recipe.id }
             _nutritionState.value = NutritionState()
         }
     }

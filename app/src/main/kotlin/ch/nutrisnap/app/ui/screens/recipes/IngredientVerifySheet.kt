@@ -169,7 +169,9 @@ fun IngredientVerifySheet(
     onConfirm: (
         totalKcal: Float, protein: Float, carbs: Float, fat: Float,
         fiber: Float?, sugar: Float?, saturatedFat: Float?, salt: Float?, sodium: Float?,
-        totalIngredientWeightG: Float?
+        totalIngredientWeightG: Float?,
+        /** Aktuelle Zutatenliste aus Verifizierung (gescannte Namen + Mengen). */
+        ingredientsText: String
     ) -> Unit
 ) {
     var overrides by remember { mutableStateOf(initialOverrides) }
@@ -193,7 +195,8 @@ fun IngredientVerifySheet(
         onOverridesChanged(overrides)
     }
 
-    var scanTarget by remember { mutableStateOf<Int?>(null) }  // index of ingredient being scanned
+    /** Index der zu scannenden Zutat; -1 = neue Zutat per Scan hinzufügen. */
+    var scanTarget by remember { mutableStateOf<Int?>(null) }
     val context = LocalContext.current
 
     // Aufklapp-Status pro Zutat (Zeilen-Key) + Ziel für "direkt in Ballaststoffe-Eingabe springen"
@@ -234,19 +237,40 @@ fun IngredientVerifySheet(
     // entweder Identify ODER Verify, nie beides gleichzeitig.
     val scanIdx = scanTarget
     if (scanIdx != null) {
+        val isAddNew = scanIdx < 0
         IngredientIdentifySheet(
-            ingredientName = verifyStates.getOrNull(scanIdx)?.result?.parsed?.name
+            ingredientName = if (isAddNew) "Neue Zutat"
+            else verifyStates.getOrNull(scanIdx)?.result?.parsed?.name
                 ?: verifyStates.getOrNull(scanIdx)?.result?.line
                 ?: "Zutat",
             onDismiss = { scanTarget = null },
             onFoodSelected = { food ->
-                val idx = scanIdx
-                if (idx in verifyStates.indices) {
+                if (isAddNew) {
+                    val amountG = 100f
+                    val line = "➕ ${food.name} (${System.currentTimeMillis()})"
+                    val result = RecipeNutritionAnalyzer.IngredientResult(
+                        line = line,
+                        parsed = RecipeNutritionAnalyzer.ParsedIngredient(amountG, food.name),
+                        foodItem = food,
+                        calories = amountG / 100f * (food.calories ?: 0f),
+                        protein = amountG / 100f * (food.protein ?: 0f),
+                        carbs = amountG / 100f * (food.carbs ?: 0f),
+                        fat = amountG / 100f * (food.fat ?: 0f),
+                        matched = true
+                    )
+                    val state = IngredientVerifyState(
+                        result = result,
+                        override = food,
+                        amountOverride = amountG
+                    )
+                    verifyStates = verifyStates + state
+                    updateOverride(line, state.toOverride())
+                } else if (scanIdx in verifyStates.indices) {
                     val updated = verifyStates.toMutableList().also {
-                        it[idx] = it[idx].copy(override = food)
+                        it[scanIdx] = it[scanIdx].copy(override = food)
                     }
                     verifyStates = updated
-                    updateOverride(updated[idx].result.line, updated[idx].toOverride())
+                    updateOverride(updated[scanIdx].result.line, updated[scanIdx].toOverride())
                 }
                 scanTarget = null
             }
@@ -396,14 +420,36 @@ fun IngredientVerifySheet(
                 )
             }
 
+            // Neue Zutat per Scan/Suche hinzufügen
+            item {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { scanTarget = -1 },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                ) {
+                    Icon(Icons.Default.Add, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Zutat scannen / hinzufügen")
+                }
+            }
+
             // Confirm button
             item {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(12.dp))
                 Button(
                     onClick = {
                         val servDiv = servings.coerceAtLeast(1)
                         val totalWeight = verifyStates.sumOf { it.effectiveAmountG.toDouble() }.toFloat()
                             .takeIf { it > 0f }
+                        val ingredientsText = verifyStates.joinToString("\n") { s ->
+                            val g = s.effectiveAmountG
+                            val amountStr = if (g >= 10f) "${g.toInt()} g" else "${"%.1f".format(g)} g"
+                            val name = s.effectiveFood?.name?.takeIf { it.isNotBlank() }
+                                ?: s.result.parsed?.name?.takeIf { it.isNotBlank() }
+                                ?: s.result.line.trimStart('•', '-', ' ', '➕').trim()
+                                    .substringBefore(" (")
+                            "$amountStr $name"
+                        }
                         onConfirm(
                             totalKcal / servDiv,
                             totalProt / servDiv,
@@ -414,7 +460,8 @@ fun IngredientVerifySheet(
                             totalSatFat?.div(servDiv),
                             totalSalt?.div(servDiv),
                             totalSodium?.div(servDiv),
-                            totalWeight
+                            totalWeight,
+                            ingredientsText
                         )
                     },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)

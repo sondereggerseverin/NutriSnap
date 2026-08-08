@@ -487,10 +487,11 @@ fun RecipesScreen(
             initialOverrides = vm.getOverridesFor(verifyRecipe.id),
             onOverridesChanged = { vm.setOverridesFor(verifyRecipe.id, it) },
             onDismiss      = { showVerifySheet = false; pendingVerify = false },
-            onConfirm      = { kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium, totalWeightG ->
+            onConfirm      = { kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium, totalWeightG, ingredientsText ->
                 vm.applyVerifiedNutrition(
                     verifyRecipe, kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium,
-                    totalIngredientWeightG = totalWeightG
+                    totalIngredientWeightG = totalWeightG,
+                    ingredientsText = ingredientsText
                 )
                 showVerifySheet = false
                 pendingVerify = false
