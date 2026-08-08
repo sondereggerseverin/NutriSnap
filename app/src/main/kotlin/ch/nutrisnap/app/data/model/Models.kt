@@ -2,6 +2,8 @@ package ch.nutrisnap.app.data.model
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.ForeignKey
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -290,6 +292,65 @@ data class Recipe(
         description = displayDescription()
     )
 }
+
+/**
+ * Teil eines Multi-Komponenten-Rezepts (z. B. „Reis & Erbsen“ und „Sauce“).
+ * Nährwerte und cookedWeightG beziehen sich auf die **gesamte** Komponente
+ * (Batch), nicht auf 100 g. Beim Tracken wird mit grams / cookedWeightG skaliert.
+ *
+ * Rezepte ohne Einträge in dieser Tabelle verhalten sich wie bisher (One-Pot /
+ * einzelne Einheit).
+ */
+@Entity(
+    tableName = "recipe_components",
+    foreignKeys = [
+        ForeignKey(
+            entity = Recipe::class,
+            parentColumns = ["id"],
+            childColumns = ["recipeId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index(value = ["recipeId"])]
+)
+data class RecipeComponent(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val recipeId: Long,
+    /** Anzeigename, z. B. „Reis & Erbsen“ oder „Butter-Chicken-Sauce“. */
+    val name: String,
+    /** Gesamtgewicht dieser Komponente nach dem Kochen (g). */
+    val cookedWeightG: Float,
+    /** Gesamtkalorien der Komponente (Batch). */
+    val totalCalories: Float,
+    val proteinG: Float = 0f,
+    val carbsG: Float = 0f,
+    val fatG: Float = 0f,
+    val fiberG: Float = 0f,
+    val sortOrder: Int = 0
+) {
+    /** Nährwerte für [grams] dieser Komponente. */
+    fun scaledTo(grams: Float): ScaledComponentNutrition {
+        val factor = if (cookedWeightG > 0f) (grams / cookedWeightG).coerceAtLeast(0f) else 0f
+        return ScaledComponentNutrition(
+            grams = grams,
+            calories = totalCalories * factor,
+            protein = proteinG * factor,
+            carbs = carbsG * factor,
+            fat = fatG * factor,
+            fiber = fiberG * factor
+        )
+    }
+}
+
+/** Ergebnis der Skalierung einer [RecipeComponent] auf eine abgewogene Menge. */
+data class ScaledComponentNutrition(
+    val grams: Float,
+    val calories: Float,
+    val protein: Float,
+    val carbs: Float,
+    val fat: Float,
+    val fiber: Float
+)
 
 // ─── Rezept-Sammlungen ───────────────────────────────────────────────────────
 @Entity(tableName = "recipe_collections")

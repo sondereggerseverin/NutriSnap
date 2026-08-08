@@ -119,6 +119,30 @@ interface RecipeDao {
 }
 
 @Dao
+interface RecipeComponentDao {
+    @Query("SELECT * FROM recipe_components WHERE recipeId = :recipeId ORDER BY sortOrder ASC, id ASC")
+    fun getForRecipe(recipeId: Long): Flow<List<RecipeComponent>>
+
+    @Query("SELECT * FROM recipe_components WHERE recipeId = :recipeId ORDER BY sortOrder ASC, id ASC")
+    suspend fun getForRecipeOnce(recipeId: Long): List<RecipeComponent>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(component: RecipeComponent): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(components: List<RecipeComponent>)
+
+    @Update
+    suspend fun update(component: RecipeComponent)
+
+    @Delete
+    suspend fun delete(component: RecipeComponent)
+
+    @Query("DELETE FROM recipe_components WHERE recipeId = :recipeId")
+    suspend fun deleteForRecipe(recipeId: Long)
+}
+
+@Dao
 interface WeightDao {
     @Query("SELECT * FROM weight_entries ORDER BY dateStr ASC")
     fun getAll(): Flow<List<WeightEntry>>

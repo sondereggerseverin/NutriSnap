@@ -343,11 +343,34 @@ class DiaryRepository(db: NutriDatabase) {
 }
 
 class RecipeRepository(db: NutriDatabase, context: Context) {
-    private val dao     = db.recipeDao()
-    private val scraper = RecipeScraper(context)
+    private val dao           = db.recipeDao()
+    private val componentDao  = db.recipeComponentDao()
+    private val scraper       = RecipeScraper(context)
 
     fun getAll():          Flow<List<Recipe>> = dao.getAll()
     fun search(q: String): Flow<List<Recipe>> = dao.search(q)
+
+    fun getComponents(recipeId: Long): Flow<List<RecipeComponent>> =
+        componentDao.getForRecipe(recipeId)
+
+    suspend fun getComponentsOnce(recipeId: Long): List<RecipeComponent> =
+        componentDao.getForRecipeOnce(recipeId)
+
+    /**
+     * Ersetzt alle Komponenten eines Rezepts. Leere Liste = One-Pot (kein Multi-Komponenten-Modus).
+     */
+    suspend fun setComponents(recipeId: Long, components: List<RecipeComponent>) {
+        componentDao.deleteForRecipe(recipeId)
+        if (components.isEmpty()) return
+        val withIds = components.mapIndexed { index, c ->
+            c.copy(id = 0, recipeId = recipeId, sortOrder = index)
+        }
+        componentDao.insertAll(withIds)
+    }
+
+    suspend fun deleteComponents(recipeId: Long) {
+        componentDao.deleteForRecipe(recipeId)
+    }
 
     /**
      * Speichert ein Rezept. Bei gleichem Inhalts-Fingerprint (sourceUrl oder

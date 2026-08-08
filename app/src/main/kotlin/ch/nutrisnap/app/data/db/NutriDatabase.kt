@@ -76,9 +76,10 @@ interface UserProfileDao {
         ch.nutrisnap.app.data.db.entity.FoodUsageContext::class,            // Feature 7
         ch.nutrisnap.app.data.db.entity.DetectedMealPatternEntity::class,   // Feature 5
         ManualActivityEntry::class,
-        Supplement::class
+        Supplement::class,
+        RecipeComponent::class
     ],
-    version = 26,
+    version = 27,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -86,6 +87,7 @@ abstract class NutriDatabase : RoomDatabase() {
     abstract fun foodItemDao(): FoodItemDao
     abstract fun diaryDao(): DiaryDao
     abstract fun recipeDao(): RecipeDao
+    abstract fun recipeComponentDao(): RecipeComponentDao
     abstract fun userProfileDao(): UserProfileDao
     abstract fun weightDao(): WeightDao
     abstract fun favoriteFoodDao(): FavoriteFoodDao
@@ -575,6 +577,33 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // Multi-Komponenten-Rezepte: Beilage und Sauce/Fleisch getrennt speichern
+        // und beim Tracken unabhängig abwiegen (oder per Knopf gleichmässig aufteilen).
+        private val MIGRATION_26_27 = object : Migration(26, 27) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS recipe_components (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        recipeId INTEGER NOT NULL,
+                        name TEXT NOT NULL,
+                        cookedWeightG REAL NOT NULL,
+                        totalCalories REAL NOT NULL,
+                        proteinG REAL NOT NULL DEFAULT 0,
+                        carbsG REAL NOT NULL DEFAULT 0,
+                        fatG REAL NOT NULL DEFAULT 0,
+                        fiberG REAL NOT NULL DEFAULT 0,
+                        sortOrder INTEGER NOT NULL DEFAULT 0,
+                        FOREIGN KEY(recipeId) REFERENCES recipes(id) ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_recipe_components_recipeId ON recipe_components(recipeId)"
+                )
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -589,7 +618,7 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16,
                         MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
                         MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
-                        MIGRATION_24_25, MIGRATION_25_26
+                        MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27
                     )
                     .build()
                     .also { INSTANCE = it }
