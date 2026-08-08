@@ -1659,15 +1659,21 @@ private fun NutritionAnalysisCard(
                     color = MaterialTheme.colorScheme.onPrimaryContainer)
                 if (!isAnalyzing) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Nur sichtbar, wenn manuell verifizierte/angepasste Zutaten vorliegen:
-                        // summiert diese neu, OHNE erneut extern zu suchen — im Gegensatz zu
-                        // "Neu berechnen", das die komplette Zutatenliste neu von OFF/USDA/KI holt
-                        // und dabei manuelle Anpassungen NICHT berücksichtigt.
+                        // Manuelle Overrides summieren, ohne OFF/USDA erneut zu fragen
                         if (hasStoredOverrides && isForThis) {
                             TextButton(onClick = onRecalculateFromOverrides, contentPadding = PaddingValues(4.dp)) {
                                 Icon(Icons.Default.Sync, null, Modifier.size(14.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text("Auswahl übernehmen", fontSize = 11.sp)
+                                Text("Auswahl", fontSize = 11.sp)
+                            }
+                        }
+                        // Immer sichtbar, wenn Makros da sind — Zutaten prüfen/anpassen
+                        // ohne zwingend die komplette DB-Suche ("Neu berechnen")
+                        if (hasMacros) {
+                            TextButton(onClick = onVerify, contentPadding = PaddingValues(4.dp)) {
+                                Icon(Icons.Default.QrCodeScanner, null, Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Verifizieren", fontSize = 11.sp)
                             }
                         }
                         TextButton(onClick = onAnalyze, contentPadding = PaddingValues(4.dp)) {
@@ -1722,23 +1728,13 @@ private fun NutritionAnalysisCard(
                         }
                     }
                 }
-                // Analysis details
+                // Analyse-Details (nur wenn frische DB-Suche vorliegt)
                 result?.let { r ->
                     Spacer(Modifier.height(8.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha=0.2f))
                     Spacer(Modifier.height(4.dp))
                     val baseText = "${r.matchedCount}/${r.totalCount} Zutaten gefunden · Gesamt: ${r.totalCalories.toInt()} kcal"
                     Text(baseText, fontSize = 10.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha=0.7f))
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = onVerify,
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(vertical = 6.dp)
-                    ) {
-                        Icon(Icons.Default.QrCodeScanner, null, Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Zutaten einzeln verifizieren", fontSize = 13.sp)
-                    }
                     if (r.estimatedCount > 0) {
                         Text("✨ ${r.estimatedCount} davon per KI geschätzt (kein DB-Treffer)",
                             fontSize = 10.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha=0.7f))
@@ -1754,6 +1750,21 @@ private fun NutritionAnalysisCard(
                             MicronutrientTable(perServing, ratio, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
                         }
                     }
+                }
+                // Verifizieren immer, sobald Makros da sind (auch ohne frische Analyse)
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onVerify,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.QrCodeScanner, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        if (result != null) "Zutaten einzeln verifizieren"
+                        else "Verifizieren (gespeicherte Werte anpassen)",
+                        fontSize = 13.sp
+                    )
                 }
             } else {
                 Spacer(Modifier.height(8.dp))
