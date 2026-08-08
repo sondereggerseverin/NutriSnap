@@ -1192,6 +1192,7 @@ fun RecipeDetailSheet(
     var ingredientsEditMode by remember(recipe.id) { mutableStateOf(false) }
     var ingredientLines by remember(recipe.id) { mutableStateOf(recipe.ingredients.lines()) }
     var scanTargetIdx by remember { mutableStateOf<Int?>(null) }
+    var showMoreOptions by remember { mutableStateOf(false) }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
@@ -1199,30 +1200,45 @@ fun RecipeDetailSheet(
         sheetState = sheetState,
         modifier = Modifier.fillMaxHeight(0.94f)
     ) {
-        // fillMaxSize verhindert Infinite-Constraint-Crash von LazyColumn im BottomSheet
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 32.dp, start = 16.dp, end = 16.dp)
         ) {
-
+            // ── Kompakter Kopf: Bild + Titel + Meta + 1-Zeilen-Makros ─────────
             item {
                 Card(
-                    shape = RoundedCornerShape(18.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    RecipeThumbnail(recipe = recipe, modifier = Modifier.fillMaxWidth().height(240.dp), shape = RoundedCornerShape(18.dp))
+                    RecipeThumbnail(
+                        recipe = recipe,
+                        modifier = Modifier.fillMaxWidth().height(140.dp),
+                        shape = RoundedCornerShape(14.dp)
+                    )
                 }
-                Spacer(Modifier.height(16.dp))
-            }
-
-            item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceBetween, verticalAlignment=Alignment.Top) {
-                    Text(recipe.displayTitle(), fontWeight=FontWeight.ExtraBold, fontSize=25.sp, lineHeight=31.sp, modifier=Modifier.weight(1f))
-                    IconButton(onClick=onEdit) { Icon(Icons.Default.Edit, "Bearbeiten", tint=MaterialTheme.colorScheme.primary) }
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text(
+                        recipe.displayTitle(),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        lineHeight = 24.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Edit, "Bearbeiten", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    }
                 }
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = 4.dp)
+                ) {
                     val cat = recipe.category()
                     if (recipe.mealCategory.isNotBlank() || cat != ch.nutrisnap.app.data.model.RecipeCategory.OTHER) {
                         MetaBadge("${cat.emoji} ${cat.label}")
@@ -1230,169 +1246,110 @@ fun RecipeDetailSheet(
                     recipe.prepTimeMinutes?.let { MetaBadge("⏱ $it min") }
                     recipe.platform?.let { MetaBadge("📌 $it") }
                 }
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(6.dp))
                 NutrientSummaryStrip(recipe)
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(8.dp))
             }
 
-            // Portionen + Metric stepper
+            // ── Dichte Portionen-Zeile ───────────────────────────────────────
             item {
-                Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant),
-                    shape=RoundedCornerShape(16.dp), modifier=Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp)) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceBetween, verticalAlignment=Alignment.CenterVertically) {
-                            Text("Portionen", fontWeight=FontWeight.SemiBold, fontSize=14.sp)
-                            Surface(shape=RoundedCornerShape(50), color=MaterialTheme.colorScheme.surface) {
-                                Row(verticalAlignment=Alignment.CenterVertically, horizontalArrangement=Arrangement.spacedBy(2.dp),
-                                    modifier=Modifier.padding(horizontal=4.dp, vertical=2.dp)) {
-                                    IconButton(onClick={if(servings>1)servings--}, Modifier.size(34.dp)) { Icon(Icons.Default.Remove,"-",Modifier.size(16.dp)) }
-                                    Text("$servings", fontWeight=FontWeight.Bold, fontSize=17.sp,
-                                        modifier=Modifier.widthIn(min=28.dp),
-                                        style=LocalTextStyle.current.copy(textAlign=TextAlign.Center))
-                                    IconButton(onClick={servings++}, Modifier.size(34.dp)) { Icon(Icons.Default.Add,"+",Modifier.size(16.dp)) }
-                                }
-                            }
-                        }
-                        Row(Modifier.fillMaxWidth().padding(top=8.dp), horizontalArrangement=Arrangement.SpaceBetween, verticalAlignment=Alignment.CenterVertically) {
-                            Text("Nur Einheiten (cup→g/ml)", fontSize=13.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
-                            Switch(checked=metricMode, onCheckedChange={metricMode=it}, modifier=Modifier.height(24.dp))
-                        }
-                        OutlinedButton(
-                            onClick = onTranslateGermanMetric,
-                            enabled = !isTranslating,
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                        ) {
-                            if (isTranslating) {
-                                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                                Spacer(Modifier.width(8.dp))
-                                Text("Übersetze…", fontSize = 13.sp)
-                            } else {
-                                Icon(Icons.Default.AutoAwesome, null, Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Alles auf Deutsch + metrisch", fontSize = 13.sp)
-                            }
-                        }
-                        TextButton(onClick = onScaleToBudget, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(top = 4.dp)) {
-                            Icon(Icons.Default.PieChart, null, Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Auf mein Restbudget anpassen", fontSize = 13.sp)
-                        }
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-            }
-
-            // Roh- / Kochgewicht für Gramm-Tracking (Nudeln, Reis, …)
-            item {
-                var cookedText by remember(recipe.id, recipe.cookedWeightG) {
-                    mutableStateOf(recipe.cookedWeightG?.takeIf { it > 0f }?.toInt()?.toString() ?: "")
-                }
-                val estimatedRaw = RecipeNutritionAnalyzer.estimateTotalGrams(recipe.ingredients).takeIf { it > 0f }
-                // Gespeicherter Wert verwerfen wenn offensichtlich kaputt (alter amount×100-Bug)
-                val rawTotal = recipe.totalIngredientWeightG?.takeIf { stored ->
-                    estimatedRaw == null || stored <= estimatedRaw * 2.5f
-                } ?: estimatedRaw
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text("Gericht-Gewicht", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                        if (rawTotal != null) {
-                            Text(
-                                "Σ Zutaten (roh): ${rawTotal.toInt()} g  ·  ≈ ${(rawTotal / recipe.servings.coerceAtLeast(1)).toInt()} g/Port.",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        } else {
-                            Text(
-                                "Rohgewicht: Zutaten verifizieren oder mit Mengen in g erfassen",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = cookedText,
-                            onValueChange = { cookedText = it.filter { c -> c.isDigit() || c == '.' || c == ',' } },
-                            label = { Text("Gewicht nach Kochen (g, optional)") },
-                            placeholder = { Text("z.B. 1800") },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            modifier = Modifier.fillMaxWidth(),
-                            supportingText = {
-                                Text(
-                                    "Nudeln/Reis nehmen Wasser auf – hier fertiges Gewicht eintragen, dann z.B. 600 g tracken.",
-                                    fontSize = 11.sp
-                                )
+                    Text("Portionen", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surface) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(0.dp),
+                            modifier = Modifier.padding(horizontal = 2.dp)
+                        ) {
+                            IconButton(onClick = { if (servings > 1) servings-- }, Modifier.size(30.dp)) {
+                                Icon(Icons.Default.Remove, "-", Modifier.size(15.dp))
                             }
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(
-                                onClick = {
-                                    val v = cookedText.replace(',', '.').toFloatOrNull()
-                                    onUpdateCookedWeight(v?.takeIf { it > 0f })
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("Speichern")
-                            }
-                            if (recipe.cookedWeightG != null) {
-                                TextButton(onClick = {
-                                    cookedText = ""
-                                    onUpdateCookedWeight(null)
-                                }) {
-                                    Text("Zurücksetzen")
-                                }
-                            }
-                        }
-                        recipe.yieldWeightG()?.let { y ->
                             Text(
-                                "Tracking-Basis: ${y.toInt()} g gesamt (${if (recipe.cookedWeightG != null) "gekocht" else "roh"})",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(top = 4.dp)
+                                "$servings",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                modifier = Modifier.widthIn(min = 24.dp),
+                                style = LocalTextStyle.current.copy(textAlign = TextAlign.Center)
                             )
+                            IconButton(onClick = { servings++ }, Modifier.size(30.dp)) {
+                                Icon(Icons.Default.Add, "+", Modifier.size(15.dp))
+                            }
                         }
                     }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("metrisch", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Switch(
+                            checked = metricMode,
+                            onCheckedChange = { metricMode = it },
+                            modifier = Modifier.height(22.dp).padding(start = 4.dp)
+                        )
+                    }
                 }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(8.dp))
             }
 
-            // Nährwert-Analyse Block
+            // ── Nährwerte + Aktionen (kompakt) ───────────────────────────────
             item {
                 NutritionAnalysisCard(
-                    recipe         = recipe,
+                    recipe = recipe,
                     nutritionState = nutritionState,
-                    servings       = servings,
-                    ratio          = ratio,
-                    onAnalyze      = onAnalyze,
-                    onVerify       = onVerify,
+                    servings = servings,
+                    ratio = ratio,
+                    onAnalyze = onAnalyze,
+                    onVerify = onVerify,
                     onRecalculateFromOverrides = onRecalculateFromOverrides,
                     hasStoredOverrides = hasStoredOverrides
                 )
                 Spacer(Modifier.height(8.dp))
-                Button(onClick={onAddToDiary(recipe.copy(servings=servings))}, modifier=Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.PlaylistAdd,null,Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Ins Tagebuch ($servings Port.)")
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { onAddToDiary(recipe.copy(servings = servings)) },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(vertical = 8.dp)
+                    ) {
+                        Icon(Icons.Default.PlaylistAdd, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Tagebuch", fontSize = 13.sp)
+                    }
+                    OutlinedButton(
+                        onClick = { onAddToShoppingList(recipe.copy(servings = servings)) },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(vertical = 8.dp)
+                    ) {
+                        Icon(Icons.Default.ShoppingCart, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Einkauf", fontSize = 13.sp)
+                    }
                 }
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick={onAddToShoppingList(recipe.copy(servings=servings))}, modifier=Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.ShoppingCart,null,Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Zutaten zur Einkaufsliste")
-                }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(10.dp))
             }
 
-            // Description
-            val desc = recipe.displayDescription().lines().filterNot{it.startsWith("📊")}.joinToString("\n").trim()
-            if (desc.isNotBlank()) {
-                item { SectionHeader("Beschreibung"); Spacer(Modifier.height(4.dp)); Text(desc, fontSize=14.sp, lineHeight=20.sp); Spacer(Modifier.height(16.dp)) }
+            // Beschreibung nur wenn sinnvoll und kurz halten
+            run {
+                val desc = recipe.displayDescription().lines()
+                    .filterNot {
+                        it.startsWith("📊") ||
+                            it.trim().startsWith("Pro Stück:", ignoreCase = true) ||
+                            it.trim().startsWith("Pro Portion:", ignoreCase = true)
+                    }
+                    .joinToString("\n").trim()
+                if (desc.isNotBlank()) {
+                    item {
+                        Text(desc, fontSize = 13.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(10.dp))
+                    }
+                }
             }
 
             // Ingredients — Header/Toggle immer sichtbar, damit auch Rezepte ohne
@@ -1592,6 +1549,110 @@ fun RecipeDetailSheet(
                     OutlinedButton(onClick={ runCatching{context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(link)).apply{flags=Intent.FLAG_ACTIVITY_NEW_TASK})}}, modifier=Modifier.fillMaxWidth()) {
                         Icon(Icons.Default.OpenInNew,null); Spacer(Modifier.width(6.dp)); Text("Original-Link öffnen")
                     }
+                }
+            }
+
+            // ── Weitere Optionen (Gewicht, Deutsch, Budget) — einklappbar ────
+            item {
+                Spacer(Modifier.height(8.dp))
+                TextButton(
+                    onClick = { showMoreOptions = !showMoreOptions },
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(vertical = 4.dp)
+                ) {
+                    Icon(
+                        if (showMoreOptions) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        null,
+                        Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        if (showMoreOptions) "Weniger Optionen" else "Mehr Optionen (Gewicht, Deutsch, Budget)",
+                        fontSize = 13.sp
+                    )
+                }
+            }
+            if (showMoreOptions) {
+                item {
+                    var cookedText by remember(recipe.id, recipe.cookedWeightG) {
+                        mutableStateOf(recipe.cookedWeightG?.takeIf { it > 0f }?.toInt()?.toString() ?: "")
+                    }
+                    val estimatedRaw = RecipeNutritionAnalyzer.estimateTotalGrams(recipe.ingredients).takeIf { it > 0f }
+                    val rawTotal = recipe.totalIngredientWeightG?.takeIf { stored ->
+                        estimatedRaw == null || stored <= estimatedRaw * 2.5f
+                    } ?: estimatedRaw
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Gericht-Gewicht", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            if (rawTotal != null) {
+                                Text(
+                                    "Σ roh: ${rawTotal.toInt()} g · ≈ ${(rawTotal / recipe.servings.coerceAtLeast(1)).toInt()} g/Port.",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            OutlinedTextField(
+                                value = cookedText,
+                                onValueChange = { cookedText = it.filter { c -> c.isDigit() || c == '.' || c == ',' } },
+                                label = { Text("Gewicht nach Kochen (g)") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(
+                                    onClick = {
+                                        val v = cookedText.replace(',', '.').toFloatOrNull()
+                                        onUpdateCookedWeight(v?.takeIf { it > 0f })
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) { Text("Speichern", fontSize = 13.sp) }
+                                if (recipe.cookedWeightG != null) {
+                                    TextButton(onClick = {
+                                        cookedText = ""
+                                        onUpdateCookedWeight(null)
+                                    }) { Text("Reset", fontSize = 13.sp) }
+                                }
+                            }
+                            recipe.yieldWeightG()?.let { y ->
+                                Text(
+                                    "Tracking-Basis: ${y.toInt()} g (${if (recipe.cookedWeightG != null) "gekocht" else "roh"})",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            HorizontalDivider()
+                            OutlinedButton(
+                                onClick = onTranslateGermanMetric,
+                                enabled = !isTranslating,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (isTranslating) {
+                                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Übersetze…", fontSize = 13.sp)
+                                } else {
+                                    Icon(Icons.Default.AutoAwesome, null, Modifier.size(16.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Alles auf Deutsch + metrisch", fontSize = 13.sp)
+                                }
+                            }
+                            TextButton(
+                                onClick = onScaleToBudget,
+                                modifier = Modifier.fillMaxWidth(),
+                                contentPadding = PaddingValues(4.dp)
+                            ) {
+                                Icon(Icons.Default.PieChart, null, Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Auf mein Restbudget anpassen", fontSize = 13.sp)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
                 }
             }
         }
