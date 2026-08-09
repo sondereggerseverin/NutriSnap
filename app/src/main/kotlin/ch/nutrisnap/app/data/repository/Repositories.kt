@@ -174,6 +174,48 @@ class DiaryRepository(db: NutriDatabase) {
     }
 
     /**
+     * Multi-Komponenten-Rezept ins Tagebuch: eine DiaryEntry pro Komponente.
+     * [gramsByComponentId] = Map componentId → abgewogene Gramm (nach dem Kochen).
+     * Leere/0-Gramm-Einträge werden übersprungen.
+     * @return IDs der erzeugten Einträge
+     */
+    suspend fun addRecipeComponentsAsMeal(
+        recipe: Recipe,
+        components: List<RecipeComponent>,
+        gramsByComponentId: Map<Long, Float>,
+        mealType: MealType,
+        date: LocalDate
+    ): List<Long> {
+        val ids = mutableListOf<Long>()
+        for (c in components) {
+            val grams = gramsByComponentId[c.id]?.takeIf { it >= 1f } ?: continue
+            val scaled = c.scaledTo(grams)
+            // amountGrams = Anteil am Komponenten-Batch (für spätere Skalierung);
+            // recipeGrams = Anzeige in g
+            val factor = if (c.cookedWeightG > 0f) (grams / c.cookedWeightG).coerceAtLeast(0.001f) else 1f
+            val id = dao.insert(
+                DiaryEntry(
+                    foodItemId = -(recipe.id.toInt()).coerceAtMost(-1),
+                    foodName = "${recipe.displayTitle()} – ${c.name}",
+                    amountGrams = factor,
+                    mealType = mealType,
+                    dateStr = date.toString(),
+                    calories = scaled.calories,
+                    protein = scaled.protein,
+                    carbs = scaled.carbs,
+                    fat = scaled.fat,
+                    fiber = scaled.fiber,
+                    recipeGrams = grams,
+                    matchedRecipeId = recipe.id
+                )
+            )
+            dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }
+            ids.add(id)
+        }
+        return ids
+    }
+
+    /**
      * Manual entry: user types name + kcal + optional macros directly.
      * foodItemId = [MANUAL_FOOD_ITEM_ID] marks manual entries. amountGrams = 0
      * (Portionsbasis 1 beim ersten Edit).

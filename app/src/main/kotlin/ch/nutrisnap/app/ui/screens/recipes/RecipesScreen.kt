@@ -232,6 +232,7 @@ fun RecipesScreen(
     var addToDiaryRecipe  by remember { mutableStateOf<Recipe?>(null) }
     var rateAfterDiary   by remember { mutableStateOf<Recipe?>(null) }
     var editRecipe        by remember { mutableStateOf<Recipe?>(null) }
+    var editComponentsRecipe by remember { mutableStateOf<Recipe?>(null) }
     var hideIncomplete    by remember { mutableStateOf(false) }
     var showBatchSheet    by remember { mutableStateOf(false) }
     var showCookSheet     by remember { mutableStateOf(false) }
@@ -539,7 +540,11 @@ fun RecipesScreen(
             onUpdateCookedWeight = { w -> vm.updateRecipe(live.copy(cookedWeightG = w)) },
             onScaleToBudget = { vm.scaleToRemainingBudget(live) },
             onTranslateGermanMetric = { vm.translateToGermanMetric(live) },
-            isTranslating = state.isTranslating
+            isTranslating = state.isTranslating,
+            onEditComponents = {
+                editComponentsRecipe = live
+                selectedRecipe = null
+            }
         )
     }
 
@@ -583,28 +588,43 @@ fun RecipesScreen(
     }
 
     addToDiaryRecipe?.let { recipe ->
-        // 1) Gekochtes Gewicht oder gespeicherte Zutatensumme, 2) Fallback: aus Text schätzen
-        val estimatedRaw = RecipeNutritionAnalyzer.estimateTotalGrams(recipe.ingredients).takeIf { it > 0f }
-        val saneStoredRaw = recipe.totalIngredientWeightG?.takeIf { stored ->
-            estimatedRaw == null || stored <= estimatedRaw * 2.5f
-        }
-        val totalYield = recipe.cookedWeightG?.takeIf { it > 0f }
-            ?: saneStoredRaw
-            ?: estimatedRaw
-        val gramsPerServing = totalYield?.div(recipe.servings.coerceAtLeast(1))
+        val components by vm.getComponents(recipe.id).collectAsState(initial = emptyList())
 
-        AddToDiarySheet(
-            recipe = recipe,
-            gramsPerServing = gramsPerServing,
-            yieldTotalG = totalYield,
-            isCookedWeight = recipe.cookedWeightG != null && (recipe.cookedWeightG ?: 0f) > 0f,
-            onConfirm = { servings, grams, meal, date ->
-                diaryVm.addRecipeAsMeal(recipe, servings, meal, grams, date)
-                rateAfterDiary = recipe
-                addToDiaryRecipe = null
-            },
-            onDismiss = { addToDiaryRecipe = null }
-        )
+        if (components.isNotEmpty()) {
+            MultiComponentAddToDiarySheet(
+                recipe = recipe,
+                components = components,
+                onConfirm = { gramsMap, meal, date ->
+                    diaryVm.addRecipeComponentsAsMeal(recipe, components, gramsMap, meal, date)
+                    rateAfterDiary = recipe
+                    addToDiaryRecipe = null
+                },
+                onDismiss = { addToDiaryRecipe = null }
+            )
+        } else {
+            // 1) Gekochtes Gewicht oder gespeicherte Zutatensumme, 2) Fallback: aus Text schätzen
+            val estimatedRaw = RecipeNutritionAnalyzer.estimateTotalGrams(recipe.ingredients).takeIf { it > 0f }
+            val saneStoredRaw = recipe.totalIngredientWeightG?.takeIf { stored ->
+                estimatedRaw == null || stored <= estimatedRaw * 2.5f
+            }
+            val totalYield = recipe.cookedWeightG?.takeIf { it > 0f }
+                ?: saneStoredRaw
+                ?: estimatedRaw
+            val gramsPerServing = totalYield?.div(recipe.servings.coerceAtLeast(1))
+
+            AddToDiarySheet(
+                recipe = recipe,
+                gramsPerServing = gramsPerServing,
+                yieldTotalG = totalYield,
+                isCookedWeight = recipe.cookedWeightG != null && (recipe.cookedWeightG ?: 0f) > 0f,
+                onConfirm = { servings, grams, meal, date ->
+                    diaryVm.addRecipeAsMeal(recipe, servings, meal, grams, date)
+                    rateAfterDiary = recipe
+                    addToDiaryRecipe = null
+                },
+                onDismiss = { addToDiaryRecipe = null }
+            )
+        }
     }
 
     rateAfterDiary?.let { recipe ->
@@ -619,6 +639,19 @@ fun RecipesScreen(
             recipe    = recipe,
             onSave    = { updated -> vm.updateRecipe(updated); editRecipe = null },
             onDismiss = { editRecipe = null }
+        )
+    }
+
+    editComponentsRecipe?.let { recipe ->
+        val existing by vm.getComponents(recipe.id).collectAsState(initial = emptyList())
+        RecipeComponentsEditorSheet(
+            recipe = recipe,
+            initial = existing,
+            onSave = { list ->
+                vm.setComponents(recipe.id, list)
+                editComponentsRecipe = null
+            },
+            onDismiss = { editComponentsRecipe = null }
         )
     }
 }
@@ -1208,7 +1241,8 @@ fun RecipeDetailSheet(
     onUpdateCookedWeight: (Float?) -> Unit = {},
     onScaleToBudget: () -> Unit = {},
     onTranslateGermanMetric: () -> Unit = {},
-    isTranslating: Boolean = false
+    isTranslating: Boolean = false,
+    onEditComponents: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var servings   by remember(recipe.id) { mutableStateOf(recipe.servings) }
@@ -1652,6 +1686,19 @@ fun RecipeDetailSheet(
                                     color = MaterialTheme.colorScheme.primary
                                 )
                             }
+                            OutlinedButton(
+                                onClick = onEditComponents,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Restaurant, null, Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Komponenten (Beilage / Sauce)…", fontSize = 13.sp)
+                            }
+                            Text(
+                                "Getrennt abwiegen oder Meal-Prep gleichmässig aufteilen.",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                             HorizontalDivider()
                             OutlinedButton(
                                 onClick = onTranslateGermanMetric,

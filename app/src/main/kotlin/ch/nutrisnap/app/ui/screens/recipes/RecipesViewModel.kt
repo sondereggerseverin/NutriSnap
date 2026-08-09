@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeCategory
+import ch.nutrisnap.app.data.model.RecipeComponent
 import ch.nutrisnap.app.data.model.RecipeScrapeResult
 import ch.nutrisnap.app.data.repository.RecipeBudgetScaleResult
 import ch.nutrisnap.app.data.repository.RecipeBudgetScaler
@@ -520,6 +521,42 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
 
     fun updateRecipe(recipe: Recipe) {
         viewModelScope.launch { repo.updateRecipe(recipe) }
+    }
+
+    fun getComponents(recipeId: Long): Flow<List<RecipeComponent>> = repo.getComponents(recipeId)
+
+    suspend fun getComponentsOnce(recipeId: Long): List<RecipeComponent> =
+        repo.getComponentsOnce(recipeId)
+
+    /**
+     * Komponenten eines Rezepts setzen (ersetzt bestehende).
+     * Leere Liste = zurück zu One-Pot.
+     * Optional: Gesamtnährwerte des Rezepts aus den Komponenten neu berechnen.
+     */
+    fun setComponents(recipeId: Long, components: List<RecipeComponent>, updateRecipeTotals: Boolean = true) {
+        viewModelScope.launch {
+            repo.setComponents(recipeId, components)
+            if (updateRecipeTotals && components.isNotEmpty()) {
+                val recipe = repo.getById(recipeId) ?: return@launch
+                val servings = recipe.servings.coerceAtLeast(1).toFloat()
+                val totalKcal = components.sumOf { it.totalCalories.toDouble() }.toFloat()
+                val totalProtein = components.sumOf { it.proteinG.toDouble() }.toFloat()
+                val totalCarbs = components.sumOf { it.carbsG.toDouble() }.toFloat()
+                val totalFat = components.sumOf { it.fatG.toDouble() }.toFloat()
+                val totalFiber = components.sumOf { it.fiberG.toDouble() }.toFloat()
+                val totalCooked = components.sumOf { it.cookedWeightG.toDouble() }.toFloat()
+                repo.updateRecipe(
+                    recipe.copy(
+                        totalCalories = totalKcal,
+                        proteinPerServing = totalProtein / servings,
+                        carbsPerServing = totalCarbs / servings,
+                        fatPerServing = totalFat / servings,
+                        fiberPerServing = totalFiber / servings,
+                        cookedWeightG = totalCooked.takeIf { it > 0f }
+                    )
+                )
+            }
+        }
     }
 
     /** Analyze recipe ingredients via OpenFoodFacts and update macros in DB */

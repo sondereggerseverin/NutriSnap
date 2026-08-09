@@ -380,6 +380,23 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
+     * Multi-Komponenten-Rezept: pro Komponente ein Tagebucheintrag mit eigenem Gewicht.
+     */
+    fun addRecipeComponentsAsMeal(
+        recipe: Recipe,
+        components: List<RecipeComponent>,
+        gramsByComponentId: Map<Long, Float>,
+        meal: MealType,
+        date: java.time.LocalDate? = null
+    ) {
+        viewModelScope.launch {
+            repo.addRecipeComponentsAsMeal(
+                recipe, components, gramsByComponentId, meal, date ?: _date.value
+            )
+        }
+    }
+
+    /**
      * Mengenänderung. [newValue] ist immer in derselben Einheit wie die Anzeige:
      * Gramm bei Lebensmitteln, Portionsfaktor bei Rezepten/Manuell, bzw. der
      * aus Gramm zurückgerechnete Portionsfaktor bei gram-getrackten Rezepten
