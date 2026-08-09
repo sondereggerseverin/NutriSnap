@@ -101,8 +101,8 @@ object SearchUtils {
 
     // Deutsche Synonyme für häufige Suchanfragen
     private val GERMAN_SYNONYMS = mapOf(
-        "haehnchen" to listOf("chicken", "huhn", "haehnchenbrustfilet"),
-        "chicken" to listOf("haehnchen", "huhn", "geflügel"),
+        "haehnchen" to listOf("chicken", "huhn", "haehnchenbrustfilet", "poulet"),
+        "chicken" to listOf("haehnchen", "huhn", "geflügel", "poulet"),
         "kartoffel" to listOf("potato", "erdapfel"),
         "tomate" to listOf("tomato", "paradeiser"),
         "apfel" to listOf("apple"),
@@ -117,6 +117,7 @@ object SearchUtils {
         "suesskartoffel" to listOf("sweet potato", "suesskartoffeln"),
         "poulet" to listOf("chicken", "haehnchen", "huhn"),
         "rueebli" to listOf("karotte", "carrot", "moehre"),
+        "ruebli" to listOf("karotte", "carrot", "moehre"),
         "ei" to listOf("egg", "eier"),
         "eier" to listOf("eggs", "ei"),
         "milch" to listOf("milk"),
@@ -128,4 +129,31 @@ object SearchUtils {
         "zwiebel" to listOf("onion"),
         "spinat" to listOf("spinach")
     )
+
+    /**
+     * Liefert Synonym-Alternativen für eine (bereits normalisierte) Query,
+     * inkl. umgekehrter Map-Richtung. Wird von der Suche genutzt, um die
+     * lokale DB mit mehreren LIKE-Queries abzufragen.
+     */
+    fun synonymsOf(normalizedQuery: String): List<String> {
+        val q = normalizedQuery.trim().lowercase()
+        if (q.isBlank()) return emptyList()
+        val out = linkedSetOf<String>()
+        GERMAN_SYNONYMS[q]?.let { out.addAll(it) }
+        // Präfix: "pouletbrust" → Synonyme von "poulet" + Suffix
+        GERMAN_SYNONYMS.entries
+            .filter { q.startsWith(it.key) && q.length > it.key.length }
+            .forEach { (key, values) ->
+                val suffix = q.removePrefix(key)
+                values.forEach { out += it + suffix }
+            }
+        // Umgekehrt: Query ist ein Synonym-Wert → Key + andere Werte
+        GERMAN_SYNONYMS.forEach { (key, values) ->
+            if (values.any { it == q || q.startsWith(it) }) {
+                out += key
+                out.addAll(values)
+            }
+        }
+        return out.filter { it.isNotBlank() && it != q }.distinct()
+    }
 }

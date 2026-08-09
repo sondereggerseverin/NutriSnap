@@ -32,9 +32,14 @@ class FoodSearchRepository(
         // da deren Volltextsuche zusammengeschriebene Komposita oft nicht findet.
         val compoundVariant = compoundSplitVariant(effectiveQuery)
 
-        val cached = foodItemDao.searchFoods(query) +
-            (swissVariant?.let { foodItemDao.searchFoods(it) } ?: emptyList())
-        val cachedDistinct = cached.distinctBy { normalizeKey(it) }
+        // Synonym-Expansion für lokale DB (z.B. "poulet" → auch "hähnchen"/"chicken")
+        val synonymQueries = synonymExpansionQueries(query) + listOfNotNull(swissVariant)
+        val cached = (listOf(query) + synonymQueries).flatMap { q ->
+            runCatching { foodItemDao.searchFoods(q) }.getOrDefault(emptyList())
+        }
+        val cachedDistinct = cached
+            .distinctBy { normalizeKey(it) }
+            .filter { hasUsableNutrition(it) || relevance(it, effectiveQuery) >= 3 }
         // Nur ein EXAKTER Namens-Treffer zählt als "gut genug" — "beginnt mit" reicht
         // nicht, weil z.B. "Apfelringe" auch mit "apfel" beginnt und sonst faelschlich
         // als Treffer für die Anfrage "apfel" durchgeht, obwohl kein echter Apfel dabei ist.
@@ -49,15 +54,20 @@ class FoodSearchRepository(
             val compoundDeferred = compoundVariant?.let { cv ->
                 async { runCatching { openFoodFactsSearch(cv) }.getOrDefault(emptyList()) }
             }
+            // Zusätzliche Remote-Suche mit Synonym (z.B. "chicken" bei "poulet")
+            val synonymRemoteDeferred = synonymQueries.take(2).map { sq ->
+                async { runCatching { openFoodFactsSearch(sq) }.getOrDefault(emptyList()) }
+            }
 
             val off = offDeferred.await()
             val usda = usdaDeferred.await()
             val swiss = swissDeferred.await()
             val compound = compoundDeferred?.await() ?: emptyList()
+            val synonymRemote = synonymRemoteDeferred.flatMap { it.await() }
 
-            var combined = (cachedDistinct + swiss + off + usda + compound)
+            var combined = (cachedDistinct + swiss + off + usda + compound + synonymRemote)
 
-            if (combined.size < 5) {
+            if (combined.count { hasUsableNutrition(it) } < 5) {
                 val nutritionix = runCatching { nutritionixApi.searchBranded(effectiveQuery) }.getOrDefault(emptyList())
                 combined = combined + nutritionix
             }
@@ -66,17 +76,51 @@ class FoodSearchRepository(
             // immer Vorrang vor der KI-Schätzung. Nur wenn wirklich nichts Ähnliches
             // gefunden wurde, wird per KI grob geschätzt (klar als "KI-geschätzt"
             // markiert, s. GroqFoodEstimatorApi/FoodSource).
-            if (combined.none { relevance(it, effectiveQuery) >= 2 }) {
+            if (combined.none { relevance(it, effectiveQuery) >= 2 && hasUsableNutrition(it) }) {
                 GroqFoodEstimatorApi.estimate(effectiveQuery)?.let { combined = combined + it }
             }
 
             val result = combined
                 .distinctBy { normalizeKey(it) }
+                // 0-kcal-Schrott ans Ende bzw. rausfiltern wenn genug brauchbare Treffer da
+                .let { list ->
+                    val usable = list.filter { hasUsableNutrition(it) }
+                    if (usable.size >= 3) usable else list
+                }
                 .sortedWith(relevanceComparator(effectiveQuery))
 
             foodItemDao.insertAll(result.filter { it.source != FoodSource.MANUAL }.take(20))
             result
         }
+    }
+
+    /** Mindestens eine sinnvolle Makro-Angabe (kein komplett leerer OFF-Eintrag). */
+    private fun hasUsableNutrition(item: FoodItem): Boolean {
+        val kcal = item.calories ?: 0f
+        val p = item.protein ?: 0f
+        val c = item.carbs ?: 0f
+        val f = item.fat ?: 0f
+        return kcal > 0f || p > 0f || c > 0f || f > 0f
+    }
+
+    /**
+     * Liefert alternative Suchbegriffe aus [SearchUtils]-Synonymen und der
+     * Schweizerdeutsch-Map, damit die lokale LIKE-Suche auch "Hähnchen" findet
+     * wenn der Nutzer "poulet" tippt.
+     */
+    private fun synonymExpansionQueries(query: String): List<String> {
+        val q = SearchUtils.normalize(query.trim())
+        if (q.length < 3) return emptyList()
+        val out = linkedSetOf<String>()
+        // Direkte Synonyme
+        SearchUtils.synonymsOf(q).forEach { out += it }
+        // swissGermanRoots deckt poulet→hähnchen ab
+        swissGermanVariant(query)?.let { out += it }
+        // Auch umgekehrt: "hähnchen" soll "poulet" in Custom-Foods finden
+        swissGermanRoots.entries
+            .filter { it.value == q || q.startsWith(it.value) }
+            .forEach { out += it.key + q.removePrefix(it.value) }
+        return out.filter { it.isNotBlank() && it != q }.take(4)
     }
 
 
@@ -119,7 +163,14 @@ class FoodSearchRepository(
          * Sortierung anwenden können statt lokale Treffer unsortiert voranzustellen.
          */
         fun relevanceComparator(query: String): Comparator<FoodItem> =
-            compareByDescending<FoodItem> { relevance(it, query) }.thenByDescending { it.completenessScore }
+            compareByDescending<FoodItem> { relevance(it, query) }
+                .thenByDescending {
+                    val kcal = it.calories ?: 0f
+                    val p = it.protein ?: 0f
+                    // Einträge ohne jegliche Nährwerte ganz nach unten
+                    if (kcal <= 0f && p <= 0f) 0 else 1
+                }
+                .thenByDescending { it.completenessScore }
     }
 
     suspend fun searchNaturalLanguage(query: String): List<FoodItem> {

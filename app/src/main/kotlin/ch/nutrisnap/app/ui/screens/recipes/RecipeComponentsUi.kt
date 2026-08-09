@@ -289,6 +289,42 @@ fun RecipeComponentsEditorSheet(
  * Standard: getrennte Grammeingaben.
  * Optional: „Gleichmässig aufteilen“ (Meal-Prep) – eine Portionszahl, Ratio bleibt.
  */
+/**
+ * Heilt offensichtliche Duplikat-Nährwerte (jede Komponente trägt die vollen
+ * Rezept-kcal) rein clientseitig für die Anzeige/Skalierung, ohne DB-Schreiben.
+ * Persistente Heilung läuft über [RecipesViewModel.healComponentNutrition].
+ */
+private fun displayHealedComponents(
+    recipe: Recipe,
+    components: List<RecipeComponent>
+): List<RecipeComponent> {
+    if (components.size <= 1) return components
+    val recipeTotal = recipe.totalCalories ?: 0f
+    if (recipeTotal <= 0f) return components
+    val duplicated = components.all { c ->
+        c.totalCalories > 0f &&
+            kotlin.math.abs(c.totalCalories - recipeTotal) / recipeTotal < 0.08f
+    }
+    val sumTooHigh = components.sumOf { it.totalCalories.toDouble() }.toFloat() > recipeTotal * 1.35f
+    if (!duplicated && !sumTooHigh) return components
+    val serv = recipe.servings.coerceAtLeast(1).toFloat()
+    val sourceProt = (recipe.proteinPerServing ?: 0f) * serv
+    val sourceCarbs = (recipe.carbsPerServing ?: 0f) * serv
+    val sourceFat = (recipe.fatPerServing ?: 0f) * serv
+    val sourceFiber = (recipe.fiberPerServing ?: 0f) * serv
+    val wSum = components.sumOf { it.cookedWeightG.toDouble() }.toFloat().coerceAtLeast(1f)
+    return components.map { c ->
+        val f = if (c.cookedWeightG > 0f) c.cookedWeightG / wSum else 1f / components.size
+        c.copy(
+            totalCalories = recipeTotal * f,
+            proteinG = sourceProt * f,
+            carbsG = sourceCarbs * f,
+            fatG = sourceFat * f,
+            fiberG = sourceFiber * f
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MultiComponentAddToDiarySheet(
@@ -298,11 +334,13 @@ fun MultiComponentAddToDiarySheet(
     onDismiss: () -> Unit,
     onFreeze: ((gramsByComponentId: Map<Long, Float>, quantity: Int) -> Unit)? = null
 ) {
+    // Sofortige Korrektur bei kaputten Bestandsdaten (Duplikat-kcal)
+    val comps = remember(recipe.id, components) { displayHealedComponents(recipe, components) }
     var equalMode by remember { mutableStateOf(false) }
     var portionsText by remember { mutableStateOf(recipe.servings.coerceAtLeast(1).toString()) }
-    var gramsTexts by remember(components) {
+    var gramsTexts by remember(comps) {
         mutableStateOf(
-            components.associate { c ->
+            comps.associate { c ->
                 // Vorschlag: eine gleichmässige Portion
                 val suggested = if (c.cookedWeightG > 0f && recipe.servings > 0)
                     (c.cookedWeightG / recipe.servings).toInt().toString()
@@ -319,21 +357,21 @@ fun MultiComponentAddToDiarySheet(
 
     // Im Equal-Mode: Gramm pro Komponente aus Portionszahl ableiten
     val effectiveGrams: Map<Long, Float> = if (equalMode) {
-        components.associate { c ->
+        comps.associate { c ->
             val g = if (c.cookedWeightG > 0f) c.cookedWeightG / portions else 0f
             c.id to g
         }
     } else {
-        components.associate { c ->
+        comps.associate { c ->
             val g = gramsTexts[c.id]?.replace(',', '.')?.toFloatOrNull()?.coerceAtLeast(0f) ?: 0f
             c.id to g
         }
     }
 
-    val totalCals = components.sumOf { c ->
+    val totalCals = comps.sumOf { c ->
         c.scaledTo(effectiveGrams[c.id] ?: 0f).calories.toDouble()
     }.toFloat()
-    val totalProtein = components.sumOf { c ->
+    val totalProtein = comps.sumOf { c ->
         c.scaledTo(effectiveGrams[c.id] ?: 0f).protein.toDouble()
     }.toFloat()
 
@@ -387,15 +425,19 @@ fun MultiComponentAddToDiarySheet(
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(8.dp))
-                components.forEach { c ->
+                comps.forEach { c ->
                     val g = effectiveGrams[c.id] ?: 0f
+                    val dens = if (c.cookedWeightG > 0f)
+                        (c.totalCalories / c.cookedWeightG * 100f).toInt() else 0
                     Text(
-                        "• ${c.name}: ${g.toInt()} g  (von ${c.cookedWeightG.toInt()} g)",
+                        "• ${c.name}: ${g.toInt()} g  (von ${c.cookedWeightG.toInt()} g · $dens kcal/100g)",
                         fontSize = 13.sp
                     )
                 }
             } else {
-                components.forEach { c ->
+                comps.forEach { c ->
+                    val dens = if (c.cookedWeightG > 0f)
+                        (c.totalCalories / c.cookedWeightG * 100f).toInt() else 0
                     OutlinedTextField(
                         value = gramsTexts[c.id] ?: "",
                         onValueChange = { v ->
@@ -403,7 +445,10 @@ fun MultiComponentAddToDiarySheet(
                         },
                         label = { Text("${c.name} (g)") },
                         supportingText = {
-                            Text("Batch: ${c.cookedWeightG.toInt()} g · ${c.totalCalories.toInt()} kcal gesamt")
+                            Text(
+                                "Batch: ${c.cookedWeightG.toInt()} g · " +
+                                    "${c.totalCalories.toInt()} kcal · $dens kcal/100g"
+                            )
                         },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,

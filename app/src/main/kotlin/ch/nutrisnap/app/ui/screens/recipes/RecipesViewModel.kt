@@ -534,42 +534,15 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
      * Komponenten eines Rezepts setzen (ersetzt bestehende).
      * Leere Liste = zurück zu One-Pot.
      * Optional: Gesamtnährwerte des Rezepts aus den Komponenten neu berechnen.
+     *
+     * Heilt kaputte Bestandsdaten: Wenn jede Komponente die vollen Rezept-kcal
+     * trägt (Summe ≈ n × Rezept-Total) oder alle kcal leer sind, werden die
+     * Nährwerte aus Zutaten-Matches bzw. proportional zum Kochgewicht neu gesetzt.
      */
     fun setComponents(recipeId: Long, components: List<RecipeComponent>, updateRecipeTotals: Boolean = true) {
         viewModelScope.launch {
             val recipe = repo.getById(recipeId) ?: return@launch
-            // Fehlende Nährwerte aus Zutaten-Matches nachziehen
-            var comps = components
-            if (comps.isNotEmpty() && comps.all { it.totalCalories <= 0f }) {
-                val suggested = suggestComponentsFromMatches(recipe)
-                if (suggested.isNotEmpty()) {
-                    comps = comps.mapIndexed { i, c ->
-                        val s = suggested.getOrNull(i) ?: suggested.first()
-                        c.copy(
-                            totalCalories = if (c.totalCalories > 0f) c.totalCalories else s.totalCalories,
-                            proteinG = if (c.proteinG > 0f) c.proteinG else s.proteinG,
-                            carbsG = if (c.carbsG > 0f) c.carbsG else s.carbsG,
-                            fatG = if (c.fatG > 0f) c.fatG else s.fatG,
-                            fiberG = if (c.fiberG > 0f) c.fiberG else s.fiberG
-                        )
-                    }
-                    // Falls nur 1 Suggested aber 2 Comps mit Gewichten: proportional split
-                    if (suggested.size == 1 && comps.size > 1) {
-                        val s = suggested.first()
-                        val wSum = comps.sumOf { it.cookedWeightG.toDouble() }.toFloat().coerceAtLeast(1f)
-                        comps = comps.map { c ->
-                            val f = if (c.cookedWeightG > 0f) c.cookedWeightG / wSum else 1f / comps.size
-                            c.copy(
-                                totalCalories = s.totalCalories * f,
-                                proteinG = s.proteinG * f,
-                                carbsG = s.carbsG * f,
-                                fatG = s.fatG * f,
-                                fiberG = s.fiberG * f
-                            )
-                        }
-                    }
-                }
-            }
+            var comps = healComponentNutrition(recipe, components)
             repo.setComponents(recipeId, comps)
             if (updateRecipeTotals && comps.isNotEmpty()) {
                 val totalKcal = comps.sumOf { it.totalCalories.toDouble() }.toFloat()
@@ -592,6 +565,68 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                     )
                 )
             }
+        }
+    }
+
+    /**
+     * Korrigiert Komponenten-Nährwerte wenn:
+     * - alle kcal ≤ 0, oder
+     * - die kcal jeder Komponente ≈ dem Rezept-Total sind (klassischer
+     *   Duplikat-Bug: beide Teile tragen 5579 kcal statt den Anteil).
+     */
+    suspend fun healComponentNutrition(
+        recipe: Recipe,
+        components: List<RecipeComponent>
+    ): List<RecipeComponent> {
+        if (components.isEmpty()) return components
+        val recipeTotal = recipe.totalCalories ?: 0f
+        val sumComp = components.sumOf { it.totalCalories.toDouble() }.toFloat()
+        val allZero = components.all { it.totalCalories <= 0f }
+        // Duplikat: jede Komponente hat (fast) die vollen Rezept-kcal
+        val duplicated = components.size > 1 && recipeTotal > 0f &&
+            components.all { c ->
+                c.totalCalories > 0f &&
+                    kotlin.math.abs(c.totalCalories - recipeTotal) / recipeTotal < 0.08f
+            }
+        // Summe der Komponenten deutlich über Rezept-Total (z.B. 2×)
+        val sumTooHigh = recipeTotal > 0f && sumComp > recipeTotal * 1.35f
+
+        if (!allZero && !duplicated && !sumTooHigh) return components
+
+        val suggested = suggestComponentsFromMatches(recipe)
+        if (suggested.size >= components.size && suggested.any { it.totalCalories > 0f }) {
+            return components.mapIndexed { i, c ->
+                val s = suggested.getOrNull(i) ?: suggested.last()
+                // Kochgewicht vom Nutzer behalten; Nährwerte aus Suggestion
+                c.copy(
+                    totalCalories = if (s.totalCalories > 0f) s.totalCalories else c.totalCalories,
+                    proteinG = if (s.proteinG > 0f) s.proteinG else c.proteinG,
+                    carbsG = if (s.carbsG > 0f) s.carbsG else c.carbsG,
+                    fatG = if (s.fatG > 0f) s.fatG else c.fatG,
+                    fiberG = if (s.fiberG > 0f) s.fiberG else c.fiberG
+                )
+            }
+        }
+
+        // Fallback: proportional zum Kochgewicht aus Rezept-Totals splitten
+        val sourceKcal = if (recipeTotal > 0f) recipeTotal
+            else components.maxOfOrNull { it.totalCalories } ?: 0f
+        if (sourceKcal <= 0f) return components
+        val serv = recipe.servings.coerceAtLeast(1).toFloat()
+        val sourceProt = (recipe.proteinPerServing ?: 0f) * serv
+        val sourceCarbs = (recipe.carbsPerServing ?: 0f) * serv
+        val sourceFat = (recipe.fatPerServing ?: 0f) * serv
+        val sourceFiber = (recipe.fiberPerServing ?: 0f) * serv
+        val wSum = components.sumOf { it.cookedWeightG.toDouble() }.toFloat().coerceAtLeast(1f)
+        return components.map { c ->
+            val f = if (c.cookedWeightG > 0f) c.cookedWeightG / wSum else 1f / components.size
+            c.copy(
+                totalCalories = sourceKcal * f,
+                proteinG = sourceProt * f,
+                carbsG = sourceCarbs * f,
+                fatG = sourceFat * f,
+                fiberG = sourceFiber * f
+            )
         }
     }
 
