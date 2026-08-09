@@ -658,9 +658,10 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         }
         fun isSide(text: String): Boolean {
             val n = text.lowercase()
+            // Nur echte Beilagen – Zwiebeln/Öl gehören zur Sauce, nicht zum Reis
             return listOf(
                 "reis", "basmati", "erbse", "erbsen", "peas", "kartoffel", "nudel", "pasta",
-                "quinoa", "couscous", "bulgur", "beilage", "zwiebel", "öl", "oil", "speiseöl"
+                "quinoa", "couscous", "bulgur", "beilage", "reisnudeln", "glasierte"
             ).any { it in n }
         }
         fun isSauce(text: String): Boolean {
@@ -668,7 +669,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             return listOf(
                 "poulet", "huhn", "chicken", "fleisch", "tomate", "rahm", "sahne", "cream",
                 "joghurt", "yogurt", "püree", "puree", "gewürz", "garam", "sauce", "butter",
-                "masala", "chili", "ingwer", "knoblauch"
+                "masala", "chili", "ingwer", "knoblauch", "zwiebel", "öl", "oil", "speiseöl",
+                "fromage", "rôti", "roti"
             ).any { it in n }
         }
         val side = mutableListOf<ch.nutrisnap.app.data.model.IngredientMatch>()

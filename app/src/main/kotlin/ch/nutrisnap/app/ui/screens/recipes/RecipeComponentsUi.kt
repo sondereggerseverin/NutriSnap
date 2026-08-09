@@ -26,32 +26,66 @@ import java.time.LocalDate
 
 /**
  * Editor: Komponenten eines Rezepts anlegen/bearbeiten.
- * Pro Komponente: Name, Kochgewicht (g), Gesamtnährwerte des Batches.
+ * Pro Komponente nur Name + Kochgewicht (g).
+ * Nährwerte werden immer aus den verifizierten Zutaten berechnet – keine Eingabefelder.
  */
 private fun fmtNum(v: Float): String =
-    if (v <= 0f) "" else if (v == v.toInt().toFloat()) v.toInt().toString() else "%.1f".format(v)
+    if (v <= 0f) "—" else if (v == v.toInt().toFloat()) v.toInt().toString() else "%.1f".format(v)
 
+/** Nur Name + Gewicht vom Nutzer; Nährwerte kommen aus [suggested]. */
 private data class Draft(
     val id: Long,
     val name: String,
-    val cookedWeightG: String,
-    val totalCalories: String,
-    val proteinG: String,
-    val carbsG: String,
-    val fatG: String,
-    val fiberG: String
+    val cookedWeightG: String
 )
 
 private fun componentToDraft(c: RecipeComponent) = Draft(
     id = c.id,
     name = c.name,
-    cookedWeightG = c.cookedWeightG.takeIf { it > 0f }?.toInt()?.toString() ?: "",
-    totalCalories = fmtNum(c.totalCalories),
-    proteinG = fmtNum(c.proteinG),
-    carbsG = fmtNum(c.carbsG),
-    fatG = fmtNum(c.fatG),
-    fiberG = fmtNum(c.fiberG)
+    cookedWeightG = c.cookedWeightG.takeIf { it > 0f }?.toInt()?.toString() ?: ""
 )
+
+/**
+ * Findet für einen Draft die passenden Suggestion-Nährwerte
+ * (gleicher Name, sonst Index, sonst proportionaler Fallback).
+ */
+private fun nutritionFor(
+    draft: Draft,
+    index: Int,
+    suggested: List<RecipeComponent>,
+    recipe: Recipe,
+    allDrafts: List<Draft>
+): RecipeComponent {
+    val byName = suggested.firstOrNull {
+        it.name.equals(draft.name.trim(), ignoreCase = true)
+    }
+    val byIndex = suggested.getOrNull(index)
+    val base = byName ?: byIndex
+    if (base != null && base.totalCalories > 0f) return base
+
+    // Fallback: Rezept-Totals proportional zu den (bereits eingegebenen) Kochgewichten
+    val recipeTotal = recipe.totalCalories ?: 0f
+    if (recipeTotal <= 0f) {
+        return RecipeComponent(recipeId = recipe.id, name = draft.name, cookedWeightG = 0f)
+    }
+    val serv = recipe.servings.coerceAtLeast(1).toFloat()
+    val weights = allDrafts.map {
+        it.cookedWeightG.replace(',', '.').toFloatOrNull()?.coerceAtLeast(0f) ?: 0f
+    }
+    val wSum = weights.sum().coerceAtLeast(1f)
+    val w = weights.getOrNull(index) ?: 0f
+    val f = if (w > 0f) w / wSum else 1f / allDrafts.size.coerceAtLeast(1)
+    return RecipeComponent(
+        recipeId = recipe.id,
+        name = draft.name,
+        cookedWeightG = w,
+        totalCalories = recipeTotal * f,
+        proteinG = (recipe.proteinPerServing ?: 0f) * serv * f,
+        carbsG = (recipe.carbsPerServing ?: 0f) * serv * f,
+        fatG = (recipe.fatPerServing ?: 0f) * serv * f,
+        fiberG = (recipe.fiberPerServing ?: 0f) * serv * f
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,34 +100,34 @@ fun RecipeComponentsEditorSheet(
     fun toDrafts(list: List<RecipeComponent>): List<Draft> =
         if (list.isEmpty()) {
             listOf(
-                Draft(0, "Beilage", "", "", "", "", "", ""),
-                Draft(0, "Sauce / Fleisch", "", "", "", "", "", "")
+                Draft(0, "Beilage", ""),
+                Draft(0, "Sauce / Fleisch", "")
             )
         } else list.map { componentToDraft(it) }
 
     var drafts by remember(recipe.id) {
         mutableStateOf(toDrafts(if (initial.isNotEmpty()) initial else suggested))
     }
-    // Suggestions / Matches → Nährwerte immer nachziehen wenn kcal noch leer
+
+    // Suggestion-Namen nachziehen, wenn Drafts noch Default-Namen haben und suggested da ist
     LaunchedEffect(suggested) {
         if (suggested.isEmpty()) return@LaunchedEffect
-        val needsFill = drafts.any { it.totalCalories.isBlank() }
-        if (!needsFill) return@LaunchedEffect
-        drafts = drafts.mapIndexed { i, d ->
-            val s = suggested.getOrNull(i) ?: suggested.getOrNull(0) ?: return@mapIndexed d
-            if (d.totalCalories.isNotBlank()) d
-            else d.copy(
-                name = d.name.ifBlank { s.name },
-                cookedWeightG = d.cookedWeightG.ifBlank {
-                    s.cookedWeightG.takeIf { it > 0f }?.toInt()?.toString() ?: ""
-                },
-                totalCalories = fmtNum(s.totalCalories),
-                proteinG = fmtNum(s.proteinG),
-                carbsG = fmtNum(s.carbsG),
-                fatG = fmtNum(s.fatG),
-                fiberG = fmtNum(s.fiberG)
-            )
+        if (drafts.size == suggested.size) {
+            drafts = drafts.mapIndexed { i, d ->
+                val s = suggested[i]
+                // Nur Name übernehmen wenn Draft noch leer/Default und suggested einen hat
+                if (d.name.isBlank() || d.name == "Beilage" || d.name == "Sauce / Fleisch" ||
+                    d.name == "Weitere Komponente"
+                ) {
+                    d.copy(name = s.name.ifBlank { d.name })
+                } else d
+            }
         }
+    }
+
+    // Beim Öffnen sofort Suggestion anfordern
+    LaunchedEffect(recipe.id) {
+        onRequestSuggest()
     }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -109,20 +143,14 @@ fun RecipeComponentsEditorSheet(
             Text("Komponenten", fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Spacer(Modifier.height(4.dp))
             Text(
-                "Nur Kochgewicht eintragen. Nährwerte werden aus den verifizierten Zutaten berechnet – du musst sie nicht tippen.",
+                "Nur Kochgewicht eintragen. Nährwerte kommen automatisch aus den verifizierten Zutaten – keine manuelle Eingabe.",
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = onRequestSuggest,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Nährwerte aus Zutaten berechnen")
-            }
             Spacer(Modifier.height(12.dp))
 
             drafts.forEachIndexed { index, draft ->
+                val nut = nutritionFor(draft, index, suggested, recipe, drafts)
                 Card(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
@@ -159,68 +187,34 @@ fun RecipeComponentsEditorSheet(
                                 drafts = drafts.toMutableList().also { it[index] = draft.copy(cookedWeightG = v) }
                             },
                             label = { Text("Kochgewicht (g)") },
-                            supportingText = { Text("Gesamtgewicht dieser Komponente nach dem Kochen") },
+                            supportingText = { Text("Gesamtgewicht dieser Komponente nach dem Kochen (ohne Topf)") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
-                        Spacer(Modifier.height(6.dp))
-                        Text("Nährwerte (Batch, aus Zutaten – editierbar)", fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                        Spacer(Modifier.height(4.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            OutlinedTextField(
-                                value = draft.totalCalories,
-                                onValueChange = { v ->
-                                    drafts = drafts.toMutableList().also { it[index] = draft.copy(totalCalories = v) }
-                                },
-                                label = { Text("kcal") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                singleLine = true,
-                                modifier = Modifier.weight(1f)
-                            )
-                            OutlinedTextField(
-                                value = draft.proteinG,
-                                onValueChange = { v ->
-                                    drafts = drafts.toMutableList().also { it[index] = draft.copy(proteinG = v) }
-                                },
-                                label = { Text("Protein g") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                singleLine = true,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        Spacer(Modifier.height(6.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            OutlinedTextField(
-                                value = draft.carbsG,
-                                onValueChange = { v ->
-                                    drafts = drafts.toMutableList().also { it[index] = draft.copy(carbsG = v) }
-                                },
-                                label = { Text("KH g") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                singleLine = true,
-                                modifier = Modifier.weight(1f)
-                            )
-                            OutlinedTextField(
-                                value = draft.fatG,
-                                onValueChange = { v ->
-                                    drafts = drafts.toMutableList().also { it[index] = draft.copy(fatG = v) }
-                                },
-                                label = { Text("Fett g") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                singleLine = true,
-                                modifier = Modifier.weight(1f)
-                            )
-                            OutlinedTextField(
-                                value = draft.fiberG,
-                                onValueChange = { v ->
-                                    drafts = drafts.toMutableList().also { it[index] = draft.copy(fiberG = v) }
-                                },
-                                label = { Text("Ballast g") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                singleLine = true,
-                                modifier = Modifier.weight(1f)
-                            )
+                        Spacer(Modifier.height(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                                Text(
+                                    "Nährwerte (berechnet aus Zutaten)",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    "${fmtNum(nut.totalCalories)} kcal · " +
+                                        "P ${fmtNum(nut.proteinG)} g · " +
+                                        "KH ${fmtNum(nut.carbsG)} g · " +
+                                        "F ${fmtNum(nut.fatG)} g" +
+                                        if (nut.fiberG > 0f) " · Ballast ${fmtNum(nut.fiberG)} g" else "",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
                     }
                 }
@@ -228,7 +222,7 @@ fun RecipeComponentsEditorSheet(
 
             TextButton(
                 onClick = {
-                    drafts = drafts + Draft(0, "Weitere Komponente", "", "", "", "", "", "")
+                    drafts = drafts + Draft(0, "Weitere Komponente", "")
                 }
             ) {
                 Icon(Icons.Default.Add, null, Modifier.size(18.dp))
@@ -252,20 +246,21 @@ fun RecipeComponentsEditorSheet(
                 }
                 Button(
                     onClick = {
-                        val result = drafts.mapNotNull { d ->
+                        val result = drafts.mapIndexedNotNull { index, d ->
                             val weight = d.cookedWeightG.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
-                                ?: return@mapNotNull null
+                                ?: return@mapIndexedNotNull null
                             val name = d.name.trim().ifBlank { "Komponente" }
+                            val nut = nutritionFor(d, index, suggested, recipe, drafts)
                             RecipeComponent(
                                 id = d.id,
                                 recipeId = recipe.id,
                                 name = name,
                                 cookedWeightG = weight,
-                                totalCalories = d.totalCalories.replace(',', '.').toFloatOrNull() ?: 0f,
-                                proteinG = d.proteinG.replace(',', '.').toFloatOrNull() ?: 0f,
-                                carbsG = d.carbsG.replace(',', '.').toFloatOrNull() ?: 0f,
-                                fatG = d.fatG.replace(',', '.').toFloatOrNull() ?: 0f,
-                                fiberG = d.fiberG.replace(',', '.').toFloatOrNull() ?: 0f
+                                totalCalories = nut.totalCalories,
+                                proteinG = nut.proteinG,
+                                carbsG = nut.carbsG,
+                                fatG = nut.fatG,
+                                fiberG = nut.fiberG
                             )
                         }
                         onSave(result)
