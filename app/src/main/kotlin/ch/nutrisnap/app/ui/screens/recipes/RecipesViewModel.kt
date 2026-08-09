@@ -537,16 +537,50 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun setComponents(recipeId: Long, components: List<RecipeComponent>, updateRecipeTotals: Boolean = true) {
         viewModelScope.launch {
-            repo.setComponents(recipeId, components)
-            if (updateRecipeTotals && components.isNotEmpty()) {
-                val recipe = repo.getById(recipeId) ?: return@launch
+            val recipe = repo.getById(recipeId) ?: return@launch
+            // Fehlende Nährwerte aus Zutaten-Matches nachziehen
+            var comps = components
+            if (comps.isNotEmpty() && comps.all { it.totalCalories <= 0f }) {
+                val suggested = suggestComponentsFromMatches(recipe)
+                if (suggested.isNotEmpty()) {
+                    comps = comps.mapIndexed { i, c ->
+                        val s = suggested.getOrNull(i) ?: suggested.first()
+                        c.copy(
+                            totalCalories = if (c.totalCalories > 0f) c.totalCalories else s.totalCalories,
+                            proteinG = if (c.proteinG > 0f) c.proteinG else s.proteinG,
+                            carbsG = if (c.carbsG > 0f) c.carbsG else s.carbsG,
+                            fatG = if (c.fatG > 0f) c.fatG else s.fatG,
+                            fiberG = if (c.fiberG > 0f) c.fiberG else s.fiberG
+                        )
+                    }
+                    // Falls nur 1 Suggested aber 2 Comps mit Gewichten: proportional split
+                    if (suggested.size == 1 && comps.size > 1) {
+                        val s = suggested.first()
+                        val wSum = comps.sumOf { it.cookedWeightG.toDouble() }.toFloat().coerceAtLeast(1f)
+                        comps = comps.map { c ->
+                            val f = if (c.cookedWeightG > 0f) c.cookedWeightG / wSum else 1f / comps.size
+                            c.copy(
+                                totalCalories = s.totalCalories * f,
+                                proteinG = s.proteinG * f,
+                                carbsG = s.carbsG * f,
+                                fatG = s.fatG * f,
+                                fiberG = s.fiberG * f
+                            )
+                        }
+                    }
+                }
+            }
+            repo.setComponents(recipeId, comps)
+            if (updateRecipeTotals && comps.isNotEmpty()) {
+                val totalKcal = comps.sumOf { it.totalCalories.toDouble() }.toFloat()
+                // Nie vorhandene Rezept-Nährwerte mit 0 überschreiben
+                if (totalKcal <= 0f) return@launch
                 val servings = recipe.servings.coerceAtLeast(1).toFloat()
-                val totalKcal = components.sumOf { it.totalCalories.toDouble() }.toFloat()
-                val totalProtein = components.sumOf { it.proteinG.toDouble() }.toFloat()
-                val totalCarbs = components.sumOf { it.carbsG.toDouble() }.toFloat()
-                val totalFat = components.sumOf { it.fatG.toDouble() }.toFloat()
-                val totalFiber = components.sumOf { it.fiberG.toDouble() }.toFloat()
-                val totalCooked = components.sumOf { it.cookedWeightG.toDouble() }.toFloat()
+                val totalProtein = comps.sumOf { it.proteinG.toDouble() }.toFloat()
+                val totalCarbs = comps.sumOf { it.carbsG.toDouble() }.toFloat()
+                val totalFat = comps.sumOf { it.fatG.toDouble() }.toFloat()
+                val totalFiber = comps.sumOf { it.fiberG.toDouble() }.toFloat()
+                val totalCooked = comps.sumOf { it.cookedWeightG.toDouble() }.toFloat()
                 repo.updateRecipe(
                     recipe.copy(
                         totalCalories = totalKcal,
@@ -605,7 +639,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         val side = mutableListOf<ch.nutrisnap.app.data.model.IngredientMatch>()
         val sauce = mutableListOf<ch.nutrisnap.app.data.model.IngredientMatch>()
         for (m in matches) {
-            val key = "${'$'}{m.ingredientRaw} ${'$'}{m.ingredientName} ${'$'}{m.matchedFoodName.orEmpty()}"
+            val key = "${m.ingredientRaw} ${m.ingredientName} ${m.matchedFoodName.orEmpty()}"
             when {
                 isSide(key) && !isSauce(key) -> side.add(m)
                 isSauce(key) -> sauce.add(m)

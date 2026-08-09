@@ -74,14 +74,25 @@ fun RecipeComponentsEditorSheet(
     var drafts by remember(recipe.id) {
         mutableStateOf(toDrafts(if (initial.isNotEmpty()) initial else suggested))
     }
-    // Wenn Suggestions später ankommen (async) und noch leer/ohne kcal → übernehmen
+    // Suggestions / Matches → Nährwerte immer nachziehen wenn kcal noch leer
     LaunchedEffect(suggested) {
-        if (suggested.isNotEmpty() && drafts.all { it.totalCalories.isBlank() }) {
-            // Kochgewichte behalten, falls schon getippt
-            val weights = drafts.map { it.cookedWeightG }
-            drafts = toDrafts(suggested).mapIndexed { i, d ->
-                d.copy(cookedWeightG = weights.getOrNull(i)?.takeIf { it.isNotBlank() } ?: d.cookedWeightG)
-            }
+        if (suggested.isEmpty()) return@LaunchedEffect
+        val needsFill = drafts.any { it.totalCalories.isBlank() }
+        if (!needsFill) return@LaunchedEffect
+        drafts = drafts.mapIndexed { i, d ->
+            val s = suggested.getOrNull(i) ?: suggested.getOrNull(0) ?: return@mapIndexed d
+            if (d.totalCalories.isNotBlank()) d
+            else d.copy(
+                name = d.name.ifBlank { s.name },
+                cookedWeightG = d.cookedWeightG.ifBlank {
+                    s.cookedWeightG.takeIf { it > 0f }?.toInt()?.toString() ?: ""
+                },
+                totalCalories = fmtNum(s.totalCalories),
+                proteinG = fmtNum(s.proteinG),
+                carbsG = fmtNum(s.carbsG),
+                fatG = fmtNum(s.fatG),
+                fiberG = fmtNum(s.fiberG)
+            )
         }
     }
 
@@ -98,7 +109,7 @@ fun RecipeComponentsEditorSheet(
             Text("Komponenten", fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Spacer(Modifier.height(4.dp))
             Text(
-                "Beilage und Sauce getrennt tracken. Nährwerte kommen aus den verifizierten Zutaten – du trägst nur noch das Kochgewicht (Waage nach dem Garen) ein.",
+                "Nur Kochgewicht eintragen. Nährwerte werden aus den verifizierten Zutaten berechnet – du musst sie nicht tippen.",
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

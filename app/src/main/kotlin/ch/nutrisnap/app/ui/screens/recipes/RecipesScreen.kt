@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.model.Recipe
+import ch.nutrisnap.app.data.model.RecipeComponent
 import ch.nutrisnap.app.data.model.RecipeCategory
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import ch.nutrisnap.app.domain.RecipeGermanMetricConverter
