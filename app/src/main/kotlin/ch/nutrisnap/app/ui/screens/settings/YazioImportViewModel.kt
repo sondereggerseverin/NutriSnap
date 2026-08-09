@@ -456,13 +456,18 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                     val barcode = obj.optString("barcode", null).takeUnless { it.isNullOrBlank() }
                     val category = obj.optString("category", null).takeUnless { it.isNullOrBlank() }
 
-                    val calories = obj.optDouble("caloriesPer100g", 0.0).toFloat()
                     val protein = obj.optDouble("proteinPer100g", 0.0).toFloat()
                     val carbs = obj.optDouble("carbsPer100g", 0.0).toFloat()
                     val fat = obj.optDouble("fatPer100g", 0.0).toFloat()
                     val fiber = obj.optDouble("fiberPer100g", 0.0).toFloat()
                     val sugar = obj.optDouble("sugarPer100g", 0.0).toFloat()
                     val salt = obj.optDouble("saltPer100g", 0.0).toFloat()
+                    // Atwater/EU: kcal aus Makros, wenn gespeicherter Wert >15% abweicht
+                    // (Yazio-Rohdaten hatten ~85 Einträge mit inkonsistenten kcal).
+                    val calories = reconcileCalories(
+                        obj.optDouble("caloriesPer100g", 0.0).toFloat(),
+                        protein, carbs, fat, fiber
+                    )
 
                     // displayName fuer Anzeige/Suche (Marke in Klammern);
                     // Dedup-Identitaet laeuft getrennt ueber name+brand+barcode.
@@ -602,6 +607,30 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             diaryRepo.deleteAllEntries()
             onDone()
+        }
+    }
+
+    companion object {
+        /**
+         * EU-Atwater: 4 kcal/g Protein + 4 KH + 9 Fett + 2 Ballaststoffe.
+         * Weicht der gespeicherte Wert >15 % ab, gewinnt der berechnete Wert
+         * (korrigiert fehlerhafte Yazio-Rohdaten).
+         */
+        fun reconcileCalories(
+            stored: Float,
+            protein: Float,
+            carbs: Float,
+            fat: Float,
+            fiber: Float = 0f
+        ): Float {
+            val calc = 4f * protein + 4f * carbs + 9f * fat + 2f * fiber
+            if (calc <= 0f) return stored
+            if (protein + carbs + fat + fiber <= 0f) return stored
+            val dev = kotlin.math.abs(stored - calc) / calc
+            return if (dev > 0.15f) {
+                // eine Nachkommastelle, analog zu den meisten JSON-Einträgen
+                (calc * 10f).toInt() / 10f
+            } else stored
         }
     }
 }
