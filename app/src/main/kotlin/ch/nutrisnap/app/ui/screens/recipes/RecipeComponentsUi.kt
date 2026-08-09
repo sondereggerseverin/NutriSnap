@@ -66,7 +66,12 @@ private fun nutritionFor(
     // Fallback: Rezept-Totals proportional zu den (bereits eingegebenen) Kochgewichten
     val recipeTotal = recipe.totalCalories ?: 0f
     if (recipeTotal <= 0f) {
-        return RecipeComponent(recipeId = recipe.id, name = draft.name, cookedWeightG = 0f)
+        return RecipeComponent(
+            recipeId = recipe.id,
+            name = draft.name,
+            cookedWeightG = 0f,
+            totalCalories = 0f
+        )
     }
     val serv = recipe.servings.coerceAtLeast(1).toFloat()
     val weights = allDrafts.map {
