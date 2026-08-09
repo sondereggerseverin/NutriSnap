@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.FoodSource
+import ch.nutrisnap.app.data.model.RecipeComponent
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.repository.FoodItemRepository
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
@@ -56,7 +57,9 @@ data class IngredientOverride(
     val manualFiber: Float? = null,
     val amountOverride: Float? = null,
     /** True = Zutat wurde vom User entfernt; beim Merge übersprungen. */
-    val deleted: Boolean = false
+    val deleted: Boolean = false,
+    /** "side" | "sauce" | null = Heuristik beim Öffnen. */
+    val componentGroup: String? = null
 )
 
 data class IngredientVerifyState(
@@ -110,8 +113,36 @@ data class IngredientVerifyState(
         return manualFiber?.let { base + ("fiber" to it) } ?: base
     }
 
-    fun toOverride(): IngredientOverride =
-        IngredientOverride(override = override, manualFiber = manualFiber, amountOverride = amountOverride)
+    fun toOverride(componentGroup: String? = null): IngredientOverride =
+        IngredientOverride(
+            override = override,
+            manualFiber = manualFiber,
+            amountOverride = amountOverride,
+            componentGroup = componentGroup
+        )
+}
+
+/** Heuristik: Beilage vs. Sauce anhand des Zutatennamens. */
+fun defaultComponentGroup(text: String): String {
+    val n = text.lowercase()
+    val sideKeys = listOf(
+        "reis", "basmati", "erbse", "erbsen", "peas", "kartoffel", "nudel", "pasta",
+        "quinoa", "couscous", "bulgur", "beilage", "reisnudeln"
+    )
+    val sauceKeys = listOf(
+        "poulet", "huhn", "chicken", "fleisch", "tomate", "rahm", "sahne", "cream",
+        "joghurt", "yogurt", "püree", "puree", "gewürz", "garam", "sauce", "butter",
+        "masala", "chili", "ingwer", "knoblauch", "zwiebel", "öl", "oil", "speiseöl",
+        "fromage", "rôti", "roti"
+    )
+    val isSide = sideKeys.any { it in n }
+    val isSauce = sauceKeys.any { it in n }
+    return when {
+        isSide && !isSauce -> "side"
+        isSauce -> "sauce"
+        isSide -> "side"
+        else -> "sauce"
+    }
 }
 
 data class VerifiedTotals(
@@ -189,12 +220,31 @@ fun IngredientVerifySheet(
         totalIngredientWeightG: Float?,
         /** Aktuelle Zutatenliste aus Verifizierung (gescannte Namen + Mengen). */
         ingredientsText: String
-    ) -> Unit
+    ) -> Unit,
+    /**
+     * Optional: Komponenten (Beilage/Sauce) mit Kochgewicht + berechneten Nährwerten.
+     * Wird nur aufgerufen, wenn mindestens ein Kochgewicht > 0 eingetragen ist.
+     */
+    onConfirmComponents: ((List<RecipeComponent>) -> Unit)? = null,
+    /** recipeId für gebaute RecipeComponent-Objekte (0 = egal, wird vom Caller gesetzt). */
+    recipeIdForComponents: Long = 0L
 ) {
     var overrides by remember { mutableStateOf(initialOverrides) }
     var verifyStates by remember {
         mutableStateOf(mergeIngredientOverrides(analysisResult.ingredients, initialOverrides))
     }
+    // Zutat → "side" | "sauce"
+    var groups by remember {
+        mutableStateOf(
+            mergeIngredientOverrides(analysisResult.ingredients, initialOverrides).associate { s ->
+                val line = s.result.line
+                val key = "${s.result.line} ${s.result.parsed?.name.orEmpty()} ${s.effectiveFood?.name.orEmpty()}"
+                line to (initialOverrides[line]?.componentGroup ?: defaultComponentGroup(key))
+            }
+        )
+    }
+    var sideWeightText by remember { mutableStateOf("") }
+    var sauceWeightText by remember { mutableStateOf("") }
     // Merkt sich, für welches AnalysisResult verifyStates zuletzt aufgebaut wurde.
     // Verhindert, dass ein neues Analyse-Ergebnis (z. B. durch "Neu berechnen" in der
     // Rezeptkarte) manuelle Anpassungen überschreibt — diese werden aus `overrides`
@@ -207,9 +257,28 @@ fun IngredientVerifySheet(
         }
     }
 
+    // Neue Zutaten in groups aufnehmen (z. B. per Scan hinzugefügt)
+    LaunchedEffect(verifyStates.map { it.result.line }) {
+        val lines = verifyStates.map { it.result.line }.toSet()
+        groups = groups.filterKeys { it in lines } + verifyStates
+            .filter { it.result.line !in groups }
+            .associate { s ->
+                val key = "${s.result.line} ${s.result.parsed?.name.orEmpty()} ${s.effectiveFood?.name.orEmpty()}"
+                s.result.line to (overrides[s.result.line]?.componentGroup ?: defaultComponentGroup(key))
+            }
+    }
+
     fun updateOverride(line: String, ov: IngredientOverride?) {
         overrides = if (ov == null) overrides - line else overrides + (line to ov)
         onOverridesChanged(overrides)
+    }
+
+    fun setGroup(line: String, group: String) {
+        groups = groups + (line to group)
+        val existing = overrides[line]
+        val state = verifyStates.firstOrNull { it.result.line == line }
+        val base = existing ?: state?.toOverride() ?: IngredientOverride()
+        updateOverride(line, base.copy(componentGroup = group))
     }
 
     /** Index der zu scannenden Zutat; -1 = neue Zutat per Scan hinzufügen. */
@@ -391,8 +460,22 @@ fun IngredientVerifySheet(
                 }
             }
 
-            // Ingredient rows — stable keys so Compose recomposes correctly after delete
-            items(verifyStates, key = { it.result.line }) { state ->
+            // ── Beilage ──────────────────────────────────────────────────────
+            item {
+                ComponentSectionHeader(
+                    title = "Beilage",
+                    subtitle = "Reis, Erbsen, Nudeln, Kartoffeln …",
+                    weightText = sideWeightText,
+                    onWeightChange = { sideWeightText = it },
+                    groupKcal = verifyStates
+                        .filter { groups[it.result.line] == "side" }
+                        .sumOf { it.effectiveCalories.toDouble() }.toFloat()
+                )
+            }
+            items(
+                verifyStates.filter { groups[it.result.line] != "sauce" },
+                key = { "side_${it.result.line}" }
+            ) { state ->
                 val index = verifyStates.indexOf(state)
                 val line = state.result.line
                 IngredientVerifyRow(
@@ -407,13 +490,14 @@ fun IngredientVerifySheet(
                     onDelete = {
                         verifyStates = verifyStates.toMutableList().also { it.remove(state) }
                         updateOverride(line, IngredientOverride(deleted = true))
+                        groups = groups - line
                     },
                     onManualFiberSaved = { value ->
                         val updated = verifyStates.toMutableList().also {
                             it[index] = it[index].copy(manualFiber = value)
                         }
                         verifyStates = updated
-                        updateOverride(line, updated[index].toOverride())
+                        updateOverride(line, updated[index].toOverride(groups[line]))
                         val newTotal = updated.mapNotNull { it.effectiveMicros["fiber"] }.takeIf { it.isNotEmpty() }?.sum()
                         newTotal?.let {
                             android.widget.Toast.makeText(
@@ -428,8 +512,74 @@ fun IngredientVerifySheet(
                             it[index] = it[index].copy(amountOverride = value)
                         }
                         verifyStates = updated
-                        updateOverride(line, updated[index].toOverride())
-                    }
+                        updateOverride(line, updated[index].toOverride(groups[line]))
+                    },
+                    componentGroup = "side",
+                    onMoveComponent = { setGroup(line, "sauce") }
+                )
+                HorizontalDivider(
+                    Modifier.padding(horizontal = 16.dp),
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+            }
+
+            // ── Sauce / Fleisch ──────────────────────────────────────────────
+            item {
+                ComponentSectionHeader(
+                    title = "Sauce / Fleisch",
+                    subtitle = "Fleisch, Tomaten, Rahm, Gewürze, Öl …",
+                    weightText = sauceWeightText,
+                    onWeightChange = { sauceWeightText = it },
+                    groupKcal = verifyStates
+                        .filter { groups[it.result.line] == "sauce" }
+                        .sumOf { it.effectiveCalories.toDouble() }.toFloat()
+                )
+            }
+            items(
+                verifyStates.filter { groups[it.result.line] == "sauce" },
+                key = { "sauce_${it.result.line}" }
+            ) { state ->
+                val index = verifyStates.indexOf(state)
+                val line = state.result.line
+                IngredientVerifyRow(
+                    state = state,
+                    expanded = expandedLines.contains(line),
+                    onToggleExpand = {
+                        expandedLines = if (expandedLines.contains(line)) expandedLines - line else expandedLines + line
+                    },
+                    autoFocusFiberEdit = fiberEditTarget == line,
+                    onFiberEditConsumed = { if (fiberEditTarget == line) fiberEditTarget = null },
+                    onScan = { scanTarget = index },
+                    onDelete = {
+                        verifyStates = verifyStates.toMutableList().also { it.remove(state) }
+                        updateOverride(line, IngredientOverride(deleted = true))
+                        groups = groups - line
+                    },
+                    onManualFiberSaved = { value ->
+                        val updated = verifyStates.toMutableList().also {
+                            it[index] = it[index].copy(manualFiber = value)
+                        }
+                        verifyStates = updated
+                        updateOverride(line, updated[index].toOverride(groups[line]))
+                        val newTotal = updated.mapNotNull { it.effectiveMicros["fiber"] }.takeIf { it.isNotEmpty() }?.sum()
+                        newTotal?.let {
+                            android.widget.Toast.makeText(
+                                context,
+                                "Ballaststoffe aktualisiert → neuer Gesamtwert: ${"%.1f".format(it)} g",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    },
+                    onAmountSaved = { value ->
+                        val updated = verifyStates.toMutableList().also {
+                            it[index] = it[index].copy(amountOverride = value)
+                        }
+                        verifyStates = updated
+                        updateOverride(line, updated[index].toOverride(groups[line]))
+                    },
+                    componentGroup = "sauce",
+                    onMoveComponent = { setGroup(line, "side") }
                 )
                 HorizontalDivider(
                     Modifier.padding(horizontal = 16.dp),
@@ -454,6 +604,9 @@ fun IngredientVerifySheet(
             // Confirm button
             item {
                 Spacer(Modifier.height(12.dp))
+                val sideW = sideWeightText.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
+                val sauceW = sauceWeightText.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
+                val hasComponents = sideW != null || sauceW != null
                 Button(
                     onClick = {
                         val servDiv = servings.coerceAtLeast(1)
@@ -475,17 +628,109 @@ fun IngredientVerifySheet(
                             totalWeight,
                             ingredientsText
                         )
+                        // Komponenten speichern, wenn Kochgewichte gesetzt
+                        if (onConfirmComponents != null && hasComponents) {
+                            val comps = buildList {
+                                if (sideW != null) {
+                                    val sideStates = verifyStates.filter { groups[it.result.line] != "sauce" }
+                                    add(
+                                        RecipeComponent(
+                                            recipeId = recipeIdForComponents,
+                                            name = "Beilage",
+                                            cookedWeightG = sideW,
+                                            totalCalories = sideStates.sumOf { it.effectiveCalories.toDouble() }.toFloat(),
+                                            proteinG = sideStates.sumOf { it.effectiveProtein.toDouble() }.toFloat(),
+                                            carbsG = sideStates.sumOf { it.effectiveCarbs.toDouble() }.toFloat(),
+                                            fatG = sideStates.sumOf { it.effectiveFat.toDouble() }.toFloat(),
+                                            fiberG = sideStates.mapNotNull { it.effectiveMicros["fiber"] }.sum(),
+                                            sortOrder = 0
+                                        )
+                                    )
+                                }
+                                if (sauceW != null) {
+                                    val sauceStates = verifyStates.filter { groups[it.result.line] == "sauce" }
+                                    add(
+                                        RecipeComponent(
+                                            recipeId = recipeIdForComponents,
+                                            name = "Sauce / Fleisch",
+                                            cookedWeightG = sauceW,
+                                            totalCalories = sauceStates.sumOf { it.effectiveCalories.toDouble() }.toFloat(),
+                                            proteinG = sauceStates.sumOf { it.effectiveProtein.toDouble() }.toFloat(),
+                                            carbsG = sauceStates.sumOf { it.effectiveCarbs.toDouble() }.toFloat(),
+                                            fatG = sauceStates.sumOf { it.effectiveFat.toDouble() }.toFloat(),
+                                            fiberG = sauceStates.mapNotNull { it.effectiveMicros["fiber"] }.sum(),
+                                            sortOrder = 1
+                                        )
+                                    )
+                                }
+                            }
+                            if (comps.isNotEmpty()) onConfirmComponents(comps)
+                        }
                     },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                 ) {
                     Icon(Icons.Default.Check, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Nährwerte übernehmen ($verifiedCount/${verifyStates.size} verifiziert)")
+                    Text(
+                        if (hasComponents)
+                            "Nährwerte + Komponenten übernehmen ($verifiedCount/${verifyStates.size})"
+                        else
+                            "Nährwerte übernehmen ($verifiedCount/${verifyStates.size} verifiziert)"
+                    )
+                }
+                if (hasComponents) {
+                    Text(
+                        "Kochgewichte gesetzt → Komponenten werden mitberechnet gespeichert.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                    )
+                } else {
+                    Text(
+                        "Optional: Kochgewichte oben bei Beilage/Sauce eintragen, dann werden Komponenten automatisch gespeichert.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                    )
                 }
             }
         }
     }
 
+}
+
+@Composable
+private fun ComponentSectionHeader(
+    title: String,
+    subtitle: String,
+    weightText: String,
+    onWeightChange: (String) -> Unit,
+    groupKcal: Float
+) {
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Spacer(Modifier.height(10.dp))
+        Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (groupKcal > 0f) {
+            Text(
+                "${safeInt(groupKcal)} kcal aus Zutaten",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        OutlinedTextField(
+            value = weightText,
+            onValueChange = onWeightChange,
+            label = { Text("Kochgewicht (g)") },
+            supportingText = { Text("Gesamtgewicht dieser Komponente nach dem Kochen (ohne Topf)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
 }
 
 // ── Single ingredient row ─────────────────────────────────────────────────────
@@ -500,7 +745,9 @@ private fun IngredientVerifyRow(
     onScan: () -> Unit,
     onDelete: () -> Unit,
     onManualFiberSaved: (Float) -> Unit,
-    onAmountSaved: (Float) -> Unit
+    onAmountSaved: (Float) -> Unit,
+    componentGroup: String? = null,
+    onMoveComponent: (() -> Unit)? = null
 ) {
     val isOverride = state.override != null
     val isMatched  = state.isVerified
@@ -628,6 +875,27 @@ private fun IngredientVerifyRow(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            }
+        }
+
+        // Schnell umhängen: Beilage ↔ Sauce
+        if (onMoveComponent != null && componentGroup != null) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = 60.dp, end = 16.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.Start
+            ) {
+                AssistChip(
+                    onClick = onMoveComponent,
+                    label = {
+                        Text(
+                            if (componentGroup == "side") "→ Sauce / Fleisch" else "→ Beilage",
+                            fontSize = 11.sp
+                        )
+                    },
+                    modifier = Modifier.height(28.dp)
+                )
             }
         }
 

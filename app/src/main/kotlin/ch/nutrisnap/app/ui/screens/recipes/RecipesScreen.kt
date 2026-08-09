@@ -533,7 +533,11 @@ fun RecipesScreen(
                 )
                 showVerifySheet = false
                 pendingVerify = false
-            }
+            },
+            onConfirmComponents = { comps ->
+                vm.setComponents(verifyRecipe.id, comps)
+            },
+            recipeIdForComponents = verifyRecipe.id
         )
     }
 
