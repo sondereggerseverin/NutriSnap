@@ -86,9 +86,8 @@ class FrozenMealRepository(
             ?: grams.coerceAtLeast(1f)
         val factor = grams / yield
         val perServing = recipe.servings.coerceAtLeast(1).toFloat()
-        // totalCalories ist fürs ganze Rezept; pro Portion = / servings
-        val cals = (recipe.totalCalories ?: 0f) / perServing * (grams / (yield / perServing))
-        // einfacher: Anteil am Gesamtbatch
+        // Anteil am Gesamtbatch: totalCalories/-nährwerte gelten fürs ganze Rezept,
+        // die gefrorene Portion bekommt den Bruchteil grams/yield davon.
         val batchFactor = grams / yield
         val totalCals = (recipe.totalCalories ?: 0f) * batchFactor
         val protein = (recipe.proteinPerServing ?: 0f) * perServing * batchFactor
