@@ -40,7 +40,7 @@ fun NutritionLabelScanScreen(
         }
         is LabelScanState.Result -> LabelResultView(
             result = s.result,
-            onSave = { name, result -> vm.saveAsProduct(name, result) },
+            onSave = { name, result, portionG -> vm.saveAsProduct(name, result, portionG) },
             onRetake = { vm.retake() },
             onBack = onNavigateBack
         )
@@ -61,16 +61,17 @@ fun NutritionLabelScanScreen(
 @Composable
 private fun LabelResultView(
     result: NutritionLabelResult,
-    onSave: (String, NutritionLabelResult) -> Unit,
+    onSave: (String, NutritionLabelResult, Float) -> Unit,
     onRetake: () -> Unit,
     onBack: () -> Unit
 ) {
-    var name     by remember { mutableStateOf("") }
+    var name     by remember { mutableStateOf(result.productName.ifBlank { "" }) }
     var calories by remember { mutableStateOf(result.caloriesPer100g.toInt().toString()) }
     var protein  by remember { mutableStateOf(result.proteinPer100g.toString()) }
     var carbs    by remember { mutableStateOf(result.carbsPer100g.toString()) }
     var fat      by remember { mutableStateOf(result.fatPer100g.toString()) }
     var fiber    by remember { mutableStateOf(result.fiberPer100g.toString()) }
+    var portionG by remember { mutableStateOf("100") }
     var saved    by remember { mutableStateOf(false) }
 
     val nameError = name.isBlank() && saved
@@ -100,8 +101,13 @@ private fun LabelResultView(
                                         proteinPer100g  = protein.toFloatOrNull()  ?: 0f,
                                         carbsPer100g    = carbs.toFloatOrNull()    ?: 0f,
                                         fatPer100g      = fat.toFloatOrNull()      ?: 0f,
-                                        fiberPer100g    = fiber.toFloatOrNull()    ?: 0f
-                                    )
+                                        fiberPer100g    = fiber.toFloatOrNull()    ?: 0f,
+                                        sugarPer100g    = result.sugarPer100g,
+                                        saltPer100g     = result.saltPer100g,
+                                        productName     = name,
+                                        brand           = result.brand
+                                    ),
+                                    portionG.replace(',', '.').toFloatOrNull() ?: 100f
                                 )
                             }
                         },
@@ -130,6 +136,16 @@ private fun LabelResultView(
                 isError = nameError,
                 supportingText = { if (nameError) Text("Name darf nicht leer sein") },
                 modifier = Modifier.fillMaxWidth(), singleLine = true
+            )
+
+            OutlinedTextField(
+                value = portionG,
+                onValueChange = { portionG = it.filter { c -> c.isDigit() || c == '.' || c == ',' } },
+                label = { Text("Portionsgrösse (g)") },
+                supportingText = { Text("z. B. 50 g bei einem Riegel") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
             )
 
             Text("Pro 100 g", fontWeight = FontWeight.SemiBold)

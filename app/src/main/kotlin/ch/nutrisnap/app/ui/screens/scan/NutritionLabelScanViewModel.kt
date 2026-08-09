@@ -47,7 +47,7 @@ class NutritionLabelScanViewModel(app: Application) : AndroidViewModel(app) {
         _state.value = LabelScanState.Capturing
     }
 
-    fun saveAsProduct(name: String, result: NutritionLabelResult) {
+    fun saveAsProduct(name: String, result: NutritionLabelResult, portionSizeG: Float = 100f) {
         viewModelScope.launch {
             repo.insert(
                 CustomFoodItem(
@@ -56,7 +56,12 @@ class NutritionLabelScanViewModel(app: Application) : AndroidViewModel(app) {
                     protein = result.proteinPer100g,
                     carbs = result.carbsPer100g,
                     fat = result.fatPer100g,
-                    fiber = result.fiberPer100g
+                    fiber = result.fiberPer100g,
+                    sugar = result.sugarPer100g,
+                    salt = result.saltPer100g,
+                    brand = result.brand.ifBlank { null },
+                    portionSizeG = portionSizeG.coerceAtLeast(1f),
+                    source = "manual"
                 )
             )
             _state.value = LabelScanState.Saved

@@ -81,7 +81,8 @@ class ImprovedFoodSearchViewModel(
 fun ImprovedFoodSearchScreen(
     viewModel: ImprovedFoodSearchViewModel,
     onFoodSelected: (FoodItem) -> Unit,
-    onOpenBarcode: () -> Unit
+    onOpenBarcode: () -> Unit,
+    onCreateCustom: () -> Unit = {}
 ) {
     val query by viewModel.query.collectAsState()
     val searchState by viewModel.searchState.collectAsState()
@@ -120,7 +121,7 @@ fun ImprovedFoodSearchScreen(
                     Spacer(Modifier.height(8.dp))
                     Text(state.message, style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(16.dp))
-                    OutlinedButton(onClick = {}) { Text("Manuell erfassen") }
+                    OutlinedButton(onClick = onCreateCustom) { Text("Selbst anlegen") }
                 }
             }
         }

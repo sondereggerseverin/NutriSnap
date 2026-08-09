@@ -27,17 +27,34 @@ class CustomFoodViewModel(app: Application) : AndroidViewModel(app) {
     fun setQuery(q: String) { _query.value = q }
 
     fun save(
-        name: String, calories: Float, protein: Float,
-        carbs: Float, fat: Float, fiber: Float
+        name: String,
+        calories: Float,
+        protein: Float,
+        carbs: Float,
+        fat: Float,
+        fiber: Float = 0f,
+        sugar: Float = 0f,
+        salt: Float = 0f,
+        portionSizeG: Float = 100f,
+        barcode: String? = null,
+        brand: String? = null
     ) = viewModelScope.launch {
-        repo.insert(CustomFoodItem(
-            name = name.trim(),
-            calories = calories,
-            protein = protein,
-            carbs = carbs,
-            fat = fat,
-            fiber = fiber
-        ))
+        repo.insert(
+            CustomFoodItem(
+                name = name.trim(),
+                calories = calories,
+                protein = protein,
+                carbs = carbs,
+                fat = fat,
+                fiber = fiber,
+                sugar = sugar,
+                salt = salt,
+                portionSizeG = portionSizeG.coerceAtLeast(1f),
+                barcode = barcode,
+                brand = brand,
+                source = "manual"
+            )
+        )
     }
 
     fun delete(item: CustomFoodItem) = viewModelScope.launch { repo.delete(item) }
