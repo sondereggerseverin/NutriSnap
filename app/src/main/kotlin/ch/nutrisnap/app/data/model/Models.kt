@@ -458,3 +458,74 @@ fun FavoriteFoodEntity.toFoodItem() = FoodItem(
     fiber    = fiberPer100g,
     source   = FoodSource.MANUAL
 )
+
+// ─── Gefrierschrank ──────────────────────────────────────────────────────────
+
+/** Eine Linie einer eingefrorenen Portion (Beilage, Sauce, …). */
+data class FrozenPortionLine(
+    val name: String,
+    val grams: Float,
+    val calories: Float,
+    val protein: Float = 0f,
+    val carbs: Float = 0f,
+    val fat: Float = 0f,
+    val fiber: Float = 0f
+)
+
+/**
+ * Eingefrorenes Menü / Meal-Prep-Pack.
+ * [portionJson] speichert die Linien **einer** Portion als JSON-Array.
+ * [quantity] = wie viele identische Packungen noch im Gefrierer liegen.
+ */
+@Entity(tableName = "frozen_meals")
+data class FrozenMeal(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val recipeId: Long? = null,
+    val name: String,
+    val quantity: Int = 1,
+    val frozenAt: Long = System.currentTimeMillis(),
+    val notes: String = "",
+    /** JSON-Array von {name, grams, calories, protein, carbs, fat, fiber} für eine Portion. */
+    val portionJson: String = "[]"
+) {
+    fun portionLines(): List<FrozenPortionLine> {
+        if (portionJson.isBlank() || portionJson == "[]") return emptyList()
+        return runCatching {
+            val arr = org.json.JSONArray(portionJson)
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                FrozenPortionLine(
+                    name = o.optString("name", "Teil"),
+                    grams = o.optDouble("grams", 0.0).toFloat(),
+                    calories = o.optDouble("calories", 0.0).toFloat(),
+                    protein = o.optDouble("protein", 0.0).toFloat(),
+                    carbs = o.optDouble("carbs", 0.0).toFloat(),
+                    fat = o.optDouble("fat", 0.0).toFloat(),
+                    fiber = o.optDouble("fiber", 0.0).toFloat()
+                )
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    fun totalCaloriesPerPortion(): Float = portionLines().sumOf { it.calories.toDouble() }.toFloat()
+    fun totalProteinPerPortion(): Float = portionLines().sumOf { it.protein.toDouble() }.toFloat()
+    fun totalGramsPerPortion(): Float = portionLines().sumOf { it.grams.toDouble() }.toFloat()
+
+    companion object {
+        fun encodePortionLines(lines: List<FrozenPortionLine>): String {
+            val arr = org.json.JSONArray()
+            for (l in lines) {
+                arr.put(org.json.JSONObject().apply {
+                    put("name", l.name)
+                    put("grams", l.grams.toDouble())
+                    put("calories", l.calories.toDouble())
+                    put("protein", l.protein.toDouble())
+                    put("carbs", l.carbs.toDouble())
+                    put("fat", l.fat.toDouble())
+                    put("fiber", l.fiber.toDouble())
+                })
+            }
+            return arr.toString()
+        }
+    }
+}

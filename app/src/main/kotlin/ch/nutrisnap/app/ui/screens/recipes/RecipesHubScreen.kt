@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material3.Icon
@@ -19,11 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ch.nutrisnap.app.ui.screens.recipegen.RecipeGeneratorScreen
 
-private enum class RecipeTab { SAVED, AI }
+private enum class RecipeTab { SAVED, FREEZER, AI }
 
-// Fasst "Rezepte" und "KI-Koch" unter einem Bottom-Nav-Eintrag zusammen.
-// Grund: 6 Bottom-Nav-Items sind zu viele (Material-Empfehlung: max. 5) und
-// beide Screens drehen sich um dasselbe Thema (Rezepte).
+// Fasst "Rezepte", "Gefrierer" und "KI-Koch" unter einem Bottom-Nav-Eintrag zusammen.
 @Composable
 fun RecipesHubScreen(sharedUrl: String?, sharedBatchUrls: List<String> = emptyList(), sharedRecipeJson: String? = null) {
     var tab by remember { mutableStateOf(RecipeTab.SAVED) }
@@ -37,6 +36,12 @@ fun RecipesHubScreen(sharedUrl: String?, sharedBatchUrls: List<String> = emptyLi
                 icon = { Icon(Icons.Default.RestaurantMenu, null, Modifier.size(18.dp)) }
             )
             Tab(
+                selected = tab == RecipeTab.FREEZER,
+                onClick = { tab = RecipeTab.FREEZER },
+                text = { Text("Gefrierer") },
+                icon = { Icon(Icons.Default.AcUnit, null, Modifier.size(18.dp)) }
+            )
+            Tab(
                 selected = tab == RecipeTab.AI,
                 onClick = { tab = RecipeTab.AI },
                 text = { Text("KI-Koch") },
@@ -44,8 +49,13 @@ fun RecipesHubScreen(sharedUrl: String?, sharedBatchUrls: List<String> = emptyLi
             )
         }
         when (tab) {
-            RecipeTab.SAVED -> RecipesScreen(sharedUrl = sharedUrl, sharedBatchUrls = sharedBatchUrls, sharedRecipeJson = sharedRecipeJson)
-            RecipeTab.AI    -> RecipeGeneratorScreen()
+            RecipeTab.SAVED -> RecipesScreen(
+                sharedUrl = sharedUrl,
+                sharedBatchUrls = sharedBatchUrls,
+                sharedRecipeJson = sharedRecipeJson
+            )
+            RecipeTab.FREEZER -> FreezerScreen()
+            RecipeTab.AI -> RecipeGeneratorScreen()
         }
     }
 }

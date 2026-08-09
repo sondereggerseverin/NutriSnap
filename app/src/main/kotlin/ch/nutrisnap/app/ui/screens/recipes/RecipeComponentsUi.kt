@@ -6,6 +6,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -270,7 +271,8 @@ fun MultiComponentAddToDiarySheet(
     recipe: Recipe,
     components: List<RecipeComponent>,
     onConfirm: (gramsByComponentId: Map<Long, Float>, meal: MealType, date: LocalDate) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onFreeze: ((gramsByComponentId: Map<Long, Float>, quantity: Int) -> Unit)? = null
 ) {
     var equalMode by remember { mutableStateOf(false) }
     var portionsText by remember { mutableStateOf(recipe.servings.coerceAtLeast(1).toString()) }
@@ -287,6 +289,7 @@ fun MultiComponentAddToDiarySheet(
     }
     var selectedMeal by remember { mutableStateOf(MealType.LUNCH) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    var freezeQtyText by remember { mutableStateOf("1") }
 
     val portions = portionsText.toIntOrNull()?.coerceAtLeast(1) ?: 1
 
@@ -442,6 +445,36 @@ fun MultiComponentAddToDiarySheet(
                     Icon(Icons.Default.Check, null, Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("Hinzufügen")
+                }
+            }
+            if (onFreeze != null) {
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = freezeQtyText,
+                        onValueChange = { freezeQtyText = it.filter { c -> c.isDigit() } },
+                        label = { Text("Packungen") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.width(110.dp)
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            val filtered = effectiveGrams.filter { it.value >= 1f }
+                            val q = freezeQtyText.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                            if (filtered.isNotEmpty()) onFreeze(filtered, q)
+                        },
+                        enabled = effectiveGrams.any { it.value >= 1f },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.AcUnit, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Einfrieren")
+                    }
                 }
             }
         }

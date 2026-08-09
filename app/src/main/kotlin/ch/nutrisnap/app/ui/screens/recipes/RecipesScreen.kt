@@ -220,6 +220,7 @@ fun RecipesScreen(
     vm: RecipesViewModel = viewModel(),
     diaryVm: ch.nutrisnap.app.ui.screens.diary.DiaryViewModel = viewModel(),
     shoppingVm: ch.nutrisnap.app.ui.screens.shopping.ShoppingListViewModel = viewModel(),
+    freezerVm: FreezerViewModel = viewModel(),
     sharedUrl: String? = null,
     sharedBatchUrls: List<String> = emptyList(),
     sharedRecipeJson: String? = null
@@ -599,7 +600,11 @@ fun RecipesScreen(
                     rateAfterDiary = recipe
                     addToDiaryRecipe = null
                 },
-                onDismiss = { addToDiaryRecipe = null }
+                onDismiss = { addToDiaryRecipe = null },
+                onFreeze = { gramsMap, qty ->
+                    freezerVm.freezeFromComponents(recipe, components, gramsMap, qty)
+                    addToDiaryRecipe = null
+                }
             )
         } else {
             // 1) Gekochtes Gewicht oder gespeicherte Zutatensumme, 2) Fallback: aus Text schätzen

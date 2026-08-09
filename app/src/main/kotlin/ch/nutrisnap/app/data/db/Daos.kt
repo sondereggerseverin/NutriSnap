@@ -143,6 +143,30 @@ interface RecipeComponentDao {
 }
 
 @Dao
+interface FrozenMealDao {
+    @Query("SELECT * FROM frozen_meals WHERE quantity > 0 ORDER BY frozenAt DESC")
+    fun getAllActive(): Flow<List<FrozenMeal>>
+
+    @Query("SELECT * FROM frozen_meals ORDER BY frozenAt DESC")
+    fun getAll(): Flow<List<FrozenMeal>>
+
+    @Query("SELECT * FROM frozen_meals WHERE id = :id")
+    suspend fun getById(id: Long): FrozenMeal?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(meal: FrozenMeal): Long
+
+    @Update
+    suspend fun update(meal: FrozenMeal)
+
+    @Delete
+    suspend fun delete(meal: FrozenMeal)
+
+    @Query("UPDATE frozen_meals SET quantity = :quantity WHERE id = :id")
+    suspend fun updateQuantity(id: Long, quantity: Int)
+}
+
+@Dao
 interface WeightDao {
     @Query("SELECT * FROM weight_entries ORDER BY dateStr ASC")
     fun getAll(): Flow<List<WeightEntry>>
