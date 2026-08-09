@@ -409,31 +409,13 @@ private fun HomeHeader(
 
             Spacer(Modifier.width(8.dp))
 
-            // Glas-Karte: Label links, Wert rechts — dichter Block statt Luft in der Mitte
-            Column(
-                Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(NutriRadius.md))
-                    .background(Color.White.copy(alpha = 0.14f))
-                    .padding(horizontal = 10.dp, vertical = 5.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                HeaderStatLine(
-                    label = "Gegessen",
-                    value = "${state.totalCalories.toInt()} kcal"
-                )
+            // Glas-Karte: 2-Spalten-Grid, damit die Breite für Inhalt statt Luft genutzt wird
+            val headerStats = buildList {
+                add(Triple("Gegessen", "${state.totalCalories.toInt()} kcal", Color.White))
                 if (state.burnedKcal > 0f) {
-                    HeaderStatLine(
-                        label = "Aktiv",
-                        value = "+${state.burnedKcal.toInt()} kcal",
-                        valueColor = Color(0xFFFFE08A)
-                    )
+                    add(Triple("Aktiv", "+${state.burnedKcal.toInt()} kcal", Color(0xFFFFE08A)))
                 }
-                HeaderStatLine(
-                    label = "Ziel",
-                    value = "${state.adjustedGoal.toInt()} kcal"
-                )
-                // Gewicht füllt die Karte sinnvoll, wenn vorhanden
+                add(Triple("Ziel", "${state.adjustedGoal.toInt()} kcal", Color.White))
                 state.lastWeightKg?.let { kg ->
                     val delta = state.previousWeightKg?.let { prev -> kg - prev }
                     val deltaText = when {
@@ -442,10 +424,27 @@ private fun HomeHeader(
                         delta < -0.05f -> " · ${"%.1f".format(delta)} kg"
                         else -> " · ±0"
                     }
-                    HeaderStatLine(
-                        label = "Gewicht",
-                        value = "${"%.1f".format(kg)} kg${deltaText ?: ""}"
-                    )
+                    add(Triple("Gewicht", "${"%.1f".format(kg)} kg${deltaText ?: ""}", Color.White))
+                }
+            }
+            Column(
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(NutriRadius.md))
+                    .background(Color.White.copy(alpha = 0.14f))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                headerStats.chunked(2).forEach { row ->
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        row.forEach { (label, value, color) ->
+                            HeaderStatCell(label, value, color, Modifier.weight(1f))
+                        }
+                        if (row.size == 1) Spacer(Modifier.weight(1f))
+                    }
                 }
             }
         }
@@ -470,16 +469,13 @@ private fun HomeHeader(
 }
 
 @Composable
-private fun HeaderStatLine(
+private fun HeaderStatCell(
     label: String,
     value: String,
-    valueColor: Color = Color.White
+    valueColor: Color = Color.White,
+    modifier: Modifier = Modifier
 ) {
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    Column(modifier) {
         Text(
             label,
             fontSize = 10.sp,
@@ -488,7 +484,7 @@ private fun HeaderStatLine(
         )
         Text(
             value,
-            fontSize = 12.sp,
+            fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             color = valueColor,
             maxLines = 1
