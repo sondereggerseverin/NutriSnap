@@ -15,11 +15,11 @@ import kotlinx.coroutines.flow.Flow
 interface FoodItemDao {
 
     // ── Basic search (used by FoodItemRepository.searchAll) ──────────────────
-    @Query("SELECT * FROM food_items WHERE name LIKE '%' || :query || '%' OR brand LIKE '%' || :query || '%' ORDER BY timesUsed DESC LIMIT 50")
+    @Query("SELECT * FROM food_items WHERE ${SearchSql.NORM_NAME} LIKE '%' || ${SearchSql.NORM_QUERY} || '%' OR ${SearchSql.NORM_BRAND} LIKE '%' || ${SearchSql.NORM_QUERY} || '%' ORDER BY timesUsed DESC LIMIT 50")
     suspend fun search(query: String): List<FoodItem>
 
     // ── Extended search (used by FoodSearchRepository) ────────────────────────
-    @Query("SELECT * FROM food_items WHERE name LIKE '%' || :query || '%' ORDER BY timesUsed DESC LIMIT 50")
+    @Query("SELECT * FROM food_items WHERE ${SearchSql.NORM_NAME} LIKE '%' || ${SearchSql.NORM_QUERY} || '%' ORDER BY timesUsed DESC LIMIT 50")
     suspend fun searchFoods(query: String): List<FoodItem>
 
     // ── Barcode lookup ────────────────────────────────────────────────────────

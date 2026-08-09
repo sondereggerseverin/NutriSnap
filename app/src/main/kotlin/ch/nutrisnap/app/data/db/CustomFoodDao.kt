@@ -10,13 +10,13 @@ interface CustomFoodDao {
     @Query("SELECT * FROM custom_foods ORDER BY createdAt DESC")
     fun getAll(): Flow<List<CustomFoodItem>>
 
-    @Query("SELECT * FROM custom_foods WHERE name LIKE '%' || :query || '%' ORDER BY createdAt DESC")
+    @Query("SELECT * FROM custom_foods WHERE ${SearchSql.NORM_NAME} LIKE '%' || ${SearchSql.NORM_QUERY} || '%' ORDER BY createdAt DESC")
     fun search(query: String): Flow<List<CustomFoodItem>>
 
     /** Einmalige (nicht-reaktive) Variante von [search] fuer die Verwendung in
      *  [ch.nutrisnap.app.data.repository.FoodItemRepository.searchAll], die einen
      *  einzelnen Ergebnis-Snapshot statt eines Flows braucht. */
-    @Query("SELECT * FROM custom_foods WHERE name LIKE '%' || :query || '%' ORDER BY createdAt DESC LIMIT 50")
+    @Query("SELECT * FROM custom_foods WHERE ${SearchSql.NORM_NAME} LIKE '%' || ${SearchSql.NORM_QUERY} || '%' ORDER BY createdAt DESC LIMIT 50")
     suspend fun searchOnce(query: String): List<CustomFoodItem>
 
     @Query("SELECT * FROM custom_foods WHERE id = :id LIMIT 1")

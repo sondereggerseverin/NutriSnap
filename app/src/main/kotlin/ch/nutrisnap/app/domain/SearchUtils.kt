@@ -116,6 +116,16 @@ object SearchUtils {
         "curry" to listOf("thai curry", "currysauce", "currypaste", "currygericht"),
         "suesskartoffel" to listOf("sweet potato", "suesskartoffeln"),
         "poulet" to listOf("chicken", "haehnchen", "huhn"),
-        "rueebli" to listOf("karotte", "carrot", "moehre")
+        "rueebli" to listOf("karotte", "carrot", "moehre"),
+        "ei" to listOf("egg", "eier"),
+        "eier" to listOf("eggs", "ei"),
+        "milch" to listOf("milk"),
+        "reis" to listOf("rice"),
+        "nudeln" to listOf("pasta", "noodles"),
+        "fisch" to listOf("fish"),
+        "fleisch" to listOf("meat"),
+        "broetchen" to listOf("bread roll", "bun", "semmel"),
+        "zwiebel" to listOf("onion"),
+        "spinat" to listOf("spinach")
     )
 }
