@@ -153,7 +153,6 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         combine(
             diaryRepo.getEntriesForDate(selected),
             profileRepo.get(),
-            weightRepo.getRecent(1),
             _streak,
             hcDao.getCacheForDate(selected),
             weightRepo.getRecent(trendWindowDays),
@@ -165,15 +164,14 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         val entries       = args[0] as List<ch.nutrisnap.app.data.model.DiaryEntry>
         val viewingToday  = selected == LocalDate.now()
         val profile        = args[1] as ch.nutrisnap.app.data.repository.UserProfile
-        val weights        = args[2] as List<ch.nutrisnap.app.data.model.WeightEntry>
-        val streak         = args[3] as Int
-        val hcCache        = args[4] as ch.nutrisnap.app.data.model.HealthConnectCache?
-        val trendWeights   = args[5] as List<ch.nutrisnap.app.data.model.WeightEntry>
-        val dailySummaries = args[6] as List<ch.nutrisnap.app.data.db.DailySummary>
-        val activityDays   = args[7] as List<ch.nutrisnap.app.data.model.HealthConnectCache>
-        val prefs          = args[8] as androidx.datastore.preferences.core.Preferences
+        val streak         = args[2] as Int
+        val hcCache        = args[3] as ch.nutrisnap.app.data.model.HealthConnectCache?
+        val trendWeights   = args[4] as List<ch.nutrisnap.app.data.model.WeightEntry>
+        val dailySummaries = args[5] as List<ch.nutrisnap.app.data.db.DailySummary>
+        val activityDays   = args[6] as List<ch.nutrisnap.app.data.model.HealthConnectCache>
+        val prefs          = args[7] as androidx.datastore.preferences.core.Preferences
         @Suppress("UNCHECKED_CAST")
-        val manualActivities = args[9] as List<ManualActivityEntry>
+        val manualActivities = args[8] as List<ManualActivityEntry>
 
         val mealOrder = ch.nutrisnap.app.data.model.parseMealOrder(prefs[KEY_MEAL_ORDER])
         val orderedMealMeta = mealOrder.map { type -> MEAL_META.first { it.first == type } }
@@ -186,6 +184,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .mapNotNull { c -> c.weightKg?.let { kg -> c.date to kg.toFloat() } }
             .toMap()
         val weightByDate = AdaptiveTdeeCalculator.mergeWeightByDate(manualWeightByDate, hcWeightByDate)
+        // Neuestes Gewicht unabhängig von Quelle (manuell oder HC), nicht nur "heute erfasst".
+        val sortedWeightDates = weightByDate.keys.sortedDescending()
+        val mergedLastWeightKg = sortedWeightDates.getOrNull(0)?.let { weightByDate[it] }
+        val mergedPreviousWeightKg = sortedWeightDates.getOrNull(1)?.let { weightByDate[it] }
         val intakeByDate = dailySummaries.associate { LocalDate.parse(it.dateStr) to it.calories }
         val trend = AdaptiveTdeeCalculator.computeTrendTdee(weightByDate, intakeByDate)
 
@@ -272,8 +274,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             carbsGoal     = profile.carbsGoalG,
             fatGoal       = profile.fatGoalG,
             streak        = streak,
-            lastWeightKg  = weights.lastOrNull()?.weightKg ?: profile.weightKg.takeIf { it > 0f },
-            previousWeightKg = trendWeights.dropLast(1).lastOrNull()?.weightKg,
+            lastWeightKg  = mergedLastWeightKg ?: profile.weightKg.takeIf { it > 0f },
+            previousWeightKg = mergedPreviousWeightKg,
             isAdaptiveTarget = adaptiveTarget != null,
             tdeeConfidence   = adaptiveTarget?.confidencePercent ?: 0,
             calorieBreakdown = breakdown,
