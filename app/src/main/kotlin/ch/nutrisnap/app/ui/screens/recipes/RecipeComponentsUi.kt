@@ -28,55 +28,61 @@ import java.time.LocalDate
  * Editor: Komponenten eines Rezepts anlegen/bearbeiten.
  * Pro Komponente: Name, Kochgewicht (g), Gesamtnährwerte des Batches.
  */
+private fun fmtNum(v: Float): String =
+    if (v <= 0f) "" else if (v == v.toInt().toFloat()) v.toInt().toString() else "%.1f".format(v)
+
+private data class Draft(
+    val id: Long,
+    val name: String,
+    val cookedWeightG: String,
+    val totalCalories: String,
+    val proteinG: String,
+    val carbsG: String,
+    val fatG: String,
+    val fiberG: String
+)
+
+private fun componentToDraft(c: RecipeComponent) = Draft(
+    id = c.id,
+    name = c.name,
+    cookedWeightG = c.cookedWeightG.takeIf { it > 0f }?.toInt()?.toString() ?: "",
+    totalCalories = fmtNum(c.totalCalories),
+    proteinG = fmtNum(c.proteinG),
+    carbsG = fmtNum(c.carbsG),
+    fatG = fmtNum(c.fatG),
+    fiberG = fmtNum(c.fiberG)
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecipeComponentsEditorSheet(
     recipe: Recipe,
     initial: List<RecipeComponent>,
+    suggested: List<RecipeComponent> = emptyList(),
     onSave: (List<RecipeComponent>) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onRequestSuggest: () -> Unit = {}
 ) {
-    data class Draft(
-        val id: Long,
-        var name: String,
-        var cookedWeightG: String,
-        var totalCalories: String,
-        var proteinG: String,
-        var carbsG: String,
-        var fatG: String,
-        var fiberG: String
-    )
+    fun toDrafts(list: List<RecipeComponent>): List<Draft> =
+        if (list.isEmpty()) {
+            listOf(
+                Draft(0, "Beilage", "", "", "", "", "", ""),
+                Draft(0, "Sauce / Fleisch", "", "", "", "", "", "")
+            )
+        } else list.map { componentToDraft(it) }
 
-    var drafts by remember(recipe.id, initial) {
-        mutableStateOf(
-            if (initial.isEmpty()) {
-                listOf(
-                    Draft(0, "Beilage", "", "", "", "", "", ""),
-                    Draft(0, "Sauce / Fleisch", "", "", "", "", "", "")
-                )
-            } else {
-                initial.map {
-                    Draft(
-                        id = it.id,
-                        name = it.name,
-                        cookedWeightG = it.cookedWeightG.takeIf { w -> w > 0f }?.toInt()?.toString() ?: "",
-                        totalCalories = it.totalCalories.takeIf { c -> c > 0f }?.toInt()?.toString() ?: "",
-                        proteinG = it.proteinG.takeIf { p -> p > 0f }?.let { p ->
-                            if (p == p.toInt().toFloat()) p.toInt().toString() else "%.1f".format(p)
-                        } ?: "",
-                        carbsG = it.carbsG.takeIf { p -> p > 0f }?.let { p ->
-                            if (p == p.toInt().toFloat()) p.toInt().toString() else "%.1f".format(p)
-                        } ?: "",
-                        fatG = it.fatG.takeIf { p -> p > 0f }?.let { p ->
-                            if (p == p.toInt().toFloat()) p.toInt().toString() else "%.1f".format(p)
-                        } ?: "",
-                        fiberG = it.fiberG.takeIf { p -> p > 0f }?.let { p ->
-                            if (p == p.toInt().toFloat()) p.toInt().toString() else "%.1f".format(p)
-                        } ?: ""
-                    )
-                }
+    var drafts by remember(recipe.id) {
+        mutableStateOf(toDrafts(if (initial.isNotEmpty()) initial else suggested))
+    }
+    // Wenn Suggestions später ankommen (async) und noch leer/ohne kcal → übernehmen
+    LaunchedEffect(suggested) {
+        if (suggested.isNotEmpty() && drafts.all { it.totalCalories.isBlank() }) {
+            // Kochgewichte behalten, falls schon getippt
+            val weights = drafts.map { it.cookedWeightG }
+            drafts = toDrafts(suggested).mapIndexed { i, d ->
+                d.copy(cookedWeightG = weights.getOrNull(i)?.takeIf { it.isNotBlank() } ?: d.cookedWeightG)
             }
-        )
+        }
     }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -92,10 +98,17 @@ fun RecipeComponentsEditorSheet(
             Text("Komponenten", fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Spacer(Modifier.height(4.dp))
             Text(
-                "Beilage und Sauce/Fleisch getrennt. Pro Teil einmal das Kochgewicht (nach dem Garen) und die Batch-Nährwerte eintragen. Beim Tracken abwiegen – die App rechnet um.",
+                "Beilage und Sauce getrennt tracken. Nährwerte kommen aus den verifizierten Zutaten – du trägst nur noch das Kochgewicht (Waage nach dem Garen) ein.",
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = onRequestSuggest,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Nährwerte aus Zutaten berechnen")
+            }
             Spacer(Modifier.height(12.dp))
 
             drafts.forEachIndexed { index, draft ->
@@ -141,7 +154,7 @@ fun RecipeComponentsEditorSheet(
                             modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(Modifier.height(6.dp))
-                        Text("Nährwerte des Batches", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        Text("Nährwerte (Batch, aus Zutaten – editierbar)", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                         Spacer(Modifier.height(4.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             OutlinedTextField(

@@ -649,14 +649,21 @@ fun RecipesScreen(
 
     editComponentsRecipe?.let { recipe ->
         val existing by vm.getComponents(recipe.id).collectAsState(initial = emptyList())
+        var suggested by remember(recipe.id) { mutableStateOf<List<RecipeComponent>>(emptyList()) }
+        var suggestKey by remember { mutableStateOf(0) }
+        LaunchedEffect(recipe.id, suggestKey) {
+            suggested = vm.suggestComponentsFromMatches(recipe)
+        }
         RecipeComponentsEditorSheet(
             recipe = recipe,
             initial = existing,
+            suggested = suggested,
             onSave = { list ->
                 vm.setComponents(recipe.id, list)
                 editComponentsRecipe = null
             },
-            onDismiss = { editComponentsRecipe = null }
+            onDismiss = { editComponentsRecipe = null },
+            onRequestSuggest = { suggestKey++ }
         )
     }
 }
@@ -1397,6 +1404,16 @@ fun RecipeDetailSheet(
                         Spacer(Modifier.width(4.dp))
                         Text("Einkauf", fontSize = 13.sp)
                     }
+                }
+                Spacer(Modifier.height(6.dp))
+                OutlinedButton(
+                    onClick = onEditComponents,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    Icon(Icons.Default.Restaurant, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Beilage / Sauce trennen", fontSize = 13.sp)
                 }
                 Spacer(Modifier.height(10.dp))
             }

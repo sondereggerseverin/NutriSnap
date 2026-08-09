@@ -81,8 +81,10 @@ data class BudgetScaleState(
 )
 
 class RecipesViewModel(app: Application) : AndroidViewModel(app) {
-    private val repo = RecipeRepository(NutriDatabase.getInstance(app), app)
-    private val budgetScaler = RecipeBudgetScaler(NutriDatabase.getInstance(app))
+    private val db = NutriDatabase.getInstance(app)
+    private val repo = RecipeRepository(db, app)
+    private val matchDao = db.ingredientMatchDao()
+    private val budgetScaler = RecipeBudgetScaler(db)
 
     init {
         // Feature 2: globales Zutaten-Wörterbuch für RecipeNutritionAnalyzer aktivieren
@@ -557,6 +559,86 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 )
             }
         }
+    }
+
+    /**
+     * Schlägt 2 Komponenten (Beilage / Sauce) aus verifizierten Zutaten vor.
+     * Nährwerte = Summe der gematchten Zutaten (Kalorien ändern sich durch Wasseraufnahme nicht).
+     * Kochgewichte bleiben leer – Nutzer trägt die abgewogenen Batch-Gewichte ein.
+     */
+    suspend fun suggestComponentsFromMatches(recipe: Recipe): List<RecipeComponent> {
+        val matches = matchDao.getMatchesForRecipeOnce(recipe.id)
+            .filter { (it.matchedCalories ?: 0f) > 0f || it.amountGrams > 0f }
+        if (matches.isEmpty()) {
+            // Fallback: gesamtes Rezept als eine Komponente mit bekannten Totals
+            val kcal = recipe.totalCalories ?: 0f
+            if (kcal <= 0f) return emptyList()
+            val serv = recipe.servings.coerceAtLeast(1).toFloat()
+            return listOf(
+                RecipeComponent(
+                    recipeId = recipe.id,
+                    name = "Gesamt",
+                    cookedWeightG = recipe.cookedWeightG ?: recipe.totalIngredientWeightG ?: 0f,
+                    totalCalories = kcal,
+                    proteinG = (recipe.proteinPerServing ?: 0f) * serv,
+                    carbsG = (recipe.carbsPerServing ?: 0f) * serv,
+                    fatG = (recipe.fatPerServing ?: 0f) * serv,
+                    fiberG = (recipe.fiberPerServing ?: 0f) * serv
+                )
+            )
+        }
+        fun isSide(text: String): Boolean {
+            val n = text.lowercase()
+            return listOf(
+                "reis", "basmati", "erbse", "erbsen", "peas", "kartoffel", "nudel", "pasta",
+                "quinoa", "couscous", "bulgur", "beilage", "zwiebel", "öl", "oil", "speiseöl"
+            ).any { it in n }
+        }
+        fun isSauce(text: String): Boolean {
+            val n = text.lowercase()
+            return listOf(
+                "poulet", "huhn", "chicken", "fleisch", "tomate", "rahm", "sahne", "cream",
+                "joghurt", "yogurt", "püree", "puree", "gewürz", "garam", "sauce", "butter",
+                "masala", "chili", "ingwer", "knoblauch"
+            ).any { it in n }
+        }
+        val side = mutableListOf<ch.nutrisnap.app.data.model.IngredientMatch>()
+        val sauce = mutableListOf<ch.nutrisnap.app.data.model.IngredientMatch>()
+        for (m in matches) {
+            val key = "${'$'}{m.ingredientRaw} ${'$'}{m.ingredientName} ${'$'}{m.matchedFoodName.orEmpty()}"
+            when {
+                isSide(key) && !isSauce(key) -> side.add(m)
+                isSauce(key) -> sauce.add(m)
+                isSide(key) -> side.add(m)
+                else -> sauce.add(m) // unklar → Sauce
+            }
+        }
+        // Wenn eine Seite leer: alles in eine Komponente
+        if (side.isEmpty() || sauce.isEmpty()) {
+            val all = side + sauce
+            return listOf(
+                RecipeComponent(
+                    recipeId = recipe.id,
+                    name = "Gesamt",
+                    cookedWeightG = recipe.cookedWeightG ?: all.sumOf { it.amountGrams.toDouble() }.toFloat(),
+                    totalCalories = all.sumOf { (it.matchedCalories ?: 0f).toDouble() }.toFloat(),
+                    proteinG = all.sumOf { (it.matchedProtein ?: 0f).toDouble() }.toFloat(),
+                    carbsG = all.sumOf { (it.matchedCarbs ?: 0f).toDouble() }.toFloat(),
+                    fatG = all.sumOf { (it.matchedFat ?: 0f).toDouble() }.toFloat()
+                )
+            )
+        }
+        fun sumComp(name: String, list: List<ch.nutrisnap.app.data.model.IngredientMatch>) =
+            RecipeComponent(
+                recipeId = recipe.id,
+                name = name,
+                cookedWeightG = 0f, // Nutzer setzt Kochgewicht
+                totalCalories = list.sumOf { (it.matchedCalories ?: 0f).toDouble() }.toFloat(),
+                proteinG = list.sumOf { (it.matchedProtein ?: 0f).toDouble() }.toFloat(),
+                carbsG = list.sumOf { (it.matchedCarbs ?: 0f).toDouble() }.toFloat(),
+                fatG = list.sumOf { (it.matchedFat ?: 0f).toDouble() }.toFloat()
+            )
+        return listOf(sumComp("Beilage", side), sumComp("Sauce / Fleisch", sauce))
     }
 
     /** Analyze recipe ingredients via OpenFoodFacts and update macros in DB */
