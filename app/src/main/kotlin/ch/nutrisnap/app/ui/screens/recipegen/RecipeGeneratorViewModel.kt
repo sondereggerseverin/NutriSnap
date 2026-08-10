@@ -502,21 +502,31 @@ class RecipeGeneratorViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Fügt das KI-Rezept direkt ins heutige Tagebuch ein (pro Portion). */
-    fun addToDiary(recipe: GeneratedRecipe, servings: Int, mealType: MealType) {
+    /**
+     * KI-Rezept ins Tagebuch eintragen.
+     * [servings] = Anzahl Portionen (recipe.calories etc. sind bereits pro Portion).
+     * [date] erlaubt rückwirkendes Eintragen (Heute/Gestern/Vorgestern).
+     */
+    fun addToDiary(
+        recipe: GeneratedRecipe,
+        servings: Float,
+        mealType: MealType,
+        date: LocalDate = LocalDate.now()
+    ) {
         viewModelScope.launch {
-            val factor = servings.coerceAtLeast(1).toFloat() / recipe.servings.coerceAtLeast(1).toFloat()
+            val portions = servings.coerceAtLeast(0.1f)
             diaryRepo.insertAndSync(
                 DiaryEntry(
                     foodItemId  = ch.nutrisnap.app.data.model.MANUAL_FOOD_ITEM_ID,
                     foodName    = recipe.title,
-                    amountGrams = 0f,
+                    // Portionsfaktor in amountGrams (wie bei RECIPE-Einträgen ohne Gramm-Basis)
+                    amountGrams = portions,
                     mealType    = mealType,
-                    dateStr     = LocalDate.now().toString(),
-                    calories    = recipe.calories * factor,
-                    protein     = recipe.protein  * factor,
-                    carbs       = recipe.carbs    * factor,
-                    fat         = recipe.fat      * factor
+                    dateStr     = date.toString(),
+                    calories    = recipe.calories * portions,
+                    protein     = recipe.protein  * portions,
+                    carbs       = recipe.carbs    * portions,
+                    fat         = recipe.fat      * portions
                 )
             )
             _state.update { it.copy(savedToDiary = true) }

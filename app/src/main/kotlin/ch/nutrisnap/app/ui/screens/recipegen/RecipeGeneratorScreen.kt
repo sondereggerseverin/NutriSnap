@@ -260,8 +260,8 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
             AddToDiarySheet(
                 recipe = recipe,
                 onDismiss = { showDiarySheet = false },
-                onConfirm = { servings, mealType ->
-                    vm.addToDiary(recipe, servings, mealType)
+                onConfirm = { servings, mealType, date ->
+                    vm.addToDiary(recipe, servings, mealType, date)
                     showDiarySheet = false
                 }
             )
@@ -1271,10 +1271,15 @@ private fun EditableIngredientRow(
 private fun AddToDiarySheet(
     recipe: GeneratedRecipe,
     onDismiss: () -> Unit,
-    onConfirm: (servings: Int, mealType: MealType) -> Unit
+    onConfirm: (servings: Float, mealType: MealType, date: java.time.LocalDate) -> Unit
 ) {
-    var servings  by remember { mutableIntStateOf(1) }
-    var mealType  by remember { mutableStateOf(MealType.LUNCH) }
+    // recipe.calories/protein/… sind pro Portion (siehe Generator-Prompt + reconcileNutrition)
+    var servingsText by remember { mutableStateOf("1") }
+    var mealType by remember { mutableStateOf(MealType.LUNCH) }
+    var selectedDate by remember { mutableStateOf(java.time.LocalDate.now()) }
+
+    val servings = servingsText.replace(',', '.').toFloatOrNull()?.coerceAtLeast(0.1f) ?: 1f
+    val estKcal = recipe.calories * servings
 
     val mealLabels = mapOf(
         MealType.BREAKFAST to "☀️ Frühstück",
@@ -1284,28 +1289,66 @@ private fun AddToDiarySheet(
     )
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 32.dp)) {
+        Column(
+            Modifier
+                .padding(horizontal = 20.dp)
+                .navigationBarsPadding()
+                .imePadding()
+                .padding(bottom = 24.dp)
+        ) {
             Text("Zum Tagebuch hinzufügen", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Text(recipe.title, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 2.dp, bottom = 16.dp))
+            Text(
+                recipe.title,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp, bottom = 16.dp)
+            )
 
             Text("Portionen", fontWeight = FontWeight.Medium)
             Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment=Alignment.CenterVertically,
-                horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 FilledTonalIconButton(
-                    onClick = { if (servings > 1) servings-- },
-                    enabled = servings > 1
+                    onClick = {
+                        val next = ((servings - 0.5f) * 10).toInt() / 10f
+                        if (next >= 0.5f) servingsText = formatServing(next)
+                    },
+                    enabled = servings > 0.5f
                 ) { Icon(Icons.Default.Remove, null) }
-                Text("$servings", fontSize = 22.sp, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.width(36.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                FilledTonalIconButton(onClick = { if (servings < 10) servings++ }) {
-                    Icon(Icons.Default.Add, null)
-                }
-                val kcal = (recipe.calories / recipe.servings.coerceAtLeast(1)) * servings
-                Text("= ${kcal.toInt()} kcal",
-                    fontSize = 14.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                OutlinedTextField(
+                    value = servingsText,
+                    onValueChange = { raw ->
+                        servingsText = raw.filter { it.isDigit() || it == '.' || it == ',' }
+                    },
+                    modifier = Modifier.width(88.dp),
+                    singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                )
+                FilledTonalIconButton(
+                    onClick = {
+                        val next = ((servings + 0.5f) * 10).toInt() / 10f
+                        if (next <= 20f) servingsText = formatServing(next)
+                    }
+                ) { Icon(Icons.Default.Add, null) }
+                Text(
+                    "= ${estKcal.toInt()} kcal",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
+            Text(
+                "1 Portion ≈ ${recipe.calories.toInt()} kcal · ±0,5 mit den Buttons",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
 
             Spacer(Modifier.height(16.dp))
 
@@ -1332,11 +1375,31 @@ private fun AddToDiarySheet(
                 }
             }
 
+            Spacer(Modifier.height(16.dp))
+
+            Text("Tag", fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val today = java.time.LocalDate.now()
+                listOf(
+                    today to "Heute",
+                    today.minusDays(1) to "Gestern",
+                    today.minusDays(2) to "Vorgestern"
+                ).forEach { (d, label) ->
+                    FilterChip(
+                        selected = selectedDate == d,
+                        onClick = { selectedDate = d },
+                        label = { Text(label, fontSize = 12.sp) }
+                    )
+                }
+            }
+
             Spacer(Modifier.height(20.dp))
 
             Button(
-                onClick = { onConfirm(servings, mealType) },
-                modifier = Modifier.fillMaxWidth()
+                onClick = { onConfirm(servings, mealType, selectedDate) },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = servings > 0f
             ) {
                 Icon(Icons.Default.Check, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
@@ -1345,6 +1408,11 @@ private fun AddToDiarySheet(
         }
     }
 }
+
+/** Formatierung für Portions-Textfeld (1 / 1.5 / 2 …). */
+private fun formatServing(v: Float): String =
+    if (v == v.toLong().toFloat()) v.toLong().toString()
+    else ((v * 10).toInt() / 10f).toString()
 
 @Composable
 private fun MacroChip(text: String, color: Color) {
