@@ -277,6 +277,7 @@ fun RecipesScreen(
     var showBatchSheet    by remember { mutableStateOf(false) }
     var showCookSheet     by remember { mutableStateOf(false) }
     var cookingRecipe     by remember { mutableStateOf<Recipe?>(null) }
+    var showCollections   by remember { mutableStateOf(false) }
     val batchState by vm.batchState.collectAsState()
     val budgetScaleState by vm.budgetScaleState.collectAsState()
     val pendingTargetKcal by vm.pendingTargetKcal.collectAsState()
@@ -297,6 +298,18 @@ fun RecipesScreen(
         CookingModeScreen(
             recipe = recipe,
             onBack = { cookingRecipe = null }
+        )
+        return
+    }
+
+    // Sammlungs-Ordner (überlagert die Liste)
+    if (showCollections) {
+        RecipeCollectionsScreen(
+            onOpenRecipe = { recipe ->
+                showCollections = false
+                selectedRecipe = recipe
+            },
+            onBack = { showCollections = false }
         )
         return
     }
@@ -330,21 +343,32 @@ fun RecipesScreen(
         }
     ) { padding ->
         Column(Modifier.padding(padding)) {
-            OutlinedTextField(
-                value = state.query, onValueChange = {
-                    vm.setQuery(it)
-                    if (it.isNotBlank()) vm.clearCookFilters()
-                },
-                label = { Text("Rezepte durchsuchen") },
-                leadingIcon = { Icon(Icons.Default.Search, null) },
-                trailingIcon = {
-                    IconButton(onClick = { showCookSheet = true }) {
-                        Icon(Icons.Default.Kitchen, "Was koche ich?")
-                    }
-                },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                singleLine = true, shape = RoundedCornerShape(12.dp)
-            )
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = state.query, onValueChange = {
+                        vm.setQuery(it)
+                        if (it.isNotBlank()) vm.clearCookFilters()
+                    },
+                    label = { Text("Rezepte durchsuchen") },
+                    leadingIcon = { Icon(Icons.Default.Search, null) },
+                    trailingIcon = {
+                        IconButton(onClick = { showCookSheet = true }) {
+                            Icon(Icons.Default.Kitchen, "Was koche ich?")
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true, shape = RoundedCornerShape(12.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                IconButton(onClick = { showCollections = true }) {
+                    Icon(Icons.Default.Folder, "Sammlungen", tint = MaterialTheme.colorScheme.primary)
+                }
+            }
 
             // ── Kategorien ───────────────────────────────────────────────────
             Row(
