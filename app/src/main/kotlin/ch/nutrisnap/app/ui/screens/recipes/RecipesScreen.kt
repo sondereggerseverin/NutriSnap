@@ -276,6 +276,9 @@ fun RecipesScreen(
     val batchState by vm.batchState.collectAsState()
     val budgetScaleState by vm.budgetScaleState.collectAsState()
     val pendingTargetKcal by vm.pendingTargetKcal.collectAsState()
+    val context = LocalContext.current
+    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val freshCards = (prefs?.get(KEY_FRESH_RECIPE_CARDS) == true) || (prefs?.get(KEY_FRESH_UI) == true)
 
     // Ziel-kcal aus „Was koche ich?“ einmalig anwenden, sobald ein Rezept geöffnet wird
     LaunchedEffect(selectedRecipe?.id, pendingTargetKcal) {
@@ -442,12 +445,13 @@ fun RecipesScreen(
                 ) {
                     items(displayedRecipes, key = { it.id }) { recipe ->
                         if (recipe.isIncomplete()) {
+                            // Unvollständige Importe: immer kompakte Warnzeile
                             RecipeCard(recipe,
                                 onClick      = { selectedRecipe = recipe },
                                 onDelete     = { vm.deleteRecipe(recipe) },
                                 onAddToDiary = { addToDiaryRecipe = recipe },
                                 onEdit       = { editRecipe = recipe })
-                        } else {
+                        } else if (freshCards) {
                             ch.nutrisnap.app.ui.components.RecipeCardV2(
                                 recipe       = recipe,
                                 onClick      = { selectedRecipe = recipe },
@@ -456,6 +460,13 @@ fun RecipesScreen(
                                 onDelete     = { vm.deleteRecipe(recipe) },
                                 onDuplicate  = { vm.duplicateRecipe(recipe) }
                             )
+                        } else {
+                            // Klassische Karte (Toggle „Fresh Recipe Cards“ aus)
+                            RecipeCard(recipe,
+                                onClick      = { selectedRecipe = recipe },
+                                onDelete     = { vm.deleteRecipe(recipe) },
+                                onAddToDiary = { addToDiaryRecipe = recipe },
+                                onEdit       = { editRecipe = recipe })
                         }
                     }
                 }
@@ -742,8 +753,9 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
     val freshCards = (prefs?.get(KEY_FRESH_RECIPE_CARDS) == true) || (prefs?.get(KEY_FRESH_UI) == true)
     val stars = recipeStarsFromPrefs(prefs?.get(KEY_RECIPE_RATINGS), recipe.id)
     val cardShape = if (freshCards) RoundedCornerShape(20.dp) else RoundedCornerShape(14.dp)
+    // Kein horizontales Padding hier — LazyColumn liefert bereits contentPadding
     Card(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (freshCards) 8.dp else 6.dp).clickable(onClick = onClick),
+        Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = cardShape,
         colors = CardDefaults.cardColors(
             containerColor = if (incomplete) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
