@@ -412,7 +412,10 @@ Rules:
 
         val ingredients = when {
             ingrIdx != null -> {
-                val end = (instrIdx ?: cleaned.length).coerceAtMost(cleaned.length)
+                // instrIdx nur als Ende-Grenze nehmen, wenn es wirklich NACH dem
+                // Zutaten-Keyword im Text liegt - sonst crasht substring(ingrIdx, end)
+                // mit begin > end (z.B. Caption erwähnt "steps" vor "zutaten").
+                val end = if (instrIdx != null && instrIdx > ingrIdx) instrIdx else cleaned.length
                 cleaned.substring(ingrIdx, end).trim()
             }
             else -> {
