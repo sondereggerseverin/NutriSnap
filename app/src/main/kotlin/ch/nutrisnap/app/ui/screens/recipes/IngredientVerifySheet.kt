@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.FoodSource
+import ch.nutrisnap.app.data.model.IngredientMatch
+import ch.nutrisnap.app.data.model.MatchSource
 import ch.nutrisnap.app.data.model.RecipeComponent
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.repository.FoodItemRepository
@@ -227,7 +229,9 @@ fun IngredientVerifySheet(
      */
     onConfirmComponents: ((List<RecipeComponent>) -> Unit)? = null,
     /** recipeId für gebaute RecipeComponent-Objekte (0 = egal, wird vom Caller gesetzt). */
-    recipeIdForComponents: Long = 0L
+    recipeIdForComponents: Long = 0L,
+    /** Persistiert verifizierte Zutaten als IngredientMatch (für späteren Komponenten-Split). */
+    onSaveMatches: ((List<IngredientMatch>) -> Unit)? = null
 ) {
     var overrides by remember { mutableStateOf(initialOverrides) }
     var verifyStates by remember {
@@ -615,6 +619,31 @@ fun IngredientVerifySheet(
                         val ingredientsText = verifyStates.joinToString("\n") { s ->
                             formatVerifyLineTitle(s)
                         }
+                        // Matches persistieren → Komponenten-Split nach Zutaten möglich
+                        onSaveMatches?.invoke(
+                            verifyStates.map { s ->
+                                val food = s.effectiveFood
+                                IngredientMatch(
+                                    recipeId = recipeIdForComponents,
+                                    ingredientRaw = s.result.line,
+                                    ingredientName = s.result.parsed?.name
+                                        ?: food?.name
+                                        ?: s.result.line,
+                                    amountGrams = s.effectiveAmountG,
+                                    matchedFoodItemId = food?.id,
+                                    matchedFoodName = food?.name,
+                                    matchedCalories = s.effectiveCalories,
+                                    matchedProtein = s.effectiveProtein,
+                                    matchedCarbs = s.effectiveCarbs,
+                                    matchedFat = s.effectiveFat,
+                                    matchSource = when {
+                                        s.override != null -> MatchSource.MANUAL
+                                        s.isVerified -> MatchSource.DATABASE
+                                        else -> MatchSource.UNMATCHED
+                                    }
+                                )
+                            }
+                        )
                         onConfirm(
                             totalKcal / servDiv,
                             totalProt / servDiv,

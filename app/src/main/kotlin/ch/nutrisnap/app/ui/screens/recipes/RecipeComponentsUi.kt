@@ -57,13 +57,19 @@ private fun nutritionFor(
     allDrafts: List<Draft>
 ): RecipeComponent {
     val byName = suggested.firstOrNull {
-        it.name.equals(draft.name.trim(), ignoreCase = true)
+        it.name.equals(draft.name.trim(), ignoreCase = true) &&
+            !it.name.equals("Gesamt", ignoreCase = true)
     }
-    val byIndex = suggested.getOrNull(index)
+    // Index nur wenn Suggestion echte Splits hat (nicht einzelnes „Gesamt“)
+    val realSplits = suggested.filter {
+        it.totalCalories > 0f && !it.name.equals("Gesamt", ignoreCase = true)
+    }
+    val byIndex = realSplits.getOrNull(index)
     val base = byName ?: byIndex
     if (base != null && base.totalCalories > 0f) return base
 
     // Fallback: Rezept-Totals proportional zu den (bereits eingegebenen) Kochgewichten
+    // (nur wenn keine Zutaten-Matches vorliegen – gleiche kcal/100g ist dann erwartet)
     val recipeTotal = recipe.totalCalories ?: 0f
     if (recipeTotal <= 0f) {
         return RecipeComponent(

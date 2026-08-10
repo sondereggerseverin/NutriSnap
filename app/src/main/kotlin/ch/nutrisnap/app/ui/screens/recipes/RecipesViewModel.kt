@@ -542,7 +542,20 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     fun setComponents(recipeId: Long, components: List<RecipeComponent>, updateRecipeTotals: Boolean = true) {
         viewModelScope.launch {
             val recipe = repo.getById(recipeId) ?: return@launch
-            var comps = healComponentNutrition(recipe, components)
+            // Duplikate nach Name zusammenführen (z. B. 2× „Sauce / Fleisch“)
+            val deduped = components
+                .groupBy { it.name.trim().lowercase() }
+                .map { (_, group) ->
+                    if (group.size == 1) group.first()
+                    else {
+                        // Letztes mit Gewicht > 0 bevorzugen, Nährwerte vom besten
+                        val best = group.lastOrNull { it.cookedWeightG > 0f && it.totalCalories > 0f }
+                            ?: group.lastOrNull { it.cookedWeightG > 0f }
+                            ?: group.last()
+                        best
+                    }
+                }
+            var comps = healComponentNutrition(recipe, deduped)
             repo.setComponents(recipeId, comps)
             if (updateRecipeTotals && comps.isNotEmpty()) {
                 val totalKcal = comps.sumOf { it.totalCalories.toDouble() }.toFloat()
@@ -572,7 +585,10 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
      * Korrigiert Komponenten-Nährwerte wenn:
      * - alle kcal ≤ 0, oder
      * - die kcal jeder Komponente ≈ dem Rezept-Total sind (klassischer
-     *   Duplikat-Bug: beide Teile tragen 5579 kcal statt den Anteil).
+     *   Duplikat-Bug: beide Teile tragen 5579 kcal statt den Anteil), oder
+     * - alle Komponenten die gleiche kcal/100g-Dichte haben (proportionale
+     *   Gewichtsaufteilung statt Zutaten-Split – z. B. Beilage und Sauce
+     *   beide 88 kcal/100g).
      */
     suspend fun healComponentNutrition(
         recipe: Recipe,
@@ -590,21 +606,41 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             }
         // Summe der Komponenten deutlich über Rezept-Total (z.B. 2×)
         val sumTooHigh = recipeTotal > 0f && sumComp > recipeTotal * 1.35f
+        // Gleiche Dichte = fast sicher Gewichts-Split statt Zutaten-Split
+        val densities = components.map { c ->
+            if (c.cookedWeightG > 0f && c.totalCalories > 0f) c.totalCalories / c.cookedWeightG else -1f
+        }
+        val validDens = densities.filter { it > 0f }
+        val sameDensity = components.size > 1 && validDens.size == components.size &&
+            validDens.all { d ->
+                kotlin.math.abs(d - validDens[0]) / validDens[0].coerceAtLeast(0.001f) < 0.05f
+            }
 
-        if (!allZero && !duplicated && !sumTooHigh) return components
+        if (!allZero && !duplicated && !sumTooHigh && !sameDensity) return components
 
         val suggested = suggestComponentsFromMatches(recipe)
-        if (suggested.size >= components.size && suggested.any { it.totalCalories > 0f }) {
-            return components.mapIndexed { i, c ->
-                val s = suggested.getOrNull(i) ?: suggested.last()
-                // Kochgewicht vom Nutzer behalten; Nährwerte aus Suggestion
-                c.copy(
-                    totalCalories = if (s.totalCalories > 0f) s.totalCalories else c.totalCalories,
-                    proteinG = if (s.proteinG > 0f) s.proteinG else c.proteinG,
-                    carbsG = if (s.carbsG > 0f) s.carbsG else c.carbsG,
-                    fatG = if (s.fatG > 0f) s.fatG else c.fatG,
-                    fiberG = if (s.fiberG > 0f) s.fiberG else c.fiberG
-                )
+        // Echter Zutaten-Split (mind. 2 Komponenten mit kcal) hat Vorrang
+        val usableSuggest = suggested.filter { it.totalCalories > 0f && it.name != "Gesamt" }
+        if (usableSuggest.isNotEmpty()) {
+            return components.map { c ->
+                val s = usableSuggest.firstOrNull { it.name.equals(c.name, ignoreCase = true) }
+                    ?: usableSuggest.firstOrNull {
+                        // Beilage / Side-Aliase
+                        val cn = c.name.lowercase()
+                        val sn = it.name.lowercase()
+                        (cn.contains("beilage") && sn.contains("beilage")) ||
+                            (cn.contains("sauce") && sn.contains("sauce")) ||
+                            (cn.contains("fleisch") && sn.contains("fleisch"))
+                    }
+                if (s != null) {
+                    c.copy(
+                        totalCalories = s.totalCalories,
+                        proteinG = s.proteinG,
+                        carbsG = s.carbsG,
+                        fatG = s.fatG,
+                        fiberG = s.fiberG
+                    )
+                } else c
             }
         }
 
@@ -801,6 +837,20 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             // Overrides löschen – Zutatenliste ist jetzt die Quelle der Wahrheit
             _ingredientOverrides.update { it - recipe.id }
             _nutritionState.value = NutritionState()
+        }
+    }
+
+    /**
+     * Speichert verifizierte Zutaten als IngredientMatch-Zeilen, damit
+     * [suggestComponentsFromMatches] Beilage/Sauce korrekt aus Zutaten splitten kann
+     * (statt proportional nach Kochgewicht → gleiche kcal/100g).
+     */
+    fun replaceMatchesForRecipe(recipeId: Long, matches: List<ch.nutrisnap.app.data.model.IngredientMatch>) {
+        viewModelScope.launch {
+            matchDao.deleteMatchesForRecipe(recipeId)
+            if (matches.isNotEmpty()) {
+                matchDao.insertMatches(matches.map { it.copy(id = 0, recipeId = recipeId) })
+            }
         }
     }
 

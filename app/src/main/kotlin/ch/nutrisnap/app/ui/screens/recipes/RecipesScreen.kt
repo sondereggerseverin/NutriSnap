@@ -537,7 +537,10 @@ fun RecipesScreen(
             onConfirmComponents = { comps ->
                 vm.setComponents(verifyRecipe.id, comps)
             },
-            recipeIdForComponents = verifyRecipe.id
+            recipeIdForComponents = verifyRecipe.id,
+            onSaveMatches = { matches ->
+                vm.replaceMatchesForRecipe(verifyRecipe.id, matches)
+            }
         )
     }
 
