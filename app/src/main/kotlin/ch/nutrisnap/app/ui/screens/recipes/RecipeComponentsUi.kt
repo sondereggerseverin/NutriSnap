@@ -19,10 +19,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ch.nutrisnap.app.data.model.IngredientMatch
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeComponent
 import java.time.LocalDate
+import kotlinx.coroutines.delay
 
 /**
  * Editor: Komponenten eines Rezepts anlegen/bearbeiten.
@@ -550,6 +552,205 @@ fun MultiComponentAddToDiarySheet(
                     }
                 }
             }
+        }
+    }
+}
+
+
+/**
+ * Beilage/Sauce-Trennung: Zutaten zuordnen + Kochgewicht.
+ * Unabhängig vom Verify-Flow (der nur Nährwerte prüft).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ComponentSplitSheet(
+    recipe: Recipe,
+    matches: List<IngredientMatch>,
+    initialComponents: List<RecipeComponent>,
+    onSave: (components: List<RecipeComponent>, matches: List<IngredientMatch>) -> Unit,
+    onDismiss: () -> Unit
+) {
+    fun defaultGroup(m: IngredientMatch): String {
+        m.componentGroup?.let { if (it == "side" || it == "sauce") return it }
+        val n = "${m.ingredientRaw} ${m.ingredientName} ${m.matchedFoodName.orEmpty()}".lowercase()
+        val sideKeys = listOf("reis", "basmati", "erbse", "erbsen", "peas", "kartoffel", "nudel", "pasta", "quinoa", "couscous", "bulgur", "beilage", "hafer", "flocken")
+        return if (sideKeys.any { it in n }) "side" else "sauce"
+    }
+
+    var groups by remember(matches) {
+        mutableStateOf(matches.associate { it.ingredientRaw to defaultGroup(it) })
+    }
+    var sideWeightText by remember {
+        mutableStateOf(
+            initialComponents.firstOrNull { it.name.contains("beilage", true) }
+                ?.cookedWeightG?.takeIf { it > 0f }?.toInt()?.toString() ?: ""
+        )
+    }
+    var sauceWeightText by remember {
+        mutableStateOf(
+            initialComponents.firstOrNull {
+                it.name.contains("sauce", true) || it.name.contains("fleisch", true)
+            }?.cookedWeightG?.takeIf { it > 0f }?.toInt()?.toString() ?: ""
+        )
+    }
+
+    fun sumMatches(list: List<IngredientMatch>) = Triple(
+        list.sumOf { (it.matchedCalories ?: 0f).toDouble() }.toFloat(),
+        list.sumOf { (it.matchedProtein ?: 0f).toDouble() }.toFloat(),
+        list.sumOf { (it.matchedCarbs ?: 0f).toDouble() }.toFloat()
+    )
+
+    val sideMatches = matches.filter { groups[it.ingredientRaw] == "side" }
+    val sauceMatches = matches.filter { groups[it.ingredientRaw] != "side" }
+    val (sideKcal, sideProt, sideCarbs) = sumMatches(sideMatches)
+    val (sauceKcal, sauceProt, sauceCarbs) = sumMatches(sauceMatches)
+    val sideFat = sideMatches.sumOf { (it.matchedFat ?: 0f).toDouble() }.toFloat()
+    val sauceFat = sauceMatches.sumOf { (it.matchedFat ?: 0f).toDouble() }.toFloat()
+
+    // Auto-save debounced
+    var lastKey by remember { mutableStateOf("") }
+    LaunchedEffect(sideWeightText, sauceWeightText, groups) {
+        delay(700)
+        val sideW = sideWeightText.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
+        val sauceW = sauceWeightText.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
+        if (sideW == null && sauceW == null) return@LaunchedEffect
+        val key = "${sideW}|${sauceW}|${groups.entries.sortedBy { it.key }}"
+        if (key == lastKey) return@LaunchedEffect
+        lastKey = key
+        val comps = buildList {
+            if (sideW != null) add(
+                RecipeComponent(
+                    recipeId = recipe.id, name = "Beilage", cookedWeightG = sideW,
+                    totalCalories = sideKcal, proteinG = sideProt, carbsG = sideCarbs, fatG = sideFat, sortOrder = 0
+                )
+            )
+            if (sauceW != null) add(
+                RecipeComponent(
+                    recipeId = recipe.id, name = "Sauce / Fleisch", cookedWeightG = sauceW,
+                    totalCalories = sauceKcal, proteinG = sauceProt, carbsG = sauceCarbs, fatG = sauceFat, sortOrder = 1
+                )
+            )
+        }
+        val updatedMatches = matches.map { m -> m.copy(componentGroup = groups[m.ingredientRaw] ?: "sauce") }
+        if (comps.isNotEmpty()) onSave(comps, updatedMatches)
+    }
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Text("Beilage / Sauce trennen", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text(
+                recipe.displayTitle(),
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
+
+            if (matches.isEmpty()) {
+                Text(
+                    "Zuerst «Verify» ausführen – ohne verifizierte Zutaten keine Trennung möglich.",
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 13.sp
+                )
+                Spacer(Modifier.height(12.dp))
+                TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("Schliessen") }
+                return@Column
+            }
+
+            Text("Zutaten zuordnen und Kochgewicht (netto) eintragen. Speichert automatisch.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(12.dp))
+
+            // Beilage
+            Text("Beilage", fontWeight = FontWeight.SemiBold)
+            Text("${fmtNum(sideKcal)} kcal aus Zutaten", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+            OutlinedTextField(
+                value = sideWeightText,
+                onValueChange = { sideWeightText = it },
+                label = { Text("Kochgewicht Beilage (g)") },
+                supportingText = {
+                    val p = sideWeightText.replace(',', '.').toFloatOrNull()
+                    Text(if (p != null && p > 0f) "Eingetragen: ${p.toInt()} g" else "Nach dem Kochen, ohne Topf")
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            sideMatches.forEach { m ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(m.ingredientRaw, fontSize = 13.sp)
+                        Text("${fmtNum(m.matchedCalories ?: 0f)} kcal", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    AssistChip(onClick = { groups = groups + (m.ingredientRaw to "sauce") }, label = { Text("→ Sauce", fontSize = 11.sp) })
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+
+            // Sauce
+            Text("Sauce / Fleisch", fontWeight = FontWeight.SemiBold)
+            Text("${fmtNum(sauceKcal)} kcal aus Zutaten", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+            OutlinedTextField(
+                value = sauceWeightText,
+                onValueChange = { sauceWeightText = it },
+                label = { Text("Kochgewicht Sauce (g)") },
+                supportingText = {
+                    val p = sauceWeightText.replace(',', '.').toFloatOrNull()
+                    Text(if (p != null && p > 0f) "Eingetragen: ${p.toInt()} g" else "Nach dem Kochen, ohne Topf")
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            sauceMatches.forEach { m ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(m.ingredientRaw, fontSize = 13.sp)
+                        Text("${fmtNum(m.matchedCalories ?: 0f)} kcal", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    AssistChip(onClick = { groups = groups + (m.ingredientRaw to "side") }, label = { Text("→ Beilage", fontSize = 11.sp) })
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
+            Button(
+                onClick = {
+                    val sideW = sideWeightText.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
+                    val sauceW = sauceWeightText.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
+                    val comps = buildList {
+                        if (sideW != null) add(
+                            RecipeComponent(
+                                recipeId = recipe.id, name = "Beilage", cookedWeightG = sideW,
+                                totalCalories = sideKcal, proteinG = sideProt, carbsG = sideCarbs, fatG = sideFat, sortOrder = 0
+                            )
+                        )
+                        if (sauceW != null) add(
+                            RecipeComponent(
+                                recipeId = recipe.id, name = "Sauce / Fleisch", cookedWeightG = sauceW,
+                                totalCalories = sauceKcal, proteinG = sauceProt, carbsG = sauceCarbs, fatG = sauceFat, sortOrder = 1
+                            )
+                        )
+                    }
+                    val updatedMatches = matches.map { m -> m.copy(componentGroup = groups[m.ingredientRaw] ?: "sauce") }
+                    onSave(comps, updatedMatches)
+                    onDismiss()
+                },
+                enabled = sideWeightText.replace(',', '.').toFloatOrNull()?.let { it > 0f } == true ||
+                    sauceWeightText.replace(',', '.').toFloatOrNull()?.let { it > 0f } == true,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Check, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Trennung speichern")
+            }
+            TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("Abbrechen") }
         }
     }
 }

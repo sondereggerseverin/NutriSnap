@@ -856,6 +856,9 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun getMatches(recipeId: Long): Flow<List<ch.nutrisnap.app.data.model.IngredientMatch>> =
+        matchDao.getMatchesForRecipe(recipeId)
+
     /**
      * Importiert ein von Claude (Chat) geteiltes Rezept-JSON direkt, ohne Zwischenschritt.
      * Wird still ignoriert, falls der Text kein erkennbares Rezept-JSON ist.

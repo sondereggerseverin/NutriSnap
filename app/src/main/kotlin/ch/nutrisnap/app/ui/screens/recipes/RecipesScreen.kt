@@ -266,6 +266,8 @@ fun RecipesScreen(
     var selectedRecipe    by remember { mutableStateOf<Recipe?>(null) }
     var showVerifySheet    by remember { mutableStateOf(false) }
     var pendingVerify      by remember { mutableStateOf(false) }
+    var showSplitSheet     by remember { mutableStateOf(false) }
+    var splitRecipeId      by remember { mutableStateOf<Long?>(null) }
     var addToDiaryRecipe  by remember { mutableStateOf<Recipe?>(null) }
     var rateAfterDiary   by remember { mutableStateOf<Recipe?>(null) }
     var editRecipe        by remember { mutableStateOf<Recipe?>(null) }
@@ -592,8 +594,36 @@ fun RecipesScreen(
         )
     }
 
+    // Beilage/Sauce-Trennung (eigenes Sheet, unabhängig von Verify)
+    val splitRecipe = if (showSplitSheet && splitRecipeId != null) {
+        state.recipes.find { it.id == splitRecipeId }
+    } else null
+    LaunchedEffect(showSplitSheet, splitRecipeId, splitRecipe) {
+        if (showSplitSheet && splitRecipeId != null && splitRecipe == null) {
+            showSplitSheet = false
+            splitRecipeId = null
+        }
+    }
+    if (showSplitSheet && splitRecipe != null) {
+        val splitMatches by vm.getMatches(splitRecipe.id).collectAsState(initial = emptyList())
+        val splitComps by vm.getComponents(splitRecipe.id).collectAsState(initial = emptyList())
+        ComponentSplitSheet(
+            recipe = splitRecipe,
+            matches = splitMatches,
+            initialComponents = splitComps,
+            onSave = { comps, matches ->
+                vm.replaceMatchesForRecipe(splitRecipe.id, matches)
+                vm.setComponents(splitRecipe.id, comps)
+            },
+            onDismiss = {
+                showSplitSheet = false
+                splitRecipeId = null
+            }
+        )
+    }
+
     // Detail-Sheet nicht gleichzeitig mit Verify-Sheet (doppeltes ModalBottomSheet = Crash)
-    if (!showVerifyNow) selectedRecipe?.let { recipe ->
+    if (!showVerifyNow && !showSplitSheet) selectedRecipe?.let { recipe ->
         // Always show latest version from state
         val live = state.recipes.find { it.id == recipe.id } ?: recipe
         RecipeDetailSheet(
@@ -613,6 +643,11 @@ fun RecipesScreen(
                     pendingVerify = true
                     vm.analyzeNutrition(live)
                 }
+            },
+            onSplitComponents = {
+                splitRecipeId = live.id
+                showSplitSheet = true
+                selectedRecipe = null
             },
             onRecalculateFromOverrides = { vm.recalculateFromOverrides(live) },
             hasStoredOverrides = vm.getOverridesFor(live.id).isNotEmpty(),
@@ -1358,6 +1393,7 @@ fun RecipeDetailSheet(
     onEdit: () -> Unit,
     onAnalyze: () -> Unit,
     onVerify: () -> Unit = {},
+    onSplitComponents: () -> Unit = {},
     onRecalculateFromOverrides: () -> Unit = {},
     hasStoredOverrides: Boolean = false,
     onAddToShoppingList: (Recipe) -> Unit = {},
@@ -1500,6 +1536,7 @@ fun RecipeDetailSheet(
                     ratio = ratio,
                     onAnalyze = onAnalyze,
                     onVerify = onVerify,
+                    onSplitComponents = onSplitComponents,
                     onRecalculateFromOverrides = onRecalculateFromOverrides,
                     hasStoredOverrides = hasStoredOverrides
                 )
@@ -1919,6 +1956,7 @@ private fun NutritionAnalysisCard(
     ratio: Float,
     onAnalyze: () -> Unit,
     onVerify: () -> Unit = {},
+    onSplitComponents: () -> Unit = {},
     onRecalculateFromOverrides: () -> Unit = {},
     hasStoredOverrides: Boolean = false
 ) {
@@ -1974,6 +2012,9 @@ private fun NutritionAnalysisCard(
                                 Icon(Icons.Default.QrCodeScanner, null, Modifier.size(13.dp))
                                 Spacer(Modifier.width(2.dp))
                                 Text("Verify", fontSize = 11.sp)
+                            }
+                            TextButton(onClick = onSplitComponents, contentPadding = PaddingValues(2.dp)) {
+                                Text("Trennen", fontSize = 11.sp)
                             }
                         }
                         TextButton(onClick = onAnalyze, contentPadding = PaddingValues(2.dp)) {
