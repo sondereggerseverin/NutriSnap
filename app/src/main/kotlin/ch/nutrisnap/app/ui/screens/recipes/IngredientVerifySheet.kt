@@ -630,7 +630,7 @@ fun IngredientVerifySheet(
                                         ?: food?.name
                                         ?: s.result.line,
                                     amountGrams = s.effectiveAmountG,
-                                    matchedFoodItemId = food?.id,
+                                    matchedFoodItemId = food?.id?.toLong(),
                                     matchedFoodName = food?.name,
                                     matchedCalories = s.effectiveCalories,
                                     matchedProtein = s.effectiveProtein,
