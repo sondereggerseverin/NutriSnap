@@ -273,6 +273,7 @@ fun RecipesScreen(
     var hideIncomplete    by remember { mutableStateOf(false) }
     var showBatchSheet    by remember { mutableStateOf(false) }
     var showCookSheet     by remember { mutableStateOf(false) }
+    var cookingRecipe     by remember { mutableStateOf<Recipe?>(null) }
     val batchState by vm.batchState.collectAsState()
     val budgetScaleState by vm.budgetScaleState.collectAsState()
     val pendingTargetKcal by vm.pendingTargetKcal.collectAsState()
@@ -286,6 +287,15 @@ fun RecipesScreen(
         val target = pendingTargetKcal ?: return@LaunchedEffect
         vm.clearPendingTargetKcal()
         vm.scaleToTargetKcal(recipe, target)
+    }
+
+    // Vollbild-Kochmodus (überlagert die Liste)
+    cookingRecipe?.let { recipe ->
+        CookingModeScreen(
+            recipe = recipe,
+            onBack = { cookingRecipe = null }
+        )
+        return
     }
 
     LaunchedEffect(sharedUrl) { if (!sharedUrl.isNullOrBlank()) showImportSheet = true }
@@ -605,6 +615,10 @@ fun RecipesScreen(
             isTranslating = state.isTranslating,
             onEditComponents = {
                 editComponentsRecipe = live
+                selectedRecipe = null
+            },
+            onStartCooking = {
+                cookingRecipe = live
                 selectedRecipe = null
             }
         )
@@ -1329,7 +1343,8 @@ fun RecipeDetailSheet(
     onScaleToBudget: () -> Unit = {},
     onTranslateGermanMetric: () -> Unit = {},
     isTranslating: Boolean = false,
-    onEditComponents: () -> Unit = {}
+    onEditComponents: () -> Unit = {},
+    onStartCooking: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var servings   by remember(recipe.id) { mutableStateOf(recipe.servings) }
@@ -1479,6 +1494,19 @@ fun RecipeDetailSheet(
                         Spacer(Modifier.width(4.dp))
                         Text("Einkauf", fontSize = 13.sp)
                     }
+                }
+                Spacer(Modifier.height(6.dp))
+                Button(
+                    onClick = onStartCooking,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(vertical = 10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiary
+                    )
+                ) {
+                    Icon(Icons.Default.RestaurantMenu, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Kochmodus starten", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 }
                 Spacer(Modifier.height(6.dp))
                 OutlinedButton(

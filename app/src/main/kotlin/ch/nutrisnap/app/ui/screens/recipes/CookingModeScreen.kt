@@ -79,6 +79,17 @@ fun CookingModeScreen(recipe: Recipe, onBack: () -> Unit) {
     var completedSteps by remember { mutableStateOf(setOf<Int>()) }
     var showIngredients by remember { mutableStateOf(false) }
 
+    // Timer-Zustände pro Schritt (bleiben beim Vor-/Zurückblättern erhalten)
+    val timerStates = remember {
+        mutableStateMapOf<Int, StepTimerState>()
+    }
+    fun timerFor(stepIndex: Int, stepText: String): StepTimerState {
+        return timerStates.getOrPut(stepIndex) {
+            val detected = detectDurationSeconds(stepText) ?: (5 * 60)
+            StepTimerState(detected)
+        }
+    }
+
     // Portionsskalierung: Basis ist recipe.servings (mind. 1, falls schlecht befuellt).
     val baseServings = remember(recipe.servings) { recipe.servings.coerceAtLeast(1) }
     var servings by remember(baseServings) { mutableStateOf(baseServings) }
@@ -201,7 +212,13 @@ fun CookingModeScreen(recipe: Recipe, onBack: () -> Unit) {
                             lineHeight = 32.sp
                         )
                     }
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(16.dp))
+
+                    // Schritt-Timer (Dauer aus Text erkannt oder Default 5 Min)
+                    val stepText = steps.getOrElse(currentStep) { "" }
+                    CookingStepTimer(state = timerFor(currentStep, stepText))
+
+                    Spacer(Modifier.height(16.dp))
 
                     // Schritt als erledigt markieren
                     Row(verticalAlignment = Alignment.CenterVertically) {
