@@ -44,6 +44,7 @@ fun RecipeCardV2(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onDuplicate: () -> Unit = {},
+    onToggleFavorite: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var portions by remember(recipe.id) { mutableFloatStateOf(1f) }
@@ -118,6 +119,24 @@ fun RecipeCardV2(
                             expanded = menuOpen,
                             onDismissRequest = { menuOpen = false }
                         ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(if (recipe.isFavorite) "Favorit entfernen" else "Als Favorit")
+                                },
+                                onClick = {
+                                    menuOpen = false
+                                    onToggleFavorite()
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        if (recipe.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                        null,
+                                        Modifier.size(18.dp),
+                                        tint = if (recipe.isFavorite) MaterialTheme.colorScheme.error
+                                        else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            )
                             DropdownMenuItem(
                                 text = { Text("Kopieren zum Anpassen") },
                                 onClick = {

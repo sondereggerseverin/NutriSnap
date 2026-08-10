@@ -533,6 +533,13 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { repo.updateRecipe(recipe) }
     }
 
+    /** Favorit umschalten (isFavorite in DB). */
+    fun toggleFavorite(recipe: Recipe) {
+        viewModelScope.launch {
+            repo.updateRecipe(recipe.copy(isFavorite = !recipe.isFavorite))
+        }
+    }
+
     fun getComponents(recipeId: Long): Flow<List<RecipeComponent>> = repo.getComponents(recipeId)
 
     suspend fun getComponentsOnce(recipeId: Long): List<RecipeComponent> =

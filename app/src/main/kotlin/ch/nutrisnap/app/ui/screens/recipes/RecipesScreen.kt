@@ -271,6 +271,7 @@ fun RecipesScreen(
     var editRecipe        by remember { mutableStateOf<Recipe?>(null) }
     var editComponentsRecipe by remember { mutableStateOf<Recipe?>(null) }
     var hideIncomplete    by remember { mutableStateOf(false) }
+    var favoritesOnly     by remember { mutableStateOf(false) }
     var showBatchSheet    by remember { mutableStateOf(false) }
     var showCookSheet     by remember { mutableStateOf(false) }
     var cookingRecipe     by remember { mutableStateOf<Recipe?>(null) }
@@ -405,6 +406,14 @@ fun RecipesScreen(
                             label    = { Text(label, fontSize = 12.sp) }
                         )
                     }
+                    val favCount = state.recipes.count { it.isFavorite }
+                    if (favCount > 0 || favoritesOnly) {
+                        FilterChip(
+                            selected = favoritesOnly,
+                            onClick  = { favoritesOnly = !favoritesOnly },
+                            label    = { Text(if (favCount > 0) "★ Favoriten ($favCount)" else "★ Favoriten", fontSize = 12.sp) }
+                        )
+                    }
                     val incompleteCount = state.recipes.count { it.isIncomplete() }
                     if (incompleteCount > 0) {
                         FilterChip(
@@ -426,7 +435,9 @@ fun RecipesScreen(
                         tint = MaterialTheme.colorScheme.primary)
                 }
             }
-            val displayedRecipes = if (hideIncomplete) state.recipes.filterNot { it.isIncomplete() } else state.recipes
+            val displayedRecipes = state.recipes
+                .let { if (favoritesOnly) it.filter { r -> r.isFavorite } else it }
+                .let { if (hideIncomplete) it.filterNot { r -> r.isIncomplete() } else it }
             if (state.recipes.isNotEmpty()) {
                 Text(
                     "${displayedRecipes.size} Rezept${if (displayedRecipes.size == 1) "" else "e"} · " +
@@ -468,7 +479,8 @@ fun RecipesScreen(
                                 onAddToDiary = { _ -> addToDiaryRecipe = recipe },
                                 onEdit       = { editRecipe = recipe },
                                 onDelete     = { vm.deleteRecipe(recipe) },
-                                onDuplicate  = { vm.duplicateRecipe(recipe) }
+                                onDuplicate  = { vm.duplicateRecipe(recipe) },
+                                onToggleFavorite = { vm.toggleFavorite(recipe) }
                             )
                         } else {
                             // Klassische Karte (Toggle „Fresh Recipe Cards“ aus)
@@ -620,7 +632,8 @@ fun RecipesScreen(
             onStartCooking = {
                 cookingRecipe = live
                 selectedRecipe = null
-            }
+            },
+            onToggleFavorite = { vm.toggleFavorite(live) }
         )
     }
 
@@ -1344,7 +1357,8 @@ fun RecipeDetailSheet(
     onTranslateGermanMetric: () -> Unit = {},
     isTranslating: Boolean = false,
     onEditComponents: () -> Unit = {},
-    onStartCooking: () -> Unit = {}
+    onStartCooking: () -> Unit = {},
+    onToggleFavorite: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var servings   by remember(recipe.id) { mutableStateOf(recipe.servings) }
@@ -1393,6 +1407,14 @@ fun RecipeDetailSheet(
                         lineHeight = 24.sp,
                         modifier = Modifier.weight(1f)
                     )
+                    IconButton(onClick = onToggleFavorite, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            if (recipe.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = if (recipe.isFavorite) "Favorit entfernen" else "Als Favorit",
+                            tint = if (recipe.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                     IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
                         Icon(Icons.Default.Edit, "Bearbeiten", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                     }
