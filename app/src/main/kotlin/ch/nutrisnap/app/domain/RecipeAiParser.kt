@@ -412,10 +412,12 @@ Rules:
 
         val ingredients = when {
             ingrIdx != null -> {
-                // instrIdx nur als Ende-Grenze nehmen, wenn es wirklich NACH dem
-                // Zutaten-Keyword im Text liegt - sonst crasht substring(ingrIdx, end)
-                // mit begin > end (z.B. Caption erwähnt "steps" vor "zutaten").
-                val end = if (instrIdx != null && instrIdx > ingrIdx) instrIdx else cleaned.length
+                // Instruktionen können VOR den Zutaten stehen (begin > end) —
+                // dann bis Textende nehmen, nicht bis zum früheren Instr-Index.
+                val end = when {
+                    instrIdx != null && instrIdx > ingrIdx -> instrIdx
+                    else -> cleaned.length
+                }.coerceIn(ingrIdx, cleaned.length)
                 cleaned.substring(ingrIdx, end).trim()
             }
             else -> {
@@ -433,7 +435,14 @@ Rules:
             }
         }
 
-        val instructions = instrIdx?.let { cleaned.substring(it).trim() } ?: ""
+        // Wenn Zubereitung vor Zutaten steht: nur bis zum Zutaten-Block
+        val instructions = when {
+            instrIdx == null -> ""
+            ingrIdx != null && instrIdx < ingrIdx ->
+                cleaned.substring(instrIdx, ingrIdx).trim()
+            else ->
+                cleaned.substring(instrIdx).trim()
+        }
 
         return Recipe(
             title           = title,

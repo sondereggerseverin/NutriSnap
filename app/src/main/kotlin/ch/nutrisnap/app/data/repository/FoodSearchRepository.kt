@@ -58,14 +58,26 @@ class FoodSearchRepository(
             val synonymRemoteDeferred = synonymQueries.take(2).map { sq ->
                 async { runCatching { openFoodFactsSearch(sq) }.getOrDefault(emptyList()) }
             }
+            // Bei Mehrwort-Query auch das spezifischste Token remote suchen
+            // ("kebabfleisch" statt nur "poulet kebabfleisch" → OFF findet mehr)
+            val specificToken = effectiveQuery.trim().split(Regex("\\s+"))
+                .map { it.lowercase() }
+                .filter { it.length >= 5 }
+                .firstOrNull { t ->
+                    t !in setOf("poulet", "hähnchen", "haehnchen", "chicken", "fleisch", "sauce")
+                }
+            val specificDeferred = specificToken?.let { tok ->
+                async { runCatching { openFoodFactsSearch(tok) }.getOrDefault(emptyList()) }
+            }
 
             val off = offDeferred.await()
             val usda = usdaDeferred.await()
             val swiss = swissDeferred.await()
             val compound = compoundDeferred?.await() ?: emptyList()
             val synonymRemote = synonymRemoteDeferred.flatMap { it.await() }
+            val specificRemote = specificDeferred?.await() ?: emptyList()
 
-            var combined = (cachedDistinct + swiss + off + usda + compound + synonymRemote)
+            var combined = (cachedDistinct + swiss + off + usda + compound + synonymRemote + specificRemote)
 
             if (combined.count { hasUsableNutrition(it) } < 5) {
                 val nutritionix = runCatching { nutritionixApi.searchBranded(effectiveQuery) }.getOrDefault(emptyList())
@@ -82,10 +94,16 @@ class FoodSearchRepository(
 
             val result = combined
                 .distinctBy { normalizeKey(it) }
-                // 0-kcal-Schrott ans Ende bzw. rausfiltern wenn genug brauchbare Treffer da
                 .let { list ->
                     val usable = list.filter { hasUsableNutrition(it) }
-                    if (usable.size >= 3) usable else list
+                    // Spezifische Treffer (relevance ≥ 2) bevorzugen — sonst
+                    // fluten generische "Hähnchen…" die Liste bei "poulet kebabfleisch"
+                    val specific = usable.filter { relevance(it, effectiveQuery) >= 2 }
+                    when {
+                        specific.size >= 3 -> specific
+                        usable.size >= 3 -> usable
+                        else -> list
+                    }
                 }
                 .sortedWith(relevanceComparator(effectiveQuery))
 
@@ -131,21 +149,55 @@ class FoodSearchRepository(
     companion object {
         /**
          * Wie gut der Produktname zur Suchanfrage passt:
-         * 4 = exakt, 3 = beginnt mit Anfrage, 2 = enthält als eigenes Wort,
-         * 1 = enthält als Teilstring, 0 = kein Treffer.
+         * 4 = exakt, 3 = beginnt mit Anfrage / alle Tokens treffen,
+         * 2 = spezifisches Token + weiteres, 1 = nur generisches Token oder Teilstring,
+         * 0 = kein Treffer.
+         *
+         * Mehrwort-Queries ("poulet kebabfleisch"): "Hähnchen-Kebabfleisch" muss
+         * klar über generischem "Hähnchenbrustfilet" landen.
          */
         fun relevance(item: FoodItem, query: String): Int {
             val q = SearchUtils.normalize(query)
             val name = SearchUtils.normalize(item.name)
             val qCompact = q.replace(" ", "")
             val nameCompact = name.replace(" ", "")
+            if (name == q || nameCompact == qCompact) return 4
+            if (name.startsWith(q) || nameCompact.startsWith(qCompact)) return 3
+
+            val tokens = q.split(Regex("\\s+")).filter { it.length >= 3 }
+            if (tokens.size >= 2) {
+                fun tokenHits(t: String): Boolean {
+                    if (name.contains(t) || nameCompact.contains(t)) return true
+                    // poulet ↔ hähnchen ↔ chicken (nach normalize: ae)
+                    val alts = when (t) {
+                        "poulet" -> listOf("haehnchen", "huhn", "chicken")
+                        "haehnchen" -> listOf("poulet", "huhn", "chicken")
+                        "chicken" -> listOf("poulet", "haehnchen", "huhn")
+                        else -> emptyList()
+                    }
+                    return alts.any { name.contains(it) || nameCompact.contains(it) }
+                }
+                val generic = setOf(
+                    "poulet", "haehnchen", "huhn", "chicken", "fleisch", "meat",
+                    "sauce", "sosse", "filet", "brust"
+                )
+                val hitCount = tokens.count { tokenHits(it) }
+                val specificTokens = tokens.filter { it !in generic }
+                val specificHits = specificTokens.count { tokenHits(it) }
+                return when {
+                    hitCount == tokens.size -> 3
+                    specificHits >= 1 && hitCount >= 2 -> 3
+                    specificHits >= 1 -> 2
+                    hitCount >= 1 -> 1
+                    else -> 0
+                }
+            }
+
             return when {
-                name == q -> 4
-                name.startsWith(q) -> 3
                 Regex("\\b${Regex.escape(q)}").containsMatchIn(name) -> 2
                 name.contains(q) -> 1
-                qCompact.length >= 3 && nameCompact.contains(qCompact) -> 1 // Kompositum, z.B. "süsskartoffelpommes"
-                SearchUtils.fuzzyMatch(q, name) -> 1 // Tippfehler/Synonym (z.B. "fritten" -> "pommes")
+                qCompact.length >= 3 && nameCompact.contains(qCompact) -> 1
+                SearchUtils.fuzzyMatch(q, name) -> 1
                 else -> 0
             }
         }
