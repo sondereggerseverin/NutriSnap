@@ -1,9 +1,20 @@
 package ch.nutrisnap.app.domain
 
+import ch.nutrisnap.app.BuildConfig
 import ch.nutrisnap.app.data.model.Recipe
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.selects.select
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 
 /**
  * Übersetzt Rezept-Zutaten und Zubereitung ins Deutsche und rechnet
@@ -12,6 +23,13 @@ import org.json.JSONObject
 object RecipeGermanMetricConverter {
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(25, TimeUnit.SECONDS)
+        .build()
+
+    private const val GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
     @Serializable
     data class ConvertedRecipe(
@@ -384,9 +402,40 @@ object RecipeGermanMetricConverter {
     /**
      * KI: Zutaten + Zubereitung ins Deutsche übersetzen und metrisch umrechnen.
      * Titel optional mitübersetzen.
+     *
+     * Gemini und Groq laufen PARALLEL (select-Race); das erste erfolgreiche
+     * Ergebnis gewinnt. Verhindert den bekannten 30s-Timeout, wenn nur Gemini
+     * sequenziell aufgerufen wurde und dann erst der Fallback greifen konnte.
      */
     suspend fun convertWithAi(recipe: Recipe): Result<ConvertedRecipe> {
-        val prompt = """
+        val prompt = buildConvertPrompt(recipe)
+
+        val rawResult = callLlm(prompt)
+        val raw = rawResult.getOrElse {
+            // Beide Provider fehlgeschlagen → offline nur Einheiten + Namensmap
+            return Result.success(offlineFallback(recipe))
+        }
+
+        return runCatching {
+            val cleaned = raw.trim()
+                .removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+            val obj = JSONObject(cleaned)
+            val ing = obj.optString("ingredients").ifBlank { recipe.ingredients }
+            val ins = obj.optString("instructions").ifBlank { recipe.instructions }
+            // Nachbearbeitung: Reste wie "dough"/"raw milk" offline nachziehen
+            val desc = obj.optString("description").ifBlank { recipe.description }
+            ConvertedRecipe(
+                title = obj.optString("title").ifBlank { recipe.title },
+                description = translateNamesToGerman(desc),
+                ingredients = convertOfflineFull(ing),
+                instructions = translateNamesToGerman(convertUnitsToMetric(ins))
+            )
+        }.recover {
+            offlineFallback(recipe)
+        }
+    }
+
+    private fun buildConvertPrompt(recipe: Recipe): String = """
 Du bist ein Schweizer/deutscher Koch-Assistent. Übersetze das Rezept VOLLSTÄNDIG ins Deutsche und rechne alle Mengen metrisch um.
 
 PFLICHT:
@@ -419,43 +468,92 @@ Antworte NUR mit JSON:
 }
 """.trimIndent()
 
-        val raw = GeminiService.generateText(
-            prompt = prompt,
-            temperature = 0.2,
-            maxTokens = 3000
-        ).getOrElse { e ->
-            // Fallback: offline nur Einheiten
-            return Result.success(
-                ConvertedRecipe(
-                    title = translateNamesToGerman(recipe.title),
-                    description = translateNamesToGerman(recipe.description),
-                    ingredients = convertOfflineFull(recipe.ingredients),
-                    instructions = convertOfflineFull(recipe.instructions)
-                )
-            )
+    private fun offlineFallback(recipe: Recipe): ConvertedRecipe = ConvertedRecipe(
+        title = translateNamesToGerman(recipe.title),
+        description = translateNamesToGerman(recipe.description),
+        ingredients = convertOfflineFull(recipe.ingredients),
+        instructions = convertOfflineFull(recipe.instructions)
+    )
+
+    /**
+     * Parallel-Race: Gemini und Groq gleichzeitig; erstes erfolgreiches Resultat gewinnt.
+     * Identisches Muster wie in RecipeAiParser / GroqRecipeGeneratorService / GroqVisionService.
+     */
+    private suspend fun callLlm(prompt: String): Result<String> = coroutineScope {
+        val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
+
+        if (!GeminiService.isAvailable()) {
+            return@coroutineScope if (apiKey.isNotBlank()) callGroq(prompt, apiKey)
+            else Result.failure(Exception("Weder Gemini- noch Groq-API-Key konfiguriert"))
         }
 
-        return runCatching {
-            val cleaned = raw.trim()
-                .removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
-            val obj = JSONObject(cleaned)
-            val ing = obj.optString("ingredients").ifBlank { recipe.ingredients }
-            val ins = obj.optString("instructions").ifBlank { recipe.instructions }
-            // Nachbearbeitung: Reste wie "dough"/"raw milk" offline nachziehen
-            val desc = obj.optString("description").ifBlank { recipe.description }
-            ConvertedRecipe(
-                title = obj.optString("title").ifBlank { recipe.title },
-                description = translateNamesToGerman(desc),
-                ingredients = convertOfflineFull(ing),
-                instructions = translateNamesToGerman(convertUnitsToMetric(ins))
+        val geminiJob: Deferred<Result<String>> = async {
+            GeminiService.generateText(
+                prompt = prompt,
+                temperature = 0.2,
+                maxTokens = 3000
             )
-        }.recover {
-            ConvertedRecipe(
-                title = translateNamesToGerman(recipe.title),
-                description = translateNamesToGerman(recipe.description),
-                ingredients = convertOfflineFull(recipe.ingredients),
-                instructions = convertOfflineFull(recipe.instructions)
+        }
+        val groqJob: Deferred<Result<String>> = async {
+            if (apiKey.isBlank()) Result.failure(Exception("Kein GROQ_API_KEY"))
+            else callGroq(prompt, apiKey)
+        }
+
+        val (winnerJob, winnerResult) = select<Pair<Deferred<Result<String>>, Result<String>>> {
+            geminiJob.onAwait { geminiJob to it }
+            groqJob.onAwait { groqJob to it }
+        }
+        val loserJob = if (winnerJob === geminiJob) groqJob else geminiJob
+
+        if (winnerResult.isSuccess) {
+            loserJob.cancel()
+            winnerResult
+        } else {
+            // Erster Provider fehlgeschlagen — auf den zweiten warten statt sofort aufzugeben
+            loserJob.await()
+        }
+    }
+
+    private fun callGroq(prompt: String, apiKey: String): Result<String> {
+        return try {
+            val requestJson = JSONObject().apply {
+                put("model", "llama-3.3-70b-versatile")
+                put("temperature", 0.2)
+                put("max_tokens", 3000)
+                put("messages", JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("role", "user")
+                        put("content", prompt)
+                    })
+                })
+            }.toString()
+
+            val requestBody = requestJson.toRequestBody("application/json".toMediaType())
+            val request = Request.Builder()
+                .url(GROQ_URL)
+                .addHeader("Authorization", "Bearer $apiKey")
+                .addHeader("Content-Type", "application/json")
+                .post(requestBody)
+                .build()
+
+            val response = client.newCall(request).execute()
+            val bodyStr = response.body?.string() ?: return Result.failure(Exception("Leere Groq-Antwort"))
+            if (!response.isSuccessful) {
+                return Result.failure(Exception("Groq Fehler ${response.code}: $bodyStr"))
+            }
+
+            val content = JSONObject(bodyStr)
+                .getJSONArray("choices")
+                .getJSONObject(0)
+                .getJSONObject("message")
+                .getString("content")
+
+            Result.success(
+                content.trim()
+                    .removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
             )
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 }
