@@ -96,7 +96,8 @@ fun SettingsScreen(
     onNavigateToScan: () -> Unit = {},
     onNavigateToMealOrder: () -> Unit = {},
     onNavigateToShoppingList: () -> Unit = {},
-    onNavigateToSupplements: () -> Unit = {}
+    onNavigateToSupplements: () -> Unit = {},
+    onNavigateToCrashLog: () -> Unit = {}
 ) {
     val state   by vm.uiState.collectAsState()
     val profile  = state.profile
@@ -311,6 +312,10 @@ fun SettingsScreen(
             OutlinedButton(onClick = onNavigateToYazioImport, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.UploadFile, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(NutriSpacing.sm)); Text("Yazio-Daten importieren")
+            }
+            OutlinedButton(onClick = onNavigateToCrashLog, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.BugReport, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(NutriSpacing.sm)); Text("Absturzprotokoll")
             }
         }
 
