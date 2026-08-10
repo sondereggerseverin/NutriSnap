@@ -608,9 +608,15 @@ fun ComponentSplitSheet(
         return if (sideKeys.any { it in n }) "side" else "sauce"
     }
 
-    var groups by remember(matches) {
+    var groups by remember {
         mutableStateOf(matches.associate { it.ingredientRaw to defaultGroup(it) })
     }
+    // Matches laden oft async → Gruppen (inkl. gespeicherte componentGroup) nachziehen
+    LaunchedEffect(matches) {
+        if (matches.isEmpty()) return@LaunchedEffect
+        groups = matches.associate { it.ingredientRaw to defaultGroup(it) }
+    }
+
     var sideWeightText by remember {
         mutableStateOf(
             initialComponents.firstOrNull { it.name.contains("beilage", true) }
@@ -623,6 +629,16 @@ fun ComponentSplitSheet(
                 it.name.contains("sauce", true) || it.name.contains("fleisch", true)
             }?.cookedWeightG?.takeIf { it > 0f }?.toInt()?.toString() ?: ""
         )
+    }
+    // Komponenten-Gewichte aus DB nachziehen (collectAsState startet leer)
+    LaunchedEffect(initialComponents) {
+        val side = initialComponents.firstOrNull { it.name.contains("beilage", true) }
+            ?.cookedWeightG?.takeIf { it > 0f }
+        val sauce = initialComponents.firstOrNull {
+            it.name.contains("sauce", true) || it.name.contains("fleisch", true)
+        }?.cookedWeightG?.takeIf { it > 0f }
+        if (side != null && sideWeightText.isBlank()) sideWeightText = side.toInt().toString()
+        if (sauce != null && sauceWeightText.isBlank()) sauceWeightText = sauce.toInt().toString()
     }
 
     fun sumMatches(list: List<IngredientMatch>) = Triple(
@@ -696,8 +712,36 @@ fun ComponentSplitSheet(
                 return@Column
             }
 
-            Text("Zutaten zuordnen und Kochgewicht (netto) eintragen. Speichert automatisch.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(12.dp))
+            val sideParsed = sideWeightText.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
+            val sauceParsed = sauceWeightText.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
+            if (sideParsed != null || sauceParsed != null) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        buildString {
+                            append("Bereits getrennt: ")
+                            if (sideParsed != null) append("Beilage ${sideParsed.toInt()} g")
+                            if (sideParsed != null && sauceParsed != null) append(" · ")
+                            if (sauceParsed != null) append("Sauce ${sauceParsed.toInt()} g")
+                        },
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+            } else {
+                Text(
+                    "Noch keine Kochgewichte – Zutaten zuordnen und Gewicht (netto) eintragen. Speichert automatisch.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+            }
 
             // Beilage
             Text("Beilage", fontWeight = FontWeight.SemiBold)
