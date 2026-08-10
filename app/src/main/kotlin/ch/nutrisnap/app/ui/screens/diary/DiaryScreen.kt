@@ -2003,7 +2003,8 @@ private fun EntryScheduleSheet(
     onMove: (java.time.LocalDate, MealType) -> Unit,
     onCopyDays: (dayCount: Int, start: java.time.LocalDate, meal: MealType?, includeStart: Boolean) -> Unit
 ) {
-    var mode by remember { mutableStateOf("move") } // move | copy
+    // move = verschieben | copy = 1× kopieren | mealprep = N Tage (gleiche Portionen)
+    var mode by remember { mutableStateOf("move") }
     val today = java.time.LocalDate.now()
     var selectedDate by remember {
         mutableStateOf(
@@ -2012,6 +2013,14 @@ private fun EntryScheduleSheet(
     }
     var selectedMeal by remember { mutableStateOf(entry.mealType) }
     var dayCount by remember { mutableIntStateOf(5) }
+
+    fun applyQuick(date: java.time.LocalDate, meal: MealType) {
+        when (mode) {
+            "move" -> onMove(date, meal)
+            "copy" -> onCopyDays(1, date, meal, true)
+            else -> onCopyDays(dayCount, date, meal, true) // mealprep
+        }
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -2028,20 +2037,42 @@ private fun EntryScheduleSheet(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = mode == "move", onClick = { mode = "move" }, label = { Text("Verschieben") })
                 FilterChip(selected = mode == "copy", onClick = { mode = "copy" }, label = { Text("Kopieren") })
+                FilterChip(selected = mode == "mealprep", onClick = { mode = "mealprep" }, label = { Text("Meal-Prep") })
             }
+            Text(
+                when (mode) {
+                    "move" -> "Eintrag an einen anderen Tag/Mahlzeit verschieben"
+                    "copy" -> "Einmalig an einen anderen Tag/Mahlzeit kopieren"
+                    else -> "Gleiche Portion auf mehrere Tage verteilen (z. B. 5 Portionen vorgekocht)"
+                },
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
 
             Spacer(Modifier.height(12.dp))
             Text("Schnell", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(
-                    onClick = { onMove(today.minusDays(1), MealType.DINNER) },
+                    onClick = { applyQuick(today.minusDays(1), MealType.DINNER) },
                     modifier = Modifier.weight(1f)
                 ) { Text("Gestern Abend", fontSize = 12.sp) }
                 OutlinedButton(
-                    onClick = { onMove(today.minusDays(1), MealType.LUNCH) },
+                    onClick = { applyQuick(today.minusDays(1), MealType.LUNCH) },
                     modifier = Modifier.weight(1f)
                 ) { Text("Gestern Mittag", fontSize = 12.sp) }
+            }
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = { applyQuick(today.minusDays(2), MealType.DINNER) },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Vorgestern Abend", fontSize = 12.sp) }
+                OutlinedButton(
+                    onClick = { applyQuick(today.minusDays(2), MealType.LUNCH) },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Vorgestern Mittag", fontSize = 12.sp) }
             }
 
             Spacer(Modifier.height(12.dp))
@@ -2049,6 +2080,7 @@ private fun EntryScheduleSheet(
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(
+                    today.minusDays(2) to "Vorgestern",
                     today.minusDays(1) to "Gestern",
                     today to "Heute",
                     today.plusDays(1) to "Morgen"
@@ -2074,7 +2106,7 @@ private fun EntryScheduleSheet(
                 }
             }
 
-            if (mode == "copy") {
+            if (mode == "mealprep") {
                 Spacer(Modifier.height(12.dp))
                 Text("Anzahl Tage (Meal-Prep)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(6.dp))
@@ -2089,7 +2121,7 @@ private fun EntryScheduleSheet(
                             label = { Text("$n Tage") }
                         )
                     }
-                    IconButton(onClick = { dayCount = (dayCount - 1).coerceAtLeast(1) }) {
+                    IconButton(onClick = { dayCount = (dayCount - 1).coerceAtLeast(2) }) {
                         Icon(Icons.Default.Remove, null)
                     }
                     Text("$dayCount", fontWeight = FontWeight.Bold, fontSize = 18.sp)
@@ -2107,12 +2139,21 @@ private fun EntryScheduleSheet(
             Spacer(Modifier.height(20.dp))
             Button(
                 onClick = {
-                    if (mode == "move") onMove(selectedDate, selectedMeal)
-                    else onCopyDays(dayCount, selectedDate, selectedMeal, true)
+                    when (mode) {
+                        "move" -> onMove(selectedDate, selectedMeal)
+                        "copy" -> onCopyDays(1, selectedDate, selectedMeal, true)
+                        else -> onCopyDays(dayCount, selectedDate, selectedMeal, true)
+                    }
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(if (mode == "move") "Verschieben" else "Auf $dayCount Tage kopieren")
+                Text(
+                    when (mode) {
+                        "move" -> "Verschieben"
+                        "copy" -> "Kopieren"
+                        else -> "Auf $dayCount Tage kopieren"
+                    }
+                )
             }
         }
     }
