@@ -9,12 +9,16 @@ import ch.nutrisnap.app.data.repository.DiaryRepository
 import ch.nutrisnap.app.data.repository.FavoriteFoodRepository
 import ch.nutrisnap.app.data.repository.FoodItemRepository
 import ch.nutrisnap.app.data.repository.UserProfileRepository
+import ch.nutrisnap.app.data.repository.WeightRepository
+import ch.nutrisnap.app.domain.AdaptiveTdeeCalculator
 import ch.nutrisnap.app.domain.GroqVisionService
 import android.graphics.Bitmap
 import android.content.Context
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.edit
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
+import ch.nutrisnap.app.ui.theme.KEY_AGGRESSIVE_SPORT_DAY
+import ch.nutrisnap.app.ui.theme.KEY_MANUAL_ACTIVITY_ENABLED
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -41,34 +45,113 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     private val foodRepo    = FoodItemRepository(db)
     private val profileRepo = UserProfileRepository(db)
     private val favRepo     = FavoriteFoodRepository(db)
+    private val weightRepo  = WeightRepository(db)
+    private val hcDao       = db.healthConnectDao()
+    private val manualActivityDao = db.manualActivityDao()
     private val contextRanking = ch.nutrisnap.app.data.repository.ContextualFoodRankingRepository(
         db.foodUsageContextDao(), favRepo
     )
-    private val mealPatternDetector = ch.nutrisnap.app.domain.MealPatternDetector(
-        repo, ch.nutrisnap.app.data.repository.MealPatternRepository(db.detectedMealPatternDao())
-    )
 
     private val _date = MutableStateFlow(LocalDate.now())
+    private val trendWindowDays = 21
 
+    /**
+     * Kalorienziel identisch zur Startseite: adaptives TDEE wenn genug Daten,
+     * sonst Profilziel + heutige Aktivität.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val uiState: StateFlow<DiaryUiState> = combine(
-        _date.flatMapLatest { date ->
-            repo.getEntriesForDate(date).map { date to it }
-        },
-        profileRepo.get()
-    ) { (date, entries), profile ->
-        DiaryUiState(
-            selectedDate  = date,
-            entries       = entries,
-            totalCalories = entries.sumOf { it.calories.toDouble() }.toFloat(),
-            totalProtein  = entries.sumOf { it.protein.toDouble() }.toFloat(),
-            totalCarbs    = entries.sumOf { it.carbs.toDouble() }.toFloat(),
-            totalFat      = entries.sumOf { it.fat.toDouble() }.toFloat(),
-            calorieGoal   = profile.dailyCalorieGoal.toFloat(),
-            proteinGoal   = profile.proteinGoalG,
-            carbsGoal     = profile.carbsGoalG,
-            fatGoal       = profile.fatGoalG
-        )
+    val uiState: StateFlow<DiaryUiState> = _date.flatMapLatest { selected ->
+        combine(
+            repo.getEntriesForDate(selected),
+            profileRepo.get(),
+            hcDao.getCacheForDate(selected),
+            weightRepo.getRecent(trendWindowDays),
+            repo.getWeeklySummary(selected.minusDays(trendWindowDays.toLong())),
+            hcDao.getLast30Days(),
+            app.notifDataStore.data,
+            manualActivityDao.getSince(selected.minusDays(29).toString())
+        ) { args ->
+            val entries = args[0] as List<DiaryEntry>
+            val profile = args[1] as ch.nutrisnap.app.data.repository.UserProfile
+            val hcCache = args[2] as HealthConnectCache?
+            @Suppress("UNCHECKED_CAST")
+            val trendWeights = args[3] as List<WeightEntry>
+            @Suppress("UNCHECKED_CAST")
+            val dailySummaries = args[4] as List<ch.nutrisnap.app.data.db.DailySummary>
+            @Suppress("UNCHECKED_CAST")
+            val activityDays = args[5] as List<HealthConnectCache>
+            val prefs = args[6] as androidx.datastore.preferences.core.Preferences
+            @Suppress("UNCHECKED_CAST")
+            val manualActivities = args[7] as List<ManualActivityEntry>
+
+            val manualWeightByDate = trendWeights.associate { LocalDate.parse(it.dateStr) to it.weightKg }
+            val hcWeightByDate = activityDays
+                .mapNotNull { c -> c.weightKg?.let { kg -> c.date to kg.toFloat() } }
+                .toMap()
+            val weightByDate = AdaptiveTdeeCalculator.mergeWeightByDate(manualWeightByDate, hcWeightByDate)
+            val intakeByDate = dailySummaries.associate { LocalDate.parse(it.dateStr) to it.calories }
+            val trend = AdaptiveTdeeCalculator.computeTrendTdee(weightByDate, intakeByDate)
+
+            val manualEnabled = prefs[KEY_MANUAL_ACTIVITY_ENABLED] ?: false
+            val manualByDate = if (manualEnabled) {
+                manualActivities.associate {
+                    LocalDate.parse(it.dateStr) to it.activeCaloriesKcal.toDouble()
+                }
+            } else emptyMap()
+            val manualToday = manualByDate[selected]
+            val hcToday = hcCache?.activeCaloriesKcal
+            val todayActiveCombined = run {
+                val sum = (hcToday ?: 0.0) + (manualToday ?: 0.0)
+                sum.takeIf { it > 0.0 }
+            }
+            val avgActiveCombined = run {
+                val byDate = linkedMapOf<LocalDate, Double>()
+                for (c in activityDays) {
+                    c.activeCaloriesKcal?.let { byDate[c.date] = it }
+                }
+                for ((d, kcal) in manualByDate) {
+                    byDate[d] = (byDate[d] ?: 0.0) + kcal
+                }
+                byDate.values.takeIf { it.isNotEmpty() }?.average()
+            }
+            val displayActiveKcal = todayActiveCombined ?: 0.0
+
+            val weeklyLoss = profile.weeklyTargetLossKg?.takeIf { it > 0f }
+            val deficitKcal = weeklyLoss?.let { it * AdaptiveTdeeCalculator.KCAL_PER_KG / 7.0 }
+                ?: AdaptiveTdeeCalculator.DEFAULT_DEFICIT_KCAL
+            val aggressiveSport = prefs[KEY_AGGRESSIVE_SPORT_DAY] ?: false
+            val activityFactor = if (aggressiveSport) 1.0 else AdaptiveTdeeCalculator.ACTIVITY_ADJUSTMENT_FACTOR
+
+            val adaptiveTarget = AdaptiveTdeeCalculator.computeDailyTarget(
+                trend = trend,
+                formulaTdee = profile.computedTdee(),
+                todayActiveKcal = todayActiveCombined,
+                avgActiveKcal = avgActiveCombined,
+                deficitKcal = deficitKcal,
+                formulaBmr = profile.computedBmr(),
+                activityFactor = activityFactor
+            )
+
+            // Gleiche Logik wie HomeUiState.adjustedGoal
+            val calorieGoal = if (adaptiveTarget != null) {
+                adaptiveTarget.targetKcal.toFloat()
+            } else {
+                profile.dailyCalorieGoal.toFloat() + displayActiveKcal.toFloat()
+            }
+
+            DiaryUiState(
+                selectedDate  = selected,
+                entries       = entries,
+                totalCalories = entries.sumOf { it.calories.toDouble() }.toFloat(),
+                totalProtein  = entries.sumOf { it.protein.toDouble() }.toFloat(),
+                totalCarbs    = entries.sumOf { it.carbs.toDouble() }.toFloat(),
+                totalFat      = entries.sumOf { it.fat.toDouble() }.toFloat(),
+                calorieGoal   = calorieGoal,
+                proteinGoal   = profile.proteinGoalG,
+                carbsGoal     = profile.carbsGoalG,
+                fatGoal       = profile.fatGoalG
+            )
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DiaryUiState())
 
     // Food search state
@@ -95,38 +178,6 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
 
     fun isFavorite(food: FoodItem): Flow<Boolean> = favRepo.isFavorite(food)
     fun toggleFavorite(food: FoodItem) = viewModelScope.launch { favRepo.toggle(food) }
-
-    // Feature 5: wiederkehrende Mahlzeiten. Erkennung läuft einmal pro ViewModel-Instanz
-    // (günstig genug: nur 28 Tage Diary-Historie), kein eigener WorkManager-Job nötig.
-    private val _mealSuggestions = MutableStateFlow<List<ch.nutrisnap.app.domain.DetectedMealPattern>>(emptyList())
-    val mealSuggestions: StateFlow<List<ch.nutrisnap.app.domain.DetectedMealPattern>> = _mealSuggestions.asStateFlow()
-
-    init {
-        viewModelScope.launch {
-            runCatching { mealPatternDetector.detectAndSavePatterns() }
-            _mealSuggestions.value = runCatching { mealPatternDetector.getSuggestionsForNow() }.getOrDefault(emptyList())
-        }
-    }
-
-    /** 1-Tap-Relog: loggt alle Foods eines erkannten Musters mit der zuletzt genutzten
-     *  Menge (falls bekannt, sonst 100g als neutraler Default). */
-    fun applyMealSuggestion(pattern: ch.nutrisnap.app.domain.DetectedMealPattern) {
-        viewModelScope.launch {
-            val allEntries = repo.getAllEntriesOnce()
-            pattern.foodItemIds.forEach { fid ->
-                val lastAmount = allEntries.filter { it.foodItemId == fid }.maxByOrNull { it.dateStr }?.amountGrams
-                foodRepo.getById(fid)?.let { food ->
-                    repo.addEntry(food, lastAmount ?: 100f, pattern.mealType, _date.value)
-                    contextRanking.recordFoodUsage(fid.toString(), food.name)
-                }
-            }
-            _mealSuggestions.update { list -> list.filterNot { it.id == pattern.id } }
-        }
-    }
-
-    fun dismissMealSuggestion(pattern: ch.nutrisnap.app.domain.DetectedMealPattern) {
-        _mealSuggestions.update { list -> list.filterNot { it.id == pattern.id } }
-    }
 
     fun setDate(date: LocalDate) { _date.value = date }
     fun prevDay()                { _date.value = _date.value.minusDays(1) }
