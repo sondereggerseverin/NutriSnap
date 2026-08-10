@@ -239,6 +239,7 @@ $userInput
 
 Extrahiere daraus alle Zutaten und Zubereitungsschritte. Falls Mengenangaben fehlen, schätze realistische Werte.
 Falls kein Rezepttitel erkennbar ist, erfinde einen passenden deutschen Namen.
+Übersetze alles ins Deutsche (auch wenn die Quelle Englisch ist) und verwende metrische Einheiten.
 """.trimIndent()
         } else {
             "Erstelle ein realistisches Rezept für: $userInput"
@@ -248,6 +249,8 @@ Falls kein Rezepttitel erkennbar ist, erfinde einen passenden deutschen Namen.
 Du bist ein erfahrener Ernährungsberater und Koch.
 $taskDescription
 
+$LANGUAGE_RULES
+
 $COMPLETE_INGREDIENT_RULES
 
 $NUTRITION_RULES
@@ -255,6 +258,18 @@ $NUTRITION_RULES
 $JSON_SCHEMA_HINT
 """.trimIndent()
     }
+
+    private val LANGUAGE_RULES = """
+SPRACHE (strikt):
+- Titel, Beschreibung, ALLE Zutatenamen und ALLE Zubereitungsschritte AUSSCHLIESSLICH auf Deutsch.
+- Kein Denglisch, keine englischen Produktnamen oder Formulierungen.
+- Beispiele: „Kakaopulver“ statt „cocoa powder“, „karamellisiertes veganes Proteinpulver“ statt
+  „caramel flavoured vegan protein powder“, „zerbröselte Erdnüsse“ statt „zerkrümelt peanuts“,
+  „Schokoraspel“ statt „chocolate shavings“, „Tupfer Erdnussbutter“ statt „blobs of peanut butter“.
+- Markennamen oder exakte Produktbezeichnungen nur behalten, wenn sie auf Deutsch gebräuchlich sind;
+  sonst sinngemäß ins Deutsche übersetzen.
+- Mengenangaben und Einheiten metrisch (g, ml, EL, TL, Stück) – nie cups, oz, °F.
+""".trimIndent()
 
     private val COMPLETE_INGREDIENT_RULES = """
 VOLLSTÄNDIGE ZUTATENLISTE (Pflicht):
@@ -279,10 +294,11 @@ NÄHRWERTE:
 """.trimIndent()
 
     private val JSON_SCHEMA_HINT = """
-Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
+Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen).
+Alle Strings (title, description, name, steps) müssen auf Deutsch sein:
 {
-  "title": "Rezeptname",
-  "description": "Kurze Beschreibung",
+  "title": "Hähnchen-Curry mit Reis",
+  "description": "Würziges indisch inspiriertes Curry mit zartem Hähnchen.",
   "structuredIngredients": [
     {"name": "Hühnerbrust", "amount": "400g", "calories": 660, "protein": 124.0, "carbs": 0.0, "fat": 14.4},
     {"name": "Speiseöl", "amount": "1 EL", "calories": 120, "protein": 0.0, "carbs": 0.0, "fat": 14.0},
@@ -290,7 +306,7 @@ Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
     {"name": "Garam Masala", "amount": "1 TL", "calories": 8, "protein": 0.3, "carbs": 1.5, "fat": 0.3}
   ],
   "ingredients": ["400g Hühnerbrust", "1 EL Speiseöl", "1 Zwiebel", "1 TL Garam Masala"],
-  "steps": ["Schritt 1", "Schritt 2"],
+  "steps": ["Zwiebel in Öl anbraten.", "Hühnerbrust würzen und mitgaren."],
   "servings": 4,
   "prepTimeMinutes": 30,
   "calories": 207,
@@ -320,6 +336,8 @@ auch wenn sie nicht in der Liste stehen — und MUSST sie mit Menge und Nährwer
 Falls für ein rundes Gericht 1–2 weitere typische Haushaltszutaten fehlen, darfst du sie ergänzen.
 Erfinde KEINE exotischen Zutaten, die die Person offensichtlich nicht hat.
 
+$LANGUAGE_RULES
+
 $COMPLETE_INGREDIENT_RULES
 
 $NUTRITION_RULES
@@ -348,6 +366,8 @@ Erfinde ein leckeres, alltagstaugliches Gericht, dessen Nährwerte PRO PORTION s
 (Toleranz ca. ±10%). Bevorzuge eine ausgewogene, proteinreiche Mahlzeit. Wenn das Budget sehr klein ist (< 300 kcal),
 schlage einen Snack statt einer ganzen Mahlzeit vor. Setze "servings" auf 1, damit die Toplevel-Werte direkt einer Portion entsprechen.
 
+$LANGUAGE_RULES
+
 $COMPLETE_INGREDIENT_RULES
 
 $NUTRITION_RULES
@@ -371,6 +391,8 @@ $JSON_SCHEMA_HINT
         return """
 Überrasche mich mit einem kreativen, aber alltagstauglichen Rezept. Stil: $cuisine, $style.
 Es soll mit haushaltsüblichen, in der Schweiz/Europa gut erhältlichen Zutaten machbar sein.
+
+$LANGUAGE_RULES
 
 Berechne die Nährwerte EXAKT basierend auf echten Zutatenmengen.
 Referenzwerte pro 100g: Hühnerbrust=165kcal/31gP, Parmesan=431kcal/38gP,
@@ -427,6 +449,8 @@ $volumeHint
 $workoutHint
 $ingredientsHint
 $notesHint
+
+$LANGUAGE_RULES
 
 Jedes Element im "meals"-Array braucht ein mealType-Feld mit genau einem der Werte:
 "BREAKFAST", "LUNCH", "DINNER", "SNACK".
@@ -494,6 +518,8 @@ $stepsList
 Schreibe NUR die Zubereitungsschritte so um, dass das Gericht $methodInstruction zubereitet wird.
 Zutaten und Mengen bleiben unverändert. Ändere NICHTS an den Nährwerten. Titel und Beschreibung
 darfst du leicht anpassen (z.B. "... aus dem Dampfgarer"), falls sinnvoll.
+
+$LANGUAGE_RULES
 
 $JSON_SCHEMA_HINT
 """.trimIndent()
