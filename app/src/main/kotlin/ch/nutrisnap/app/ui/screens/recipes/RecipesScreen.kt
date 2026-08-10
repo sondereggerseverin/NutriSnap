@@ -275,6 +275,15 @@ fun RecipesScreen(
     var showCookSheet     by remember { mutableStateOf(false) }
     val batchState by vm.batchState.collectAsState()
     val budgetScaleState by vm.budgetScaleState.collectAsState()
+    val pendingTargetKcal by vm.pendingTargetKcal.collectAsState()
+
+    // Ziel-kcal aus „Was koche ich?“ einmalig anwenden, sobald ein Rezept geöffnet wird
+    LaunchedEffect(selectedRecipe?.id, pendingTargetKcal) {
+        val recipe = selectedRecipe ?: return@LaunchedEffect
+        val target = pendingTargetKcal ?: return@LaunchedEffect
+        vm.clearPendingTargetKcal()
+        vm.scaleToTargetKcal(recipe, target)
+    }
 
     LaunchedEffect(sharedUrl) { if (!sharedUrl.isNullOrBlank()) showImportSheet = true }
     LaunchedEffect(sharedRecipeJson) { if (!sharedRecipeJson.isNullOrBlank()) vm.importFromSharedJson(sharedRecipeJson) }
@@ -470,10 +479,8 @@ fun RecipesScreen(
         CookWithWhatIHaveSheet(
             onDismiss = { showCookSheet = false },
             onSearch = { ingredients, category, targetKcal ->
-                vm.searchByIngredients(ingredients, category)
+                vm.searchByIngredients(ingredients, category, targetKcal)
                 showCookSheet = false
-                // targetKcal wird beim Öffnen eines Rezepts über Budget-Scale genutzt —
-                // speichern wir lokal nicht; User tippt „Auf Restbudget“ oder wir scalen optional.
             }
         )
     }
@@ -2328,13 +2335,13 @@ private fun CookWithWhatIHaveSheet(
                 value = kcalText,
                 onValueChange = { kcalText = it.filter { ch -> ch.isDigit() } },
                 label = { Text("Ziel-kcal pro Portion (optional)") },
-                placeholder = { Text("z.B. 500 — Skalierung im Rezept") },
+                placeholder = { Text("z.B. 500") },
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
             Text(
-                "Kalorien skalierst du im geöffneten Rezept („Auf Restbudget“ / Ziel-kcal).",
+                "Beim Öffnen eines Rezepts wird die Portion automatisch auf dieses Ziel skaliert.",
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 6.dp)

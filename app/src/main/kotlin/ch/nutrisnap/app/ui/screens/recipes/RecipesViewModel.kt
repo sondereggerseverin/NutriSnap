@@ -127,6 +127,10 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     private val _budgetScaleState = MutableStateFlow(BudgetScaleState())
     val budgetScaleState: StateFlow<BudgetScaleState> = _budgetScaleState.asStateFlow()
 
+    /** Optionales kcal-Ziel aus „Was koche ich?“ — wird beim Öffnen eines Rezepts einmalig angewendet. */
+    private val _pendingTargetKcal = MutableStateFlow<Float?>(null)
+    val pendingTargetKcal: StateFlow<Float?> = _pendingTargetKcal.asStateFlow()
+
     private val _isTranslating = MutableStateFlow(false)
 
     /** Feature 1: Rezeptportion auf das heutige Kalorien-Restbudget skalieren. */
@@ -143,6 +147,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun clearBudgetScale() { _budgetScaleState.value = BudgetScaleState() }
+
+    fun clearPendingTargetKcal() { _pendingTargetKcal.value = null }
 
     /** Portion auf festes kcal-Ziel skalieren (z.B. aus „Was koche ich?“). */
     fun scaleToTargetKcal(recipe: Recipe, targetKcal: Float) {
@@ -282,10 +288,11 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * „Was koche ich?“: Zutaten (Komma/Zeilen) müssen im Rezept vorkommen.
-     * Optional Kategorie-Filter. Query-Feld wird geleert, damit die volle Liste
-     * als Basis dient und nur die Needles filtern.
+     * Optional Kategorie-Filter und Ziel-kcal pro Portion.
+     * Query-Feld wird geleert, damit die volle Liste als Basis dient und nur die Needles filtern.
+     * [targetKcal] wird beim nächsten Öffnen eines Rezepts einmalig skaliert.
      */
-    fun searchByIngredients(raw: String, category: RecipeCategory? = null) {
+    fun searchByIngredients(raw: String, category: RecipeCategory? = null, targetKcal: Float? = null) {
         val needles = raw.split(Regex("[,;\n]"))
             .map { it.trim() }
             .filter { it.length >= 2 }
@@ -293,6 +300,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         _query.value = ""
         _ingredientNeedles.value = needles
         if (category != null) _categoryFilter.value = category
+        _pendingTargetKcal.value = targetKcal?.takeIf { it > 0f }
     }
 
     fun setRecipeCategory(recipe: Recipe, category: RecipeCategory) {
