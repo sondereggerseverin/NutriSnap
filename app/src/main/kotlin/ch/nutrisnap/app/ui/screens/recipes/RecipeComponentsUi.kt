@@ -109,6 +109,25 @@ fun RecipeComponentsEditorSheet(
     var drafts by remember(recipe.id) {
         mutableStateOf(toDrafts(if (initial.isNotEmpty()) initial else suggested))
     }
+    // initial kommt oft async (collectAsState startet leer) → Gewichte nachziehen
+    LaunchedEffect(initial) {
+        if (initial.isEmpty()) return@LaunchedEffect
+        val fromDb = toDrafts(initial)
+        drafts = if (drafts.all { it.cookedWeightG.isBlank() } && drafts.size <= fromDb.size) {
+            fromDb
+        } else {
+            drafts.map { d ->
+                if (d.cookedWeightG.isNotBlank()) d
+                else {
+                    val match = fromDb.firstOrNull {
+                        it.name.equals(d.name, ignoreCase = true) && it.cookedWeightG.isNotBlank()
+                    }
+                    if (match != null) d.copy(cookedWeightG = match.cookedWeightG, id = match.id)
+                    else d
+                }
+            }
+        }
+    }
 
     // Suggestion-Namen nachziehen, wenn Drafts noch Default-Namen haben und suggested da ist
     LaunchedEffect(suggested) {
@@ -183,13 +202,25 @@ fun RecipeComponentsEditorSheet(
                             modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(Modifier.height(6.dp))
+                        val weightParsed = draft.cookedWeightG.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
+                        val densText = if (weightParsed != null && nut.totalCalories > 0f) {
+                            val per100 = nut.totalCalories / weightParsed * 100f
+                            " · ${fmtNum(per100)} kcal/100g"
+                        } else ""
                         OutlinedTextField(
                             value = draft.cookedWeightG,
                             onValueChange = { v ->
                                 drafts = drafts.toMutableList().also { it[index] = draft.copy(cookedWeightG = v) }
                             },
                             label = { Text("Kochgewicht (g)") },
-                            supportingText = { Text("Gesamtgewicht dieser Komponente nach dem Kochen (ohne Topf)") },
+                            supportingText = {
+                                Text(
+                                    if (weightParsed != null)
+                                        "Eingetragen: ${weightParsed.toInt()} g$densText"
+                                    else
+                                        "Noch nicht gesetzt – Gesamtgewicht nach dem Kochen (ohne Topf)"
+                                )
+                            },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
