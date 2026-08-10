@@ -54,6 +54,7 @@ import ch.nutrisnap.app.ui.screens.scan.FoodScanScreen
 import ch.nutrisnap.app.ui.screens.scan.NutritionLabelScanScreen
 import ch.nutrisnap.app.ui.screens.scan.ScanChooserScreen
 import ch.nutrisnap.app.ui.screens.security.BiometricLockScreen
+import ch.nutrisnap.app.ui.screens.settings.CrashLogScreen
 import ch.nutrisnap.app.ui.screens.settings.KEY_BIOMETRIC_LOCK
 import ch.nutrisnap.app.ui.screens.settings.NotificationSettingsScreen
 import ch.nutrisnap.app.ui.screens.settings.MealOrderScreen
@@ -404,7 +405,8 @@ fun MainScaffold(
                     onNavigateToScan          = { navController.navigate("scan_chooser") },
                     onNavigateToMealOrder     = { navController.navigate("meal_order") },
                     onNavigateToShoppingList  = { navController.navigate("shopping_list") },
-                    onNavigateToSupplements   = { navController.navigate("supplements") }
+                    onNavigateToSupplements   = { navController.navigate("supplements") },
+                    onNavigateToCrashLog      = { navController.navigate("crash_log") }
                 )
             }
             composable(
@@ -542,6 +544,13 @@ fun MainScaffold(
                 ch.nutrisnap.app.ui.screens.supplements.SupplementsScreen(
                     onNavigateBack = { navController.popBackStack() }
                 )
+            }
+            composable(
+                "crash_log",
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) {
+                CrashLogScreen(onBack = { navController.popBackStack() })
             }
         }
     }
