@@ -257,11 +257,13 @@ fun RecipesScreen(
     diaryVm: ch.nutrisnap.app.ui.screens.diary.DiaryViewModel = viewModel(),
     shoppingVm: ch.nutrisnap.app.ui.screens.shopping.ShoppingListViewModel = viewModel(),
     freezerVm: FreezerViewModel = viewModel(),
+    collectionsVm: RecipeCollectionsViewModel = viewModel(),
     sharedUrl: String? = null,
     sharedBatchUrls: List<String> = emptyList(),
     sharedRecipeJson: String? = null
 ) {
     val state by vm.uiState.collectAsState()
+    val collections by collectionsVm.collections.collectAsState()
     var showImportSheet   by remember { mutableStateOf(false) }
     var selectedRecipe    by remember { mutableStateOf<Recipe?>(null) }
     var showVerifySheet    by remember { mutableStateOf(false) }
@@ -274,6 +276,7 @@ fun RecipesScreen(
     var editComponentsRecipe by remember { mutableStateOf<Recipe?>(null) }
     var hideIncomplete    by remember { mutableStateOf(false) }
     var favoritesOnly     by remember { mutableStateOf(false) }
+    var collectionFilterId by remember { mutableStateOf<Long?>(null) }
     var showBatchSheet    by remember { mutableStateOf(false) }
     var showCookSheet     by remember { mutableStateOf(false) }
     var cookingRecipe     by remember { mutableStateOf<Recipe?>(null) }
@@ -437,9 +440,32 @@ fun RecipesScreen(
                     if (favCount > 0 || favoritesOnly) {
                         FilterChip(
                             selected = favoritesOnly,
-                            onClick  = { favoritesOnly = !favoritesOnly },
+                            onClick  = {
+                                favoritesOnly = !favoritesOnly
+                                if (favoritesOnly) collectionFilterId = null
+                            },
                             label    = { Text(if (favCount > 0) "★ Favoriten ($favCount)" else "★ Favoriten", fontSize = 12.sp) }
                         )
+                    }
+                    collections.forEach { col ->
+                        val colCount = state.recipes.count { it.collectionId == col.id }
+                        if (colCount > 0 || collectionFilterId == col.id) {
+                            FilterChip(
+                                selected = collectionFilterId == col.id,
+                                onClick = {
+                                    collectionFilterId =
+                                        if (collectionFilterId == col.id) null else col.id
+                                    if (collectionFilterId != null) favoritesOnly = false
+                                },
+                                label = {
+                                    Text(
+                                        "${col.emoji} ${col.name}" +
+                                            if (colCount > 0) " ($colCount)" else "",
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            )
+                        }
                     }
                     val incompleteCount = state.recipes.count { it.isIncomplete() }
                     if (incompleteCount > 0) {
@@ -464,6 +490,10 @@ fun RecipesScreen(
             }
             val displayedRecipes = state.recipes
                 .let { if (favoritesOnly) it.filter { r -> r.isFavorite } else it }
+                .let { list ->
+                    val cid = collectionFilterId
+                    if (cid != null) list.filter { it.collectionId == cid } else list
+                }
                 .let { if (hideIncomplete) it.filterNot { r -> r.isIncomplete() } else it }
             if (state.recipes.isNotEmpty()) {
                 Text(

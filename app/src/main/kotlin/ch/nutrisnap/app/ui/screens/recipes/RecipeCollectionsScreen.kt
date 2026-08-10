@@ -38,6 +38,12 @@ class RecipeCollectionsViewModel(app: Application) : AndroidViewModel(app) {
         dao.getFavoriteRecipes()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** collectionId → Anzahl Rezepte */
+    val collectionCounts: StateFlow<Map<Long, Int>> =
+        dao.getCollectionCounts()
+            .map { rows -> rows.associate { it.collectionId to it.cnt } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
     fun recipesInCollection(collectionId: Long): Flow<List<Recipe>> =
         dao.getRecipesByCollection(collectionId)
 
@@ -75,11 +81,13 @@ fun RecipeCollectionsScreen(
 ) {
     val collections by viewModel.collections.collectAsState()
     val favorites by viewModel.favoriteRecipes.collectAsState()
+    val counts by viewModel.collectionCounts.collectAsState()
     var showNewCollectionDialog by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
     var newEmoji by remember { mutableStateOf("📁") }
     var openCollection by remember { mutableStateOf<RecipeCollection?>(null) }
     var showFavorites by remember { mutableStateOf(false) }
+    var pendingDelete by remember { mutableStateOf<RecipeCollection?>(null) }
 
     val emojis = listOf("📁", "🍕", "🥗", "🍰", "🥩", "🍜", "🥤", "🌮", "🍱", "⭐", "🎄", "💪")
 
@@ -179,6 +187,7 @@ fun RecipeCollectionsScreen(
             }
 
             items(collections, key = { it.id }) { collection ->
+                val count = counts[collection.id] ?: 0
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -192,12 +201,18 @@ fun RecipeCollectionsScreen(
                     ) {
                         Text(collection.emoji, style = MaterialTheme.typography.headlineSmall)
                         Spacer(Modifier.width(12.dp))
-                        Text(
-                            collection.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(onClick = { viewModel.deleteCollection(collection) }) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                collection.name,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                "$count Rezept${if (count == 1) "" else "e"}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(onClick = { pendingDelete = collection }) {
                             Icon(
                                 Icons.Default.Delete,
                                 contentDescription = "Löschen",
@@ -274,6 +289,38 @@ fun RecipeCollectionsScreen(
             },
             dismissButton = {
                 OutlinedButton(onClick = { showNewCollectionDialog = false }) {
+                    Text("Abbrechen")
+                }
+            }
+        )
+    }
+
+    pendingDelete?.let { col ->
+        val count = counts[col.id] ?: 0
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("Sammlung löschen?") },
+            text = {
+                Text(
+                    if (count > 0)
+                        "„${col.emoji} ${col.name}“ und die Zuordnung von $count Rezept${if (count == 1) "" else "en"} entfernen? Die Rezepte selbst bleiben erhalten."
+                    else
+                        "„${col.emoji} ${col.name}“ wirklich löschen?"
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteCollection(col)
+                        pendingDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) { Text("Löschen") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { pendingDelete = null }) {
                     Text("Abbrechen")
                 }
             }

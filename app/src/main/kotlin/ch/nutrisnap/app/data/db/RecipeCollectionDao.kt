@@ -5,6 +5,12 @@ import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeCollection
 import kotlinx.coroutines.flow.Flow
 
+/** Hilfszeile für Rezept-Anzahl pro Sammlung. */
+data class CollectionCount(
+    val collectionId: Long,
+    val cnt: Int
+)
+
 @Dao
 interface RecipeCollectionDao {
 
@@ -16,6 +22,16 @@ interface RecipeCollectionDao {
 
     @Query("SELECT * FROM recipes WHERE isFavorite = 1 ORDER BY savedAt DESC")
     fun getFavoriteRecipes(): Flow<List<Recipe>>
+
+    @Query(
+        """
+        SELECT collectionId AS collectionId, COUNT(*) AS cnt
+        FROM recipes
+        WHERE collectionId IS NOT NULL
+        GROUP BY collectionId
+        """
+    )
+    fun getCollectionCounts(): Flow<List<CollectionCount>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCollection(collection: RecipeCollection): Long
