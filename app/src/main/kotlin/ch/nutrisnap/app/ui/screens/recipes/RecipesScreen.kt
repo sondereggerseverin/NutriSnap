@@ -558,6 +558,7 @@ fun RecipesScreen(
 
     val showVerifyNow = showVerifySheet && verifyRecipe != null && verifyResult != null
     if (showVerifyNow) {
+        val existingComps by vm.getComponents(verifyRecipe!!.id).collectAsState(initial = emptyList())
         IngredientVerifySheet(
             analysisResult = verifyResult!!,
             recipeName     = verifyRecipe!!.displayTitle(),
@@ -580,7 +581,14 @@ fun RecipesScreen(
             recipeIdForComponents = verifyRecipe.id,
             onSaveMatches = { matches ->
                 vm.replaceMatchesForRecipe(verifyRecipe.id, matches)
-            }
+            },
+            initialSideWeightG = existingComps.firstOrNull {
+                it.name.contains("beilage", ignoreCase = true)
+            }?.cookedWeightG,
+            initialSauceWeightG = existingComps.firstOrNull {
+                it.name.contains("sauce", ignoreCase = true) ||
+                    it.name.contains("fleisch", ignoreCase = true)
+            }?.cookedWeightG
         )
     }
 

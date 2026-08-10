@@ -6,6 +6,8 @@ import androidx.room.PrimaryKey
 /**
  * Speichert welche Zutat eines Rezepts mit welchem FoodItem gematcht wurde.
  * Ein Eintrag pro Rezept-Zutat.
+ *
+ * [componentGroup]: "side" | "sauce" | null — Zuordnung Beilage/Sauce aus dem Verify-Sheet.
  */
 @Entity(tableName = "ingredient_matches")
 data class IngredientMatch(
@@ -21,7 +23,9 @@ data class IngredientMatch(
     val matchedProtein: Float? = null,
     val matchedCarbs: Float? = null,
     val matchedFat: Float? = null,
-    val matchSource: MatchSource = MatchSource.UNMATCHED
+    val matchSource: MatchSource = MatchSource.UNMATCHED,
+    /** "side" | "sauce" | null (Heuristik beim Split). */
+    val componentGroup: String? = null
 )
 
 enum class MatchSource {

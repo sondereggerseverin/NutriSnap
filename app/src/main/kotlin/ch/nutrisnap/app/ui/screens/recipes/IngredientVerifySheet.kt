@@ -231,7 +231,10 @@ fun IngredientVerifySheet(
     /** recipeId für gebaute RecipeComponent-Objekte (0 = egal, wird vom Caller gesetzt). */
     recipeIdForComponents: Long = 0L,
     /** Persistiert verifizierte Zutaten als IngredientMatch (für späteren Komponenten-Split). */
-    onSaveMatches: ((List<IngredientMatch>) -> Unit)? = null
+    onSaveMatches: ((List<IngredientMatch>) -> Unit)? = null,
+    /** Bereits gespeicherte Kochgewichte (Beilage / Sauce) zum Vorausfüllen. */
+    initialSideWeightG: Float? = null,
+    initialSauceWeightG: Float? = null
 ) {
     var overrides by remember { mutableStateOf(initialOverrides) }
     var verifyStates by remember {
@@ -247,8 +250,12 @@ fun IngredientVerifySheet(
             }
         )
     }
-    var sideWeightText by remember { mutableStateOf("") }
-    var sauceWeightText by remember { mutableStateOf("") }
+    var sideWeightText by remember {
+        mutableStateOf(initialSideWeightG?.takeIf { it > 0f }?.toInt()?.toString() ?: "")
+    }
+    var sauceWeightText by remember {
+        mutableStateOf(initialSauceWeightG?.takeIf { it > 0f }?.toInt()?.toString() ?: "")
+    }
     // Merkt sich, für welches AnalysisResult verifyStates zuletzt aufgebaut wurde.
     // Verhindert, dass ein neues Analyse-Ergebnis (z. B. durch "Neu berechnen" in der
     // Rezeptkarte) manuelle Anpassungen überschreibt — diese werden aus `overrides`
@@ -640,7 +647,8 @@ fun IngredientVerifySheet(
                                         s.override != null -> MatchSource.MANUAL
                                         s.isVerified -> MatchSource.DATABASE
                                         else -> MatchSource.UNMATCHED
-                                    }
+                                    },
+                                    componentGroup = groups[s.result.line] ?: "sauce"
                                 )
                             }
                         )

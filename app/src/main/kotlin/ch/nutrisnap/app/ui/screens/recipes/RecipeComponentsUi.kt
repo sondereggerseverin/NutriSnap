@@ -68,33 +68,13 @@ private fun nutritionFor(
     val base = byName ?: byIndex
     if (base != null && base.totalCalories > 0f) return base
 
-    // Fallback: Rezept-Totals proportional zu den (bereits eingegebenen) Kochgewichten
-    // (nur wenn keine Zutaten-Matches vorliegen – gleiche kcal/100g ist dann erwartet)
-    val recipeTotal = recipe.totalCalories ?: 0f
-    if (recipeTotal <= 0f) {
-        return RecipeComponent(
-            recipeId = recipe.id,
-            name = draft.name,
-            cookedWeightG = 0f,
-            totalCalories = 0f
-        )
-    }
-    val serv = recipe.servings.coerceAtLeast(1).toFloat()
-    val weights = allDrafts.map {
-        it.cookedWeightG.replace(',', '.').toFloatOrNull()?.coerceAtLeast(0f) ?: 0f
-    }
-    val wSum = weights.sum().coerceAtLeast(1f)
-    val w = weights.getOrNull(index) ?: 0f
-    val f = if (w > 0f) w / wSum else 1f / allDrafts.size.coerceAtLeast(1)
+    // Kein Fake-Split: ohne echte Zutaten-Matches bleiben Nährwerte leer
+    // (Verify → Zutaten zuordnen → Kochgewicht ist der korrekte Weg)
     return RecipeComponent(
         recipeId = recipe.id,
         name = draft.name,
-        cookedWeightG = w,
-        totalCalories = recipeTotal * f,
-        proteinG = (recipe.proteinPerServing ?: 0f) * serv * f,
-        carbsG = (recipe.carbsPerServing ?: 0f) * serv * f,
-        fatG = (recipe.fatPerServing ?: 0f) * serv * f,
-        fiberG = (recipe.fiberPerServing ?: 0f) * serv * f
+        cookedWeightG = draft.cookedWeightG.replace(',', '.').toFloatOrNull() ?: 0f,
+        totalCalories = 0f
     )
 }
 
@@ -108,13 +88,21 @@ fun RecipeComponentsEditorSheet(
     onDismiss: () -> Unit,
     onRequestSuggest: () -> Unit = {}
 ) {
-    fun toDrafts(list: List<RecipeComponent>): List<Draft> =
+    fun toDrafts(list: List<RecipeComponent>): List<Draft> {
         if (list.isEmpty()) {
-            listOf(
+            return listOf(
                 Draft(0, "Beilage", ""),
                 Draft(0, "Sauce / Fleisch", "")
             )
-        } else list.map { componentToDraft(it) }
+        }
+        // Duplikate nach Name entfernen (z. B. 2× Sauce)
+        val deduped = list
+            .groupBy { it.name.trim().lowercase() }
+            .map { (_, g) ->
+                g.lastOrNull { it.cookedWeightG > 0f } ?: g.last()
+            }
+        return deduped.map { componentToDraft(it) }
+    }
 
     var drafts by remember(recipe.id) {
         mutableStateOf(toDrafts(if (initial.isNotEmpty()) initial else suggested))
@@ -216,15 +204,23 @@ fun RecipeComponentsEditorSheet(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Spacer(Modifier.height(2.dp))
-                                Text(
-                                    "${fmtNum(nut.totalCalories)} kcal · " +
-                                        "P ${fmtNum(nut.proteinG)} g · " +
-                                        "KH ${fmtNum(nut.carbsG)} g · " +
-                                        "F ${fmtNum(nut.fatG)} g" +
-                                        if (nut.fiberG > 0f) " · Ballast ${fmtNum(nut.fiberG)} g" else "",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
+                                if (nut.totalCalories > 0f) {
+                                    Text(
+                                        "${fmtNum(nut.totalCalories)} kcal · " +
+                                            "P ${fmtNum(nut.proteinG)} g · " +
+                                            "KH ${fmtNum(nut.carbsG)} g · " +
+                                            "F ${fmtNum(nut.fatG)} g" +
+                                            if (nut.fiberG > 0f) " · Ballast ${fmtNum(nut.fiberG)} g" else "",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                } else {
+                                    Text(
+                                        "Noch keine Zutaten-Zuordnung. Im Verify-Fenster Zutaten in Beilage/Sauce sortieren und Kochgewicht setzen.",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
                             }
                         }
                     }

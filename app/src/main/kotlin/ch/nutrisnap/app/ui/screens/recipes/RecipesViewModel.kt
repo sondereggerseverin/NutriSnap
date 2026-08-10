@@ -570,7 +570,14 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                         best
                     }
                 }
-            var comps = healComponentNutrition(recipe, deduped)
+            // Vom Verify-Sheet kommende Werte (unterschiedliche kcal/100g) nicht überschreiben
+            val dens = deduped.map { c ->
+                if (c.cookedWeightG > 0f && c.totalCalories > 0f) c.totalCalories / c.cookedWeightG else -1f
+            }
+            val alreadySplit = deduped.size >= 2 &&
+                dens.all { it > 0f } &&
+                dens.maxOrNull()!!.let { mx -> dens.minOrNull()!!.let { mn -> mx / mn.coerceAtLeast(0.001f) > 1.08f } }
+            var comps = if (alreadySplit) deduped else healComponentNutrition(recipe, deduped)
             repo.setComponents(recipeId, comps)
             if (updateRecipeTotals && comps.isNotEmpty()) {
                 val totalKcal = comps.sumOf { it.totalCalories.toDouble() }.toFloat()
@@ -689,30 +696,13 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun suggestComponentsFromMatches(recipe: Recipe): List<RecipeComponent> {
         val matches = matchDao.getMatchesForRecipeOnce(recipe.id)
             .filter { (it.matchedCalories ?: 0f) > 0f || it.amountGrams > 0f }
-        if (matches.isEmpty()) {
-            // Fallback: gesamtes Rezept als eine Komponente mit bekannten Totals
-            val kcal = recipe.totalCalories ?: 0f
-            if (kcal <= 0f) return emptyList()
-            val serv = recipe.servings.coerceAtLeast(1).toFloat()
-            return listOf(
-                RecipeComponent(
-                    recipeId = recipe.id,
-                    name = "Gesamt",
-                    cookedWeightG = recipe.cookedWeightG ?: recipe.totalIngredientWeightG ?: 0f,
-                    totalCalories = kcal,
-                    proteinG = (recipe.proteinPerServing ?: 0f) * serv,
-                    carbsG = (recipe.carbsPerServing ?: 0f) * serv,
-                    fatG = (recipe.fatPerServing ?: 0f) * serv,
-                    fiberG = (recipe.fiberPerServing ?: 0f) * serv
-                )
-            )
-        }
+        if (matches.isEmpty()) return emptyList()
+
         fun isSide(text: String): Boolean {
             val n = text.lowercase()
-            // Nur echte Beilagen – Zwiebeln/Öl gehören zur Sauce, nicht zum Reis
             return listOf(
                 "reis", "basmati", "erbse", "erbsen", "peas", "kartoffel", "nudel", "pasta",
-                "quinoa", "couscous", "bulgur", "beilage", "reisnudeln", "glasierte"
+                "quinoa", "couscous", "bulgur", "beilage", "reisnudeln"
             ).any { it in n }
         }
         fun isSauce(text: String): Boolean {
@@ -721,46 +711,43 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 "poulet", "huhn", "chicken", "fleisch", "tomate", "rahm", "sahne", "cream",
                 "joghurt", "yogurt", "püree", "puree", "gewürz", "garam", "sauce", "butter",
                 "masala", "chili", "ingwer", "knoblauch", "zwiebel", "öl", "oil", "speiseöl",
-                "fromage", "rôti", "roti"
+                "fromage", "rôti", "roti", "kebab"
             ).any { it in n }
         }
+
         val side = mutableListOf<ch.nutrisnap.app.data.model.IngredientMatch>()
         val sauce = mutableListOf<ch.nutrisnap.app.data.model.IngredientMatch>()
         for (m in matches) {
-            val key = "${m.ingredientRaw} ${m.ingredientName} ${m.matchedFoodName.orEmpty()}"
-            when {
-                isSide(key) && !isSauce(key) -> side.add(m)
-                isSauce(key) -> sauce.add(m)
-                isSide(key) -> side.add(m)
-                else -> sauce.add(m) // unklar → Sauce
+            when (m.componentGroup) {
+                "side" -> side.add(m)
+                "sauce" -> sauce.add(m)
+                else -> {
+                    val key = "${m.ingredientRaw} ${m.ingredientName} ${m.matchedFoodName.orEmpty()}"
+                    when {
+                        isSide(key) && !isSauce(key) -> side.add(m)
+                        isSauce(key) -> sauce.add(m)
+                        isSide(key) -> side.add(m)
+                        else -> sauce.add(m)
+                    }
+                }
             }
         }
-        // Wenn eine Seite leer: alles in eine Komponente
-        if (side.isEmpty() || sauce.isEmpty()) {
-            val all = side + sauce
-            return listOf(
-                RecipeComponent(
-                    recipeId = recipe.id,
-                    name = "Gesamt",
-                    cookedWeightG = recipe.cookedWeightG ?: all.sumOf { it.amountGrams.toDouble() }.toFloat(),
-                    totalCalories = all.sumOf { (it.matchedCalories ?: 0f).toDouble() }.toFloat(),
-                    proteinG = all.sumOf { (it.matchedProtein ?: 0f).toDouble() }.toFloat(),
-                    carbsG = all.sumOf { (it.matchedCarbs ?: 0f).toDouble() }.toFloat(),
-                    fatG = all.sumOf { (it.matchedFat ?: 0f).toDouble() }.toFloat()
-                )
-            )
-        }
+
         fun sumComp(name: String, list: List<ch.nutrisnap.app.data.model.IngredientMatch>) =
             RecipeComponent(
                 recipeId = recipe.id,
                 name = name,
-                cookedWeightG = 0f, // Nutzer setzt Kochgewicht
+                cookedWeightG = 0f,
                 totalCalories = list.sumOf { (it.matchedCalories ?: 0f).toDouble() }.toFloat(),
                 proteinG = list.sumOf { (it.matchedProtein ?: 0f).toDouble() }.toFloat(),
                 carbsG = list.sumOf { (it.matchedCarbs ?: 0f).toDouble() }.toFloat(),
                 fatG = list.sumOf { (it.matchedFat ?: 0f).toDouble() }.toFloat()
             )
-        return listOf(sumComp("Beilage", side), sumComp("Sauce / Fleisch", sauce))
+
+        return buildList {
+            if (side.isNotEmpty()) add(sumComp("Beilage", side))
+            if (sauce.isNotEmpty()) add(sumComp("Sauce / Fleisch", sauce))
+        }
     }
 
     /** Analyze recipe ingredients via OpenFoodFacts and update macros in DB */
