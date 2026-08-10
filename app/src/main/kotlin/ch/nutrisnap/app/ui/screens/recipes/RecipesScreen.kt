@@ -820,18 +820,16 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
     val incomplete = recipe.isIncomplete()
     val context = LocalContext.current
     val prefs by context.notifDataStore.data.collectAsState(initial = null)
-    val freshCards = (prefs?.get(KEY_FRESH_RECIPE_CARDS) == true) || (prefs?.get(KEY_FRESH_UI) == true)
     val stars = recipeStarsFromPrefs(prefs?.get(KEY_RECIPE_RATINGS), recipe.id)
-    val cardShape = if (freshCards) RoundedCornerShape(20.dp) else RoundedCornerShape(14.dp)
-    // Kein horizontales Padding hier — LazyColumn liefert bereits contentPadding
+    // Fresh-Layout läuft über RecipeCardV2; hier nur Warnzeile + klassische Karte
     Card(
         Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = cardShape,
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (incomplete) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                               else MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(if (incomplete) 0.dp else if (freshCards) 3.dp else 2.dp)
+        elevation = CardDefaults.cardElevation(if (incomplete) 0.dp else 2.dp)
     ) {
         if (incomplete) {
             // Kompakte Darstellung für leere Web-Importe ohne Caption/Bild/Kalorien
@@ -848,128 +846,39 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
                     Icon(Icons.Default.DeleteOutline, "Löschen", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
                 }
             }
-        } else if (freshCards) {
-            Column {
-                RecipeThumbnail(
-                    recipe = recipe,
-                    modifier = Modifier.fillMaxWidth().height(200.dp),
-                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
-                )
-                Column(Modifier.padding(14.dp)) {
-                    Text(
-                        recipe.displayTitle(),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
+        } else {
+            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                RecipeThumbnail(recipe = recipe, size = 72.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(recipe.displayTitle(), fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
                     if (stars > 0) {
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(2.dp))
                         RecipeStarsRow(stars)
                     }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        recipe.totalCalories?.let {
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer
-                            ) {
-                                Text(
-                                    "${(it / recipe.servings.coerceAtLeast(1)).toInt()} kcal",
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                        recipe.proteinPerServing?.let {
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = MaterialTheme.colorScheme.secondaryContainer
-                            ) {
-                                Text(
-                                    "P ${it.toInt()}g",
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
-                        recipe.carbsPerServing?.let {
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = MaterialTheme.colorScheme.tertiaryContainer
-                            ) {
-                                Text(
-                                    "K ${it.toInt()}g",
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
-                        recipe.fatPerServing?.let {
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant
-                            ) {
-                                Text(
-                                    "F ${it.toInt()}g",
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
+                        recipe.platform?.let { PlatformChip(it) }
+                        recipe.totalCalories?.let { MiniChip("🔥 ${(it/recipe.servings.coerceAtLeast(1)).toInt()} kcal/Port.") }
+                        recipe.prepTimeMinutes?.let { MiniChip("⏱ $it min") }
                     }
-                    Spacer(Modifier.height(10.dp))
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = onAddToDiary, Modifier.size(36.dp)) {
-                            Icon(Icons.Default.PlaylistAdd, "Ins Tagebuch", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                        }
-                        IconButton(onClick = onEdit, Modifier.size(36.dp)) {
-                            Icon(Icons.Default.Edit, "Bearbeiten", Modifier.size(18.dp))
-                        }
-                        IconButton(onClick = { showConfirm = true }, Modifier.size(36.dp)) {
-                            Icon(Icons.Default.DeleteOutline, "Löschen", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
-                        }
+                    Text("${recipe.servings} Port.", fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp))
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    IconButton(onClick = onAddToDiary, Modifier.size(36.dp)) {
+                        Icon(Icons.Default.PlaylistAdd, "Ins Tagebuch", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                    }
+                    IconButton(onClick = onEdit, Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Edit, "Bearbeiten", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick = { showConfirm = true }, Modifier.size(36.dp)) {
+                        Icon(Icons.Default.DeleteOutline, "Löschen", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
                     }
                 }
             }
-        } else {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            RecipeThumbnail(recipe = recipe, size = 72.dp)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(recipe.displayTitle(), fontWeight = FontWeight.Bold, fontSize = 15.sp,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis)
-                if (stars > 0) {
-                    Spacer(Modifier.height(2.dp))
-                    RecipeStarsRow(stars)
-                }
-                Spacer(Modifier.height(4.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    recipe.platform?.let { PlatformChip(it) }
-                    recipe.totalCalories?.let { MiniChip("🔥 ${(it/recipe.servings.coerceAtLeast(1)).toInt()} kcal/Port.") }
-                    recipe.prepTimeMinutes?.let { MiniChip("⏱ $it min") }
-                }
-                Text("${recipe.servings} Port.", fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 2.dp))
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                IconButton(onClick = onAddToDiary, Modifier.size(36.dp)) {
-                    Icon(Icons.Default.PlaylistAdd, "Ins Tagebuch", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                }
-                IconButton(onClick = onEdit, Modifier.size(36.dp)) {
-                    Icon(Icons.Default.Edit, "Bearbeiten", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                IconButton(onClick = { showConfirm = true }, Modifier.size(36.dp)) {
-                    Icon(Icons.Default.DeleteOutline, "Löschen", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
-                }
-            }
-        }
         }
     }
     if (showConfirm) {
