@@ -705,6 +705,7 @@ private fun EntryDetailSheet(
             Modifier
                 .padding(horizontal = NutriSpacing.lg)
                 .navigationBarsPadding()
+                .imePadding()
                 .padding(bottom = NutriSpacing.lg)
         ) {
             Row(
@@ -2058,6 +2059,7 @@ private fun EntryScheduleSheet(
             Modifier
                 .padding(horizontal = 16.dp)
                 .navigationBarsPadding()
+                .imePadding()
                 .padding(bottom = 24.dp)
         ) {
             Text("Verschieben / kopieren", fontWeight = FontWeight.Bold, fontSize = 18.sp)
@@ -2171,6 +2173,7 @@ private fun MealCopySheet(
             Modifier
                 .padding(horizontal = 16.dp)
                 .navigationBarsPadding()
+                .imePadding()
                 .padding(bottom = 24.dp)
         ) {
             Text("Mahlzeit kopieren", fontWeight = FontWeight.Bold, fontSize = 18.sp)

@@ -37,6 +37,7 @@ import ch.nutrisnap.app.data.model.RecipeComponent
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.repository.FoodItemRepository
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private fun fmtMacro(v: Float): String =
@@ -255,6 +256,86 @@ fun IngredientVerifySheet(
     }
     var sauceWeightText by remember {
         mutableStateOf(initialSauceWeightG?.takeIf { it > 0f }?.toInt()?.toString() ?: "")
+    }
+    // Async geladene Komponenten-Gewichte nachziehen (collectAsState kommt oft nach dem ersten Frame)
+    LaunchedEffect(initialSideWeightG) {
+        val w = initialSideWeightG?.takeIf { it > 0f } ?: return@LaunchedEffect
+        if (sideWeightText.isBlank()) sideWeightText = w.toInt().toString()
+    }
+    LaunchedEffect(initialSauceWeightG) {
+        val w = initialSauceWeightG?.takeIf { it > 0f } ?: return@LaunchedEffect
+        if (sauceWeightText.isBlank()) sauceWeightText = w.toInt().toString()
+    }
+    // Kochgewicht + Gruppen auto-speichern (debounced), sobald mindestens ein Gewicht da ist
+    var lastAutoSavedKey by remember { mutableStateOf("") }
+    LaunchedEffect(sideWeightText, sauceWeightText, groups, verifyStates) {
+        if (onConfirmComponents == null) return@LaunchedEffect
+        delay(700)
+        val sideW = sideWeightText.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
+        val sauceW = sauceWeightText.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
+        if (sideW == null && sauceW == null) return@LaunchedEffect
+        val key = "${sideW ?: 0}|${sauceW ?: 0}|${groups.entries.sortedBy { it.key }.joinToString { "${it.key}=${it.value}" }}"
+        if (key == lastAutoSavedKey) return@LaunchedEffect
+        lastAutoSavedKey = key
+        val comps = buildList {
+            if (sideW != null) {
+                val sideStates = verifyStates.filter { groups[it.result.line] != "sauce" }
+                add(
+                    RecipeComponent(
+                        recipeId = recipeIdForComponents,
+                        name = "Beilage",
+                        cookedWeightG = sideW,
+                        totalCalories = sideStates.sumOf { it.effectiveCalories.toDouble() }.toFloat(),
+                        proteinG = sideStates.sumOf { it.effectiveProtein.toDouble() }.toFloat(),
+                        carbsG = sideStates.sumOf { it.effectiveCarbs.toDouble() }.toFloat(),
+                        fatG = sideStates.sumOf { it.effectiveFat.toDouble() }.toFloat(),
+                        fiberG = sideStates.mapNotNull { it.effectiveMicros["fiber"] }.sum(),
+                        sortOrder = 0
+                    )
+                )
+            }
+            if (sauceW != null) {
+                val sauceStates = verifyStates.filter { groups[it.result.line] == "sauce" }
+                add(
+                    RecipeComponent(
+                        recipeId = recipeIdForComponents,
+                        name = "Sauce / Fleisch",
+                        cookedWeightG = sauceW,
+                        totalCalories = sauceStates.sumOf { it.effectiveCalories.toDouble() }.toFloat(),
+                        proteinG = sauceStates.sumOf { it.effectiveProtein.toDouble() }.toFloat(),
+                        carbsG = sauceStates.sumOf { it.effectiveCarbs.toDouble() }.toFloat(),
+                        fatG = sauceStates.sumOf { it.effectiveFat.toDouble() }.toFloat(),
+                        fiberG = sauceStates.mapNotNull { it.effectiveMicros["fiber"] }.sum(),
+                        sortOrder = 1
+                    )
+                )
+            }
+        }
+        if (comps.isNotEmpty()) onConfirmComponents(comps)
+        // Matches mit Gruppen ebenfalls mitschreiben
+        onSaveMatches?.invoke(
+            verifyStates.map { s ->
+                val food = s.effectiveFood
+                IngredientMatch(
+                    recipeId = recipeIdForComponents,
+                    ingredientRaw = s.result.line,
+                    ingredientName = s.result.parsed?.name ?: food?.name ?: s.result.line,
+                    amountGrams = s.effectiveAmountG,
+                    matchedFoodItemId = food?.id?.toLong(),
+                    matchedFoodName = food?.name,
+                    matchedCalories = s.effectiveCalories,
+                    matchedProtein = s.effectiveProtein,
+                    matchedCarbs = s.effectiveCarbs,
+                    matchedFat = s.effectiveFat,
+                    matchSource = when {
+                        s.override != null -> MatchSource.MANUAL
+                        s.isVerified -> MatchSource.DATABASE
+                        else -> MatchSource.UNMATCHED
+                    },
+                    componentGroup = groups[s.result.line] ?: "sauce"
+                )
+            }
+        )
     }
     // Merkt sich, für welches AnalysisResult verifyStates zuletzt aufgebaut wurde.
     // Verhindert, dass ein neues Analyse-Ergebnis (z. B. durch "Neu berechnen" in der
@@ -758,11 +839,19 @@ private fun ComponentSectionHeader(
             )
         }
         Spacer(Modifier.height(6.dp))
+        val parsed = weightText.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
         OutlinedTextField(
             value = weightText,
             onValueChange = onWeightChange,
             label = { Text("Kochgewicht (g)") },
-            supportingText = { Text("Gesamtgewicht dieser Komponente nach dem Kochen (ohne Topf)") },
+            supportingText = {
+                Text(
+                    if (parsed != null)
+                        "Eingetragen: ${parsed.toInt()} g · wird automatisch gespeichert"
+                    else
+                        "Gesamtgewicht nach dem Kochen (ohne Topf) – wird automatisch gespeichert"
+                )
+            },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             singleLine = true,
             modifier = Modifier.fillMaxWidth()

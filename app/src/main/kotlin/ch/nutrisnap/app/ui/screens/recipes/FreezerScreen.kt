@@ -281,6 +281,7 @@ fun FreezeMealSheet(
             Modifier
                 .padding(horizontal = 16.dp)
                 .navigationBarsPadding()
+                .imePadding()
                 .padding(bottom = 20.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {

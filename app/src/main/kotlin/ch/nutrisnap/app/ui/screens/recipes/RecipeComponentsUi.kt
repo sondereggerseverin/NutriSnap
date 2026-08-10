@@ -135,6 +135,7 @@ fun RecipeComponentsEditorSheet(
             Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
+                .imePadding()
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 24.dp)
                 .verticalScroll(rememberScrollState())
@@ -382,6 +383,7 @@ fun MultiComponentAddToDiarySheet(
             Modifier
                 .padding(horizontal = 16.dp)
                 .navigationBarsPadding()
+                .imePadding()
                 .padding(bottom = 16.dp)
                 .verticalScroll(rememberScrollState())
         ) {

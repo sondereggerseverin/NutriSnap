@@ -1055,7 +1055,8 @@ fun ImportSheet(
         if (error != null && isInstagram) showManual = true
     }
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(horizontal=16.dp).navigationBarsPadding().padding(bottom=8.dp)) {
+        Column(Modifier.padding(horizontal=16.dp).navigationBarsPadding()
+                .imePadding().padding(bottom=8.dp)) {
             if (!showManual) {
                 Text(
                     "Rezept importieren",
@@ -1212,7 +1213,8 @@ fun BatchImportSheet(
     var pasteText by remember { mutableStateOf("") }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(horizontal = 16.dp).navigationBarsPadding().padding(bottom = 8.dp)) {
+        Column(Modifier.padding(horizontal = 16.dp).navigationBarsPadding()
+                .imePadding().padding(bottom = 8.dp)) {
             Text("Rezepte importieren", fontWeight = FontWeight.Bold, fontSize = 20.sp)
             Spacer(Modifier.height(4.dp))
             Text("Mehrere Links auf einmal importieren",
@@ -2106,7 +2108,8 @@ fun AddToDiarySheet(
     val estCals = calsPerServ?.let { it * servings }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(horizontal=16.dp).navigationBarsPadding().padding(bottom=16.dp)) {
+        Column(Modifier.padding(horizontal=16.dp).navigationBarsPadding()
+                .imePadding().padding(bottom=16.dp)) {
             Text("Ins Tagebuch", fontWeight=FontWeight.Bold, fontSize=18.sp)
             Spacer(Modifier.height(4.dp))
             Text(recipe.displayTitle(), fontSize=13.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)

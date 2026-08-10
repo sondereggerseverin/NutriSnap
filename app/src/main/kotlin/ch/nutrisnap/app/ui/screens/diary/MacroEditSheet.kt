@@ -67,6 +67,7 @@ fun MacroEditSheet(
             Modifier
                 .padding(horizontal = NutriSpacing.lg)
                 .navigationBarsPadding()
+                .imePadding()
                 .padding(bottom = NutriSpacing.lg),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
