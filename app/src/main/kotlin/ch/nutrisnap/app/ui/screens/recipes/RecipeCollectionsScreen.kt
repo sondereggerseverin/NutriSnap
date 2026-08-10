@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
@@ -368,4 +369,86 @@ private fun CollectionRecipesScreen(
             }
         }
     }
+}
+
+/** Dialog: Rezept einer Sammlung zuweisen oder entfernen. */
+@Composable
+fun AssignToCollectionDialog(
+    recipe: Recipe,
+    onDismiss: () -> Unit,
+    viewModel: RecipeCollectionsViewModel = viewModel()
+) {
+    val collections by viewModel.collections.collectAsState()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Sammlung wählen") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    recipe.displayTitle(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+
+                // Keine Sammlung
+                ListItem(
+                    headlineContent = { Text("Keine Sammlung") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.Clear,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        viewModel.assignToCollection(recipe.id, null)
+                        onDismiss()
+                    },
+                    colors = ListItemDefaults.colors(
+                        containerColor = if (recipe.collectionId == null)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else Color.Transparent
+                    )
+                )
+
+                if (collections.isEmpty()) {
+                    Text(
+                        "Noch keine Sammlungen – erstelle eine unter dem Ordner-Icon.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+
+                collections.forEach { col ->
+                    ListItem(
+                        headlineContent = { Text("${col.emoji} ${col.name}") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.Folder,
+                                contentDescription = null,
+                                tint = if (recipe.collectionId == col.id)
+                                    MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            viewModel.assignToCollection(recipe.id, col.id)
+                            onDismiss()
+                        },
+                        colors = ListItemDefaults.colors(
+                            containerColor = if (recipe.collectionId == col.id)
+                                MaterialTheme.colorScheme.primaryContainer
+                            else Color.Transparent
+                        )
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Schließen") }
+        }
+    )
 }

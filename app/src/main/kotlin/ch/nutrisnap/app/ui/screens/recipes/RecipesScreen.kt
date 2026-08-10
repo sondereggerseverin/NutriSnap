@@ -278,6 +278,7 @@ fun RecipesScreen(
     var showCookSheet     by remember { mutableStateOf(false) }
     var cookingRecipe     by remember { mutableStateOf<Recipe?>(null) }
     var showCollections   by remember { mutableStateOf(false) }
+    var assignCollectionRecipe by remember { mutableStateOf<Recipe?>(null) }
     val batchState by vm.batchState.collectAsState()
     val budgetScaleState by vm.budgetScaleState.collectAsState()
     val pendingTargetKcal by vm.pendingTargetKcal.collectAsState()
@@ -700,7 +701,17 @@ fun RecipesScreen(
                 cookingRecipe = live
                 selectedRecipe = null
             },
-            onToggleFavorite = { vm.toggleFavorite(live) }
+            onToggleFavorite = { vm.toggleFavorite(live) },
+            onAssignCollection = {
+                assignCollectionRecipe = live
+            }
+        )
+    }
+
+    assignCollectionRecipe?.let { recipe ->
+        AssignToCollectionDialog(
+            recipe = recipe,
+            onDismiss = { assignCollectionRecipe = null }
         )
     }
 
@@ -1337,7 +1348,8 @@ fun RecipeDetailSheet(
     isTranslating: Boolean = false,
     onEditComponents: () -> Unit = {},
     onStartCooking: () -> Unit = {},
-    onToggleFavorite: () -> Unit = {}
+    onToggleFavorite: () -> Unit = {},
+    onAssignCollection: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var servings   by remember(recipe.id) { mutableStateOf(recipe.servings) }
@@ -1392,6 +1404,15 @@ fun RecipeDetailSheet(
                             contentDescription = if (recipe.isFavorite) "Favorit entfernen" else "Als Favorit",
                             tint = if (recipe.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    IconButton(onClick = onAssignCollection, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            Icons.Default.Folder,
+                            contentDescription = "Sammlung zuweisen",
+                            tint = if (recipe.collectionId != null) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                     IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
