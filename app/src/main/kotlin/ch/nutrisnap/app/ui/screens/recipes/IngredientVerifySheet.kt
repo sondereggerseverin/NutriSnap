@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -473,8 +473,12 @@ fun IngredientVerifySheet(
             }
 
             // ── Zutaten (flach, ohne Beilage/Sauce) ─────────────────────────
-            items(verifyStates, key = { it.result.line }) { state ->
-                val index = verifyStates.indexOf(state)
+            // Key muss eindeutig sein: result.line kann doppelt vorkommen
+            // (z.B. zweimal „Salz“) → sonst Crash beim Scrollen (LazyColumn).
+            itemsIndexed(
+                verifyStates,
+                key = { index, state -> "${index}\u0000${state.result.line}" }
+            ) { index, state ->
                 val line = state.result.line
                 IngredientVerifyRow(
                     state = state,
@@ -486,30 +490,37 @@ fun IngredientVerifySheet(
                     onFiberEditConsumed = { if (fiberEditTarget == line) fiberEditTarget = null },
                     onScan = { scanTarget = index },
                     onDelete = {
-                        verifyStates = verifyStates.toMutableList().also { it.remove(state) }
-                        updateOverride(line, IngredientOverride(deleted = true))
+                        // Index-basiert: indexOf(state) ist bei NaN-Floats / gleichen Zeilen unzuverlässig
+                        if (index in verifyStates.indices) {
+                            verifyStates = verifyStates.toMutableList().also { it.removeAt(index) }
+                            updateOverride(line, IngredientOverride(deleted = true))
+                        }
                     },
                     onManualFiberSaved = { value ->
-                        val updated = verifyStates.toMutableList().also {
-                            it[index] = it[index].copy(manualFiber = value)
-                        }
-                        verifyStates = updated
-                        updateOverride(line, updated[index].toOverride(null))
-                        val newTotal = updated.mapNotNull { it.effectiveMicros["fiber"] }.takeIf { it.isNotEmpty() }?.sum()
-                        newTotal?.let {
-                            android.widget.Toast.makeText(
-                                context,
-                                "Ballaststoffe aktualisiert → neuer Gesamtwert: ${"%.1f".format(it)} g",
-                                android.widget.Toast.LENGTH_SHORT
-                            ).show()
+                        if (index in verifyStates.indices) {
+                            val updated = verifyStates.toMutableList().also {
+                                it[index] = it[index].copy(manualFiber = value)
+                            }
+                            verifyStates = updated
+                            updateOverride(line, updated[index].toOverride(null))
+                            val newTotal = updated.mapNotNull { it.effectiveMicros["fiber"] }.takeIf { it.isNotEmpty() }?.sum()
+                            newTotal?.let {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Ballaststoffe aktualisiert → neuer Gesamtwert: ${"%.1f".format(it)} g",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         }
                     },
                     onAmountSaved = { value ->
-                        val updated = verifyStates.toMutableList().also {
-                            it[index] = it[index].copy(amountOverride = value)
+                        if (index in verifyStates.indices) {
+                            val updated = verifyStates.toMutableList().also {
+                                it[index] = it[index].copy(amountOverride = value)
+                            }
+                            verifyStates = updated
+                            updateOverride(line, updated[index].toOverride(null))
                         }
-                        verifyStates = updated
-                        updateOverride(line, updated[index].toOverride(null))
                     },
                     componentGroup = null,
                     onMoveComponent = null
