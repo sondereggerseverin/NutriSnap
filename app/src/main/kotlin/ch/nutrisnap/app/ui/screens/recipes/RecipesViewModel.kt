@@ -533,6 +533,36 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { repo.updateRecipe(recipe) }
     }
 
+    /**
+     * Freies Rezept ohne Import: Titel + Zutatenzeilen (+ optional Zubereitung).
+     * Speichert mit platform=manual; nach dem Speichern als lastImport melden,
+     * damit die UI direkt „Ansehen“ anbieten kann.
+     */
+    fun createManualRecipe(
+        title: String,
+        ingredients: String,
+        instructions: String = "",
+        servings: Int = 1,
+        mealCategory: String = ""
+    ) {
+        viewModelScope.launch {
+            val cleanTitle = title.trim().ifBlank { "Mein Rezept" }
+            val recipe = Recipe(
+                title = cleanTitle,
+                description = "",
+                ingredients = ingredients.trim(),
+                instructions = instructions.trim(),
+                servings = servings.coerceAtLeast(1),
+                platform = "manual",
+                tags = "manuell",
+                mealCategory = mealCategory,
+                sourceUrl = null
+            ).withGuessedCategoryIfEmpty().withoutNullArtifacts()
+            val saved = recipe.copy(id = repo.saveRecipe(recipe))
+            _importState.update { it.copy(lastImport = saved) }
+        }
+    }
+
     /** Favorit umschalten (isFavorite in DB). */
     fun toggleFavorite(recipe: Recipe) {
         viewModelScope.launch {

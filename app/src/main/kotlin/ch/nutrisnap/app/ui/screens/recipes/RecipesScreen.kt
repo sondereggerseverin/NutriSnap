@@ -265,6 +265,7 @@ fun RecipesScreen(
     val state by vm.uiState.collectAsState()
     val collections by collectionsVm.collections.collectAsState()
     var showImportSheet   by remember { mutableStateOf(false) }
+    var showCreateSheet   by remember { mutableStateOf(false) }
     var selectedRecipe    by remember { mutableStateOf<Recipe?>(null) }
     var showVerifySheet    by remember { mutableStateOf(false) }
     var pendingVerify      by remember { mutableStateOf(false) }
@@ -339,9 +340,14 @@ fun RecipesScreen(
                     Icon(Icons.Default.PlaylistAdd, "Mehrere Rezepte importieren")
                 }
                 Spacer(Modifier.height(8.dp))
-                FloatingActionButton(onClick = { showImportSheet = true },
+                SmallFloatingActionButton(onClick = { showImportSheet = true },
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer) {
+                    Icon(Icons.Default.Link, "Rezept importieren")
+                }
+                Spacer(Modifier.height(8.dp))
+                FloatingActionButton(onClick = { showCreateSheet = true },
                     containerColor = MaterialTheme.colorScheme.secondary) {
-                    Icon(Icons.Default.Link, "Rezept importieren", tint = MaterialTheme.colorScheme.onSecondary)
+                    Icon(Icons.Default.Add, "Freies Rezept erstellen", tint = MaterialTheme.colorScheme.onSecondary)
                 }
             }
         }
@@ -428,7 +434,8 @@ fun RecipesScreen(
                         "instagram" to "📷 IG",
                         "tiktok"    to "🎵 TikTok",
                         "web"       to "🌐 Web",
-                        "ki"        to "✨ KI"
+                        "ki"        to "✨ KI",
+                        "manual"    to "✏️ Frei"
                     ).forEach { (value, label) ->
                         FilterChip(
                             selected = state.platformFilter == value,
@@ -551,6 +558,16 @@ fun RecipesScreen(
                 }
             }
         }
+    }
+
+    if (showCreateSheet) {
+        ManualRecipeCreateSheet(
+            onSave = { title, ingredients, instructions, servings, mealCategory ->
+                vm.createManualRecipe(title, ingredients, instructions, servings, mealCategory)
+                showCreateSheet = false
+            },
+            onDismiss = { showCreateSheet = false }
+        )
     }
 
     if (showImportSheet) {
@@ -959,6 +976,7 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
         "instagram" -> Icons.Default.CameraAlt to "Instagram"
         "tiktok"    -> Icons.Default.VideoLibrary to "TikTok"
         "ki"        -> Icons.Default.AutoAwesome to "KI"
+        "manual"    -> Icons.Default.Edit to "Frei"
         else        -> Icons.Default.Language to "Web"
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1022,6 +1040,7 @@ private fun platformVisuals(platform: String?): Pair<List<Color>, androidx.compo
         "tiktok"    -> listOf(Color(0xFF25F4EE), Color(0xFF000000), Color(0xFFFE2C55)) to Icons.Default.VideoLibrary
         "ki"        -> listOf(Color(0xFFFF9B45), Color(0xFFD9633B)) to Icons.Default.AutoAwesome
         "bild"      -> listOf(Color(0xFF5B8DEF), Color(0xFF3A6BC7)) to Icons.Default.Photo
+        "manual"    -> listOf(Color(0xFF457B9D), Color(0xFF1D3557)) to Icons.Default.Edit
         else        -> listOf(Color(0xFF2D6A4F), Color(0xFF40916C)) to Icons.Default.RestaurantMenu
     }
 
