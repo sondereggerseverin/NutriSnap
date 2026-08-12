@@ -1754,9 +1754,14 @@ fun RecipeDetailSheet(
                     }
                 } else {
                     // ── Ansicht mit Status-Icons ──
+                    // itemsIndexed + Index-Key: identische Zutatenzeilen (z.B. 2× „• 1 shot Espresso“)
+                    // würden sonst denselben LazyColumn-Key erzeugen → Crash beim Scrollen.
                     val rawLines = recipe.ingredients.lines()
-                    items(rawLines) { rawLine ->
-                        if (rawLine.isBlank()) { Spacer(Modifier.height(4.dp)); return@items }
+                    itemsIndexed(
+                        rawLines,
+                        key = { index, line -> "${index}\u0000$line" }
+                    ) { _, rawLine ->
+                        if (rawLine.isBlank()) { Spacer(Modifier.height(4.dp)); return@itemsIndexed }
                         val scaled  = if (ratio != 1f) scaleNumbers(rawLine, ratio) else rawLine
                         val display = if (metricMode) convertToMetric(scaled) else scaled
                         val isHeader = !display.startsWith("•") && !display.startsWith("-") &&
