@@ -46,6 +46,23 @@ data class WeekBucket(
     val activityCalories: Float
 )
 
+/**
+ * Eine Kalenderwoche für die Wochenübersicht-Tabelle
+ * (Ø-Gewicht, Ø-Kalorien, Aktivität, Δ vs. Vorwoche, Zone).
+ */
+data class WeekOverviewRow(
+    val weekNumber: Int,
+    val year: Int,
+    val from: LocalDate,
+    val to: LocalDate,
+    val avgWeightKg: Float?,
+    val weightChangePct: Float?,
+    val avgCalories: Int,
+    val caloriesChangePct: Float?,
+    val avgActivityCalories: Int,
+    val zone: String
+)
+
 data class AnalysisUiState(
     val period:                AnalysisPeriod = AnalysisPeriod.WOCHE,
     val anchorDate:             LocalDate = LocalDate.now(),
@@ -70,7 +87,10 @@ data class AnalysisUiState(
     val hasHistoryPermission:        Boolean = false,
     // true, wenn der sichtbare Zeitraum > 30 Tage zurückliegt und die History-Permission
     // noch fehlt -> Health Connect liefert fuer diese Tage sonst einfach nichts zurueck.
-    val showHistoryPermissionPrompt: Boolean = false
+    val showHistoryPermissionPrompt: Boolean = false,
+    /** Letzte N Kalenderwochen für die einsehbare Wochenübersicht-Tabelle. */
+    val weekOverview: List<WeekOverviewRow> = emptyList(),
+    val weekOverviewLoading: Boolean = false
 )
 
 private val dayFormatter   = DateTimeFormatter.ofPattern("EEEE, d. MMMM", Locale.GERMAN)
@@ -208,6 +228,111 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Lädt die letzten [weeks] Kalenderwochen (Mo–So) für die Wochenübersicht-Tabelle.
+     * Einmalig beim Öffnen der Tabelle – nicht bei jedem Period-Wechsel.
+     */
+    fun loadWeekOverview(weeks: Int = 12) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(weekOverviewLoading = true) }
+            val today = LocalDate.now()
+            val thisMonday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            val from = thisMonday.minusWeeks((weeks - 1).toLong())
+            val to = thisMonday.plusDays(6)
+
+            // HC-Daten für den längeren Zeitraum nachladen (best effort)
+            runCatching { healthRepo.ensureRangeSynced(from, to) }
+
+            val summaries = diaryRepo.getSummaryBetween(from, to).first()
+            val hcCache = healthRepo.getRange(from, to).first()
+            val weightEntries = weightRepo.getAll().first()
+            val profile = profileRepo.get().first()
+            val tdee = profile.computedTdee()?.toInt() ?: profile.dailyCalorieGoal
+
+            val summaryByDate = summaries.associateBy { it.dateStr }
+            val hcByDate = hcCache.associateBy { it.date }
+            val weightByDate = weightEntries.associateBy { LocalDate.parse(it.dateStr) }
+
+            val rows = ArrayList<WeekOverviewRow>(weeks)
+            var prevAvgCal: Int? = null
+            var prevAvgWeight: Float? = null
+
+            for (i in 0 until weeks) {
+                val weekStart = from.plusWeeks(i.toLong())
+                val weekEnd = weekStart.plusDays(6)
+                var calSum = 0.0
+                var calDays = 0
+                var actSum = 0.0
+                var actDays = 0
+                var weightSum = 0.0
+                var weightDays = 0
+
+                var d = weekStart
+                while (!d.isAfter(weekEnd)) {
+                    val s = summaryByDate[d.toString()]
+                    if (s != null && s.calories > 0f) {
+                        calSum += s.calories
+                        calDays++
+                    }
+                    val hc = hcByDate[d]
+                    val act = hc?.activeCaloriesKcal?.toFloat() ?: 0f
+                    if (act > 0f) {
+                        actSum += act
+                        actDays++
+                    }
+                    val w = hc?.weightKg?.toFloat() ?: weightByDate[d]?.weightKg
+                    if (w != null && w > 0f) {
+                        weightSum += w
+                        weightDays++
+                    }
+                    d = d.plusDays(1)
+                }
+
+                val avgCal = if (calDays > 0) (calSum / calDays).toInt() else 0
+                val avgAct = if (actDays > 0) (actSum / actDays).toInt() else 0
+                val avgW = if (weightDays > 0) (weightSum / weightDays).toFloat() else null
+
+                val calChange = if (prevAvgCal != null && prevAvgCal > 0 && avgCal > 0) {
+                    ((avgCal - prevAvgCal).toFloat() / prevAvgCal) * 100f
+                } else null
+                val wChange = if (prevAvgWeight != null && prevAvgWeight > 0f && avgW != null) {
+                    ((avgW - prevAvgWeight) / prevAvgWeight) * 100f
+                } else null
+
+                val zone = when {
+                    avgCal <= 0 -> "—"
+                    avgCal < tdee * 0.92f -> "Defizit"
+                    avgCal > tdee * 1.08f -> "Überschuss"
+                    else -> "Erhalt"
+                }
+
+                val weekFields = java.time.temporal.WeekFields.ISO
+                rows += WeekOverviewRow(
+                    weekNumber = weekStart.get(weekFields.weekOfWeekBasedYear()),
+                    year = weekStart.get(weekFields.weekBasedYear()),
+                    from = weekStart,
+                    to = weekEnd,
+                    avgWeightKg = avgW,
+                    weightChangePct = wChange,
+                    avgCalories = avgCal,
+                    caloriesChangePct = calChange,
+                    avgActivityCalories = avgAct,
+                    zone = zone
+                )
+                if (avgCal > 0) prevAvgCal = avgCal
+                if (avgW != null) prevAvgWeight = avgW
+            }
+
+            // Neueste Woche zuerst
+            _uiState.update {
+                it.copy(
+                    weekOverview = rows.asReversed(),
+                    weekOverviewLoading = false
+                )
+            }
+        }
+    }
+
     private fun buildState(
         period:        AnalysisPeriod,
         range:         Range,
@@ -256,6 +381,7 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
             }
         } else emptyList()
 
+        val prev = _uiState.value
         return AnalysisUiState(
             period                 = period,
             anchorDate             = range.anchor,
@@ -278,7 +404,9 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
             weightEnd              = weightPoints.lastOrNull()?.weightKg,
             isSyncingHistory       = false,
             hasHistoryPermission        = hasHistory,
-            showHistoryPermissionPrompt = !hasHistory && range.from.isBefore(LocalDate.now().minusDays(29))
+            showHistoryPermissionPrompt = !hasHistory && range.from.isBefore(LocalDate.now().minusDays(29)),
+            weekOverview           = prev.weekOverview,
+            weekOverviewLoading    = prev.weekOverviewLoading
         )
     }
 }

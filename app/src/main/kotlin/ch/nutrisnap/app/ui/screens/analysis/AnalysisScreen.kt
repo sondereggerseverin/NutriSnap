@@ -34,6 +34,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnalysisScreen(
     vm: AnalysisViewModel = viewModel(),
@@ -42,6 +43,7 @@ fun AnalysisScreen(
 ) {
     val state by vm.uiState.collectAsState()
     var showDatePicker by remember { mutableStateOf(false) }
+    var showWeekOverview by remember { mutableStateOf(false) }
 
     val historyPermissionLauncher = rememberLauncherForActivityResult(
         contract = PermissionController.createRequestPermissionResultContract()
@@ -55,6 +57,14 @@ fun AnalysisScreen(
                 vm.goToDate(date)
                 showDatePicker = false
             }
+        )
+    }
+
+    if (showWeekOverview) {
+        WeekOverviewSheet(
+            rows = state.weekOverview,
+            loading = state.weekOverviewLoading,
+            onDismiss = { showWeekOverview = false }
         )
     }
 
@@ -95,6 +105,41 @@ fun AnalysisScreen(
                         Text("Frag deine App", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                         Text("Chat über deine Daten", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                }
+            }
+        }
+
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        showWeekOverview = true
+                        if (state.weekOverview.isEmpty() && !state.weekOverviewLoading) {
+                            vm.loadWeekOverview(12)
+                        }
+                    },
+                shape = RoundedCornerShape(NutriRadius.md)
+            ) {
+                Row(
+                    Modifier.padding(NutriSpacing.md),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.DateRange, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(NutriSpacing.md))
+                    Column(Modifier.weight(1f)) {
+                        Text("Wochenübersicht", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text(
+                            "Ø-Gewicht, Kalorien, Aktivität, Zone – letzte 12 Wochen",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -580,3 +625,168 @@ private fun MacroAverageRow(label: String, value: Float, goal: Float, color: Col
         )
     }
 }
+
+// ── Wochenübersicht (Tabelle wie im Reels-Beispiel) ──────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WeekOverviewSheet(
+    rows: List<WeekOverviewRow>,
+    loading: Boolean,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        modifier = Modifier.fillMaxHeight(0.92f)
+    ) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp)
+        ) {
+            Text(
+                "Wochenübersicht",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+            Text(
+                "Ø-Werte pro Kalenderwoche (Mo–So). Zone relativ zum Kalorienziel (±8 %).",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            when {
+                loading -> {
+                    Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
+                rows.isEmpty() -> {
+                    Text(
+                        "Noch keine Daten für die letzten Wochen.",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(24.dp)
+                    )
+                }
+                else -> {
+                    WeekOverviewHeaderRow()
+                    HorizontalDivider()
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(bottom = 32.dp)
+                    ) {
+                        items(rows.size) { idx ->
+                            WeekOverviewDataRow(rows[idx])
+                            if (idx < rows.lastIndex) {
+                                HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeekOverviewHeaderRow() {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("KW", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(36.dp))
+        Text("Ø kg", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(52.dp))
+        Text("Δ%", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
+        Text("Ø kcal", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(56.dp))
+        Text("Δ%", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
+        Text("Aktiv.", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
+        Text("Zone", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun WeekOverviewDataRow(row: WeekOverviewRow) {
+    val calHighlight = row.caloriesChangePct?.let { kotlin.math.abs(it) >= 10f } == true
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(
+                if (calHighlight) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                else Color.Transparent
+            )
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            "${row.weekNumber}",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.width(36.dp)
+        )
+        Text(
+            row.avgWeightKg?.let { "%.1f".format(it) } ?: "—",
+            fontSize = 12.sp,
+            modifier = Modifier.width(52.dp)
+        )
+        Text(
+            formatPct(row.weightChangePct),
+            fontSize = 11.sp,
+            color = pctColor(row.weightChangePct),
+            modifier = Modifier.width(48.dp)
+        )
+        Text(
+            if (row.avgCalories > 0) row.avgCalories.toString() else "—",
+            fontSize = 12.sp,
+            fontWeight = if (calHighlight) FontWeight.Bold else FontWeight.Normal,
+            modifier = Modifier.width(56.dp)
+        )
+        Text(
+            formatPct(row.caloriesChangePct),
+            fontSize = 11.sp,
+            color = pctColor(row.caloriesChangePct),
+            modifier = Modifier.width(48.dp)
+        )
+        Text(
+            if (row.avgActivityCalories > 0) row.avgActivityCalories.toString() else "—",
+            fontSize = 12.sp,
+            modifier = Modifier.width(48.dp)
+        )
+        Text(
+            row.zone,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = when (row.zone) {
+                "Defizit" -> Color(0xFF2E7D32)
+                "Überschuss" -> Color(0xFFC62828)
+                "Erhalt" -> MaterialTheme.colorScheme.primary
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+private fun formatPct(v: Float?): String =
+    when {
+        v == null -> "—"
+        v > 0f -> "+%.1f%%".format(v)
+        else -> "%.1f%%".format(v)
+    }
+
+@Composable
+private fun pctColor(v: Float?): Color =
+    when {
+        v == null -> MaterialTheme.colorScheme.onSurfaceVariant
+        v > 0.5f -> Color(0xFFC62828)
+        v < -0.5f -> Color(0xFF2E7D32)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
