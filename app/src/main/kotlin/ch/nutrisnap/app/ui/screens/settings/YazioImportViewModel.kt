@@ -318,11 +318,23 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                     db.recipeDao().getAll().first().forEach { existing.add(it.title.trim().lowercase()) }
                 } catch (e: Exception) { /* ignore */ }
 
-                // name(lowercase) -> id, fuer Zutaten-Matching; wird bei Neuanlage erweitert,
-                // damit dieselbe Zutat innerhalb dieses Imports nicht mehrfach angelegt wird.
-                val foodIdByName = db.customFoodDao().getAllOnce()
+                // Bestehende Custom-Foods: ID-Lookup + Makro-Lookup (nach Basisname),
+                // damit Rezeptzutaten nicht mit 0-kcal-Platzhaltern landen, wenn das
+                // Produkt schon als Yazio-Food/manuell mit echten Nährwerten existiert.
+                val allFoods = db.customFoodDao().getAllOnce()
+                val foodIdByName = allFoods
                     .associate { it.name.trim().lowercase() to it.id }
                     .toMutableMap()
+                val macrosByBaseName = allFoods
+                    .filter { it.calories > 0f || it.protein > 0f || it.carbs > 0f || it.fat > 0f }
+                    .groupBy { baseName(it.name) }
+                    .mapValues { (_, list) ->
+                        // Bevorzuge yazio_import / verified vor leeren Platzhaltern
+                        list.maxWithOrNull(
+                            compareBy<CustomFoodItem> { if (it.source == "yazio_import") 2 else if (it.verified) 1 else 0 }
+                                .thenByDescending { it.calories }
+                        )!!
+                    }
 
                 var imported = 0
                 var skipped = 0
@@ -354,15 +366,26 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
 
                             if (name.isNotBlank() && foodIdByName[name.lowercase()] == null) {
                                 val displayName = if (!producer.isNullOrBlank()) "$name ($producer)" else name
+                                // Makros aus bereits importiertem Yazio-Food / gleichem Basisnamen übernehmen
+                                val donor = macrosByBaseName[baseName(name)]
+                                    ?: macrosByBaseName[baseName(displayName)]
                                 val newId = db.customFoodDao().insert(
                                     CustomFoodItem(
                                         name = displayName,
-                                        calories = 0f, protein = 0f, carbs = 0f, fat = 0f,
-                                        brand = producer,
-                                        source = "yazio_recipe_ingredient"
+                                        calories = donor?.calories ?: 0f,
+                                        protein = donor?.protein ?: 0f,
+                                        carbs = donor?.carbs ?: 0f,
+                                        fat = donor?.fat ?: 0f,
+                                        fiber = donor?.fiber ?: 0f,
+                                        sugar = donor?.sugar ?: 0f,
+                                        salt = donor?.salt ?: 0f,
+                                        barcode = donor?.barcode,
+                                        brand = producer ?: donor?.brand,
+                                        source = if (donor != null) "yazio_import" else "yazio_recipe_ingredient"
                                     )
                                 )
                                 foodIdByName[name.lowercase()] = newId.toInt()
+                                foodIdByName[displayName.lowercase()] = newId.toInt()
                                 autoCreatedIngredients++
                             }
 
@@ -550,13 +573,62 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                         }
                     }
                 }
+                // Leere Yazio-Rezeptzutaten (0-Makros) mit echten Werten aus diesem Import auffüllen
+                val backfilled = backfillEmptyRecipeIngredients()
+
                 _foodState.value = YazioFoodImportState.Success(
-                    YazioFoodImportResult(importedFoods = imported, updatedFoods = updated, skippedFoods = skipped)
+                    YazioFoodImportResult(
+                        importedFoods = imported,
+                        updatedFoods = updated + backfilled,
+                        skippedFoods = skipped
+                    )
                 )
             } catch (e: Exception) {
                 _foodState.value = YazioFoodImportState.Error(e.message ?: "Unbekannter Fehler")
             }
         }
+    }
+
+    /**
+     * Füllt bestehende Custom-Foods mit source=yazio_recipe_ingredient und 0-Makros
+     * aus Einträgen mit gleichen Basisnamen (yazio_import / manuell mit Werten).
+     * @return Anzahl aktualisierter Einträge
+     */
+    private suspend fun backfillEmptyRecipeIngredients(): Int {
+        val all = db.customFoodDao().getAllOnce()
+        val donors = all
+            .filter { it.calories > 0f || it.protein > 0f || it.carbs > 0f || it.fat > 0f }
+            .groupBy { baseName(it.name) }
+            .mapValues { (_, list) ->
+                list.maxWithOrNull(
+                    compareBy<CustomFoodItem> { if (it.source == "yazio_import") 2 else if (it.verified) 1 else 0 }
+                        .thenByDescending { it.calories }
+                )!!
+            }
+        var updated = 0
+        for (item in all) {
+            val empty = item.calories == 0f && item.protein == 0f && item.carbs == 0f && item.fat == 0f
+            if (!empty) continue
+            if (item.source != "yazio_recipe_ingredient" && item.source != "yazio_diary_only") continue
+            val donor = donors[baseName(item.name)] ?: continue
+            if (donor.id == item.id) continue
+            db.customFoodDao().update(
+                item.copy(
+                    calories = donor.calories,
+                    protein = donor.protein,
+                    carbs = donor.carbs,
+                    fat = donor.fat,
+                    fiber = donor.fiber,
+                    sugar = donor.sugar,
+                    salt = donor.salt,
+                    barcode = item.barcode ?: donor.barcode,
+                    brand = item.brand ?: donor.brand,
+                    source = if (donor.source == "yazio_import") "yazio_import" else item.source
+                )
+            )
+            updated++
+        }
+        return updated
     }
 
     fun resetRecipeState() { _recipeState.value = YazioRecipeImportState.Idle }
