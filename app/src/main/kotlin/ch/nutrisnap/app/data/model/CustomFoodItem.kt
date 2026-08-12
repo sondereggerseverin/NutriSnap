@@ -25,8 +25,11 @@ data class CustomFoodItem(
     val portionSizeG: Float = 100f,
     /** Herkunft: "manual" (Nutzer), "yazio_import" (aus yazio_foods.json), "yazio_recipe_ingredient"
      *  (automatisch aus einer Rezept-Zutat ohne bekannte Makros angelegt), "yazio_diary_only"
-     *  (nur aus dem CSV-Tagebuch bekannt, kein foods.json-Eintrag vorhanden). */
+     *  (nur aus dem CSV-Tagebuch bekannt, kein foods.json-Eintrag vorhanden),
+     *  "label_scan" (Nährwerttabelle fotografiert). */
     @ColumnInfo(defaultValue = "'manual'") val source: String = "manual",
+    /** Vom Nutzer geprüft/bestätigt (Makros und Name stimmen). */
+    @ColumnInfo(defaultValue = "0") val verified: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val userId: String = ""
 )

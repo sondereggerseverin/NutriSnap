@@ -43,6 +43,7 @@ import ch.nutrisnap.app.ui.screens.analysis.AnalysisScreen
 import ch.nutrisnap.app.ui.screens.auth.AuthViewModel
 import ch.nutrisnap.app.ui.screens.auth.LoginScreen
 import ch.nutrisnap.app.ui.screens.customfood.CreateCustomFoodScreen
+import ch.nutrisnap.app.ui.screens.customfood.CustomFoodListScreen
 import ch.nutrisnap.app.ui.screens.diary.DiaryScreen
 import ch.nutrisnap.app.ui.screens.export.ExportScreen
 import ch.nutrisnap.app.ui.screens.insights.InsightsScreen
@@ -480,7 +481,30 @@ fun MainScaffold(
                 enterTransition = { pushEnter }, exitTransition = { pushExit },
                 popEnterTransition = { popEnter }, popExitTransition = { popExit }
             ) {
+                CustomFoodListScreen(
+                    onBack = { navController.popBackStack() },
+                    onAdd = { navController.navigate("custom_food_create") },
+                    onEdit = { id -> navController.navigate("custom_food_edit/$id") }
+                )
+            }
+            composable(
+                "custom_food_create",
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) {
                 CreateCustomFoodScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = "custom_food_edit/{id}",
+                arguments = listOf(navArgument("id") { type = NavType.IntType }),
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) { backStackEntry ->
+                val idArg = backStackEntry.arguments?.getInt("id")
+                CreateCustomFoodScreen(
+                    onBack = { navController.popBackStack() },
+                    editId = idArg
+                )
             }
             composable(
                 "meal_templates",

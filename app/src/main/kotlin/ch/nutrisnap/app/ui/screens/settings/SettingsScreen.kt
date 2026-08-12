@@ -293,7 +293,7 @@ fun SettingsScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
                 OutlinedButton(onClick = onNavigateToCustomFoods, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.Restaurant, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(NutriSpacing.xs)); Text("Eigene", fontSize = 12.sp)
+                    Spacer(Modifier.width(NutriSpacing.xs)); Text("Lebensmittel", fontSize = 12.sp)
                 }
                 OutlinedButton(onClick = onNavigateToMealTemplates, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.Bookmark, null, Modifier.size(16.dp))

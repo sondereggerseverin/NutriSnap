@@ -80,7 +80,7 @@ interface UserProfileDao {
         RecipeComponent::class,
         FrozenMeal::class
     ],
-    version = 29,
+    version = 30,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -634,6 +634,15 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // Custom-Foods: Nutzer-Verifizierung (Yazio-Import / manuell / Label-Scan)
+        private val MIGRATION_29_30 = object : Migration(29, 30) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE custom_foods ADD COLUMN verified INTEGER NOT NULL DEFAULT 0"
+                )
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -649,7 +658,7 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
                         MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
                         MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28,
-                        MIGRATION_28_29
+                        MIGRATION_28_29, MIGRATION_29_30
                     )
                     .build()
                     .also { INSTANCE = it }

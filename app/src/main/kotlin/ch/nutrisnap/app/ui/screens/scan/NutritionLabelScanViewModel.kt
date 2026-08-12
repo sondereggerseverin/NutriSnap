@@ -61,7 +61,8 @@ class NutritionLabelScanViewModel(app: Application) : AndroidViewModel(app) {
                     salt = result.saltPer100g,
                     brand = result.brand.ifBlank { null },
                     portionSizeG = portionSizeG.coerceAtLeast(1f),
-                    source = "manual"
+                    source = "label_scan",
+                    verified = true
                 )
             )
             _state.value = LabelScanState.Saved

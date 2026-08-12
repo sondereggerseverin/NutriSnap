@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 class CustomFoodRepository(private val dao: CustomFoodDao) {
     fun getAll(): Flow<List<CustomFoodItem>> = dao.getAll()
     fun search(query: String): Flow<List<CustomFoodItem>> = dao.search(query)
+    suspend fun getById(id: Int): CustomFoodItem? = dao.getById(id)
     suspend fun insert(item: CustomFoodItem) = dao.insert(item)
     suspend fun update(item: CustomFoodItem) = dao.update(item)
     suspend fun delete(item: CustomFoodItem) = dao.delete(item)

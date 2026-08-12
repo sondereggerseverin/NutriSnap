@@ -17,14 +17,35 @@ class CustomFoodViewModel(app: Application) : AndroidViewModel(app) {
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
 
-    val foods: StateFlow<List<CustomFoodItem>> = _query
-        .debounce(200)
-        .flatMapLatest { q ->
-            if (q.isBlank()) repo.getAll() else repo.search(q)
+    /** null = alle, true = nur verifiziert, false = nur unverifiziert */
+    private val _verifiedFilter = MutableStateFlow<Boolean?>(null)
+    val verifiedFilter: StateFlow<Boolean?> = _verifiedFilter.asStateFlow()
+
+    /** null = alle Quellen, sonst exakter Source-String */
+    private val _sourceFilter = MutableStateFlow<String?>(null)
+    val sourceFilter: StateFlow<String?> = _sourceFilter.asStateFlow()
+
+    val foods: StateFlow<List<CustomFoodItem>> = combine(
+        _query.debounce(200),
+        _verifiedFilter,
+        _sourceFilter
+    ) { q, verified, source -> Triple(q, verified, source) }
+        .flatMapLatest { (q, verified, source) ->
+            val base = if (q.isBlank()) repo.getAll() else repo.search(q)
+            base.map { list ->
+                list.filter { item ->
+                    (verified == null || item.verified == verified) &&
+                        (source == null || item.source == source)
+                }
+            }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun setQuery(q: String) { _query.value = q }
+    fun setVerifiedFilter(v: Boolean?) { _verifiedFilter.value = v }
+    fun setSourceFilter(s: String?) { _sourceFilter.value = s }
+
+    suspend fun getById(id: Int): CustomFoodItem? = repo.getById(id)
 
     fun save(
         name: String,
@@ -37,7 +58,8 @@ class CustomFoodViewModel(app: Application) : AndroidViewModel(app) {
         salt: Float = 0f,
         portionSizeG: Float = 100f,
         barcode: String? = null,
-        brand: String? = null
+        brand: String? = null,
+        verified: Boolean = true
     ) = viewModelScope.launch {
         repo.insert(
             CustomFoodItem(
@@ -52,9 +74,16 @@ class CustomFoodViewModel(app: Application) : AndroidViewModel(app) {
                 portionSizeG = portionSizeG.coerceAtLeast(1f),
                 barcode = barcode,
                 brand = brand,
-                source = "manual"
+                source = "manual",
+                verified = verified
             )
         )
+    }
+
+    fun update(item: CustomFoodItem) = viewModelScope.launch { repo.update(item) }
+
+    fun setVerified(item: CustomFoodItem, verified: Boolean) = viewModelScope.launch {
+        repo.update(item.copy(verified = verified))
     }
 
     fun delete(item: CustomFoodItem) = viewModelScope.launch { repo.delete(item) }
