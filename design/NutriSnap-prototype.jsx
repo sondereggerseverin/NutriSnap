@@ -122,6 +122,14 @@ const INITIAL_STATE = {
   streak: 7,
   favorites: ["1", "4", "7"],
   recipes: SAMPLE_RECIPES,
+  recipeFavorites: ["r1"],
+  collections: [
+    { id: "c1", name: "Meal-Prep", recipeIds: ["r1"] },
+    { id: "c2", name: "High Protein", recipeIds: ["r2"] },
+  ],
+  freezer: [
+    { id: "f1", name: "Hähnchen Quinoa Bowl", quantity: 2, kcal: 480, frozenAt: "2026-08-10" },
+  ],
   customFoods: [],
   // Adaptives Kalorienziel (AdaptiveTdeeCalculator in der APK)
   adaptiveTarget: { active: true, confidence: 82 },
@@ -656,26 +664,70 @@ function WeightChart({ data }) {
 }
 
 // ─── RECIPES SCREEN ───────────────────────────────────────────────────────────
-function RecipesScreen({ state, dispatch }) {
-  const [tab, setTab] = useState("discover"); // discover | my | favorites
+// ─── RECIPES HUB (analog RecipesHubScreen.kt: Rezepte / Gefrierer / KI-Koch) ───
+function RecipesHubScreen({ state, dispatch }) {
+  const [hubTab, setHubTab] = useState("saved"); // saved | freezer | ai
+  return (
+    <div>
+      <div style={{ display: "flex", borderBottom: `1px solid ${COLORS.border}`, background: COLORS.card }}>
+        {[
+          { key: "saved", label: "Rezepte", icon: "🍽️" },
+          { key: "freezer", label: "Gefrierer", icon: "❄️" },
+          { key: "ai", label: "KI-Koch", icon: "✨" },
+        ].map(({ key, label, icon }) => (
+          <button key={key} onClick={() => setHubTab(key)} style={{
+            flex: 1, padding: "12px 4px 10px", border: "none", background: "none", cursor: "pointer",
+            borderBottom: hubTab === key ? `2.5px solid ${COLORS.primary}` : "2.5px solid transparent",
+            color: hubTab === key ? COLORS.primary : COLORS.textLight, fontWeight: 700, fontSize: 12,
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+          }}>
+            <span style={{ fontSize: 18 }}>{icon}</span>
+            {label}
+          </button>
+        ))}
+      </div>
+      {hubTab === "saved" && <SavedRecipesScreen state={state} dispatch={dispatch} />}
+      {hubTab === "freezer" && <FreezerScreen state={state} dispatch={dispatch} />}
+      {hubTab === "ai" && <AiCookScreen state={state} dispatch={dispatch} />}
+    </div>
+  );
+}
+
+function SavedRecipesScreen({ state, dispatch }) {
+  const [filter, setFilter] = useState("all"); // all | favorites | collections
   const [selected, setSelected] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [search, setSearch] = useState("");
   const [activeTag, setActiveTag] = useState(null);
+  const [activeCollection, setActiveCollection] = useState(null);
 
+  const recipeFavorites = state.recipeFavorites || [];
+  const collections = state.collections || [];
   const allTags = [...new Set(state.recipes.flatMap(r => r.tags))];
-  const filtered = state.recipes.filter(r =>
+
+  let filtered = state.recipes.filter(r =>
     (search.length < 2 || r.name.toLowerCase().includes(search.toLowerCase())) &&
     (!activeTag || r.tags.includes(activeTag))
   );
+  if (filter === "favorites") filtered = filtered.filter(r => recipeFavorites.includes(r.id));
+  if (filter === "collections" && activeCollection) {
+    const col = collections.find(c => c.id === activeCollection);
+    filtered = filtered.filter(r => (col?.recipeIds || []).includes(r.id));
+  }
 
-  if (selected) return <RecipeDetail recipe={selected} onBack={() => setSelected(null)} onAddToDiary={(meal) => {
-    dispatch({ type: "ADD_ENTRY", date: today, mealKey: meal, entry: {
-      id: uid(), foodId: selected.id, name: selected.name, amount: 1,
-      kcal: selected.kcal, protein: selected.protein, carbs: selected.carbs, fat: selected.fat, fiber: 0
-    }});
-    setSelected(null);
-  }} />;
+  if (selected) return <RecipeDetail
+    recipe={selected}
+    isFavorite={recipeFavorites.includes(selected.id)}
+    onToggleFavorite={() => dispatch({ type: "TOGGLE_RECIPE_FAVORITE", recipeId: selected.id })}
+    onBack={() => setSelected(null)}
+    onAddToDiary={(meal) => {
+      dispatch({ type: "ADD_ENTRY", date: today, mealKey: meal, entry: {
+        id: uid(), foodId: selected.id, name: selected.name, amount: 1,
+        kcal: selected.kcal, protein: selected.protein, carbs: selected.carbs, fat: selected.fat, fiber: 0
+      }});
+      setSelected(null);
+    }}
+  />;
 
   if (showCreate) return <CreateRecipeScreen onBack={() => setShowCreate(false)} onSave={(r) => { dispatch({ type: "ADD_RECIPE", recipe: r }); setShowCreate(false); }} />;
 
@@ -687,20 +739,43 @@ function RecipesScreen({ state, dispatch }) {
         <button onClick={() => setShowCreate(true)} style={{ background: COLORS.primary, border: "none", borderRadius: 10, color: "#fff", padding: "10px 14px", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>+ Neu</button>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-        <Pill active={!activeTag} onClick={() => setActiveTag(null)}>Alle</Pill>
-        {allTags.map(t => <Pill key={t} active={activeTag===t} onClick={() => setActiveTag(t === activeTag ? null : t)}>#{t}</Pill>)}
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+        {[
+          { key: "all", label: "Alle" },
+          { key: "favorites", label: "♥ Favoriten" },
+          { key: "collections", label: "📁 Sammlungen" },
+        ].map(({ key, label }) => (
+          <Pill key={key} active={filter === key} onClick={() => { setFilter(key); setActiveCollection(null); }}>{label}</Pill>
+        ))}
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        {[["discover","🌍 Entdecken"],["my","📋 Meine"]].map(([t,l]) => (
-          <Pill key={t} active={tab===t} onClick={() => setTab(t)}>{l}</Pill>
-        ))}
+      {filter === "collections" && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+          {collections.length === 0 && (
+            <span style={{ fontSize: 13, color: COLORS.textLight }}>Noch keine Sammlungen – in der App unter Rezepte anlegen.</span>
+          )}
+          {collections.map(c => (
+            <Pill key={c.id} active={activeCollection === c.id} onClick={() => setActiveCollection(activeCollection === c.id ? null : c.id)}>
+              {c.name} ({(c.recipeIds || []).length})
+            </Pill>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+        <Pill active={!activeTag} onClick={() => setActiveTag(null)}>Alle Tags</Pill>
+        {allTags.map(t => <Pill key={t} active={activeTag === t} onClick={() => setActiveTag(t === activeTag ? null : t)}>#{t}</Pill>)}
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {filtered.map(r => (
-          <RecipeCard key={r.id} recipe={r} onClick={() => setSelected(r)} />
+          <RecipeCard
+            key={r.id}
+            recipe={r}
+            isFavorite={recipeFavorites.includes(r.id)}
+            onToggleFavorite={(e) => { e.stopPropagation(); dispatch({ type: "TOGGLE_RECIPE_FAVORITE", recipeId: r.id }); }}
+            onClick={() => setSelected(r)}
+          />
         ))}
         {filtered.length === 0 && (
           <div style={{ textAlign: "center", padding: "40px 0", color: COLORS.textLight }}>
@@ -714,7 +789,132 @@ function RecipesScreen({ state, dispatch }) {
   );
 }
 
-function RecipeCard({ recipe, onClick }) {
+function FreezerScreen({ state, dispatch }) {
+  const meals = state.freezer || [];
+  const totalPacks = meals.reduce((s, m) => s + (m.quantity || 1), 0);
+
+  return (
+    <div style={{ padding: "16px 16px 80px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        <span style={{ fontSize: 28 }}>❄️</span>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 18, color: COLORS.text }}>Gefrierschrank</div>
+          <div style={{ fontSize: 13, color: COLORS.textLight }}>
+            {meals.length === 0 ? "Noch nichts eingefroren" : `${totalPacks} Packungen · ${meals.length} Menüs`}
+          </div>
+        </div>
+      </div>
+
+      {meals.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "48px 16px", color: COLORS.textLight }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🧊</div>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>Gefrierschrank ist leer</div>
+          <div style={{ fontSize: 13 }}>In der App kannst du Portionen aus dem Tagebuch oder aus Rezepten einfrieren (Meal-Prep).</div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {meals.map(m => (
+            <div key={m.id} style={{ background: COLORS.card, borderRadius: 14, padding: 14, boxShadow: "0 1px 6px rgba(0,0,0,0.05)", display: "flex", gap: 12, alignItems: "center" }}>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: COLORS.surface, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>❄️</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, color: COLORS.text }}>{m.name}</div>
+                <div style={{ fontSize: 12, color: COLORS.textLight }}>{m.quantity}× · {m.kcal} kcal · eingefroren {m.frozenAt}</div>
+              </div>
+              <button onClick={() => dispatch({ type: "THAW_MEAL", mealId: m.id })} style={{ padding: "8px 12px", background: COLORS.primary, color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>Auftauen</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AiCookScreen({ state, dispatch }) {
+  const [prompt, setPrompt] = useState("");
+  const [generated, setGenerated] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  function handleGenerate() {
+    if (!prompt.trim()) return;
+    setLoading(true);
+    // Mock: in der echten App läuft Groq/Gemini
+    setTimeout(() => {
+      setGenerated({
+        id: uid(),
+        name: "Protein-Bowl mit Hähnchen",
+        category: "Lunch",
+        tags: ["high-protein", "schnell"],
+        totalTime: 20,
+        servings: 1,
+        image: "🥗",
+        ingredients: [
+          { name: "Hühnerbrust", amount: 150, unit: "g" },
+          { name: "Quinoa", amount: 80, unit: "g" },
+          { name: "Spinat", amount: 50, unit: "g" },
+          { name: "Avocado", amount: 50, unit: "g" },
+        ],
+        instructions: [
+          "Quinoa nach Packungsanweisung kochen.",
+          "Hühnerbrust würzen und in der Pfanne braten.",
+          "Spinat kurz mitdünsten, Avocado schneiden.",
+          "Alles in einer Schüssel anrichten.",
+        ],
+        kcal: 520, protein: 48, carbs: 35, fat: 18,
+      });
+      setLoading(false);
+    }, 900);
+  }
+
+  return (
+    <div style={{ padding: "16px 16px 80px" }}>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontWeight: 700, fontSize: 18, color: COLORS.text, marginBottom: 4 }}>✨ KI-Koch</div>
+        <div style={{ fontSize: 13, color: COLORS.textLight }}>Beschreibe, was du kochen willst – die KI erstellt ein Rezept (wie in der App mit Groq/Gemini).</div>
+      </div>
+
+      <textarea
+        value={prompt}
+        onChange={e => setPrompt(e.target.value)}
+        placeholder="z. B. Schnelles high-protein Abendessen mit Hähnchen, unter 600 kcal…"
+        rows={3}
+        style={{ width: "100%", padding: 12, border: `1.5px solid ${COLORS.border}`, borderRadius: 12, fontSize: 14, color: COLORS.text, outline: "none", background: COLORS.bg, resize: "vertical", marginBottom: 12, fontFamily: "inherit" }}
+      />
+      <button
+        onClick={handleGenerate}
+        disabled={loading || !prompt.trim()}
+        style={{ width: "100%", padding: 14, background: loading ? COLORS.textLight : COLORS.primary, color: "#fff", border: "none", borderRadius: 12, fontWeight: 700, fontSize: 15, cursor: loading ? "wait" : "pointer", marginBottom: 20 }}
+      >
+        {loading ? "Rezept wird erstellt…" : "Rezept generieren"}
+      </button>
+
+      {generated && (
+        <div style={{ background: COLORS.card, borderRadius: 16, padding: 16, boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
+            <span style={{ fontSize: 36 }}>{generated.image}</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 16, color: COLORS.text }}>{generated.name}</div>
+              <div style={{ fontSize: 12, color: COLORS.textLight }}>⏱ {generated.totalTime} Min · {generated.kcal} kcal · P {generated.protein}g</div>
+            </div>
+          </div>
+          <div style={{ fontSize: 13, color: COLORS.textMid, marginBottom: 10 }}>
+            {generated.ingredients.map(i => `${i.amount}${i.unit} ${i.name}`).join(" · ")}
+          </div>
+          <ol style={{ margin: "0 0 14px", paddingLeft: 18, fontSize: 13, color: COLORS.text, lineHeight: 1.5 }}>
+            {generated.instructions.map((s, i) => <li key={i}>{s}</li>)}
+          </ol>
+          <button
+            onClick={() => { dispatch({ type: "ADD_RECIPE", recipe: generated }); setGenerated(null); setPrompt(""); }}
+            style={{ width: "100%", padding: 12, background: COLORS.primary, color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer" }}
+          >
+            In Meine Rezepte speichern
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RecipeCard({ recipe, onClick, isFavorite, onToggleFavorite }) {
   const catColors = { Breakfast: COLORS.breakfast, Lunch: COLORS.lunch, Dinner: COLORS.dinner, Snack: COLORS.snack };
   return (
     <div onClick={onClick} style={{ background: COLORS.card, borderRadius: 16, padding: 16, boxShadow: "0 1px 6px rgba(0,0,0,0.05)", cursor: "pointer", display: "flex", gap: 14, alignItems: "center" }}>
@@ -730,11 +930,16 @@ function RecipeCard({ recipe, onClick }) {
         </div>
         <div style={{ fontSize: 12, color: COLORS.textLight }}>⏱ {recipe.totalTime} Min • {recipe.servings} Port. • {recipe.kcal} kcal</div>
       </div>
+      {onToggleFavorite && (
+        <button onClick={onToggleFavorite} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", padding: 4, color: isFavorite ? COLORS.accent : COLORS.textLight }}>
+          {isFavorite ? "♥" : "♡"}
+        </button>
+      )}
     </div>
   );
 }
 
-function RecipeDetail({ recipe, onBack, onAddToDiary }) {
+function RecipeDetail({ recipe, onBack, onAddToDiary, isFavorite, onToggleFavorite }) {
   const [showAddMeal, setShowAddMeal] = useState(false);
   const meals = ["breakfast","lunch","dinner","snack"];
   const mealLabels = { breakfast: "Frühstück", lunch: "Mittagessen", dinner: "Abendessen", snack: "Snack" };
@@ -743,7 +948,12 @@ function RecipeDetail({ recipe, onBack, onAddToDiary }) {
     <div style={{ padding: "0 0 80px" }}>
       <div style={{ background: COLORS.card, padding: "16px 20px", display: "flex", alignItems: "center", gap: 12, borderBottom: `1px solid ${COLORS.border}` }}>
         <button onClick={onBack} style={{ background: COLORS.surface, border: "none", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 16, color: COLORS.textMid }}>←</button>
-        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: COLORS.text }}>{recipe.name}</h2>
+        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: COLORS.text, flex: 1 }}>{recipe.name}</h2>
+        {onToggleFavorite && (
+          <button onClick={onToggleFavorite} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: isFavorite ? COLORS.accent : COLORS.textLight }}>
+            {isFavorite ? "♥" : "♡"}
+          </button>
+        )}
       </div>
 
       <div style={{ padding: 16 }}>
@@ -1241,6 +1451,17 @@ function reducer(state, action) {
       return { ...state, recipes: [...state.recipes, action.recipe] };
     case "ADD_CUSTOM_FOOD":
       return { ...state, customFoods: [...state.customFoods, action.food] };
+    case "TOGGLE_RECIPE_FAVORITE": {
+      const favs = state.recipeFavorites || [];
+      return {
+        ...state,
+        recipeFavorites: favs.includes(action.recipeId)
+          ? favs.filter(id => id !== action.recipeId)
+          : [...favs, action.recipeId],
+      };
+    }
+    case "THAW_MEAL":
+      return { ...state, freezer: (state.freezer || []).filter(m => m.id !== action.mealId) };
     default:
       return state;
   }
@@ -1289,7 +1510,7 @@ export default function NutriSnap() {
       <div style={{ overflowY: "auto", height: "calc(100vh - 120px)" }}>
         {tab === "home" && <HomeScreen state={appState} dispatch={appDispatch} onNavigate={setTab} />}
         {tab === "diary" && <DiaryScreen state={appState} dispatch={appDispatch} />}
-        {tab === "recipes" && <RecipesScreen state={appState} dispatch={appDispatch} />}
+        {tab === "recipes" && <RecipesHubScreen state={appState} dispatch={appDispatch} />}
         {tab === "analysis" && <AnalysisScreen state={appState} />}
         {tab === "profile" && <ProfileScreen state={appState} dispatch={appDispatch} />}
       </div>
