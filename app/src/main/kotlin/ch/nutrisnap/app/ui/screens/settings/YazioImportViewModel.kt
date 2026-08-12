@@ -10,6 +10,7 @@ import ch.nutrisnap.app.data.model.IngredientMatch
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.repository.DiaryRepository
+import ch.nutrisnap.app.domain.IngredientNutritionDatabase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -97,9 +98,13 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Name ohne abschliessende Klammer-Marke, z.B. "Magerquark (Milfina)" -> "magerquark". */
+    /** Entfernt alle Klammerzusätze und hängende Marken-Suffixe für robustes Matching. */
     private fun baseName(raw: String): String {
-        val n = normalizeFoodName(raw)
-        return n.replace(Regex("\\s*\\([^)]*\\)\\s*$"), "").trim()
+        var n = normalizeFoodName(raw)
+        // Alle (...) entfernen: "Eier, roh (ohne Schale) (Hühnerei)" → "eier, roh"
+        n = n.replace(Regex("\\s*\\([^)]*\\)"), " ").replace(Regex("\\s+"), " ").trim()
+        // Trailing ", roh"/", gekocht" etc. behalten – lookup matcht per Substring
+        return n
     }
 
     /**
@@ -364,28 +369,39 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                             val unit = ing.optString("unit", "g")
                             val producer = ing.optString("producer", null).takeUnless { it.isNullOrBlank() }
 
-                            if (name.isNotBlank() && foodIdByName[name.lowercase()] == null) {
+                            if (name.isNotBlank() && foodIdByName[name.lowercase()] == null
+                                && foodIdByName[baseName(name)] == null
+                            ) {
                                 val displayName = if (!producer.isNullOrBlank()) "$name ($producer)" else name
-                                // Makros aus bereits importiertem Yazio-Food / gleichem Basisnamen übernehmen
+                                // 1) bestehendes Custom-Food, 2) kuratierte Referenz-DB
                                 val donor = macrosByBaseName[baseName(name)]
                                     ?: macrosByBaseName[baseName(displayName)]
+                                val ref = if (donor == null) {
+                                    IngredientNutritionDatabase.lookup(name)
+                                        ?: IngredientNutritionDatabase.lookup(baseName(name))
+                                } else null
                                 val newId = db.customFoodDao().insert(
                                     CustomFoodItem(
                                         name = displayName,
-                                        calories = donor?.calories ?: 0f,
-                                        protein = donor?.protein ?: 0f,
-                                        carbs = donor?.carbs ?: 0f,
-                                        fat = donor?.fat ?: 0f,
-                                        fiber = donor?.fiber ?: 0f,
+                                        calories = donor?.calories ?: ref?.calories ?: 0f,
+                                        protein = donor?.protein ?: ref?.protein ?: 0f,
+                                        carbs = donor?.carbs ?: ref?.carbs ?: 0f,
+                                        fat = donor?.fat ?: ref?.fat ?: 0f,
+                                        fiber = donor?.fiber ?: ref?.fiber ?: 0f,
                                         sugar = donor?.sugar ?: 0f,
                                         salt = donor?.salt ?: 0f,
                                         barcode = donor?.barcode,
                                         brand = producer ?: donor?.brand,
-                                        source = if (donor != null) "yazio_import" else "yazio_recipe_ingredient"
+                                        source = when {
+                                            donor != null -> "yazio_import"
+                                            ref != null -> "yazio_recipe_ingredient"
+                                            else -> "yazio_recipe_ingredient"
+                                        }
                                     )
                                 )
                                 foodIdByName[name.lowercase()] = newId.toInt()
                                 foodIdByName[displayName.lowercase()] = newId.toInt()
+                                foodIdByName[baseName(name)] = newId.toInt()
                                 autoCreatedIngredients++
                             }
 
@@ -424,11 +440,14 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                     existing.add(title.trim().lowercase())
                     imported++
                 }
+                // Bestehende leere Zutaten (auch aus früheren Imports) nachfüllen
+                val backfilled = backfillEmptyRecipeIngredients()
+
                 _recipeState.value = YazioRecipeImportState.Success(
                     YazioRecipeImportResult(
                         importedRecipes = imported,
                         skippedRecipes = skipped,
-                        autoCreatedIngredientFoods = autoCreatedIngredients
+                        autoCreatedIngredientFoods = autoCreatedIngredients + backfilled
                     )
                 )
             } catch (e: Exception) {
@@ -590,8 +609,9 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Füllt bestehende Custom-Foods mit source=yazio_recipe_ingredient und 0-Makros
-     * aus Einträgen mit gleichen Basisnamen (yazio_import / manuell mit Werten).
+     * Füllt bestehende Custom-Foods mit 0-Makros:
+     * 1) aus anderen Custom-Foods mit gleichem Basisnamen
+     * 2) Fallback: [IngredientNutritionDatabase] (Ei, Linsen, Mehl, …)
      * @return Anzahl aktualisierter Einträge
      */
     private suspend fun backfillEmptyRecipeIngredients(): Int {
@@ -610,23 +630,43 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
             val empty = item.calories == 0f && item.protein == 0f && item.carbs == 0f && item.fat == 0f
             if (!empty) continue
             if (item.source != "yazio_recipe_ingredient" && item.source != "yazio_diary_only") continue
-            val donor = donors[baseName(item.name)] ?: continue
-            if (donor.id == item.id) continue
-            db.customFoodDao().update(
-                item.copy(
-                    calories = donor.calories,
-                    protein = donor.protein,
-                    carbs = donor.carbs,
-                    fat = donor.fat,
-                    fiber = donor.fiber,
-                    sugar = donor.sugar,
-                    salt = donor.salt,
-                    barcode = item.barcode ?: donor.barcode,
-                    brand = item.brand ?: donor.brand,
-                    source = if (donor.source == "yazio_import") "yazio_import" else item.source
+
+            val donor = donors[baseName(item.name)]
+                ?.takeIf { it.id != item.id }
+            if (donor != null) {
+                db.customFoodDao().update(
+                    item.copy(
+                        calories = donor.calories,
+                        protein = donor.protein,
+                        carbs = donor.carbs,
+                        fat = donor.fat,
+                        fiber = donor.fiber,
+                        sugar = donor.sugar,
+                        salt = donor.salt,
+                        barcode = item.barcode ?: donor.barcode,
+                        brand = item.brand ?: donor.brand,
+                        source = if (donor.source == "yazio_import") "yazio_import" else item.source
+                    )
                 )
-            )
-            updated++
+                updated++
+                continue
+            }
+
+            // Fallback: kuratierte Referenz-DB (Ei, Linsen, Mehl, …)
+            val ref = IngredientNutritionDatabase.lookup(item.name)
+                ?: IngredientNutritionDatabase.lookup(baseName(item.name))
+            if (ref != null) {
+                db.customFoodDao().update(
+                    item.copy(
+                        calories = ref.calories,
+                        protein = ref.protein,
+                        carbs = ref.carbs,
+                        fat = ref.fat,
+                        fiber = ref.fiber
+                    )
+                )
+                updated++
+            }
         }
         return updated
     }
