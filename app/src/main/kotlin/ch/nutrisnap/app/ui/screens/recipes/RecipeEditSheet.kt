@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -320,6 +321,9 @@ private data class ManualIngredientLine(
 /**
  * Freies Rezept erstellen: Name, Portionen, Zutaten einzeln (Menge g + Name).
  * Speichert ohne Import/URL – Nährwerte können danach per „Verifizieren“ berechnet werden.
+ *
+ * Column+verticalScroll statt LazyColumn: bei Tastatur bleibt das Sheet stabil und
+ * die Zutatenzeilen bleiben sichtbar (LazyColumn + ModalBottomSheet + IME war instabil).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -335,6 +339,8 @@ fun ManualRecipeCreateSheet(
         mutableStateOf(listOf(ManualIngredientLine(id = 0L)))
     }
     var category by remember { mutableStateOf(RecipeCategory.OTHER) }
+    val scrollState = rememberScrollState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     fun formatIngredients(): String = lines.mapNotNull { line ->
         val name = line.name.trim()
@@ -345,11 +351,28 @@ fun ManualRecipeCreateSheet(
 
     val canSave = title.isNotBlank() && lines.any { it.name.isNotBlank() }
 
+    fun doSave() {
+        if (!canSave) return
+        onSave(
+            title.trim(),
+            formatIngredients(),
+            instructions.trim(),
+            servingsText.toIntOrNull()?.coerceAtLeast(1) ?: 1,
+            category.name
+        )
+    }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         modifier = Modifier.fillMaxHeight(0.96f)
     ) {
-        Column(Modifier.fillMaxSize()) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .imePadding()
+                .navigationBarsPadding()
+        ) {
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -359,197 +382,163 @@ fun ManualRecipeCreateSheet(
             ) {
                 TextButton(onClick = onDismiss) { Text("Abbrechen") }
                 Text("Freies Rezept", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                TextButton(
-                    onClick = {
-                        if (!canSave) return@TextButton
-                        onSave(
-                            title.trim(),
-                            formatIngredients(),
-                            instructions.trim(),
-                            servingsText.toIntOrNull()?.coerceAtLeast(1) ?: 1,
-                            category.name
-                        )
-                    },
-                    enabled = canSave
-                ) {
+                TextButton(onClick = { doSave() }, enabled = canSave) {
                     Text("Speichern", fontWeight = FontWeight.Bold)
                 }
             }
             HorizontalDivider()
 
-            LazyColumn(
+            Column(
                 modifier = Modifier
                     .weight(1f)
-                    .imePadding()
-                    .navigationBarsPadding(),
-                contentPadding = PaddingValues(16.dp),
+                    .verticalScroll(scrollState)
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                item {
-                    Text(
-                        "Ohne Link oder Foto – Name vergeben und Zutaten einzeln eintragen. " +
-                            "Nährwerte danach über „Verifizieren“ berechnen.",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    "Ohne Link oder Foto – Name vergeben und Zutaten einzeln eintragen. " +
+                        "Nährwerte danach über „Verifizieren“ berechnen.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-                item {
-                    OutlinedTextField(
-                        value = title,
-                        onValueChange = { title = it },
-                        label = { Text("Rezeptname") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        leadingIcon = { Icon(Icons.Default.Title, null) }
-                    )
-                }
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Rezeptname") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.Title, null) }
+                )
 
-                item {
-                    OutlinedTextField(
-                        value = servingsText,
-                        onValueChange = { servingsText = it.filter { c -> c.isDigit() }.take(3) },
-                        label = { Text("Portionen") },
-                        modifier = Modifier.fillMaxWidth(0.45f),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        leadingIcon = { Icon(Icons.Default.People, null, Modifier.size(18.dp)) }
-                    )
-                }
+                OutlinedTextField(
+                    value = servingsText,
+                    onValueChange = { servingsText = it.filter { c -> c.isDigit() }.take(3) },
+                    label = { Text("Portionen") },
+                    modifier = Modifier.fillMaxWidth(0.45f),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    leadingIcon = { Icon(Icons.Default.People, null, Modifier.size(18.dp)) }
+                )
 
-                item {
-                    Text("Kategorie", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                    Spacer(Modifier.height(6.dp))
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        RecipeCategory.entries.forEach { cat ->
-                            FilterChip(
-                                selected = category == cat,
-                                onClick = { category = cat },
-                                label = {
-                                    Text(
-                                        cat.emoji + " " + cat.label,
-                                        style = MaterialTheme.typography.labelMedium
-                                    )
-                                }
-                            )
-                        }
-                    }
-                }
-
-                item {
-                    Text("Zutaten", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                    Text(
-                        "Menge in g und Name – pro Zeile eine Zutat",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                items(lines, key = { it.id }) { line ->
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = line.amountG,
-                            onValueChange = { newVal ->
-                                lines = lines.map {
-                                    if (it.id == line.id) it.copy(amountG = newVal.filter { c ->
-                                        c.isDigit() || c == ',' || c == '.'
-                                    }.take(6)) else it
-                                }
-                            },
-                            label = { Text("g") },
-                            modifier = Modifier.width(88.dp),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-                        )
-                        OutlinedTextField(
-                            value = line.name,
-                            onValueChange = { newVal ->
-                                lines = lines.map {
-                                    if (it.id == line.id) it.copy(name = newVal) else it
-                                }
-                            },
-                            label = { Text("Zutat") },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            placeholder = { Text("z.B. Haferflocken") }
-                        )
-                        IconButton(
-                            onClick = {
-                                lines = if (lines.size <= 1) {
-                                    val id = nextId
-                                    nextId = nextId + 1
-                                    listOf(ManualIngredientLine(id = id))
-                                } else {
-                                    lines.filter { it.id != line.id }
-                                }
+                Text("Kategorie", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    RecipeCategory.entries.forEach { cat ->
+                        FilterChip(
+                            selected = category == cat,
+                            onClick = { category = cat },
+                            label = {
+                                Text(
+                                    cat.emoji + " " + cat.label,
+                                    style = MaterialTheme.typography.labelMedium
+                                )
                             }
+                        )
+                    }
+                }
+
+                Text("Zutaten", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text(
+                    "Menge in g und Name – pro Zeile eine Zutat",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                lines.forEach { line ->
+                    key(line.id) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                Icons.Default.Delete,
-                                contentDescription = "Zutat entfernen",
-                                tint = MaterialTheme.colorScheme.error
+                            OutlinedTextField(
+                                value = line.amountG,
+                                onValueChange = { newVal ->
+                                    lines = lines.map {
+                                        if (it.id == line.id) it.copy(
+                                            amountG = newVal.filter { c ->
+                                                c.isDigit() || c == ',' || c == '.'
+                                            }.take(6)
+                                        ) else it
+                                    }
+                                },
+                                label = { Text("g") },
+                                modifier = Modifier.width(88.dp),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                             )
+                            OutlinedTextField(
+                                value = line.name,
+                                onValueChange = { newVal ->
+                                    lines = lines.map {
+                                        if (it.id == line.id) it.copy(name = newVal) else it
+                                    }
+                                },
+                                label = { Text("Zutat") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                placeholder = { Text("z.B. Haferflocken") }
+                            )
+                            IconButton(
+                                onClick = {
+                                    lines = if (lines.size <= 1) {
+                                        val id = nextId
+                                        nextId = nextId + 1
+                                        listOf(ManualIngredientLine(id = id))
+                                    } else {
+                                        lines.filter { it.id != line.id }
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Zutat entfernen",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                     }
                 }
 
-                item {
-                    OutlinedButton(
-                        onClick = {
-                            val id = nextId
-                            nextId = nextId + 1
-                            lines = lines + ManualIngredientLine(id = id)
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.Add, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Zutat hinzufügen")
-                    }
+                OutlinedButton(
+                    onClick = {
+                        val id = nextId
+                        nextId = nextId + 1
+                        lines = lines + ManualIngredientLine(id = id)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Add, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Zutat hinzufügen")
                 }
 
-                item {
-                    OutlinedTextField(
-                        value = instructions,
-                        onValueChange = { instructions = it },
-                        label = { Text("Zubereitung (optional)") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 100.dp),
-                        maxLines = 12
-                    )
-                }
+                OutlinedTextField(
+                    value = instructions,
+                    onValueChange = { instructions = it },
+                    label = { Text("Zubereitung (optional)") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 100.dp),
+                    maxLines = 12
+                )
 
-                item {
-                    Button(
-                        onClick = {
-                            if (!canSave) return@Button
-                            onSave(
-                                title.trim(),
-                                formatIngredients(),
-                                instructions.trim(),
-                                servingsText.toIntOrNull()?.coerceAtLeast(1) ?: 1,
-                                category.name
-                            )
-                        },
-                        enabled = canSave,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.Save, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Rezept speichern")
-                    }
-                    Spacer(Modifier.height(24.dp))
+                Button(
+                    onClick = { doSave() },
+                    enabled = canSave,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Save, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Rezept speichern")
                 }
+                // Extra Platz, damit die letzte Zeile über der Tastatur bleibt
+                Spacer(Modifier.height(120.dp))
             }
         }
     }
