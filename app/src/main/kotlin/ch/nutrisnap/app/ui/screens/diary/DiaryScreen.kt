@@ -1291,10 +1291,22 @@ fun AddFoodSheet(
         return
     }
 
-    val addSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val density = LocalDensity.current
+    // rememberUpdatedState: confirmValueChange-Lambda hält sonst stale imeVisible
+    val imeVisible = WindowInsets.ime.getBottom(density) > 0
+    val imeVisibleState = rememberUpdatedState(imeVisible)
+    // Tastatur offen: Sheet nicht per Gesture schließen (sonst Crashes/Dismiss beim Öffnen)
+    val addSheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { newValue ->
+            if (imeVisibleState.value && newValue == SheetValue.Hidden) false else true
+        }
+    )
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = addSheetState
+        sheetState = addSheetState,
+        // Insets selbst handhaben (imePadding unten), sonst doppelte/kämpfende Resize-Logik
+        contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
     ) {
         Column(
             Modifier
