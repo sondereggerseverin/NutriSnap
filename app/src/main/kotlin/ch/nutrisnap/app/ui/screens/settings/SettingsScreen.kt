@@ -84,6 +84,20 @@ private fun computeGoals(
     return Triple(kcal, proteinG, fatG)
 }
 
+/** Unterseiten im Mehr-Tab – Hub statt endloser Scroll-Liste. */
+private enum class SettingsHubSection(
+    val title: String,
+    val subtitle: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector
+) {
+    Appearance("Design", "Theme & Optik", Icons.Default.Palette),
+    Features("Features", "Scan, Listen, Rezepte", Icons.Default.Apps),
+    Profile("Profil & Ziele", "Körper, Makros, Zielgewicht", Icons.Default.Person),
+    Health("Gesundheit", "Health Connect & Sport", Icons.Default.Favorite),
+    Data("Daten", "Import, Export, Vorlagen", Icons.Default.Storage),
+    Kitchen("Küche", "Ofen / Dampfgarer", Icons.Default.Kitchen),
+}
+
 @Composable
 fun SettingsScreen(
     vm: SettingsViewModel = viewModel(),
@@ -116,6 +130,7 @@ fun SettingsScreen(
     var weeklyTargetLossText by remember(profile.weeklyTargetLossKg) { mutableStateOf(profile.weeklyTargetLossKg?.toString() ?: "") }
     var selectedGoal by remember { mutableStateOf(FitnessGoal.MAINTAIN) }
     var showSaved   by remember { mutableStateOf(false) }
+    var section     by remember { mutableStateOf<SettingsHubSection?>(null) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
@@ -142,412 +157,532 @@ fun SettingsScreen(
             .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.lg),
         verticalArrangement = Arrangement.spacedBy(NutriSpacing.md)
     ) {
-        Text("Einstellungen", fontWeight = FontWeight.Bold, fontSize = 24.sp)
-
-        // Theme Picker
-        SettingsCard(title = "App-Design", icon = Icons.Default.Palette) {
-            ThemePickerSection(
-                currentTheme = currentTheme,
-                onThemeSelected = { theme ->
-                    scope.launch {
-                        context.notifDataStore.edit { prefs ->
-                            prefs[ch.nutrisnap.app.ui.theme.KEY_APP_THEME] = theme.name
-                        }
-                    }
-                }
+        // ── Header ──────────────────────────────────────────────────────────
+        if (section == null) {
+            Text("Mehr", fontWeight = FontWeight.Bold, fontSize = 24.sp)
+            Text(
+                "Einstellungen & Shortcuts",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        }
-
-        // Feature-Shortcuts
-        SettingsCard(title = "Features", icon = Icons.Default.Apps) {
-            Button(onClick = onNavigateToScan, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.PhotoCamera, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(NutriSpacing.sm)); Text("Essen fotografieren / Scannen")
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
-                OutlinedButton(onClick = onNavigateToStats, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.BarChart, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(NutriSpacing.xs)); Text("Statistik", fontSize = 12.sp)
-                }
-                OutlinedButton(onClick = onNavigateToNotifSettings, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.Notifications, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(NutriSpacing.xs)); Text("Reminder", fontSize = 12.sp)
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
-                OutlinedButton(onClick = onNavigateToMealOrder, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.DragHandle, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(NutriSpacing.xs)); Text("Reihenfolge", fontSize = 12.sp)
-                }
-                OutlinedButton(onClick = onNavigateToShoppingList, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.ShoppingCart, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(NutriSpacing.xs)); Text("Einkaufsliste", fontSize = 12.sp)
-                }
-            }
-        }
-
-        SettingsCard(title = "Rezepte", icon = Icons.Default.RestaurantMenu) {
-            val autoGerman = prefs?.get(KEY_AUTO_GERMAN_METRIC) ?: false
+        } else {
             Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(NutriSpacing.xs)
             ) {
-                Column(Modifier.weight(1f).padding(end = 12.dp)) {
-                    Text("Import: Deutsch + metrisch", fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                IconButton(onClick = { section = null }) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                }
+                Column {
+                    Text(section!!.title, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                     Text(
-                        "Neue Rezepte automatisch übersetzen und auf ml/g umrechnen",
+                        section!!.subtitle,
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Switch(
-                    checked = autoGerman,
-                    onCheckedChange = { checked ->
-                        scope.launch {
-                            context.notifDataStore.edit { it[KEY_AUTO_GERMAN_METRIC] = checked }
-                        }
-                    }
-                )
             }
         }
 
-        // Design-Experiment (FreshBatch-inspiriert, default aus)
-        SettingsCard(title = "Design-Experiment", icon = Icons.Default.AutoAwesome) {
-            Text(
-                "Optionaler Look à la Wochenplan-Apps: große Rezeptbilder, weichere Karten. Standard-Design bleibt unverändert, solange die Schalter aus sind.",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(NutriSpacing.sm))
-            val freshUi = prefs?.get(KEY_FRESH_UI) ?: false
-            val freshCards = prefs?.get(KEY_FRESH_RECIPE_CARDS) ?: false
-            val freshHome = prefs?.get(KEY_FRESH_HOME) ?: false
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f).padding(end = 8.dp)) {
-                    Text("Frisches Design (Master)", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    Text("Aktiviert die Unteroptionen unten", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Switch(
-                    checked = freshUi,
-                    onCheckedChange = { checked ->
-                        scope.launch {
-                            context.notifDataStore.edit {
-                                it[KEY_FRESH_UI] = checked
-                                if (checked) {
-                                    it[KEY_FRESH_RECIPE_CARDS] = true
-                                    it[KEY_FRESH_HOME] = true
-                                }
-                            }
-                        }
-                    }
-                )
-            }
-            Spacer(Modifier.height(NutriSpacing.xs))
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f).padding(end = 8.dp)) {
-                    Text("Große Rezept-Karten", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    Text("Bild oben, Makro-Pills, runder", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Switch(
-                    checked = freshCards || freshUi,
-                    enabled = true,
-                    onCheckedChange = { checked ->
-                        scope.launch {
-                            context.notifDataStore.edit { it[KEY_FRESH_RECIPE_CARDS] = checked }
-                        }
-                    }
-                )
-            }
-            Spacer(Modifier.height(NutriSpacing.xs))
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f).padding(end = 8.dp)) {
-                    Text("Home weicher", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    Text("Kompaktere Mahlzeiten-Karten, mehr Rundung", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Switch(
-                    checked = freshHome || freshUi,
-                    onCheckedChange = { checked ->
-                        scope.launch {
-                            context.notifDataStore.edit { it[KEY_FRESH_HOME] = checked }
-                        }
-                    }
-                )
-            }
-        }
-
-        // Daten & mehr
-        SettingsCard(title = "Daten & mehr", icon = Icons.Default.Storage) {
-            Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
-                OutlinedButton(onClick = onNavigateToCustomFoods, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.Restaurant, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(NutriSpacing.xs)); Text("Lebensmittel", fontSize = 12.sp)
-                }
-                OutlinedButton(onClick = onNavigateToMealTemplates, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.Bookmark, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(NutriSpacing.xs)); Text("Vorlagen", fontSize = 12.sp)
-                }
-            }
-            Spacer(Modifier.height(NutriSpacing.sm))
-            OutlinedButton(onClick = onNavigateToSupplements, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.Medication, null, Modifier.size(16.dp))
-                Spacer(Modifier.width(NutriSpacing.xs)); Text("Supplements")
-            }
-            Button(onClick = onNavigateToExport, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.Download, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(NutriSpacing.sm)); Text("Daten exportieren (CSV)")
-            }
-            OutlinedButton(onClick = onNavigateToYazioImport, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.UploadFile, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(NutriSpacing.sm)); Text("Yazio-Daten importieren")
-            }
-            OutlinedButton(onClick = onNavigateToCrashLog, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.BugReport, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(NutriSpacing.sm)); Text("Absturzprotokoll")
-            }
-        }
-
-        // Ziel-Auswahl
-        SettingsCard(title = "Mein Ziel", icon = Icons.Default.Flag) {
-            Text(
-                "Was möchtest du erreichen?",
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(NutriSpacing.sm))
-            Column(verticalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
-                FitnessGoal.entries.chunked(2).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
-                        row.forEach { goal ->
-                            val selected = goal == selectedGoal
-                            FilterChip(
-                                selected = selected,
-                                onClick  = { selectedGoal = goal; applyGoal() },
-                                label = {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(NutriSpacing.xs)
-                                    ) {
-                                        Text(goal.emoji, fontSize = 14.sp)
-                                        Text(goal.label, fontSize = 12.sp)
-                                    }
-                                },
+        when (section) {
+            null -> {
+                // ── Hub: 2-Spalten-Kacheln ───────────────────────────────────
+                SettingsHubSection.entries.chunked(2).forEach { row ->
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(NutriSpacing.md)
+                    ) {
+                        row.forEach { s ->
+                            SettingsHubTile(
+                                section = s,
                                 modifier = Modifier.weight(1f),
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                    selectedLabelColor     = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
+                                onClick = { section = s }
                             )
                         }
                         if (row.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
+
+                // Schnellzugriff unten
+                Text(
+                    "Schnellzugriff",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = NutriSpacing.sm)
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
+                    OutlinedButton(onClick = onNavigateToScan, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.PhotoCamera, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Scan", fontSize = 12.sp)
+                    }
+                    OutlinedButton(onClick = onNavigateToShoppingList, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.ShoppingCart, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Einkauf", fontSize = 12.sp)
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
+                    OutlinedButton(onClick = onNavigateToStats, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.BarChart, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Statistik", fontSize = 12.sp)
+                    }
+                    OutlinedButton(onClick = onNavigateToNotifSettings, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.Notifications, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Reminder", fontSize = 12.sp)
+                    }
+                }
             }
-            Text(
-                selectedGoal.desc,
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = NutriSpacing.xs)
-            )
-        }
 
-        // Health Connect
-        HealthConnectCard()
-
-        // Samsung Health Data SDK
-        SamsungHealthCard()
-
-        // Manuelle Aktivitätskalorien
-        ManualActivitySettingsCard()
-
-        AggressiveSportDayCard()
-
-        // Körperdaten
-        SettingsCard(title = "Körperdaten", icon = Icons.Default.Person) {
-            Text(
-                "Geschlecht",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(NutriSpacing.xs))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                val sexOptions = listOf(Sex.FEMALE to "Weiblich", Sex.MALE to "Männlich", Sex.UNSPECIFIED to "Keine Angabe")
-                sexOptions.forEach { (option, label) ->
-                    FilterChip(
-                        selected = sex == option,
-                        onClick = { sex = option; applyGoal() },
-                        label = { Text(label, fontSize = 12.sp) },
-                        modifier = Modifier.weight(1f)
+            SettingsHubSection.Appearance -> {
+                SettingsCard(title = "App-Design", icon = Icons.Default.Palette) {
+                    ThemePickerSection(
+                        currentTheme = currentTheme,
+                        onThemeSelected = { theme ->
+                            scope.launch {
+                                context.notifDataStore.edit { prefs ->
+                                    prefs[ch.nutrisnap.app.ui.theme.KEY_APP_THEME] = theme.name
+                                }
+                            }
+                        }
+                    )
+                }
+                SettingsCard(title = "Design-Experiment", icon = Icons.Default.AutoAwesome) {
+                    Text(
+                        "Optionaler Look: große Rezeptbilder, weichere Karten. Standard bleibt, solange die Schalter aus sind.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(NutriSpacing.sm))
+                    val freshUi = prefs?.get(KEY_FRESH_UI) ?: false
+                    val freshCards = prefs?.get(KEY_FRESH_RECIPE_CARDS) ?: false
+                    val freshHome = prefs?.get(KEY_FRESH_HOME) ?: false
+                    SettingsSwitchRow(
+                        title = "Frisches Design (Master)",
+                        subtitle = "Aktiviert die Unteroptionen",
+                        checked = freshUi,
+                        onCheckedChange = { checked ->
+                            scope.launch {
+                                context.notifDataStore.edit {
+                                    it[KEY_FRESH_UI] = checked
+                                    if (checked) {
+                                        it[KEY_FRESH_RECIPE_CARDS] = true
+                                        it[KEY_FRESH_HOME] = true
+                                    }
+                                }
+                            }
+                        }
+                    )
+                    SettingsSwitchRow(
+                        title = "Große Rezept-Karten",
+                        subtitle = "Bild oben, Makro-Pills",
+                        checked = freshCards || freshUi,
+                        onCheckedChange = { checked ->
+                            scope.launch {
+                                context.notifDataStore.edit { it[KEY_FRESH_RECIPE_CARDS] = checked }
+                            }
+                        }
+                    )
+                    SettingsSwitchRow(
+                        title = "Home weicher",
+                        subtitle = "Kompaktere Mahlzeiten-Karten",
+                        checked = freshHome || freshUi,
+                        onCheckedChange = { checked ->
+                            scope.launch {
+                                context.notifDataStore.edit { it[KEY_FRESH_HOME] = checked }
+                            }
+                        }
                     )
                 }
             }
-            Spacer(Modifier.height(NutriSpacing.sm))
-            GoalField("Gewicht (kg)",  weightText, KeyboardType.Number) {
-                weightText = it; applyGoal()
+
+            SettingsHubSection.Features -> {
+                SettingsCard(title = "Shortcuts", icon = Icons.Default.Apps) {
+                    Button(onClick = onNavigateToScan, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.PhotoCamera, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(NutriSpacing.sm)); Text("Essen fotografieren / Scannen")
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
+                        OutlinedButton(onClick = onNavigateToStats, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.BarChart, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Statistik", fontSize = 12.sp)
+                        }
+                        OutlinedButton(onClick = onNavigateToNotifSettings, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.Notifications, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Reminder", fontSize = 12.sp)
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
+                        OutlinedButton(onClick = onNavigateToMealOrder, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.DragHandle, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Reihenfolge", fontSize = 12.sp)
+                        }
+                        OutlinedButton(onClick = onNavigateToShoppingList, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.ShoppingCart, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Einkaufsliste", fontSize = 12.sp)
+                        }
+                    }
+                }
+                SettingsCard(title = "Rezepte", icon = Icons.Default.RestaurantMenu) {
+                    val autoGerman = prefs?.get(KEY_AUTO_GERMAN_METRIC) ?: false
+                    SettingsSwitchRow(
+                        title = "Import: Deutsch + metrisch",
+                        subtitle = "Neue Rezepte übersetzen und auf ml/g umrechnen",
+                        checked = autoGerman,
+                        onCheckedChange = { checked ->
+                            scope.launch {
+                                context.notifDataStore.edit { it[KEY_AUTO_GERMAN_METRIC] = checked }
+                            }
+                        }
+                    )
+                }
             }
-            GoalField("Grösse (cm)",   heightText, KeyboardType.Number) {
-                heightText = it; applyGoal()
-            }
-            GoalField("Alter (Jahre)", ageText,    KeyboardType.Number) {
-                ageText = it; applyGoal()
-            }
-        }
 
-        // Ernährungsziele
-        SettingsCard(title = "Ernährungsziele", icon = Icons.Default.TrackChanges) {
-            Text(
-                "Automatisch berechnet – du kannst auch manuell anpassen.",
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(NutriSpacing.xs))
-            GoalField("Kalorienziel (kcal)",  calorieText, KeyboardType.Number) { calorieText = it }
-            GoalField("Proteinziel (g)",      proteinText, KeyboardType.Number) { proteinText = it }
-            Text(
-                "Empfehlung Aktiv: 1,6–2,4 g/kg KG (bei ${weightText.toFloatOrNull()?.let { "%.0f".format(it) } ?: "—"} kg ≈ "
-                    + "${weightText.toFloatOrNull()?.let { (it * 1.6f).toInt() } ?: "—"}–"
-                    + "${weightText.toFloatOrNull()?.let { (it * 2.4f).toInt() } ?: "—"} g)",
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            GoalField("Kohlenhydratziel (g)", carbsText,   KeyboardType.Number) { carbsText   = it }
-            GoalField("Fettziel (g)",         fatText,     KeyboardType.Number) { fatText     = it }
-            Text(
-                "Ballaststoffe: fest ${ch.nutrisnap.app.ui.screens.home.FIBER_GOAL_G.toInt()} g/Tag (D-A-CH-Richtwert)",
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-        }
-
-        // Aktivitätslevel
-        SettingsCard(title = "Aktivitätslevel", icon = Icons.Default.DirectionsRun) {
-            ActivitySlider(value = activity) { activity = it; applyGoal() }
-        }
-
-        // Küchengerät
-        SettingsCard(title = "Backofen / Dampfgarer", icon = Icons.Default.Kitchen) {
-            Text(
-                "Optional: Modell hinterlegen, damit KI-Rezepte für Ofen/Dampfgarer echte Programme, Temperaturen und Zeiten deines Geräts nutzen.",
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(NutriSpacing.xs))
-            GoalField(
-                "Gerätemodell (z.B. V-ZUG Combi-Steam SL CSTSLc)",
-                applianceModelText,
-                KeyboardType.Text
-            ) { applianceModelText = it }
-        }
-
-        // Zielgewicht & Prognose
-        SettingsCard(title = "Zielgewicht & Prognose", icon = Icons.Default.Flag) {
-            Text(
-                "Optional: Zielgewicht setzen, um zu sehen, wann du es bei deinem aktuellen Tempo erreichst.",
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(NutriSpacing.xs))
-            GoalField("Zielgewicht (kg)", targetWeightText, KeyboardType.Decimal) { targetWeightText = it }
-            Spacer(Modifier.height(NutriSpacing.xs))
-            GoalField("Wochenziel (kg/Woche, z.B. 0.5)", weeklyTargetLossText, KeyboardType.Decimal) { weeklyTargetLossText = it }
-            Spacer(Modifier.height(NutriSpacing.xs))
-            GoalPrognosisPreview()
-        }
-
-        // TDEE Preview
-        val previewProfile = UserProfile(
-            weightKg       = weightText.toFloatOrNull() ?: profile.weightKg,
-            heightCm       = heightText.toIntOrNull()   ?: profile.heightCm,
-            ageYears       = ageText.toIntOrNull()      ?: profile.ageYears,
-            activityFactor = activity,
-            sex            = sex
-        )
-        previewProfile.computedTdee()?.let { tdee ->
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                shape = RoundedCornerShape(NutriRadius.lg)
-            ) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(NutriSpacing.lg),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            "Dein Grundumsatz (TDEE)",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Text(
-                            "Basis für die Zielberechnung",
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                        )
+            SettingsHubSection.Profile -> {
+                SettingsCard(title = "Mein Ziel", icon = Icons.Default.Flag) {
+                    Text(
+                        "Was möchtest du erreichen?",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(NutriSpacing.sm))
+                    Column(verticalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
+                        FitnessGoal.entries.chunked(2).forEach { row ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
+                                row.forEach { goal ->
+                                    val selected = goal == selectedGoal
+                                    FilterChip(
+                                        selected = selected,
+                                        onClick  = { selectedGoal = goal; applyGoal() },
+                                        label = {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(NutriSpacing.xs)
+                                            ) {
+                                                Text(goal.emoji, fontSize = 14.sp)
+                                                Text(goal.label, fontSize = 12.sp)
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                            selectedLabelColor     = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    )
+                                }
+                                if (row.size == 1) Spacer(Modifier.weight(1f))
+                            }
+                        }
                     }
                     Text(
-                        "${tdee.toInt()} kcal",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.primary
+                        selectedGoal.desc,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = NutriSpacing.xs)
                     )
+                }
+
+                SettingsCard(title = "Körperdaten", icon = Icons.Default.Person) {
+                    Text(
+                        "Geschlecht",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(NutriSpacing.xs))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        val sexOptions = listOf(Sex.FEMALE to "Weiblich", Sex.MALE to "Männlich", Sex.UNSPECIFIED to "Keine Angabe")
+                        sexOptions.forEach { (option, label) ->
+                            FilterChip(
+                                selected = sex == option,
+                                onClick = { sex = option; applyGoal() },
+                                label = { Text(label, fontSize = 12.sp) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(NutriSpacing.sm))
+                    GoalField("Gewicht (kg)",  weightText, KeyboardType.Number) {
+                        weightText = it; applyGoal()
+                    }
+                    GoalField("Grösse (cm)",   heightText, KeyboardType.Number) {
+                        heightText = it; applyGoal()
+                    }
+                    GoalField("Alter (Jahre)", ageText,    KeyboardType.Number) {
+                        ageText = it; applyGoal()
+                    }
+                }
+
+                SettingsCard(title = "Ernährungsziele", icon = Icons.Default.TrackChanges) {
+                    Text(
+                        "Automatisch berechnet – du kannst auch manuell anpassen.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(NutriSpacing.xs))
+                    GoalField("Kalorienziel (kcal)",  calorieText, KeyboardType.Number) { calorieText = it }
+                    GoalField("Proteinziel (g)",      proteinText, KeyboardType.Number) { proteinText = it }
+                    Text(
+                        "Empfehlung Aktiv: 1,6–2,4 g/kg KG (bei ${weightText.toFloatOrNull()?.let { "%.0f".format(it) } ?: "—"} kg ≈ "
+                            + "${weightText.toFloatOrNull()?.let { (it * 1.6f).toInt() } ?: "—"}–"
+                            + "${weightText.toFloatOrNull()?.let { (it * 2.4f).toInt() } ?: "—"} g)",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    GoalField("Kohlenhydratziel (g)", carbsText,   KeyboardType.Number) { carbsText   = it }
+                    GoalField("Fettziel (g)",         fatText,     KeyboardType.Number) { fatText     = it }
+                    Text(
+                        "Ballaststoffe: fest ${ch.nutrisnap.app.ui.screens.home.FIBER_GOAL_G.toInt()} g/Tag (D-A-CH-Richtwert)",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+
+                SettingsCard(title = "Aktivitätslevel", icon = Icons.Default.DirectionsRun) {
+                    ActivitySlider(value = activity) { activity = it; applyGoal() }
+                }
+
+                SettingsCard(title = "Zielgewicht & Prognose", icon = Icons.Default.Flag) {
+                    Text(
+                        "Optional: Zielgewicht setzen, um zu sehen, wann du es bei deinem aktuellen Tempo erreichst.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(NutriSpacing.xs))
+                    GoalField("Zielgewicht (kg)", targetWeightText, KeyboardType.Decimal) { targetWeightText = it }
+                    Spacer(Modifier.height(NutriSpacing.xs))
+                    GoalField("Wochenziel (kg/Woche, z.B. 0.5)", weeklyTargetLossText, KeyboardType.Decimal) { weeklyTargetLossText = it }
+                    Spacer(Modifier.height(NutriSpacing.xs))
+                    GoalPrognosisPreview()
+                }
+
+                val previewProfile = UserProfile(
+                    weightKg       = weightText.toFloatOrNull() ?: profile.weightKg,
+                    heightCm       = heightText.toIntOrNull()   ?: profile.heightCm,
+                    ageYears       = ageText.toIntOrNull()      ?: profile.ageYears,
+                    activityFactor = activity,
+                    sex            = sex
+                )
+                previewProfile.computedTdee()?.let { tdee ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                        shape = RoundedCornerShape(NutriRadius.lg)
+                    ) {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(NutriSpacing.lg),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    "Dein Grundumsatz (TDEE)",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Text(
+                                    "Basis für die Zielberechnung",
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                )
+                            }
+                            Text(
+                                "${tdee.toInt()} kcal",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        vm.save(UserProfile(
+                            weightKg         = weightText.toFloatOrNull()  ?: 0f,
+                            heightCm         = heightText.toIntOrNull()    ?: 0,
+                            ageYears         = ageText.toIntOrNull()       ?: 0,
+                            dailyCalorieGoal = calorieText.toIntOrNull()   ?: 2000,
+                            proteinGoalG     = proteinText.toFloatOrNull() ?: 120f,
+                            carbsGoalG       = carbsText.toFloatOrNull()   ?: 220f,
+                            fatGoalG         = fatText.toFloatOrNull()     ?: 65f,
+                            activityFactor   = activity,
+                            sex              = sex,
+                            applianceModel   = applianceModelText.trim(),
+                            targetWeightKg     = targetWeightText.toFloatOrNull(),
+                            weeklyTargetLossKg = weeklyTargetLossText.toFloatOrNull()
+                        ))
+                        showSaved = true
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(NutriRadius.md)
+                ) {
+                    Icon(Icons.Default.Save, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(NutriSpacing.sm))
+                    Text("Speichern")
+                }
+
+                if (showSaved) {
+                    LaunchedEffect(Unit) { kotlinx.coroutines.delay(2000); showSaved = false }
+                    Text(
+                        "\u2713 Gespeichert",
+                        color = MacroColors.calories,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    )
+                }
+            }
+
+            SettingsHubSection.Health -> {
+                HealthConnectCard()
+                SamsungHealthCard()
+                ManualActivitySettingsCard()
+                AggressiveSportDayCard()
+            }
+
+            SettingsHubSection.Data -> {
+                SettingsCard(title = "Daten & mehr", icon = Icons.Default.Storage) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
+                        OutlinedButton(onClick = onNavigateToCustomFoods, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.Restaurant, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Lebensmittel", fontSize = 12.sp)
+                        }
+                        OutlinedButton(onClick = onNavigateToMealTemplates, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.Bookmark, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Vorlagen", fontSize = 12.sp)
+                        }
+                    }
+                    Spacer(Modifier.height(NutriSpacing.sm))
+                    OutlinedButton(onClick = onNavigateToSupplements, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Medication, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(NutriSpacing.xs)); Text("Supplements")
+                    }
+                    Button(onClick = onNavigateToExport, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Download, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(NutriSpacing.sm)); Text("Daten exportieren (CSV)")
+                    }
+                    OutlinedButton(onClick = onNavigateToYazioImport, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.UploadFile, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(NutriSpacing.sm)); Text("Yazio-Daten importieren")
+                    }
+                    OutlinedButton(onClick = onNavigateToCrashLog, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.BugReport, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(NutriSpacing.sm)); Text("Absturzprotokoll")
+                    }
+                }
+            }
+
+            SettingsHubSection.Kitchen -> {
+                SettingsCard(title = "Backofen / Dampfgarer", icon = Icons.Default.Kitchen) {
+                    Text(
+                        "Optional: Modell hinterlegen, damit KI-Rezepte für Ofen/Dampfgarer echte Programme, Temperaturen und Zeiten deines Geräts nutzen.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(NutriSpacing.xs))
+                    GoalField(
+                        "Gerätemodell (z.B. V-ZUG Combi-Steam SL CSTSLc)",
+                        applianceModelText,
+                        KeyboardType.Text
+                    ) { applianceModelText = it }
+                    Spacer(Modifier.height(NutriSpacing.sm))
+                    Button(
+                        onClick = {
+                            vm.save(profile.copy(applianceModel = applianceModelText.trim()))
+                            showSaved = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(NutriRadius.md)
+                    ) {
+                        Icon(Icons.Default.Save, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(NutriSpacing.sm))
+                        Text("Speichern")
+                    }
+                    if (showSaved) {
+                        LaunchedEffect(Unit) { kotlinx.coroutines.delay(2000); showSaved = false }
+                        Text(
+                            "\u2713 Gespeichert",
+                            color = MacroColors.calories,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        )
+                    }
                 }
             }
         }
 
-        Button(
-            onClick = {
-                vm.save(UserProfile(
-                    weightKg         = weightText.toFloatOrNull()  ?: 0f,
-                    heightCm         = heightText.toIntOrNull()    ?: 0,
-                    ageYears         = ageText.toIntOrNull()       ?: 0,
-                    dailyCalorieGoal = calorieText.toIntOrNull()   ?: 2000,
-                    proteinGoalG     = proteinText.toFloatOrNull() ?: 120f,
-                    carbsGoalG       = carbsText.toFloatOrNull()   ?: 220f,
-                    fatGoalG         = fatText.toFloatOrNull()     ?: 65f,
-                    activityFactor   = activity,
-                    sex              = sex,
-                    applianceModel   = applianceModelText.trim(),
-                    targetWeightKg     = targetWeightText.toFloatOrNull(),
-                    weeklyTargetLossKg = weeklyTargetLossText.toFloatOrNull()
-                ))
-                showSaved = true
-            },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(NutriRadius.md)
-        ) {
-            Icon(Icons.Default.Save, null, Modifier.size(18.dp))
-            Spacer(Modifier.width(NutriSpacing.sm))
-            Text("Speichern")
-        }
+        Spacer(Modifier.height(NutriSpacing.xxxl))
+    }
+}
 
-        if (showSaved) {
-            LaunchedEffect(Unit) { kotlinx.coroutines.delay(2000); showSaved = false }
+@Composable
+private fun SettingsHubTile(
+    section: SettingsHubSection,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = 96.dp),
+        shape = RoundedCornerShape(NutriRadius.lg),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(1.dp)
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(NutriSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
+        ) {
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    section.icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Text(section.title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
             Text(
-                "\u2713 Gespeichert",
-                color = MacroColors.calories,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
+                section.subtitle,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 14.sp
             )
         }
-        Spacer(Modifier.height(NutriSpacing.xxxl))
+    }
+}
+
+@Composable
+private fun SettingsSwitchRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f).padding(end = 8.dp)) {
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
