@@ -4,6 +4,7 @@ import android.Manifest
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
+import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -29,6 +30,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.canhub.cropper.CropImageContract
+import com.canhub.cropper.CropImageContractOptions
+import com.canhub.cropper.CropImageOptions
+import com.canhub.cropper.CropImageView
 import java.util.concurrent.Executors
 
 /**
@@ -52,27 +57,52 @@ fun PhotoCaptureScreen(
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     val executor = remember { Executors.newSingleThreadExecutor() }
 
+    fun decodeBitmap(uri: Uri): Bitmap? = try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val source = android.graphics.ImageDecoder.createSource(context.contentResolver, uri)
+            android.graphics.ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                decoder.isMutableRequired = true
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+        }
+    } catch (_: Exception) {
+        null
+    }
+
+    val cropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
+        if (!result.isSuccessful) {
+            isCapturing = false
+            return@rememberLauncherForActivityResult
+        }
+        val croppedUri = result.uriContent
+        isCapturing = false
+        if (croppedUri != null) {
+            decodeBitmap(croppedUri)?.let { onPhotoCaptured(it) }
+        }
+    }
+
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
-        if (uri != null) {
-            isCapturing = true
-            val bitmap = try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    val source = android.graphics.ImageDecoder.createSource(context.contentResolver, uri)
-                    android.graphics.ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
-                        decoder.isMutableRequired = true
-                    }
-                } else {
-                    @Suppress("DEPRECATION")
-                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-                }
-            } catch (e: Exception) {
-                null
-            }
-            isCapturing = false
-            bitmap?.let { onPhotoCaptured(it) }
-        }
+        if (uri == null) return@rememberLauncherForActivityResult
+        isCapturing = true
+        cropLauncher.launch(
+            CropImageContractOptions(
+                uri = uri,
+                cropImageOptions = CropImageOptions(
+                    guidelines = CropImageView.Guidelines.ON,
+                    outputCompressFormat = Bitmap.CompressFormat.JPEG,
+                    outputCompressQuality = 90,
+                    activityTitle = "Foto zuschneiden",
+                    cropMenuCropButtonTitle = "Fertig",
+                    allowFlipping = true,
+                    allowRotation = true,
+                    fixAspectRatio = false
+                )
+            )
+        )
     }
 
     LaunchedEffect(Unit) {

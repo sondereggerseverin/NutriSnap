@@ -8,6 +8,10 @@ import androidx.activity.result.PickVisualMediaRequest
 
 import android.content.Intent
 import android.net.Uri
+import com.canhub.cropper.CropImageContract
+import com.canhub.cropper.CropImageContractOptions
+import com.canhub.cropper.CropImageOptions
+import com.canhub.cropper.CropImageView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -1068,32 +1072,68 @@ fun ImportSheet(
     var hybridScreenshot by remember { mutableStateOf<Bitmap?>(null) }
     val isInstagram = "instagram.com" in url.lowercase() || "instagr.am" in url.lowercase()
 
-    // Reiner Bild-Import (ohne Link)
+    fun decodePickedBitmap(uri: Uri): Bitmap? =
+        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+
+    // Crop nach Galerie-Auswahl (reiner Bild-Import)
+    val imageCropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
+        if (!result.isSuccessful) return@rememberLauncherForActivityResult
+        val cropped = result.uriContent ?: return@rememberLauncherForActivityResult
+        runCatching {
+            val bitmap = decodePickedBitmap(cropped)
+                ?: throw IllegalStateException("Bild konnte nicht geladen werden")
+            vm.importFromImage(bitmap)
+        }
+    }
+
+    // Reiner Bild-Import (ohne Link) → Zuschneiden → Import
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
-        runCatching {
-            context.contentResolver.openInputStream(uri)?.use { stream ->
-                val bitmap = BitmapFactory.decodeStream(stream)
-                    ?: throw IllegalStateException("Bild konnte nicht geladen werden")
-                vm.importFromImage(bitmap)
-            } ?: throw IllegalStateException("Bild konnte nicht geöffnet werden")
-        }.onFailure {
-            // Fehler landet über importError im Sheet
-        }
+        imageCropLauncher.launch(
+            CropImageContractOptions(
+                uri = uri,
+                cropImageOptions = CropImageOptions(
+                    guidelines = CropImageView.Guidelines.ON,
+                    outputCompressFormat = Bitmap.CompressFormat.JPEG,
+                    outputCompressQuality = 90,
+                    activityTitle = "Rezept zuschneiden",
+                    cropMenuCropButtonTitle = "Fertig",
+                    allowFlipping = true,
+                    allowRotation = true,
+                    fixAspectRatio = false
+                )
+            )
+        )
     }
 
-    // Optionaler Screenshot für Hybrid-Import (Link + Rezeptbild)
+    // Hybrid-Screenshot: zuschneiden, dann Bitmap behalten
+    val hybridCropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
+        if (!result.isSuccessful) return@rememberLauncherForActivityResult
+        val cropped = result.uriContent ?: return@rememberLauncherForActivityResult
+        hybridScreenshot = decodePickedBitmap(cropped)
+    }
+
     val hybridScreenshotPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
-        runCatching {
-            context.contentResolver.openInputStream(uri)?.use { stream ->
-                hybridScreenshot = BitmapFactory.decodeStream(stream)
-            }
-        }
+        hybridCropLauncher.launch(
+            CropImageContractOptions(
+                uri = uri,
+                cropImageOptions = CropImageOptions(
+                    guidelines = CropImageView.Guidelines.ON,
+                    outputCompressFormat = Bitmap.CompressFormat.JPEG,
+                    outputCompressQuality = 90,
+                    activityTitle = "Screenshot zuschneiden",
+                    cropMenuCropButtonTitle = "Fertig",
+                    allowFlipping = true,
+                    allowRotation = true,
+                    fixAspectRatio = false
+                )
+            )
+        )
     }
 
     LaunchedEffect(error) {

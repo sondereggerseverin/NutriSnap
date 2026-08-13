@@ -111,7 +111,7 @@ fun RecipeCardV2(
                             modifier = Modifier.size(28.dp)
                         ) {
                             Icon(
-                                Icons.Default.MoreVert,
+                                Icons.Filled.MoreVert,
                                 contentDescription = "Mehr",
                                 modifier = Modifier.size(18.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -131,7 +131,7 @@ fun RecipeCardV2(
                                 },
                                 leadingIcon = {
                                     Icon(
-                                        if (recipe.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                        if (recipe.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                         null,
                                         Modifier.size(18.dp),
                                         tint = if (recipe.isFavorite) MaterialTheme.colorScheme.error
@@ -146,7 +146,7 @@ fun RecipeCardV2(
                                     onDuplicate()
                                 },
                                 leadingIcon = {
-                                    Icon(Icons.Default.ContentCopy, null, Modifier.size(18.dp))
+                                    Icon(Icons.Filled.ContentCopy, null, Modifier.size(18.dp))
                                 }
                             )
                             DropdownMenuItem(
@@ -157,7 +157,7 @@ fun RecipeCardV2(
                                 },
                                 leadingIcon = {
                                     Icon(
-                                        Icons.Default.DeleteOutline,
+                                        Icons.Filled.DeleteOutline,
                                         null,
                                         Modifier.size(18.dp),
                                         tint = MaterialTheme.colorScheme.error
@@ -231,7 +231,7 @@ fun RecipeCardV2(
                         )
                     ) {
                         Icon(
-                            Icons.Default.PlaylistAdd,
+                            Icons.Filled.PlaylistAdd,
                             contentDescription = "Ins Tagebuch",
                             modifier = Modifier.size(18.dp)
                         )
@@ -308,7 +308,7 @@ fun RecipeCardImage(recipe: Recipe, modifier: Modifier = Modifier) {
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    Icons.Default.RestaurantMenu,
+                    Icons.Filled.RestaurantMenu,
                     contentDescription = null,
                     modifier = Modifier.size(28.dp),
                     tint = Color.White.copy(alpha = 0.85f)

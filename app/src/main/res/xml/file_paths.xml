@@ -2,4 +2,7 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- context.getExternalFilesDir(null), wo PdfReportGenerator die Reports ablegt -->
     <external-files-path name="reports" path="."/>
+    <!-- Cropper-Ausgabe + temporäre Bild-URIs -->
+    <cache-path name="cache" path="."/>
+    <files-path name="files" path="."/>
 </paths>

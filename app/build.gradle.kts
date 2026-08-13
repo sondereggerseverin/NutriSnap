@@ -98,6 +98,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.jsoup)
     implementation(libs.coil.compose)
+    implementation(libs.android.image.cropper)
     implementation(libs.okhttp)
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)

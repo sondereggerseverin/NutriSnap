@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -31,6 +32,10 @@ import androidx.compose.ui.unit.sp
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeCategory
 import coil.compose.AsyncImage
+import com.canhub.cropper.CropImageContract
+import com.canhub.cropper.CropImageContractOptions
+import com.canhub.cropper.CropImageOptions
+import com.canhub.cropper.CropImageView
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,20 +64,40 @@ fun RecipeEditSheet(
     var imageUri     by remember { mutableStateOf<Uri?>(recipe.imageUrl?.let { Uri.parse(it) }) }
     var imageUrl     by remember { mutableStateOf(recipe.imageUrl) } // keeps remote URL if not replaced
 
-    // Gallery picker
+    // Nach Auswahl: Zuschneiden, dann übernommen
+    val cropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
+        if (result.isSuccessful) {
+            val cropped = result.uriContent ?: return@rememberLauncherForActivityResult
+            imageUri = cropped
+            imageUrl = cropped.toString()
+        }
+    }
+
+    // Gallery picker → öffnet Cropper
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        if (uri != null) {
-            // Persist read permission so the URI stays valid across restarts
-            runCatching {
-                context.contentResolver.takePersistableUriPermission(
-                    uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            }
-            imageUri = uri
-            imageUrl = uri.toString() // overwrite — local URI used as imageUrl
+        if (uri == null) return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.takePersistableUriPermission(
+                uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
         }
+        cropLauncher.launch(
+            CropImageContractOptions(
+                uri = uri,
+                cropImageOptions = CropImageOptions(
+                    guidelines = CropImageView.Guidelines.ON,
+                    outputCompressFormat = Bitmap.CompressFormat.JPEG,
+                    outputCompressQuality = 90,
+                    activityTitle = "Foto zuschneiden",
+                    cropMenuCropButtonTitle = "Fertig",
+                    allowFlipping = true,
+                    allowRotation = true,
+                    fixAspectRatio = false
+                )
+            )
+        )
     }
 
     fun buildSaved(): Recipe {
