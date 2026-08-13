@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -1063,8 +1064,10 @@ fun ImportSheet(
     var url by remember(prefillUrl) { mutableStateOf(prefillUrl) }
     var showManual by remember(openAtManualCaption) { mutableStateOf(openAtManualCaption) }
     var manualTitle by remember { mutableStateOf("") }; var manualCaption by remember { mutableStateOf("") }
-    val isInstagram = "instagram.com" in url || "instagr.am" in url
+    var hybridScreenshot by remember { mutableStateOf<Bitmap?>(null) }
+    val isInstagram = "instagram.com" in url.lowercase() || "instagr.am" in url.lowercase()
 
+    // Reiner Bild-Import (ohne Link)
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
@@ -1079,6 +1082,19 @@ fun ImportSheet(
             // Fehler landet über importError im Sheet
         }
     }
+
+    // Optionaler Screenshot für Hybrid-Import (Link + Rezeptbild)
+    val hybridScreenshotPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                hybridScreenshot = BitmapFactory.decodeStream(stream)
+            }
+        }
+    }
+
     LaunchedEffect(error) {
         if (error != null && isInstagram) showManual = true
     }
@@ -1170,8 +1186,78 @@ fun ImportSheet(
                 OutlinedTextField(value=url, onValueChange={url=it}, label={Text("URL einfügen")},
                     leadingIcon={Icon(Icons.Default.Link,null)}, modifier=Modifier.fillMaxWidth(), singleLine=true, isError=error!=null)
                 if (error != null) Text(error, color=MaterialTheme.colorScheme.error, fontSize=13.sp, modifier=Modifier.padding(top=4.dp))
+
+                // Hybrid: bei Instagram-Link optional Rezept-Screenshot anhängen
+                if (isInstagram && url.isNotBlank()) {
+                    Spacer(Modifier.height(12.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+                        )
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text(
+                                "Caption leer? Rezept-Screenshot anhängen",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "Link liefert Bild + Quelle, Screenshot die Zutaten/Anleitung.",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        hybridScreenshotPicker.launch(
+                                            PickVisualMediaRequest(
+                                                ActivityResultContracts.PickVisualMedia.ImageOnly
+                                            )
+                                        )
+                                    },
+                                    enabled = !isLoading,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.AddPhotoAlternate, null, Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        if (hybridScreenshot != null) "Screenshot gewählt"
+                                        else "Screenshot wählen"
+                                    )
+                                }
+                                if (hybridScreenshot != null) {
+                                    Spacer(Modifier.width(8.dp))
+                                    IconButton(
+                                        onClick = { hybridScreenshot = null },
+                                        enabled = !isLoading
+                                    ) {
+                                        Icon(Icons.Default.Close, "Entfernen")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Spacer(Modifier.height(12.dp))
-                Button(onClick={onImport(url.trim())}, enabled=url.isNotBlank()&&!isLoading, modifier=Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = {
+                        if (isInstagram && hybridScreenshot != null) {
+                            vm.importHybridFromInstagram(url.trim(), hybridScreenshot)
+                        } else {
+                            onImport(url.trim())
+                        }
+                    },
+                    enabled = url.isNotBlank() && !isLoading,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     if (isLoading) {
                         CircularProgressIndicator(
                             Modifier.size(18.dp),
@@ -1184,6 +1270,7 @@ fun ImportSheet(
                         when {
                             isLoading && !importPhase.isNullOrBlank() -> importPhase
                             isLoading -> "Importiere…"
+                            isInstagram && hybridScreenshot != null -> "Link + Screenshot importieren"
                             else -> "Importieren"
                         }
                     )

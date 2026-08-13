@@ -427,6 +427,213 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Hybrid-Import: Instagram-/Social-Link (Quelle + Bildvorschau) + optional Rezept-Screenshot
+     * (Zutaten/Anleitung aus dem Bild). Typischer Fall: Caption leer/schwach, Rezept steht
+     * im Bild oder in den Kommentaren → Screenshot liefert den Text, der Link die Meta-Daten.
+     *
+     * - Link wird gescraped → imageUrl, sourceUrl, Titel (falls vorhanden)
+     * - Screenshot (falls vorhanden) → Vision extrahiert Zutaten/Anleitung (priorisiert)
+     * - Ergebnis: ein Rezept mit funktionierendem Link, Bildvorschau und sauberem Text
+     */
+    fun importHybridFromInstagram(url: String, recipeScreenshot: Bitmap?) {
+        viewModelScope.launch {
+            _importState.update {
+                it.copy(
+                    isImporting = true,
+                    importPhase = "Link laden…",
+                    importError = null,
+                    instagramBlocked = false
+                )
+            }
+            try {
+                val trimmedUrl = url.trim()
+                if (trimmedUrl.isBlank()) {
+                    _importState.update {
+                        it.copy(isImporting = false, importPhase = null, importError = "Bitte Link einfügen")
+                    }
+                    return@launch
+                }
+
+                // 1) Link scrapen (Meta: Bild, Titel, ggf. schwache Caption)
+                val scrapeResult = repo.importFromUrl(trimmedUrl) { phase ->
+                    _importState.update { s -> s.copy(importPhase = phase) }
+                }
+
+                if (scrapeResult.instagramBlocked) {
+                    // Blockiert: ohne Screenshot können wir nichts Sinnvolles speichern
+                    if (recipeScreenshot == null) {
+                        _importState.update {
+                            it.copy(
+                                isImporting = false,
+                                importPhase = null,
+                                instagramBlocked = true,
+                                blockedUrl = trimmedUrl
+                            )
+                        }
+                        return@launch
+                    }
+                    // Mit Screenshot: trotzdem aus dem Bild bauen und Link manuell setzen
+                    _importState.update { it.copy(importPhase = "Rezept aus Screenshot lesen…") }
+                    val vision = GroqVisionService()
+                    val base64 = vision.bitmapToBase64Jpeg(recipeScreenshot, quality = 80)
+                    val extracted = vision.extractRecipeFromImage(base64).getOrElse { e ->
+                        _importState.update {
+                            it.copy(
+                                isImporting = false,
+                                importPhase = null,
+                                importError = e.message ?: "Screenshot konnte nicht gelesen werden"
+                            )
+                        }
+                        return@launch
+                    }
+                    if (extracted.title.isBlank() && extracted.ingredients.isBlank()) {
+                        _importState.update {
+                            it.copy(
+                                isImporting = false,
+                                importPhase = null,
+                                importError = "Kein Rezept im Screenshot erkannt"
+                            )
+                        }
+                        return@launch
+                    }
+                    val totalMin = listOfNotNull(extracted.prepTimeMinutes, extracted.cookTimeMinutes)
+                        .takeIf { it.isNotEmpty() }?.sum()
+                    val recipe = Recipe(
+                        title = extracted.title.ifBlank { "Instagram Rezept" },
+                        description = extracted.description,
+                        sourceUrl = trimmedUrl,
+                        platform = "instagram",
+                        ingredients = extracted.ingredients,
+                        instructions = extracted.instructions,
+                        servings = extracted.servings.coerceAtLeast(1),
+                        prepTimeMinutes = totalMin ?: extracted.prepTimeMinutes,
+                        totalCalories = extracted.caloriesPerServing?.let {
+                            it * extracted.servings.coerceAtLeast(1)
+                        },
+                        proteinPerServing = extracted.proteinPerServing,
+                        carbsPerServing = extracted.carbsPerServing,
+                        fatPerServing = extracted.fatPerServing,
+                        tags = "instagram,hybrid"
+                    )
+                    var saved = recipe.copy(id = repo.saveRecipe(recipe))
+                    if (shouldAutoGermanMetric()) {
+                        val converted = RecipeGermanMetricConverter.convertWithAi(saved).getOrNull()
+                        if (converted != null) {
+                            saved = saved.copy(
+                                title = converted.title.ifBlank { saved.title },
+                                description = converted.description.ifBlank { saved.description },
+                                ingredients = converted.ingredients.ifBlank { saved.ingredients },
+                                instructions = converted.instructions.ifBlank { saved.instructions }
+                            )
+                            repo.updateRecipe(saved)
+                        }
+                    }
+                    _importState.update { it.copy(isImporting = false, importPhase = null, lastImport = saved) }
+                    analyzeNutrition(saved)
+                    return@launch
+                }
+
+                if (!scrapeResult.success || scrapeResult.recipe == null) {
+                    // Scrape fehlgeschlagen – mit Screenshot allein weitermachen
+                    if (recipeScreenshot == null) {
+                        _importState.update {
+                            it.copy(
+                                isImporting = false,
+                                importPhase = null,
+                                importError = scrapeResult.error ?: "Link konnte nicht geladen werden"
+                            )
+                        }
+                        return@launch
+                    }
+                }
+
+                var base = scrapeResult.recipe
+                    ?: Recipe(
+                        title = "Instagram Rezept",
+                        sourceUrl = trimmedUrl,
+                        platform = "instagram",
+                        tags = "instagram,hybrid"
+                    )
+
+                // 2) Optional: Screenshot → Zutaten/Anleitung priorisieren
+                if (recipeScreenshot != null) {
+                    _importState.update { it.copy(importPhase = "Rezept aus Screenshot lesen…") }
+                    val vision = GroqVisionService()
+                    val base64 = vision.bitmapToBase64Jpeg(recipeScreenshot, quality = 80)
+                    val extracted = vision.extractRecipeFromImage(base64).getOrNull()
+                    if (extracted != null &&
+                        (extracted.ingredients.isNotBlank() || extracted.instructions.isNotBlank())
+                    ) {
+                        val totalMin = listOfNotNull(extracted.prepTimeMinutes, extracted.cookTimeMinutes)
+                            .takeIf { it.isNotEmpty() }?.sum()
+                        base = base.copy(
+                            title = extracted.title.ifBlank { base.title }.ifBlank { "Instagram Rezept" },
+                            description = extracted.description.ifBlank { base.description },
+                            ingredients = extracted.ingredients.ifBlank { base.ingredients },
+                            instructions = extracted.instructions.ifBlank { base.instructions },
+                            servings = if (extracted.servings > 0) extracted.servings else base.servings,
+                            prepTimeMinutes = totalMin ?: extracted.prepTimeMinutes ?: base.prepTimeMinutes,
+                            totalCalories = extracted.caloriesPerServing?.let {
+                                it * extracted.servings.coerceAtLeast(1)
+                            } ?: base.totalCalories,
+                            proteinPerServing = extracted.proteinPerServing ?: base.proteinPerServing,
+                            carbsPerServing = extracted.carbsPerServing ?: base.carbsPerServing,
+                            fatPerServing = extracted.fatPerServing ?: base.fatPerServing,
+                            sourceUrl = base.sourceUrl ?: trimmedUrl,
+                            platform = base.platform ?: "instagram",
+                            tags = listOfNotNull(
+                                base.tags.takeIf { it.isNotBlank() },
+                                "hybrid"
+                            ).joinToString(",").ifBlank { "instagram,hybrid" }
+                        )
+                        // Scrape hatte das Rezept schon gespeichert → updaten statt neu speichern
+                        if (base.id > 0) {
+                            repo.updateRecipe(base)
+                        } else {
+                            base = base.copy(id = repo.saveRecipe(base))
+                        }
+                    }
+                }
+
+                // 3) Auto-Übersetzung / Metrik falls gewünscht
+                if (shouldAutoGermanMetric()) {
+                    _importState.update { it.copy(importPhase = "Übersetze…") }
+                    val converted = RecipeGermanMetricConverter.convertWithAi(base).getOrNull()
+                    if (converted != null) {
+                        base = base.copy(
+                            title = converted.title.ifBlank { base.title },
+                            description = converted.description.ifBlank { base.description },
+                            ingredients = converted.ingredients.ifBlank { base.ingredients },
+                            instructions = converted.instructions.ifBlank { base.instructions },
+                            mealCategory = base.mealCategory.ifBlank {
+                                RecipeCategory.guess(
+                                    converted.title.ifBlank { base.title },
+                                    converted.ingredients.ifBlank { base.ingredients },
+                                    converted.description.ifBlank { base.description }
+                                ).name
+                            }
+                        )
+                        repo.updateRecipe(base)
+                    }
+                }
+
+                _importState.update {
+                    it.copy(isImporting = false, importPhase = null, lastImport = base)
+                }
+                analyzeNutrition(base)
+            } catch (e: Exception) {
+                _importState.update {
+                    it.copy(
+                        isImporting = false,
+                        importPhase = null,
+                        importError = e.message ?: "Fehler beim Hybrid-Import"
+                    )
+                }
+            }
+        }
+    }
+
     private suspend fun shouldAutoGermanMetric(): Boolean {
         return runCatching {
             val prefs = getApplication<Application>().notifDataStore.data.first()
