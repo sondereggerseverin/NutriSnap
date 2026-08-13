@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -361,105 +362,110 @@ fun RecipesScreen(
         }
     ) { padding ->
         Column(Modifier.padding(padding)) {
+            // Kompakte Suche (ohne Label → weniger Höhe)
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
-                    value = state.query, onValueChange = {
+                    value = state.query,
+                    onValueChange = {
                         vm.setQuery(it)
                         if (it.isNotBlank()) vm.clearCookFilters()
                     },
-                    label = { Text("Rezepte durchsuchen") },
-                    leadingIcon = { Icon(Icons.Default.Search, null) },
-                    trailingIcon = {
-                        IconButton(onClick = { showCookSheet = true }) {
-                            Icon(Icons.Default.Kitchen, "Was koche ich?")
-                        }
-                    },
+                    placeholder = { Text("Suchen…", fontSize = 14.sp) },
+                    leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(20.dp)) },
                     modifier = Modifier.weight(1f),
-                    singleLine = true, shape = RoundedCornerShape(12.dp)
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    textStyle = LocalTextStyle.current.copy(fontSize = 14.sp)
                 )
-                Spacer(Modifier.width(4.dp))
-                IconButton(onClick = { showCollections = true }) {
-                    Icon(Icons.Default.Folder, "Sammlungen", tint = MaterialTheme.colorScheme.primary)
-                }
-            }
-
-            // ── Kategorien ───────────────────────────────────────────────────
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 4.dp)
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                FilterChip(
-                    selected = state.categoryFilter == null,
-                    onClick = { vm.setCategoryFilter(null) },
-                    label = { Text("Alle", fontSize = 12.sp) }
-                )
-                RecipeCategory.entries.forEach { cat ->
-                    FilterChip(
-                        selected = state.categoryFilter == cat,
-                        onClick = {
-                            vm.setCategoryFilter(if (state.categoryFilter == cat) null else cat)
-                        },
-                        label = { Text("${cat.emoji} ${cat.label}", fontSize = 12.sp) }
-                    )
+                IconButton(
+                    onClick = { showCollections = true },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(Icons.Default.Folder, "Sammlungen", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                 }
             }
 
             if (state.ingredientNeedles.isNotEmpty()) {
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         "Zutaten: " + state.ingredientNeedles.joinToString(", "),
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.weight(1f),
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    TextButton(onClick = { vm.clearCookFilters() }) { Text("Zurücksetzen", fontSize = 12.sp) }
+                    TextButton(onClick = { vm.clearCookFilters() }) { Text("Reset", fontSize = 11.sp) }
                 }
             }
 
-            // ── Filter & Sortierung ──────────────────────────────────────────
+            // Eine Zeile: Kategorie + Plattform + Favoriten + Sammlungen + Sort
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .padding(bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState())
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .horizontalScroll(rememberScrollState())
                 ) {
+                    FilterChip(
+                        selected = state.categoryFilter == null && state.platformFilter == null && !favoritesOnly && collectionFilterId == null,
+                        onClick = {
+                            vm.setCategoryFilter(null)
+                            vm.setPlatformFilter(null)
+                            favoritesOnly = false
+                            collectionFilterId = null
+                        },
+                        label = { Text("Alle", fontSize = 11.sp) },
+                        modifier = Modifier.height(28.dp)
+                    )
+                    RecipeCategory.entries.forEach { cat ->
+                        FilterChip(
+                            selected = state.categoryFilter == cat,
+                            onClick = {
+                                vm.setCategoryFilter(if (state.categoryFilter == cat) null else cat)
+                            },
+                            label = { Text("${cat.emoji} ${cat.label}", fontSize = 11.sp) },
+                            modifier = Modifier.height(28.dp)
+                        )
+                    }
                     listOf(
-                        null       to "Alle",
                         "instagram" to "📷 IG",
-                        "tiktok"    to "🎵 TikTok",
-                        "web"       to "🌐 Web",
-                        "ki"        to "✨ KI",
-                        "manual"    to "✏️ Frei"
+                        "tiktok" to "🎵 TikTok",
+                        "web" to "🌐 Web",
+                        "ki" to "✨ KI",
+                        "manual" to "✏️ Frei"
                     ).forEach { (value, label) ->
                         FilterChip(
                             selected = state.platformFilter == value,
-                            onClick  = { vm.setPlatformFilter(value) },
-                            label    = { Text(label, fontSize = 12.sp) }
+                            onClick = { vm.setPlatformFilter(if (state.platformFilter == value) null else value) },
+                            label = { Text(label, fontSize = 11.sp) },
+                            modifier = Modifier.height(28.dp)
                         )
                     }
                     val favCount = state.recipes.count { it.isFavorite }
                     if (favCount > 0 || favoritesOnly) {
                         FilterChip(
                             selected = favoritesOnly,
-                            onClick  = {
+                            onClick = {
                                 favoritesOnly = !favoritesOnly
                                 if (favoritesOnly) collectionFilterId = null
                             },
-                            label    = { Text(if (favCount > 0) "★ Favoriten ($favCount)" else "★ Favoriten", fontSize = 12.sp) }
+                            label = { Text(if (favCount > 0) "★ $favCount" else "★", fontSize = 11.sp) },
+                            modifier = Modifier.height(28.dp)
                         )
                     }
                     collections.forEach { col ->
@@ -474,11 +480,11 @@ fun RecipesScreen(
                                 },
                                 label = {
                                     Text(
-                                        "${col.emoji} ${col.name}" +
-                                            if (colCount > 0) " ($colCount)" else "",
-                                        fontSize = 12.sp
+                                        "${col.emoji}${if (colCount > 0) colCount else ""}",
+                                        fontSize = 11.sp
                                     )
-                                }
+                                },
+                                modifier = Modifier.height(28.dp)
                             )
                         }
                     }
@@ -486,23 +492,32 @@ fun RecipesScreen(
                     if (incompleteCount > 0) {
                         FilterChip(
                             selected = hideIncomplete,
-                            onClick  = { hideIncomplete = !hideIncomplete },
-                            label    = { Text("🧹 Ohne leere ($incompleteCount)", fontSize = 12.sp) }
+                            onClick = { hideIncomplete = !hideIncomplete },
+                            label = { Text("🧹 $incompleteCount", fontSize = 11.sp) },
+                            modifier = Modifier.height(28.dp)
                         )
                     }
                 }
-                IconButton(onClick = {
-                    val next = when (state.sort) {
-                        RecipeSort.NEWEST   -> RecipeSort.NAME
-                        RecipeSort.NAME     -> RecipeSort.CALORIES
-                        RecipeSort.CALORIES -> RecipeSort.NEWEST
-                    }
-                    vm.setSort(next)
-                }) {
-                    Icon(Icons.Default.Sort, "Sortierung: ${state.sort}",
-                        tint = MaterialTheme.colorScheme.primary)
+                IconButton(
+                    onClick = {
+                        val next = when (state.sort) {
+                            RecipeSort.NEWEST -> RecipeSort.NAME
+                            RecipeSort.NAME -> RecipeSort.CALORIES
+                            RecipeSort.CALORIES -> RecipeSort.NEWEST
+                        }
+                        vm.setSort(next)
+                    },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Sort,
+                        "Sortierung: ${state.sort}",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
+
             val displayedRecipes = state.recipes
                 .let { if (favoritesOnly) it.filter { r -> r.isFavorite } else it }
                 .let { list ->
@@ -512,14 +527,14 @@ fun RecipesScreen(
                 .let { if (hideIncomplete) it.filterNot { r -> r.isIncomplete() } else it }
             if (state.recipes.isNotEmpty()) {
                 Text(
-                    "${displayedRecipes.size} Rezept${if (displayedRecipes.size == 1) "" else "e"} · " +
+                    "${displayedRecipes.size} · " +
                         when (state.sort) {
-                            RecipeSort.NEWEST   -> "neueste zuerst"
+                            RecipeSort.NEWEST   -> "neueste"
                             RecipeSort.NAME     -> "A–Z"
-                            RecipeSort.CALORIES -> "meiste kcal zuerst"
+                            RecipeSort.CALORIES -> "kcal"
                         },
-                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
                 )
             }
 

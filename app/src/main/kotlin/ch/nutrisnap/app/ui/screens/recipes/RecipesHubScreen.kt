@@ -2,6 +2,7 @@ package ch.nutrisnap.app.ui.screens.recipes
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
@@ -18,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import ch.nutrisnap.app.ui.screens.recipegen.RecipeGeneratorScreen
 
 private enum class RecipeTab { SAVED, FREEZER, AI }
@@ -28,24 +30,24 @@ fun RecipesHubScreen(sharedUrl: String?, sharedBatchUrls: List<String> = emptyLi
     var tab by remember { mutableStateOf(RecipeTab.SAVED) }
 
     Column(Modifier.fillMaxSize()) {
-        TabRow(selectedTabIndex = tab.ordinal) {
+        TabRow(selectedTabIndex = tab.ordinal, modifier = Modifier.height(44.dp)) {
             Tab(
                 selected = tab == RecipeTab.SAVED,
                 onClick = { tab = RecipeTab.SAVED },
-                text = { Text("Rezepte") },
-                icon = { Icon(Icons.Default.RestaurantMenu, null, Modifier.size(18.dp)) }
+                text = { Text("Rezepte", fontSize = 12.sp) },
+                icon = { Icon(Icons.Default.RestaurantMenu, null, Modifier.size(16.dp)) }
             )
             Tab(
                 selected = tab == RecipeTab.FREEZER,
                 onClick = { tab = RecipeTab.FREEZER },
-                text = { Text("Gefrierer") },
-                icon = { Icon(Icons.Default.AcUnit, null, Modifier.size(18.dp)) }
+                text = { Text("Gefrierer", fontSize = 12.sp) },
+                icon = { Icon(Icons.Default.AcUnit, null, Modifier.size(16.dp)) }
             )
             Tab(
                 selected = tab == RecipeTab.AI,
                 onClick = { tab = RecipeTab.AI },
-                text = { Text("KI-Koch") },
-                icon = { Icon(Icons.Default.AutoAwesome, null, Modifier.size(18.dp)) }
+                text = { Text("KI-Koch", fontSize = 12.sp) },
+                icon = { Icon(Icons.Default.AutoAwesome, null, Modifier.size(16.dp)) }
             )
         }
         when (tab) {
