@@ -274,7 +274,9 @@ fun RecipesScreen(
     var showCreateSheet   by remember { mutableStateOf(false) }
     var selectedRecipe    by remember { mutableStateOf<Recipe?>(null) }
     var showVerifySheet    by remember { mutableStateOf(false) }
+    var verifyReadOnly     by remember { mutableStateOf(false) }
     var pendingVerify      by remember { mutableStateOf(false) }
+    var pendingViewOnly    by remember { mutableStateOf(false) }
     var showSplitSheet     by remember { mutableStateOf(false) }
     var splitRecipeId      by remember { mutableStateOf<Long?>(null) }
     var addToDiaryRecipe  by remember { mutableStateOf<Recipe?>(null) }
@@ -628,11 +630,13 @@ fun RecipesScreen(
     val verifyResult = nutState.result?.takeIf {
         nutState.recipeId == verifyRecipe?.id && !nutState.isAnalyzing
     }
-    // Nach Analyse automatisch Verify öffnen, falls angefordert
-    LaunchedEffect(nutState.result, nutState.isAnalyzing, pendingVerify, verifyRecipe?.id) {
-        if (pendingVerify && verifyRecipe != null && verifyResult != null && !nutState.isAnalyzing) {
+    // Nach Analyse automatisch Verify/Einsehen öffnen, falls angefordert
+    LaunchedEffect(nutState.result, nutState.isAnalyzing, pendingVerify, pendingViewOnly, verifyRecipe?.id) {
+        if ((pendingVerify || pendingViewOnly) && verifyRecipe != null && verifyResult != null && !nutState.isAnalyzing) {
+            verifyReadOnly = pendingViewOnly
             showVerifySheet = true
             pendingVerify = false
+            pendingViewOnly = false
         }
     }
 
@@ -645,7 +649,8 @@ fun RecipesScreen(
             servings       = verifyRecipe.servings,
             initialOverrides = vm.getOverridesFor(verifyRecipe.id),
             onOverridesChanged = { vm.setOverridesFor(verifyRecipe.id, it) },
-            onDismiss      = { showVerifySheet = false; pendingVerify = false },
+            onDismiss      = { showVerifySheet = false; pendingVerify = false; pendingViewOnly = false; verifyReadOnly = false },
+            readOnly       = verifyReadOnly,
             onConfirm      = { kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium, totalWeightG, ingredientsText ->
                 vm.applyVerifiedNutrition(
                     verifyRecipe, kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium,
@@ -654,6 +659,8 @@ fun RecipesScreen(
                 )
                 showVerifySheet = false
                 pendingVerify = false
+                pendingViewOnly = false
+                verifyReadOnly = false
             },
             onConfirmComponents = { comps ->
                 vm.setComponents(verifyRecipe.id, comps)
@@ -707,11 +714,12 @@ fun RecipesScreen(
         RecipeDetailSheet(
             recipe       = live,
             nutritionState = state.nutritionState,
-            onDismiss    = { selectedRecipe = null; vm.clearNutrition() },
+            onDismiss    = { selectedRecipe = null }, // Nutrition behalten → Re-Verify ändert keine Matches
             onAddToDiary = { r -> addToDiaryRecipe = r; selectedRecipe = null },
             onEdit       = { editRecipe = live; selectedRecipe = null },
             onAnalyze    = { vm.analyzeNutrition(live) },
             onVerify     = {
+                verifyReadOnly = false
                 val hasResult = state.nutritionState.result != null &&
                     state.nutritionState.recipeId == live.id &&
                     !state.nutritionState.isAnalyzing
@@ -719,6 +727,18 @@ fun RecipesScreen(
                     showVerifySheet = true
                 } else {
                     pendingVerify = true
+                    vm.analyzeNutrition(live)
+                }
+            },
+            onViewIngredients = {
+                verifyReadOnly = true
+                val hasResult = state.nutritionState.result != null &&
+                    state.nutritionState.recipeId == live.id &&
+                    !state.nutritionState.isAnalyzing
+                if (hasResult) {
+                    showVerifySheet = true
+                } else {
+                    pendingViewOnly = true
                     vm.analyzeNutrition(live)
                 }
             },
@@ -1542,6 +1562,7 @@ fun RecipeDetailSheet(
     onEdit: () -> Unit,
     onAnalyze: () -> Unit,
     onVerify: () -> Unit = {},
+    onViewIngredients: () -> Unit = {},
     onSplitComponents: () -> Unit = {},
     onRecalculateFromOverrides: () -> Unit = {},
     hasStoredOverrides: Boolean = false,
@@ -1695,6 +1716,7 @@ fun RecipeDetailSheet(
                     ratio = ratio,
                     onAnalyze = onAnalyze,
                     onVerify = onVerify,
+                    onViewIngredients = onViewIngredients,
                     onSplitComponents = onSplitComponents,
                     onRecalculateFromOverrides = onRecalculateFromOverrides,
                     hasStoredOverrides = hasStoredOverrides
@@ -2120,6 +2142,7 @@ private fun NutritionAnalysisCard(
     ratio: Float,
     onAnalyze: () -> Unit,
     onVerify: () -> Unit = {},
+    onViewIngredients: () -> Unit = {},
     onSplitComponents: () -> Unit = {},
     onRecalculateFromOverrides: () -> Unit = {},
     hasStoredOverrides: Boolean = false
@@ -2172,6 +2195,11 @@ private fun NutritionAnalysisCard(
                             }
                         }
                         if (hasMacros) {
+                            TextButton(onClick = onViewIngredients, contentPadding = PaddingValues(2.dp)) {
+                                Icon(Icons.Default.Visibility, null, Modifier.size(13.dp))
+                                Spacer(Modifier.width(2.dp))
+                                Text("Einsehen", fontSize = 11.sp)
+                            }
                             TextButton(onClick = onVerify, contentPadding = PaddingValues(2.dp)) {
                                 Icon(Icons.Default.QrCodeScanner, null, Modifier.size(13.dp))
                                 Spacer(Modifier.width(2.dp))

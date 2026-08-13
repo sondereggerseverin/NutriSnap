@@ -235,7 +235,9 @@ fun IngredientVerifySheet(
     onSaveMatches: ((List<IngredientMatch>) -> Unit)? = null,
     /** Bereits gespeicherte Kochgewichte (Beilage / Sauce) zum Vorausfüllen. */
     initialSideWeightG: Float? = null,
-    initialSauceWeightG: Float? = null
+    initialSauceWeightG: Float? = null,
+    /** Nur ansehen: keine Edits, kein Override-Schreiben, kein Übernehmen. */
+    readOnly: Boolean = false
 ) {
     var overrides by remember { mutableStateOf(initialOverrides) }
     var verifyStates by remember {
@@ -281,6 +283,7 @@ fun IngredientVerifySheet(
     }
 
     fun updateOverride(line: String, ov: IngredientOverride?) {
+        if (readOnly) return
         overrides = if (ov == null) overrides - line else overrides + (line to ov)
         onOverridesChanged(overrides)
     }
@@ -394,7 +397,7 @@ fun IngredientVerifySheet(
             // Header
             item {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    Text("Zutaten verifizieren", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    Text(if (readOnly) "Zutaten einsehen" else "Zutaten verifizieren", fontWeight = FontWeight.Bold, fontSize = 20.sp)
                     Text(
                         "$recipeName · $servings Portion${if (servings != 1) "en" else ""}",
                         fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -486,9 +489,10 @@ fun IngredientVerifySheet(
                     onToggleExpand = {
                         expandedLines = if (expandedLines.contains(line)) expandedLines - line else expandedLines + line
                     },
-                    autoFocusFiberEdit = fiberEditTarget == line,
+                    autoFocusFiberEdit = !readOnly && fiberEditTarget == line,
                     onFiberEditConsumed = { if (fiberEditTarget == line) fiberEditTarget = null },
-                    onScan = { scanTarget = index },
+                    onScan = { if (!readOnly) scanTarget = index },
+                    readOnly = readOnly,
                     onDelete = {
                         // Index-basiert: indexOf(state) ist bei NaN-Floats / gleichen Zeilen unzuverlässig
                         if (index in verifyStates.indices) {
@@ -533,7 +537,7 @@ fun IngredientVerifySheet(
             }
 
             // Neue Zutat per Scan/Suche hinzufügen
-            item {
+            if (!readOnly) item {
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(
                     onClick = { scanTarget = -1 },
@@ -545,8 +549,8 @@ fun IngredientVerifySheet(
                 }
             }
 
-            // Confirm button
-            item {
+            // Confirm button (nur im Edit-Modus)
+            if (!readOnly) item {
                 Spacer(Modifier.height(12.dp))
                 Button(
                     onClick = {
@@ -670,7 +674,8 @@ private fun IngredientVerifyRow(
     onManualFiberSaved: (Float) -> Unit,
     onAmountSaved: (Float) -> Unit,
     componentGroup: String? = null,
-    onMoveComponent: (() -> Unit)? = null
+    onMoveComponent: (() -> Unit)? = null,
+    readOnly: Boolean = false
 ) {
     val isOverride = state.override != null
     val isMatched  = state.isVerified
@@ -788,9 +793,11 @@ private fun IngredientVerifyRow(
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // Direkter Scan-Zugriff — kein Aufklappen nötig für die genaueste Methode
-                    IconButton(onClick = onScan, Modifier.size(26.dp)) {
-                        Icon(Icons.Default.QrCodeScanner, "Produkt ändern (Scan/Suche/Manuell)", Modifier.size(15.dp),
-                            tint = MaterialTheme.colorScheme.primary)
+                    if (!readOnly) {
+                        IconButton(onClick = onScan, Modifier.size(26.dp)) {
+                            Icon(Icons.Default.QrCodeScanner, "Produkt ändern (Scan/Suche/Manuell)", Modifier.size(15.dp),
+                                tint = MaterialTheme.colorScheme.primary)
+                        }
                     }
                     Icon(
                         if (showActions) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
@@ -988,6 +995,7 @@ private fun IngredientVerifyRow(
                     )
                 }
 
+                if (!readOnly) {
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     // Keep as-is (close actions)
@@ -1014,6 +1022,7 @@ private fun IngredientVerifyRow(
                         Text("Löschen", fontSize = 12.sp)
                     }
                 }
+                } // !readOnly
             }
         }
     }
