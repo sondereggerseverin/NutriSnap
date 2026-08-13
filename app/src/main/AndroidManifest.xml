@@ -109,5 +109,11 @@
                 android:resource="@xml/file_paths"/>
         </provider>
 
+
+        <!-- canhub CropImageActivity requires Theme.AppCompat (or descendant) -->
+        <activity
+            android:name="com.canhub.cropper.CropImageActivity"
+            android:theme="@style/Theme.NutriSnap.Cropper"
+            android:exported="true" />
     </application>
 </manifest>
