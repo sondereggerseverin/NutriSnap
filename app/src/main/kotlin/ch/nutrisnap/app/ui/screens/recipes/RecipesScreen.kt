@@ -12,6 +12,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -1098,9 +1099,20 @@ fun ImportSheet(
     LaunchedEffect(error) {
         if (error != null && isInstagram) showManual = true
     }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(horizontal=16.dp).navigationBarsPadding()
-                .imePadding().padding(bottom=8.dp)) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp)
+        ) {
             if (!showManual) {
                 Text(
                     "Rezept importieren",
@@ -1326,10 +1338,21 @@ fun BatchImportSheet(
     onDismiss: () -> Unit
 ) {
     var pasteText by remember { mutableStateOf("") }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(horizontal = 16.dp).navigationBarsPadding()
-                .imePadding().padding(bottom = 8.dp)) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp)
+        ) {
             Text("Rezepte importieren", fontWeight = FontWeight.Bold, fontSize = 20.sp)
             Spacer(Modifier.height(4.dp))
             Text("Mehrere Links auf einmal importieren",
@@ -2243,9 +2266,20 @@ fun AddToDiarySheet(
     val calsPerServ = recipe.totalCalories?.let { it / recipe.servings.coerceAtLeast(1) }
     val estCals = calsPerServ?.let { it * servings }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(horizontal=16.dp).navigationBarsPadding()
-                .imePadding().padding(bottom=16.dp)) {
+    val diarySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = diarySheetState
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp)
+        ) {
             Text("Ins Tagebuch", fontWeight=FontWeight.Bold, fontSize=18.sp)
             Spacer(Modifier.height(4.dp))
             Text(recipe.displayTitle(), fontSize=13.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -2500,10 +2534,17 @@ private fun CookWithWhatIHaveSheet(
     var ingredients by remember { mutableStateOf("") }
     var category by remember { mutableStateOf<RecipeCategory?>(null) }
     var kcalText by remember { mutableStateOf("") }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    val cookSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = cookSheetState
+    ) {
         Column(
             Modifier
                 .fillMaxWidth()
+                .navigationBarsPadding()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 32.dp)
         ) {
