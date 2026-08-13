@@ -270,6 +270,206 @@ private fun MacroInline(label: String, value: Float, color: Color) {
     )
 }
 
+/**
+ * Kompakte Kachel für 2-Spalten-Grid: Bild oben, Titel + kcal darunter.
+ * Mehr Rezepte sichtbar; Aktionen über Overflow-Menü und schnellem „+ Tagebuch“.
+ */
+@Composable
+fun RecipeGridCard(
+    recipe: Recipe,
+    onClick: () -> Unit,
+    onAddToDiary: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onDuplicate: () -> Unit = {},
+    onToggleFavorite: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    val baseServings = recipe.servings.coerceAtLeast(1)
+    val kcalPer = recipe.totalCalories?.div(baseServings)
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(NutriRadius.md),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(1.dp)
+    ) {
+        Column {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1.15f)
+            ) {
+                RecipeCardImage(
+                    recipe = recipe,
+                    modifier = Modifier.fillMaxSize()
+                )
+                // Favorit-Hinweis oben links
+                if (recipe.isFavorite) {
+                    Icon(
+                        Icons.Filled.Favorite,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(6.dp)
+                            .size(16.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+                // Schnell-Add + Menü oben rechts
+                Row(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    FilledIconButton(
+                        onClick = onAddToDiary,
+                        modifier = Modifier.size(30.dp),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.92f)
+                        )
+                    ) {
+                        Icon(
+                            Icons.Filled.PlaylistAdd,
+                            contentDescription = "Ins Tagebuch",
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Box {
+                        FilledIconButton(
+                            onClick = { menuOpen = true },
+                            modifier = Modifier.size(30.dp),
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            )
+                        ) {
+                            Icon(
+                                Icons.Filled.MoreVert,
+                                contentDescription = "Mehr",
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = menuOpen,
+                            onDismissRequest = { menuOpen = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(if (recipe.isFavorite) "Favorit entfernen" else "Als Favorit")
+                                },
+                                onClick = {
+                                    menuOpen = false
+                                    onToggleFavorite()
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        if (recipe.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                        null,
+                                        Modifier.size(18.dp)
+                                    )
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Bearbeiten") },
+                                onClick = {
+                                    menuOpen = false
+                                    onEdit()
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Filled.RestaurantMenu, null, Modifier.size(18.dp))
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Kopieren zum Anpassen") },
+                                onClick = {
+                                    menuOpen = false
+                                    onDuplicate()
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Filled.ContentCopy, null, Modifier.size(18.dp))
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Löschen", color = MaterialTheme.colorScheme.error) },
+                                onClick = {
+                                    menuOpen = false
+                                    showDeleteConfirm = true
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Filled.DeleteOutline,
+                                        null,
+                                        Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+            Column(Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
+                Text(
+                    recipe.displayTitle(),
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 16.sp
+                )
+                Spacer(Modifier.height(2.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    kcalPer?.let {
+                        Text(
+                            "${it.toInt()} kcal",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = MacroColors.calories
+                        )
+                    }
+                    recipe.platform?.takeIf { it.isNotBlank() }?.let { platform ->
+                        Text(
+                            platform.replaceFirstChar { c -> c.uppercase() },
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+    }
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Rezept löschen?") },
+            text = { Text(recipe.displayTitle()) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDelete()
+                    showDeleteConfirm = false
+                }) {
+                    Text("Löschen", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Abbrechen") }
+            }
+        )
+    }
+}
+
 @Composable
 fun RecipeCardImage(recipe: Recipe, modifier: Modifier = Modifier) {
     var loadFailed by remember(recipe.imageUrl) { mutableStateOf(false) }

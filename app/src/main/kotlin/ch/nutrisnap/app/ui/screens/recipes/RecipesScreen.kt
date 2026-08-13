@@ -22,6 +22,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -53,6 +56,8 @@ import ch.nutrisnap.app.domain.RecipeGermanMetricConverter
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_RATINGS
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_UI
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_CARDS
+import ch.nutrisnap.app.ui.theme.KEY_CLASSIC_RECIPE_LIST
+import ch.nutrisnap.app.ui.components.RecipeGridCard
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import androidx.datastore.preferences.core.edit
 import androidx.compose.material.icons.filled.Star
@@ -297,7 +302,9 @@ fun RecipesScreen(
     val pendingTargetKcal by vm.pendingTargetKcal.collectAsState()
     val context = LocalContext.current
     val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val classicList = prefs?.get(KEY_CLASSIC_RECIPE_LIST) == true
     val freshCards = (prefs?.get(KEY_FRESH_RECIPE_CARDS) == true) || (prefs?.get(KEY_FRESH_UI) == true)
+    val useGrid = !classicList
 
     // Ziel-kcal aus „Was koche ich?“ einmalig anwenden, sobald ein Rezept geöffnet wird
     LaunchedEffect(selectedRecipe?.id, pendingTargetKcal) {
@@ -544,38 +551,60 @@ fun RecipesScreen(
                     message = if (hideIncomplete) "Keine vollständigen Rezepte" else "Noch keine Rezepte gespeichert",
                     sub = if (hideIncomplete) "Schalte den Filter aus, um alle zu sehen" else "Tippe auf + und füge einen Link ein"
                 )
+            } else if (useGrid) {
+                // Kompakte 2-Spalten-Übersicht – mehr Rezepte auf einen Blick
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 80.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    gridItems(displayedRecipes, key = { it.id }) { recipe ->
+                        RecipeGridCard(
+                            recipe = recipe,
+                            onClick = { selectedRecipe = recipe },
+                            onAddToDiary = { addToDiaryRecipe = recipe },
+                            onEdit = { editRecipe = recipe },
+                            onDelete = { vm.deleteRecipe(recipe) },
+                            onDuplicate = { vm.duplicateRecipe(recipe) },
+                            onToggleFavorite = { vm.toggleFavorite(recipe) }
+                        )
+                    }
+                }
             } else {
+                // Klassische 1-Spalten-Liste (ursprüngliches Design)
                 LazyColumn(
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp).let {
-                        PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 80.dp)
-                    },
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 80.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(displayedRecipes, key = { it.id }) { recipe ->
                         if (recipe.isIncomplete()) {
-                            // Unvollständige Importe: immer kompakte Warnzeile
-                            RecipeCard(recipe,
-                                onClick      = { selectedRecipe = recipe },
-                                onDelete     = { vm.deleteRecipe(recipe) },
+                            RecipeCard(
+                                recipe,
+                                onClick = { selectedRecipe = recipe },
+                                onDelete = { vm.deleteRecipe(recipe) },
                                 onAddToDiary = { addToDiaryRecipe = recipe },
-                                onEdit       = { editRecipe = recipe })
+                                onEdit = { editRecipe = recipe }
+                            )
                         } else if (freshCards) {
                             ch.nutrisnap.app.ui.components.RecipeCardV2(
-                                recipe       = recipe,
-                                onClick      = { selectedRecipe = recipe },
+                                recipe = recipe,
+                                onClick = { selectedRecipe = recipe },
                                 onAddToDiary = { _ -> addToDiaryRecipe = recipe },
-                                onEdit       = { editRecipe = recipe },
-                                onDelete     = { vm.deleteRecipe(recipe) },
-                                onDuplicate  = { vm.duplicateRecipe(recipe) },
+                                onEdit = { editRecipe = recipe },
+                                onDelete = { vm.deleteRecipe(recipe) },
+                                onDuplicate = { vm.duplicateRecipe(recipe) },
                                 onToggleFavorite = { vm.toggleFavorite(recipe) }
                             )
                         } else {
-                            // Klassische Karte (Toggle „Fresh Recipe Cards“ aus)
-                            RecipeCard(recipe,
-                                onClick      = { selectedRecipe = recipe },
-                                onDelete     = { vm.deleteRecipe(recipe) },
+                            RecipeCard(
+                                recipe,
+                                onClick = { selectedRecipe = recipe },
+                                onDelete = { vm.deleteRecipe(recipe) },
                                 onAddToDiary = { addToDiaryRecipe = recipe },
-                                onEdit       = { editRecipe = recipe })
+                                onEdit = { editRecipe = recipe }
+                            )
                         }
                     }
                 }

@@ -40,6 +40,7 @@ import ch.nutrisnap.app.ui.theme.KEY_MANUAL_ACTIVITY_ENABLED
 import ch.nutrisnap.app.ui.theme.KEY_AGGRESSIVE_SPORT_DAY
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_UI
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_CARDS
+import ch.nutrisnap.app.ui.theme.KEY_CLASSIC_RECIPE_LIST
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_HOME
 
 enum class FitnessGoal(val label: String, val emoji: String, val desc: String) {
@@ -246,6 +247,25 @@ fun SettingsScreen(
                                 context.notifDataStore.edit { prefs ->
                                     prefs[ch.nutrisnap.app.ui.theme.KEY_APP_THEME] = theme.name
                                 }
+                            }
+                        }
+                    )
+                }
+                SettingsCard(title = "Rezept-Übersicht", icon = Icons.Default.RestaurantMenu) {
+                    val classicList = prefs?.get(KEY_CLASSIC_RECIPE_LIST) ?: false
+                    Text(
+                        "Standard ist die kompakte 2-Spalten-Ansicht. Schalte um, wenn du die frühere Listenansicht zurück willst.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(NutriSpacing.sm))
+                    SettingsSwitchRow(
+                        title = "Klassische Listenansicht",
+                        subtitle = "Ursprüngliches 1-Spalten-Design",
+                        checked = classicList,
+                        onCheckedChange = { checked ->
+                            scope.launch {
+                                context.notifDataStore.edit { it[KEY_CLASSIC_RECIPE_LIST] = checked }
                             }
                         }
                     )

@@ -237,6 +237,8 @@ val KEY_RECIPE_RATINGS = stringPreferencesKey("recipe_ratings_json")
 val KEY_FRESH_UI = androidx.datastore.preferences.core.booleanPreferencesKey("fresh_ui")
 val KEY_FRESH_RECIPE_CARDS = androidx.datastore.preferences.core.booleanPreferencesKey("fresh_recipe_cards")
 val KEY_FRESH_HOME = androidx.datastore.preferences.core.booleanPreferencesKey("fresh_home")
+/** true = klassische 1-Spalten-Liste (bisheriges Design), false/absent = kompakte 2-Spalten-Grid-Übersicht */
+val KEY_CLASSIC_RECIPE_LIST = androidx.datastore.preferences.core.booleanPreferencesKey("classic_recipe_list")
 
 
 // ── Typography ─────────────────────────────────────────────────────────────────
