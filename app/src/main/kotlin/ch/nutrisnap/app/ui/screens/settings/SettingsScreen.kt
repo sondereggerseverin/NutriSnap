@@ -254,14 +254,14 @@ fun SettingsScreen(
                 SettingsCard(title = "Rezept-Übersicht", icon = Icons.Default.RestaurantMenu) {
                     val classicList = prefs?.get(KEY_CLASSIC_RECIPE_LIST) ?: false
                     Text(
-                        "Standard ist die kompakte 2-Spalten-Ansicht. Schalte um, wenn du die frühere Listenansicht zurück willst.",
+                        "Standard: kompakte 2-Spalten-Kacheln (mehr Rezepte sichtbar). Schalter an = Design vor dem Redesign (Stand CI #758, 1-Spalten-Liste).",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(NutriSpacing.sm))
                     SettingsSwitchRow(
-                        title = "Klassische Listenansicht",
-                        subtitle = "Ursprüngliches 1-Spalten-Design",
+                        title = "Altes Design (vor #758)",
+                        subtitle = "1-Spalten-Liste wie zuvor",
                         checked = classicList,
                         onCheckedChange = { checked ->
                             scope.launch {
