@@ -94,7 +94,10 @@ fun RecipeEditSheet(
                     cropMenuCropButtonTitle = "Fertig",
                     allowFlipping = true,
                     allowRotation = true,
-                    fixAspectRatio = false
+                    fixAspectRatio = false,
+                    // Handles nicht am Bildrand → kein Konflikt mit Notification-Shade
+                    initialCropWindowPaddingRatio = 0.08f,
+                    multiTouchEnabled = true
                 )
             )
         )
