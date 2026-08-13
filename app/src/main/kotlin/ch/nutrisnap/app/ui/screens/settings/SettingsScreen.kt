@@ -1056,8 +1056,10 @@ fun ThemePickerSection(
     currentTheme: AppTheme,
     onThemeSelected: (AppTheme) -> Unit
 ) {
-    val columns = 4
-    AppTheme.entries.chunked(columns).forEach { rowThemes ->
+    val columns = 3
+    // Nur kuratierte Themes; Legacy-Themes bleiben gültig, erscheinen nicht
+    val themes = AppTheme.pickerThemes
+    themes.chunked(columns).forEach { rowThemes ->
         Row(
             Modifier.fillMaxWidth().padding(bottom = NutriSpacing.sm),
             horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
@@ -1082,36 +1084,37 @@ private fun ThemeCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scheme = MaterialTheme.colorScheme
     Card(
         modifier = modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(NutriRadius.md),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) theme.primaryLight else MaterialTheme.colorScheme.surface
+            containerColor = if (isSelected) theme.primary.copy(alpha = 0.18f) else scheme.surfaceVariant.copy(alpha = 0.45f)
         ),
-        border = if (isSelected) BorderStroke(2.dp, theme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        elevation = CardDefaults.cardElevation(if (isSelected) 4.dp else 0.dp)
+        border = if (isSelected) BorderStroke(2.dp, theme.primary) else BorderStroke(1.dp, scheme.outline.copy(alpha = 0.5f)),
+        elevation = CardDefaults.cardElevation(if (isSelected) 2.dp else 0.dp)
     ) {
         Column(
             Modifier
-                .padding(vertical = NutriSpacing.sm, horizontal = NutriSpacing.xs)
+                .padding(vertical = NutriSpacing.md, horizontal = NutriSpacing.xs)
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
                 Modifier
-                    .size(32.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
                     .background(theme.primary),
                 contentAlignment = Alignment.Center
             ) {
-                Text(theme.emoji, fontSize = 14.sp)
+                Text(theme.emoji, fontSize = 16.sp)
             }
-            Spacer(Modifier.height(NutriSpacing.xs))
+            Spacer(Modifier.height(NutriSpacing.sm))
             Text(
-                theme.label.split(" ").first(),
-                fontSize = 10.sp,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                color = if (isSelected) theme.primaryDark else MaterialTheme.colorScheme.onSurfaceVariant,
+                theme.label,
+                fontSize = 12.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = if (isSelected) theme.primary else scheme.onSurfaceVariant,
                 maxLines = 1
             )
         }

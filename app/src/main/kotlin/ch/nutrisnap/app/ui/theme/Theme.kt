@@ -56,19 +56,12 @@ enum class AppTheme(
     val primaryLight: Color,
     val accent: Color,
     val accentLight: Color,
-    val background: Color
+    val background: Color,
+    /** Nur kuratierte Themes im Picker; Rest bleibt für DataStore-Kompatibilität. */
+    val showInPicker: Boolean = true
 ) {
-    FOREST_GREEN(
-        label = "Forest Green", emoji = "\uD83C\uDF3F",
-        primary      = Color(0xFF059669),
-        primaryDark  = Color(0xFF065F46),
-        primaryLight = Color(0xFFD1FAE5),
-        accent       = Color(0xFFF97316),
-        accentLight  = Color(0xFFFFEDD5),
-        background   = Color(0xFFF0FDF4)
-    ),
     OCEAN_BLUE(
-        label = "Ocean Blue", emoji = "\uD83C\uDF0A",
+        label = "Ocean", emoji = "\uD83C\uDF0A",
         primary      = Color(0xFF2563EB),
         primaryDark  = Color(0xFF1E40AF),
         primaryLight = Color(0xFFDBEAFE),
@@ -76,8 +69,35 @@ enum class AppTheme(
         accentLight  = Color(0xFFCFFAFE),
         background   = Color(0xFFEFF6FF)
     ),
+    FOREST_GREEN(
+        label = "Forest", emoji = "\uD83C\uDF3F",
+        primary      = Color(0xFF059669),
+        primaryDark  = Color(0xFF065F46),
+        primaryLight = Color(0xFFD1FAE5),
+        accent       = Color(0xFFF97316),
+        accentLight  = Color(0xFFFFEDD5),
+        background   = Color(0xFFF0FDF4)
+    ),
+    SLATE_CHARCOAL(
+        label = "Slate", emoji = "\uD83D\uDDA4",
+        primary      = Color(0xFF475569),
+        primaryDark  = Color(0xFF1E293B),
+        primaryLight = Color(0xFFE2E8F0),
+        accent       = Color(0xFFF59E0B),
+        accentLight  = Color(0xFFFEF3C7),
+        background   = Color(0xFFF8FAFC)
+    ),
+    MIDNIGHT_INDIGO(
+        label = "Midnight", emoji = "\uD83C\uDF03",
+        primary      = Color(0xFF4F46E5),
+        primaryDark  = Color(0xFF3730A3),
+        primaryLight = Color(0xFFE0E7FF),
+        accent       = Color(0xFFFBBF24),
+        accentLight  = Color(0xFFFEF3C7),
+        background   = Color(0xFFEEF2FF)
+    ),
     SUNSET_ORANGE(
-        label = "Sunset Orange", emoji = "\uD83C\uDF05",
+        label = "Sunset", emoji = "\uD83C\uDF05",
         primary      = Color(0xFFEA580C),
         primaryDark  = Color(0xFFC2410C),
         primaryLight = Color(0xFFFED7AA),
@@ -86,7 +106,7 @@ enum class AppTheme(
         background   = Color(0xFFFFF7ED)
     ),
     LAVENDER_DUSK(
-        label = "Lavender Dusk", emoji = "\uD83C\uDF06",
+        label = "Lavender", emoji = "\uD83C\uDF06",
         primary      = Color(0xFF7C3AED),
         primaryDark  = Color(0xFF5B21B6),
         primaryLight = Color(0xFFEDE9FE),
@@ -94,87 +114,53 @@ enum class AppTheme(
         accentLight  = Color(0xFFFCE7F3),
         background   = Color(0xFFF5F3FF)
     ),
+    // Legacy – bleiben gültig, erscheinen nicht im Picker
     MINT_FRESH(
-        label = "Mint Fresh", emoji = "\uD83C\uDF43",
-        primary      = Color(0xFF2DD4BF),
-        primaryDark  = Color(0xFF0F9B8E),
-        primaryLight = Color(0xFFD9FBF0),
-        accent       = Color(0xFF0EA5E9),
-        accentLight  = Color(0xFFE0F2FE),
-        background   = Color(0xFFECFDF5)
+        label = "Mint", emoji = "\uD83C\uDF43",
+        primary = Color(0xFF2DD4BF), primaryDark = Color(0xFF0F9B8E), primaryLight = Color(0xFFD9FBF0),
+        accent = Color(0xFF0EA5E9), accentLight = Color(0xFFE0F2FE), background = Color(0xFFECFDF5),
+        showInPicker = false
     ),
     ROSE_GOLD(
-        label = "Rose Gold", emoji = "\uD83C\uDF38",
-        primary      = Color(0xFFE11D48),
-        primaryDark  = Color(0xFFBE123C),
-        primaryLight = Color(0xFFFCE7F3),
-        accent       = Color(0xFFF59E0B),
-        accentLight  = Color(0xFFFEF3C7),
-        background   = Color(0xFFFFF1F2)
+        label = "Rose", emoji = "\uD83C\uDF38",
+        primary = Color(0xFFE11D48), primaryDark = Color(0xFFBE123C), primaryLight = Color(0xFFFCE7F3),
+        accent = Color(0xFFF59E0B), accentLight = Color(0xFFFEF3C7), background = Color(0xFFFFF1F2),
+        showInPicker = false
     ),
     LAGOON_TEAL(
-        label = "Lagoon Teal", emoji = "\uD83C\uDFDD\uFE0F",
-        primary      = Color(0xFF0D9488),
-        primaryDark  = Color(0xFF115E59),
-        primaryLight = Color(0xFFCCFBF1),
-        accent       = Color(0xFFF97316),
-        accentLight  = Color(0xFFFFEDD5),
-        background   = Color(0xFFF0FDFA)
+        label = "Lagoon", emoji = "\uD83C\uDFDD\uFE0F",
+        primary = Color(0xFF0D9488), primaryDark = Color(0xFF115E59), primaryLight = Color(0xFFCCFBF1),
+        accent = Color(0xFFF97316), accentLight = Color(0xFFFFEDD5), background = Color(0xFFF0FDFA),
+        showInPicker = false
     ),
     GOLDEN_AMBER(
-        label = "Golden Amber", emoji = "\uD83C\uDF6F",
-        primary      = Color(0xFFD97706),
-        primaryDark  = Color(0xFF92400E),
-        primaryLight = Color(0xFFFEF3C7),
-        accent       = Color(0xFF0891B2),
-        accentLight  = Color(0xFFCFFAFE),
-        background   = Color(0xFFFEFCE8)
+        label = "Golden", emoji = "\uD83C\uDF6F",
+        primary = Color(0xFFD97706), primaryDark = Color(0xFF92400E), primaryLight = Color(0xFFFEF3C7),
+        accent = Color(0xFF0891B2), accentLight = Color(0xFFCFFAFE), background = Color(0xFFFEFCE8),
+        showInPicker = false
     ),
     SUNNY(
         label = "Sunny", emoji = "☀️",
-        primary      = Color(0xFFF5C518),
-        primaryDark  = Color(0xFFCA8A04),
-        primaryLight = Color(0xFFFEF9C3),
-        accent       = Color(0xFFEA580C),
-        accentLight  = Color(0xFFFFEDD5),
-        background   = Color(0xFFFFFBEB)
-    ),
-    SLATE_CHARCOAL(
-        label = "Slate Charcoal", emoji = "\uD83D\uDDA4",
-        primary      = Color(0xFF475569),
-        primaryDark  = Color(0xFF1E293B),
-        primaryLight = Color(0xFFE2E8F0),
-        accent       = Color(0xFFF59E0B),
-        accentLight  = Color(0xFFFEF3C7),
-        background   = Color(0xFFF8FAFC)
+        primary = Color(0xFFF5C518), primaryDark = Color(0xFFCA8A04), primaryLight = Color(0xFFFEF9C3),
+        accent = Color(0xFFEA580C), accentLight = Color(0xFFFFEDD5), background = Color(0xFFFFFBEB),
+        showInPicker = false
     ),
     CHERRY_RED(
-        label = "Cherry Red", emoji = "\uD83C\uDF52",
-        primary      = Color(0xFFDC2626),
-        primaryDark  = Color(0xFF991B1B),
-        primaryLight = Color(0xFFFEE2E2),
-        accent       = Color(0xFF059669),
-        accentLight  = Color(0xFFD1FAE5),
-        background   = Color(0xFFFEF2F2)
-    ),
-    MIDNIGHT_INDIGO(
-        label = "Midnight Indigo", emoji = "\uD83C\uDF03",
-        primary      = Color(0xFF4F46E5),
-        primaryDark  = Color(0xFF3730A3),
-        primaryLight = Color(0xFFE0E7FF),
-        accent       = Color(0xFFFBBF24),
-        accentLight  = Color(0xFFFEF3C7),
-        background   = Color(0xFFEEF2FF)
+        label = "Cherry", emoji = "\uD83C\uDF52",
+        primary = Color(0xFFDC2626), primaryDark = Color(0xFF991B1B), primaryLight = Color(0xFFFEE2E2),
+        accent = Color(0xFF059669), accentLight = Color(0xFFD1FAE5), background = Color(0xFFFEF2F2),
+        showInPicker = false
     ),
     CITRUS_ZEST(
-        label = "Citrus Zest", emoji = "\uD83C\uDF4B",
-        primary      = Color(0xFF65A30D),
-        primaryDark  = Color(0xFF3F6212),
-        primaryLight = Color(0xFFECFCCB),
-        accent       = Color(0xFFDB2777),
-        accentLight  = Color(0xFFFCE7F3),
-        background   = Color(0xFFFAFDF0)
+        label = "Citrus", emoji = "\uD83C\uDF4B",
+        primary = Color(0xFF65A30D), primaryDark = Color(0xFF3F6212), primaryLight = Color(0xFFECFCCB),
+        accent = Color(0xFFDB2777), accentLight = Color(0xFFFCE7F3), background = Color(0xFFFAFDF0),
+        showInPicker = false
     );
+
+    companion object {
+        val pickerThemes: List<AppTheme> get() = entries.filter { it.showInPicker }
+    }
 
     fun toColorScheme() = lightColorScheme(
         primary            = primary,
