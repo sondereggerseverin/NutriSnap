@@ -70,6 +70,8 @@ fun AnalysisScreen(
         )
     }
 
+    val window = ch.nutrisnap.app.ui.rememberWindowInfo()
+    ch.nutrisnap.app.ui.AdaptiveContent(window = window) {
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -198,6 +200,7 @@ fun AnalysisScreen(
 
         item { StreakCard(streak = state.streak) }
     }
+    } // AdaptiveContent
 }
 
 // ── Zeitraum-Umschalter ─────────────────────────────────────────────────────

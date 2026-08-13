@@ -151,6 +151,8 @@ fun SettingsScreen(
         fatText     = fat.toInt().toString()
     }
 
+    val window = ch.nutrisnap.app.ui.rememberWindowInfo()
+    ch.nutrisnap.app.ui.AdaptiveContent(window = window) {
     Column(
         Modifier
             .fillMaxSize()
@@ -187,8 +189,9 @@ fun SettingsScreen(
 
         when (section) {
             null -> {
-                // ── Hub: 2-Spalten-Kacheln ───────────────────────────────────
-                SettingsHubSection.entries.chunked(2).forEach { row ->
+                // ── Hub: 2 Spalten Phone, 3 auf Tablet ───────────────────────
+                val hubCols = window.settingsHubColumns
+                SettingsHubSection.entries.chunked(hubCols).forEach { row ->
                     Row(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(NutriSpacing.md)
@@ -200,7 +203,7 @@ fun SettingsScreen(
                                 onClick = { section = s }
                             )
                         }
-                        if (row.size == 1) Spacer(Modifier.weight(1f))
+                        repeat(hubCols - row.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
 
@@ -640,6 +643,7 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(NutriSpacing.xxxl))
     }
+    } // AdaptiveContent
 }
 
 @Composable

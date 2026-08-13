@@ -44,11 +44,16 @@ fun HomeScreen(
     val hcState by hcVm.uiState.collectAsState()
     var showWeightDialog by remember { mutableStateOf(false) }
     var showActivityDialog by remember { mutableStateOf(false) }
+    val window = ch.nutrisnap.app.ui.rememberWindowInfo()
 
-    Box(Modifier.fillMaxSize()) {
+    ch.nutrisnap.app.ui.AdaptiveContent(window = window) {
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 100.dp)
+            contentPadding = PaddingValues(
+                start = if (window.isTablet) 16.dp else 0.dp,
+                end = if (window.isTablet) 16.dp else 0.dp,
+                bottom = 100.dp
+            )
         ) {
             item {
                 HomeHeader(

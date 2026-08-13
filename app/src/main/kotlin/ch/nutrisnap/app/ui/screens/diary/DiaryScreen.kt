@@ -265,9 +265,18 @@ fun DiaryScreen(
             }
         }
     ) { padding ->
+        val window = ch.nutrisnap.app.ui.rememberWindowInfo()
+        ch.nutrisnap.app.ui.AdaptiveContent(
+            modifier = Modifier.padding(padding),
+            window = window
+        ) {
         LazyColumn(
-            Modifier.padding(padding).fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 100.dp)
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = if (window.isTablet) 12.dp else 0.dp,
+                end = if (window.isTablet) 12.dp else 0.dp,
+                bottom = 100.dp
+            )
         ) {
             item { DateNavigator(state.selectedDate, vm::prevDay, vm::nextDay, vm::setDate) }
             item {
@@ -434,6 +443,7 @@ fun DiaryScreen(
                 }
             }
         }
+        } // AdaptiveContent
     }
 
     if (showAddSheet) AddFoodSheet(

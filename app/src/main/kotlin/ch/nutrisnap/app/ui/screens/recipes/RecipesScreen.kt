@@ -305,6 +305,8 @@ fun RecipesScreen(
     val classicList = prefs?.get(KEY_CLASSIC_RECIPE_LIST) == true
     val freshCards = (prefs?.get(KEY_FRESH_RECIPE_CARDS) == true) || (prefs?.get(KEY_FRESH_UI) == true)
     val useGrid = !classicList
+    val window = ch.nutrisnap.app.ui.rememberWindowInfo()
+    val gridColumns = window.recipeGridColumns(classicList = false)
 
     // Ziel-kcal aus „Was koche ich?“ einmalig anwenden, sobald ein Rezept geöffnet wird
     LaunchedEffect(selectedRecipe?.id, pendingTargetKcal) {
@@ -552,12 +554,17 @@ fun RecipesScreen(
                     sub = if (hideIncomplete) "Schalte den Filter aus, um alle zu sehen" else "Tippe auf + und füge einen Link ein"
                 )
             } else if (useGrid) {
-                // Kompakte 2-Spalten-Übersicht – mehr Rezepte auf einen Blick
+                // Grid: Phone 2, Tablet 3–4 Spalten
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 80.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    columns = GridCells.Fixed(gridColumns),
+                    contentPadding = PaddingValues(
+                        start = if (window.isTablet) 16.dp else 10.dp,
+                        end = if (window.isTablet) 16.dp else 10.dp,
+                        top = 4.dp,
+                        bottom = 80.dp
+                    ),
+                    horizontalArrangement = Arrangement.spacedBy(if (window.isTablet) 12.dp else 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (window.isTablet) 12.dp else 8.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
                     gridItems(displayedRecipes, key = { it.id }) { recipe ->
@@ -573,10 +580,13 @@ fun RecipesScreen(
                     }
                 }
             } else {
-                // Klassische 1-Spalten-Liste (ursprüngliches Design)
+                // Klassische 1-Spalten-Liste (ursprüngliches Design); auf Tablet zentriert begrenzt
+                val listPadH = if (window.isTablet) 24.dp else 16.dp
                 LazyColumn(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 80.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    contentPadding = PaddingValues(start = listPadH, end = listPadH, top = 6.dp, bottom = 80.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxSize()
                 ) {
                     items(displayedRecipes, key = { it.id }) { recipe ->
                         if (recipe.isIncomplete()) {
