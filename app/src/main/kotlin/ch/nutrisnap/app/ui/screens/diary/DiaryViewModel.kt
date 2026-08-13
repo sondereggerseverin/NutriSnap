@@ -8,6 +8,7 @@ import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.data.repository.DiaryRepository
 import ch.nutrisnap.app.data.repository.FavoriteFoodRepository
 import ch.nutrisnap.app.data.repository.FoodItemRepository
+import ch.nutrisnap.app.data.repository.RecipeRepository
 import ch.nutrisnap.app.data.repository.UserProfileRepository
 import ch.nutrisnap.app.data.repository.WeightRepository
 import ch.nutrisnap.app.domain.AdaptiveTdeeCalculator
@@ -43,6 +44,7 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     private val db          = NutriDatabase.getInstance(app)
     private val repo        = DiaryRepository(db)
     private val foodRepo    = FoodItemRepository(db)
+    private val recipeRepo  = RecipeRepository(db, app)
     private val profileRepo = UserProfileRepository(db)
     private val favRepo     = FavoriteFoodRepository(db)
     private val weightRepo  = WeightRepository(db)
@@ -537,15 +539,31 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
 
     // Eintrag-Detail (Mikronaehrstoffe), analog Yazio: Antippen eines Tagebuch-
     // Eintrags laedt das zugehoerige FoodItem fuer die volle Naehrwerttabelle.
+    // Bei Rezepten wird zusaetzlich das Recipe fuer die Zutatenliste geladen.
     private val _entryDetailFood = MutableStateFlow<FoodItem?>(null)
     val entryDetailFood: StateFlow<FoodItem?> = _entryDetailFood
 
+    private val _entryDetailRecipe = MutableStateFlow<ch.nutrisnap.app.data.model.Recipe?>(null)
+    val entryDetailRecipe: StateFlow<ch.nutrisnap.app.data.model.Recipe?> = _entryDetailRecipe
+
     fun loadEntryDetail(entry: DiaryEntry) {
         _entryDetailFood.value = null
-        if (entry.foodItemId <= 0) return // manuelle Eintraege/Rezepte haben kein FoodItem
-        viewModelScope.launch { _entryDetailFood.value = foodRepo.getById(entry.foodItemId) }
+        _entryDetailRecipe.value = null
+        viewModelScope.launch {
+            when {
+                entry.isFoodEntry ->
+                    _entryDetailFood.value = foodRepo.getById(entry.foodItemId)
+                entry.isRecipeEntry -> {
+                    val recipeId = (-entry.foodItemId).toLong()
+                    _entryDetailRecipe.value = recipeRepo.getById(recipeId)
+                }
+            }
+        }
     }
-    fun clearEntryDetail() { _entryDetailFood.value = null }
+    fun clearEntryDetail() {
+        _entryDetailFood.value = null
+        _entryDetailRecipe.value = null
+    }
 
     fun saveCustomFood(item: FoodItem) = viewModelScope.launch { foodRepo.saveCustomFood(item) }
 }

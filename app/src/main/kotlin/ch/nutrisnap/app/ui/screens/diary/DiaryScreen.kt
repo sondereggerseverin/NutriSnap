@@ -452,9 +452,11 @@ fun DiaryScreen(
         // Closure-Referenz), damit ein Makro-Override sofort sichtbar wird.
         val liveEntry = state.entries.firstOrNull { it.id == entry.id } ?: entry
         val foodItem by vm.entryDetailFood.collectAsState()
+        val detailRecipe by vm.entryDetailRecipe.collectAsState()
         EntryDetailSheet(
             entry     = liveEntry,
             foodItem  = foodItem,
+            recipe    = detailRecipe,
             onEdit    = { editEntry = liveEntry; detailEntry = null; vm.clearEntryDetail() },
             onEditMacro = { field -> macroEditField = field },
             onDismiss = { detailEntry = null; vm.clearEntryDetail() }
@@ -621,6 +623,7 @@ private fun EditEntryDialog(
 private fun EntryDetailSheet(
     entry: DiaryEntry,
     foodItem: ch.nutrisnap.app.data.model.FoodItem?,
+    recipe: ch.nutrisnap.app.data.model.Recipe? = null,
     onEdit: () -> Unit,
     onEditMacro: (MacroField) -> Unit,
     onDismiss: () -> Unit
@@ -695,6 +698,7 @@ private fun EntryDetailSheet(
                 .padding(horizontal = NutriSpacing.lg)
                 .navigationBarsPadding()
                 .imePadding()
+                .verticalScroll(rememberScrollState())
                 .padding(bottom = NutriSpacing.lg)
         ) {
             Row(
@@ -759,6 +763,141 @@ private fun EntryDetailSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+
+            // Zutaten bei Rezept-Einträgen (skaliert auf getrackte Menge)
+            if (entry.isRecipeEntry) {
+                HorizontalDivider(Modifier.padding(vertical = NutriSpacing.md))
+                EntryRecipeIngredientsSection(entry = entry, recipe = recipe)
+            }
+        }
+    }
+}
+
+/**
+ * Skaliert eine Zutatenzeile proportional zum getrackten Portionsfaktor.
+ * (Gleiche Heuristik wie im Kochmodus: fuehrende Mengenangabe * Faktor.)
+ */
+private val entryIngredientQtyRegex =
+    Regex("""^\s*(\d+/\d+|\d+(?:[.,]\d+)?)(\s*)(.*)$""", RegexOption.DOT_MATCHES_ALL)
+
+private fun scaleEntryIngredientLine(line: String, factor: Double): String {
+    val match = entryIngredientQtyRegex.find(line) ?: return line
+    val (numStr, spacer, rest) = match.destructured
+    val value = if (numStr.contains("/")) {
+        val parts = numStr.split("/")
+        val n = parts[0].toDoubleOrNull() ?: return line
+        val d = parts[1].toDoubleOrNull() ?: return line
+        if (d == 0.0) return line
+        n / d
+    } else {
+        numStr.replace(",", ".").toDoubleOrNull() ?: return line
+    }
+    val scaled = value * factor
+    val rounded = kotlin.math.round(scaled * 100) / 100.0
+    val formatted = if (rounded == rounded.toLong().toDouble()) {
+        rounded.toLong().toString()
+    } else {
+        rounded.toString().trimEnd('0').trimEnd('.').replace(".", ",")
+    }
+    return "$formatted$spacer$rest"
+}
+
+@Composable
+private fun EntryRecipeIngredientsSection(
+    entry: DiaryEntry,
+    recipe: ch.nutrisnap.app.data.model.Recipe?
+) {
+    var expanded by remember { mutableStateOf(true) }
+    val lines = remember(recipe?.id, recipe?.ingredients) {
+        recipe?.ingredients
+            ?.lineSequence()
+            ?.map {
+                it.trim()
+                    .removePrefix("•").removePrefix("-").removePrefix("*")
+                    .removePrefix("·").trim()
+            }
+            ?.filter { it.isNotBlank() }
+            ?.toList()
+            .orEmpty()
+    }
+    // amountGrams = Portionsfaktor relativ zu 1 Rezept-Portion;
+    // ingredients-Text bezieht sich auf das ganze Rezept (servings Portionen).
+    val scaleFactor = remember(entry.amountGrams, recipe?.servings) {
+        val servings = (recipe?.servings ?: 1).coerceAtLeast(1).toDouble()
+        (entry.amountGrams.toDouble() / servings).coerceAtLeast(0.01)
+    }
+
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded },
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Zutaten", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(
+                when {
+                    recipe == null -> "Rezept nicht mehr in der Bibliothek"
+                    entry.isGramTrackedRecipe ->
+                        "für ${entry.recipeGrams!!.toInt()} g (×${"%.2f".format(scaleFactor).trimEnd('0').trimEnd('.')})"
+                    else ->
+                        "für ${formatPortionAmount(entry.amountGrams)} (×${"%.2f".format(scaleFactor).trimEnd('0').trimEnd('.')})"
+                },
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Icon(
+            if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+            contentDescription = if (expanded) "Zuklappen" else "Aufklappen",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+
+    if (expanded) {
+        Spacer(Modifier.height(NutriSpacing.sm))
+        if (recipe == null) {
+            Text(
+                "Das Original-Rezept wurde gelöscht – Zutaten nicht verfügbar.",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else if (lines.isEmpty()) {
+            Text(
+                "Keine Zutaten hinterlegt.",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            lines.forEach { line ->
+                val display = scaleEntryIngredientLine(line, scaleFactor)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 3.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text(
+                        "•",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(end = 8.dp, top = 1.dp)
+                    )
+                    Text(
+                        display,
+                        fontSize = 13.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+            // Makro-Zusammenfassung der getrackten Menge (bereits im Header, hier als Kontext)
+            Spacer(Modifier.height(NutriSpacing.sm))
+            Text(
+                "${entry.calories.toInt()} kcal · P ${entry.protein.toInt()} · K ${entry.carbs.toInt()} · F ${entry.fat.toInt()}",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
