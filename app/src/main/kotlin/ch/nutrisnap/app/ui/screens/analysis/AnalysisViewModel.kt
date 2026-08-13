@@ -63,6 +63,17 @@ data class WeekOverviewRow(
     val zone: String
 )
 
+/** Ein Kalendertag für die Tagesübersicht-Tabelle (analog zur Wochenübersicht). */
+data class DayOverviewRow(
+    val date: LocalDate,
+    val weightKg: Float?,
+    val weightChangePct: Float?,
+    val calories: Int,
+    val caloriesChangePct: Float?,
+    val activityCalories: Int,
+    val zone: String
+)
+
 data class AnalysisUiState(
     val period:                AnalysisPeriod = AnalysisPeriod.WOCHE,
     val anchorDate:             LocalDate = LocalDate.now(),
@@ -90,7 +101,10 @@ data class AnalysisUiState(
     val showHistoryPermissionPrompt: Boolean = false,
     /** Letzte N Kalenderwochen für die einsehbare Wochenübersicht-Tabelle. */
     val weekOverview: List<WeekOverviewRow> = emptyList(),
-    val weekOverviewLoading: Boolean = false
+    val weekOverviewLoading: Boolean = false,
+    /** Letzte N Tage für die Tagesübersicht-Tabelle. */
+    val dayOverview: List<DayOverviewRow> = emptyList(),
+    val dayOverviewLoading: Boolean = false
 )
 
 private val dayFormatter   = DateTimeFormatter.ofPattern("EEEE, d. MMMM", Locale.GERMAN)
@@ -333,6 +347,79 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Lädt die letzten [days] Kalendertage für die Tagesübersicht-Tabelle.
+     * Zone relativ zum Kalorienziel (±8 %), Δ% vs. Vortag.
+     */
+    fun loadDayOverview(days: Int = 30) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(dayOverviewLoading = true) }
+            val today = LocalDate.now()
+            val from = today.minusDays((days - 1).toLong())
+            val to = today
+
+            runCatching { healthRepo.ensureRangeSynced(from, to) }
+
+            val summaries = diaryRepo.getSummaryBetween(from, to).first()
+            val hcCache = healthRepo.getRange(from, to).first()
+            val weightEntries = weightRepo.getAll().first()
+            val profile = profileRepo.get().first()
+            val tdee = profile.computedTdee()?.toInt() ?: profile.dailyCalorieGoal
+
+            val summaryByDate = summaries.associateBy { it.dateStr }
+            val hcByDate = hcCache.associateBy { it.date }
+            val weightByDate = weightEntries.associateBy { LocalDate.parse(it.dateStr) }
+
+            val rows = ArrayList<DayOverviewRow>(days)
+            var prevCal: Int? = null
+            var prevWeight: Float? = null
+
+            var d = from
+            while (!d.isAfter(to)) {
+                val s = summaryByDate[d.toString()]
+                val cal = if (s != null && s.calories > 0f) s.calories.toInt() else 0
+                val hc = hcByDate[d]
+                val act = (hc?.activeCaloriesKcal?.toFloat() ?: 0f).toInt().coerceAtLeast(0)
+                val w = hc?.weightKg?.toFloat() ?: weightByDate[d]?.weightKg
+
+                val calChange = if (prevCal != null && prevCal > 0 && cal > 0) {
+                    ((cal - prevCal).toFloat() / prevCal) * 100f
+                } else null
+                val wChange = if (prevWeight != null && prevWeight > 0f && w != null && w > 0f) {
+                    ((w - prevWeight) / prevWeight) * 100f
+                } else null
+
+                val zone = when {
+                    cal <= 0 -> "—"
+                    cal < tdee * 0.92f -> "Defizit"
+                    cal > tdee * 1.08f -> "Überschuss"
+                    else -> "Erhalt"
+                }
+
+                rows += DayOverviewRow(
+                    date = d,
+                    weightKg = w?.takeIf { it > 0f },
+                    weightChangePct = wChange,
+                    calories = cal,
+                    caloriesChangePct = calChange,
+                    activityCalories = act,
+                    zone = zone
+                )
+                if (cal > 0) prevCal = cal
+                if (w != null && w > 0f) prevWeight = w
+                d = d.plusDays(1)
+            }
+
+            // Neuester Tag zuerst
+            _uiState.update {
+                it.copy(
+                    dayOverview = rows.asReversed(),
+                    dayOverviewLoading = false
+                )
+            }
+        }
+    }
+
     private fun buildState(
         period:        AnalysisPeriod,
         range:         Range,
@@ -406,7 +493,9 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
             hasHistoryPermission        = hasHistory,
             showHistoryPermissionPrompt = !hasHistory && range.from.isBefore(LocalDate.now().minusDays(29)),
             weekOverview           = prev.weekOverview,
-            weekOverviewLoading    = prev.weekOverviewLoading
+            weekOverviewLoading    = prev.weekOverviewLoading,
+            dayOverview            = prev.dayOverview,
+            dayOverviewLoading     = prev.dayOverviewLoading
         )
     }
 }

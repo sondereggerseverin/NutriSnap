@@ -62,8 +62,10 @@ fun AnalysisScreen(
 
     if (showWeekOverview) {
         WeekOverviewSheet(
-            rows = state.weekOverview,
-            loading = state.weekOverviewLoading,
+            weekRows = state.weekOverview,
+            weekLoading = state.weekOverviewLoading,
+            dayRows = state.dayOverview,
+            dayLoading = state.dayOverviewLoading,
             onDismiss = { showWeekOverview = false }
         )
     }
@@ -118,6 +120,9 @@ fun AnalysisScreen(
                         if (state.weekOverview.isEmpty() && !state.weekOverviewLoading) {
                             vm.loadWeekOverview(12)
                         }
+                        if (state.dayOverview.isEmpty() && !state.dayOverviewLoading) {
+                            vm.loadDayOverview(30)
+                        }
                     },
                 shape = RoundedCornerShape(NutriRadius.md)
             ) {
@@ -128,9 +133,9 @@ fun AnalysisScreen(
                     Icon(Icons.Default.DateRange, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(NutriSpacing.md))
                     Column(Modifier.weight(1f)) {
-                        Text("Wochenübersicht", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text("Wochen- & Tagesübersicht", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                         Text(
-                            "Ø-Gewicht, Kalorien, Aktivität, Zone – letzte 12 Wochen",
+                            "Gewicht, Kalorien, Aktivität, Zone – Wochen oder Tage",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -626,66 +631,127 @@ private fun MacroAverageRow(label: String, value: Float, goal: Float, color: Col
     }
 }
 
-// ── Wochenübersicht (Tabelle wie im Reels-Beispiel) ──────────────────────────
+// ── Wochen- & Tagesübersicht ─────────────────────────────────────────────────
+
+private enum class OverviewMode { WOCHE, TAG }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WeekOverviewSheet(
-    rows: List<WeekOverviewRow>,
-    loading: Boolean,
+    weekRows: List<WeekOverviewRow>,
+    weekLoading: Boolean,
+    dayRows: List<DayOverviewRow>,
+    dayLoading: Boolean,
     onDismiss: () -> Unit
 ) {
+    var mode by remember { mutableStateOf(OverviewMode.WOCHE) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        modifier = Modifier.fillMaxHeight(0.92f)
-    ) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
             Modifier
-                .fillMaxSize()
-                .padding(horizontal = 12.dp)
+                .fillMaxWidth()
+                .fillMaxHeight(0.92f)
+                .padding(horizontal = NutriSpacing.lg)
+                .navigationBarsPadding()
         ) {
             Text(
-                "Wochenübersicht",
+                if (mode == OverviewMode.WOCHE) "Wochenübersicht" else "Tagesübersicht",
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                modifier = Modifier.padding(bottom = 4.dp)
+                fontSize = 18.sp
             )
             Text(
-                "Ø-Werte pro Kalenderwoche (Mo–So). Zone relativ zum Kalorienziel (±8 %).",
+                if (mode == OverviewMode.WOCHE)
+                    "Ø-Werte pro Kalenderwoche (Mo–So). Zone relativ zum Kalorienziel (±8 %)."
+                else
+                    "Werte pro Tag. Zone relativ zum Kalorienziel (±8 %). Δ% vs. Vortag.",
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 12.dp)
+                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
             )
 
-            when {
-                loading -> {
-                    Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = mode == OverviewMode.WOCHE,
+                    onClick = { mode = OverviewMode.WOCHE },
+                    label = { Text("Woche") }
+                )
+                FilterChip(
+                    selected = mode == OverviewMode.TAG,
+                    onClick = { mode = OverviewMode.TAG },
+                    label = { Text("Tag") }
+                )
+            }
+
+            when (mode) {
+                OverviewMode.WOCHE -> {
+                    when {
+                        weekLoading && weekRows.isEmpty() -> {
+                            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                        weekRows.isEmpty() -> {
+                            Text(
+                                "Noch keine Wochendaten.",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(24.dp)
+                            )
+                        }
+                        else -> {
+                            WeekOverviewHeaderRow()
+                            HorizontalDivider()
+                            LazyColumn(
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(bottom = 32.dp)
+                            ) {
+                                items(weekRows.size) { idx ->
+                                    WeekOverviewDataRow(weekRows[idx])
+                                    if (idx < weekRows.lastIndex) {
+                                        HorizontalDivider(
+                                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
-                rows.isEmpty() -> {
-                    Text(
-                        "Noch keine Daten für die letzten Wochen.",
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(24.dp)
-                    )
-                }
-                else -> {
-                    WeekOverviewHeaderRow()
-                    HorizontalDivider()
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(bottom = 32.dp)
-                    ) {
-                        items(rows.size) { idx ->
-                            WeekOverviewDataRow(rows[idx])
-                            if (idx < rows.lastIndex) {
-                                HorizontalDivider(
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                                )
+                OverviewMode.TAG -> {
+                    when {
+                        dayLoading && dayRows.isEmpty() -> {
+                            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                        dayRows.isEmpty() -> {
+                            Text(
+                                "Noch keine Tagesdaten.",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(24.dp)
+                            )
+                        }
+                        else -> {
+                            DayOverviewHeaderRow()
+                            HorizontalDivider()
+                            LazyColumn(
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(bottom = 32.dp)
+                            ) {
+                                items(dayRows.size) { idx ->
+                                    DayOverviewDataRow(dayRows[idx])
+                                    if (idx < dayRows.lastIndex) {
+                                        HorizontalDivider(
+                                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -726,53 +792,86 @@ private fun WeekOverviewDataRow(row: WeekOverviewRow) {
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            "${row.weekNumber}",
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.width(36.dp)
-        )
-        Text(
-            row.avgWeightKg?.let { "%.1f".format(it) } ?: "—",
-            fontSize = 12.sp,
-            modifier = Modifier.width(52.dp)
-        )
-        Text(
-            formatPct(row.weightChangePct),
-            fontSize = 11.sp,
-            color = pctColor(row.weightChangePct),
-            modifier = Modifier.width(48.dp)
-        )
+        Text("${row.weekNumber}", fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.width(36.dp))
+        Text(row.avgWeightKg?.let { "%.1f".format(it) } ?: "—", fontSize = 12.sp, modifier = Modifier.width(52.dp))
+        Text(formatPct(row.weightChangePct), fontSize = 11.sp, color = pctColor(row.weightChangePct), modifier = Modifier.width(48.dp))
         Text(
             if (row.avgCalories > 0) row.avgCalories.toString() else "—",
             fontSize = 12.sp,
             fontWeight = if (calHighlight) FontWeight.Bold else FontWeight.Normal,
             modifier = Modifier.width(56.dp)
         )
-        Text(
-            formatPct(row.caloriesChangePct),
-            fontSize = 11.sp,
-            color = pctColor(row.caloriesChangePct),
-            modifier = Modifier.width(48.dp)
-        )
-        Text(
-            if (row.avgActivityCalories > 0) row.avgActivityCalories.toString() else "—",
-            fontSize = 12.sp,
-            modifier = Modifier.width(48.dp)
-        )
+        Text(formatPct(row.caloriesChangePct), fontSize = 11.sp, color = pctColor(row.caloriesChangePct), modifier = Modifier.width(48.dp))
+        Text(if (row.avgActivityCalories > 0) row.avgActivityCalories.toString() else "—", fontSize = 12.sp, modifier = Modifier.width(48.dp))
         Text(
             row.zone,
             fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
-            color = when (row.zone) {
-                "Defizit" -> Color(0xFF2E7D32)
-                "Überschuss" -> Color(0xFFC62828)
-                "Erhalt" -> MaterialTheme.colorScheme.primary
-                else -> MaterialTheme.colorScheme.onSurfaceVariant
-            },
+            color = zoneColor(row.zone),
             modifier = Modifier.weight(1f)
         )
     }
+}
+
+@Composable
+private fun DayOverviewHeaderRow() {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("Tag", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(56.dp))
+        Text("kg", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
+        Text("Δ%", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
+        Text("kcal", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(52.dp))
+        Text("Δ%", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
+        Text("Aktiv.", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
+        Text("Zone", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun DayOverviewDataRow(row: DayOverviewRow) {
+    val calHighlight = row.caloriesChangePct?.let { kotlin.math.abs(it) >= 10f } == true
+    val dayLabel = "%02d.%02d.".format(row.date.dayOfMonth, row.date.monthValue)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(
+                if (calHighlight) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                else Color.Transparent
+            )
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(dayLabel, fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.width(56.dp))
+        Text(row.weightKg?.let { "%.1f".format(it) } ?: "—", fontSize = 12.sp, modifier = Modifier.width(48.dp))
+        Text(formatPct(row.weightChangePct), fontSize = 11.sp, color = pctColor(row.weightChangePct), modifier = Modifier.width(48.dp))
+        Text(
+            if (row.calories > 0) row.calories.toString() else "—",
+            fontSize = 12.sp,
+            fontWeight = if (calHighlight) FontWeight.Bold else FontWeight.Normal,
+            modifier = Modifier.width(52.dp)
+        )
+        Text(formatPct(row.caloriesChangePct), fontSize = 11.sp, color = pctColor(row.caloriesChangePct), modifier = Modifier.width(48.dp))
+        Text(if (row.activityCalories > 0) row.activityCalories.toString() else "—", fontSize = 12.sp, modifier = Modifier.width(48.dp))
+        Text(
+            row.zone,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = zoneColor(row.zone),
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun zoneColor(zone: String): Color = when (zone) {
+    "Defizit" -> Color(0xFF2E7D32)
+    "Überschuss" -> Color(0xFFC62828)
+    "Erhalt" -> MaterialTheme.colorScheme.primary
+    else -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
 private fun formatPct(v: Float?): String =
