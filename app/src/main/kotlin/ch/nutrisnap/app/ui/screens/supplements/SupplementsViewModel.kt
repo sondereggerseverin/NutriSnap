@@ -1,6 +1,8 @@
 package ch.nutrisnap.app.ui.screens.supplements
 
 import android.app.Application
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import ch.nutrisnap.app.data.db.NutriDatabase
@@ -12,12 +14,14 @@ import ch.nutrisnap.app.data.model.SupplementTiming
 import ch.nutrisnap.app.data.repository.SupplementRepository
 import ch.nutrisnap.app.domain.DailySupplementPlan
 import ch.nutrisnap.app.domain.SupplementRecommendationEngine
+import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.json.JSONArray
+import java.time.LocalDate
 
 class SupplementsViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = SupplementRepository(NutriDatabase.getInstance(app))
@@ -32,6 +36,26 @@ class SupplementsViewModel(app: Application) : AndroidViewModel(app) {
             SharingStarted.WhileSubscribed(5000),
             DailySupplementPlan(emptyList(), emptyList(), emptyList())
         )
+
+    /** IDs der heute als eingenommen markierten Supplements. */
+    val takenTodayIds: StateFlow<Set<Int>> = getApplication<Application>().notifDataStore.data
+        .map { prefs ->
+            val key = stringSetPreferencesKey("supplement_taken_${LocalDate.now()}")
+            prefs[key].orEmpty().mapNotNull { it.toIntOrNull() }.toSet()
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    fun toggleTakenToday(supplementId: Int) {
+        viewModelScope.launch {
+            val key = stringSetPreferencesKey("supplement_taken_${LocalDate.now()}")
+            getApplication<Application>().notifDataStore.edit { prefs ->
+                val current = prefs[key].orEmpty().toMutableSet()
+                val idStr = supplementId.toString()
+                if (idStr in current) current.remove(idStr) else current.add(idStr)
+                prefs[key] = current
+            }
+        }
+    }
 
     init {
         viewModelScope.launch { seedFromAssetsIfEmpty() }

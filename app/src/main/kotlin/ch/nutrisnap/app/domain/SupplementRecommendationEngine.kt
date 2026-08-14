@@ -1,6 +1,7 @@
 package ch.nutrisnap.app.domain
 
 import ch.nutrisnap.app.data.model.Supplement
+import ch.nutrisnap.app.data.model.SupplementCategory
 import ch.nutrisnap.app.data.model.SupplementConflictGroup
 import ch.nutrisnap.app.data.model.SupplementStatus
 import ch.nutrisnap.app.data.model.SupplementTiming
@@ -51,13 +52,29 @@ object SupplementRecommendationEngine {
         return DailySupplementPlan(morning = morning, evening = evening, onDemandHints = onDemand)
     }
 
-    private fun reasonFor(s: Supplement): String = when (s.conflictGroup) {
-        SupplementConflictGroup.MAGNESIUM_QUELLE -> "Magnesium-Quelle für heute"
-        SupplementConflictGroup.MULTIVITAMIN_QUELLE -> "Multivitamin für heute"
-        SupplementConflictGroup.VITAMIN_D_QUELLE -> "Vitamin-D-Quelle für heute"
-        SupplementConflictGroup.ZINK_SELEN_EISEN_QUELLE -> "Zink/Selen/Eisen für heute"
-        SupplementConflictGroup.KOFFEIN_QUELLE -> "Koffeinhaltig — nicht zusätzlich kombinieren"
-        SupplementConflictGroup.OMEGA_3_QUELLE -> "Omega-3-Quelle für heute"
-        SupplementConflictGroup.NONE -> "Laut Verzehrempfehlung"
+    private fun reasonFor(s: Supplement): String {
+        val base = when (s.conflictGroup) {
+            SupplementConflictGroup.MAGNESIUM_QUELLE -> "Magnesium-Quelle für heute"
+            SupplementConflictGroup.MULTIVITAMIN_QUELLE -> "Multivitamin für heute"
+            SupplementConflictGroup.VITAMIN_D_QUELLE -> "Vitamin-D-Quelle für heute"
+            SupplementConflictGroup.ZINK_SELEN_EISEN_QUELLE -> "Zink/Selen/Eisen für heute"
+            SupplementConflictGroup.KOFFEIN_QUELLE -> "Koffeinhaltig — nicht zusätzlich kombinieren"
+            SupplementConflictGroup.OMEGA_3_QUELLE -> "Omega-3-Quelle für heute"
+            SupplementConflictGroup.NONE -> "Laut Verzehrempfehlung"
+        }
+        val tip = contextTip(s)
+        return if (tip != null) "$base · $tip" else base
+    }
+
+    /** Praktischer Einnahme-Hinweis (kein medizinischer Rat). */
+    fun contextTip(s: Supplement): String? = when {
+        s.preferredTiming == SupplementTiming.ZUR_MAHLZEIT -> "besser zu einer Mahlzeit"
+        s.preferredTiming == SupplementTiming.VOR_TRAINING -> "vor dem Training"
+        s.category == SupplementCategory.EISEN -> "besser zu einer Mahlzeit, nicht mit Kaffee/Tee"
+        s.category == SupplementCategory.MAGNESIUM -> "abends oft angenehmer"
+        s.category == SupplementCategory.VITAMIN_D -> "gerne zum Essen (fettlöslich)"
+        s.category == SupplementCategory.OMEGA_3 -> "gerne zum Essen (fettlöslich)"
+        s.category == SupplementCategory.ZINK -> "besser zu einer Mahlzeit"
+        else -> null
     }
 }

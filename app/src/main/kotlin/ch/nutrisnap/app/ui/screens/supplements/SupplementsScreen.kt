@@ -36,6 +36,7 @@ fun SupplementsScreen(
 ) {
     val list by vm.supplements.collectAsState()
     val plan by vm.dailyPlan.collectAsState()
+    val takenToday by vm.takenTodayIds.collectAsState()
     var selected by remember { mutableStateOf<Supplement?>(null) }
     var showAdd by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<Supplement?>(null) }
@@ -86,10 +87,20 @@ fun SupplementsScreen(
                 Spacer(Modifier.height(6.dp))
             }
             item {
-                RecommendationBlock("Morgens", plan.morning)
+                RecommendationBlock(
+                    title = "Morgens",
+                    items = plan.morning,
+                    takenIds = takenToday,
+                    onToggleTaken = vm::toggleTakenToday
+                )
             }
             item {
-                RecommendationBlock("Abends", plan.evening)
+                RecommendationBlock(
+                    title = "Abends",
+                    items = plan.evening,
+                    takenIds = takenToday,
+                    onToggleTaken = vm::toggleTakenToday
+                )
             }
             if (plan.onDemandHints.isNotEmpty()) {
                 item {
@@ -153,25 +164,56 @@ fun SupplementsScreen(
 }
 
 @Composable
-private fun RecommendationBlock(title: String, items: List<SupplementRecommendation>) {
+private fun RecommendationBlock(
+    title: String,
+    items: List<SupplementRecommendation>,
+    takenIds: Set<Int>,
+    onToggleTaken: (Int) -> Unit
+) {
     Card(
         Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(NutriRadius.lg),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f))
     ) {
         Column(Modifier.padding(NutriSpacing.md)) {
-            Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            val done = items.count { it.supplement.id in takenIds }
+            Text(
+                if (items.isEmpty()) title else "$title ($done/${items.size})",
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp
+            )
             if (items.isEmpty()) {
                 Text("Keine Empfehlung", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 items.forEach { rec ->
+                    val id = rec.supplement.id
+                    val taken = id in takenIds
                     Spacer(Modifier.height(6.dp))
-                    Text(rec.supplement.name, fontWeight = FontWeight.Medium, fontSize = 13.sp)
-                    Text(
-                        "${rec.supplement.servingSize.ifBlank { "laut Packung" }} · ${rec.reason}",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onToggleTaken(id) }
+                    ) {
+                        Checkbox(
+                            checked = taken,
+                            onCheckedChange = { onToggleTaken(id) }
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                rec.supplement.name,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 13.sp,
+                                color = if (taken) MaterialTheme.colorScheme.onSurfaceVariant
+                                else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                "${rec.supplement.servingSize.ifBlank { "laut Packung" }} · ${rec.reason}",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             }
         }
