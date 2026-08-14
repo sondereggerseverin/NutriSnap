@@ -24,7 +24,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import ch.nutrisnap.app.data.model.Recipe
+import ch.nutrisnap.app.ui.screens.settings.notifDataStore
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_RECIPE_MENU
 import ch.nutrisnap.app.ui.theme.MacroColors
 import ch.nutrisnap.app.ui.theme.NutriRadius
 import coil.compose.AsyncImage
@@ -52,6 +55,11 @@ fun RecipeCardV2(
     var portions by remember(recipe.id) { mutableFloatStateOf(1f) }
     var menuOpen by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val largerMenu = prefs?.get(KEY_TOGGLE_TOUCH_RECIPE_MENU) ?: true
+    val menuBtnSize = if (largerMenu) 40.dp else 28.dp
+    val menuIconSize = if (largerMenu) 22.dp else 18.dp
 
     val baseServings = recipe.servings.coerceAtLeast(1)
     val kcalPer = recipe.totalCalories?.div(baseServings)
@@ -108,12 +116,12 @@ fun RecipeCardV2(
                     Box {
                         IconButton(
                             onClick = { menuOpen = true },
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(menuBtnSize)
                         ) {
                             Icon(
                                 Icons.Filled.MoreVert,
                                 contentDescription = "Mehr",
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(menuIconSize),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }

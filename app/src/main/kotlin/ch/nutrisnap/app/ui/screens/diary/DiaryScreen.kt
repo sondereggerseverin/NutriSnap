@@ -280,22 +280,45 @@ fun DiaryScreen(
         ) {
             item { DateNavigator(state.selectedDate, vm::prevDay, vm::nextDay, vm::setDate) }
             item {
-                TextButton(
-                    onClick = {
-                        vm.copyYesterday { n ->
-                            scope.launch {
-                                snackbarHostState.showSnackbar(
-                                    if (n > 0) "$n Einträge von gestern übernommen"
-                                    else "Gestern war leer – nichts zu kopieren"
-                                )
+                val largerYesterday = mealPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_YESTERDAY_BTN) ?: true
+                if (largerYesterday) {
+                    FilledTonalButton(
+                        onClick = {
+                            vm.copyYesterday { n ->
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        if (n > 0) "$n Einträge von gestern übernommen"
+                                        else "Gestern war leer – nichts zu kopieren"
+                                    )
+                                }
                             }
-                        }
-                    },
-                    modifier = Modifier.padding(horizontal = NutriSpacing.lg)
-                ) {
-                    Icon(Icons.Default.ContentCopy, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Gestern übernehmen", fontSize = 13.sp)
+                        },
+                        modifier = Modifier
+                            .padding(horizontal = NutriSpacing.lg)
+                            .heightIn(min = 40.dp)
+                    ) {
+                        Icon(Icons.Default.ContentCopy, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Gestern übernehmen", fontSize = 13.sp)
+                    }
+                } else {
+                    TextButton(
+                        onClick = {
+                            vm.copyYesterday { n ->
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        if (n > 0) "$n Einträge von gestern übernommen"
+                                        else "Gestern war leer – nichts zu kopieren"
+                                    )
+                                }
+                            }
+                        },
+                        modifier = Modifier.padding(horizontal = NutriSpacing.lg)
+                    ) {
+                        Icon(Icons.Default.ContentCopy, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Gestern übernehmen", fontSize = 13.sp)
+                    }
                 }
             }
             item {
@@ -331,6 +354,9 @@ fun DiaryScreen(
                         SectionHeader(
                             title  = meal.label(),
                             action = {
+                                val largerHeader = mealPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_MEAL_HEADER) ?: true
+                                val headerBtnSize = if (largerHeader) 40.dp else 28.dp
+                                val headerIconSize = if (largerHeader) 22.dp else 18.dp
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
                                         "$mealKcal kcal",
@@ -340,24 +366,24 @@ fun DiaryScreen(
                                     )
                                     IconButton(
                                         onClick = { scheduleMeal = meal },
-                                        modifier = Modifier.size(28.dp)
+                                        modifier = Modifier.size(headerBtnSize)
                                     ) {
                                         Icon(
                                             Icons.Default.ContentCopy,
                                             contentDescription = "Mahlzeit auf mehrere Tage kopieren",
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(18.dp)
+                                            modifier = Modifier.size(headerIconSize)
                                         )
                                     }
                                     IconButton(
                                         onClick = { expandedNutrition = if (expandedNutrition == meal) null else meal },
-                                        modifier = Modifier.size(28.dp)
+                                        modifier = Modifier.size(headerBtnSize)
                                     ) {
                                         Icon(
                                             if (expandedNutrition == meal) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                                             contentDescription = "Nährwerte anzeigen",
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(20.dp)
+                                            modifier = Modifier.size(if (largerHeader) 24.dp else 20.dp)
                                         )
                                     }
                                 }
@@ -1141,6 +1167,10 @@ private fun DiaryEntryRow(
 ) {
     var showConfirm by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val largerDiaryIcons = prefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_DIARY_ICONS) ?: true
+    val diaryIconBtnSize = if (largerDiaryIcons) 40.dp else 32.dp
 
     val isRecipeEntry = looksLikePortionEntry(entry)
     val amountLabel   = if (isRecipeEntry) recipeAmountLabel(entry)
@@ -1220,7 +1250,7 @@ private fun DiaryEntryRow(
                 Box {
                     IconButton(
                         onClick = { showMenu = true },
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(diaryIconBtnSize)
                     ) {
                         Icon(
                             Icons.Default.MoreVert,

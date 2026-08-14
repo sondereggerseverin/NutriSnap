@@ -583,6 +583,14 @@ private fun MealOverviewGrid(
  *  eigenem Rand zu brauchen (wirkte zuvor unruhig/zusammenhangslos). */
 @Composable
 private fun MealRowItem(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () -> Unit) {
+    val context = LocalContext.current
+    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val largerQuickAdd = prefs?.get(KEY_TOGGLE_TOUCH_MEAL_QUICKADD) ?: true
+    val largerIcon = prefs?.get(KEY_TOGGLE_TOUCH_MEAL_ICON) ?: true
+    val iconSize = if (largerIcon) 46.dp else 38.dp
+    val quickAddSize = if (largerQuickAdd) 46.dp else 34.dp
+    val quickAddIconSize = if (largerQuickAdd) 22.dp else 17.dp
+
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
         Box(
             Modifier
@@ -606,12 +614,12 @@ private fun MealRowItem(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () 
             ) {
                 Box(
                     Modifier
-                        .size(38.dp)
+                        .size(iconSize)
                         .clip(RoundedCornerShape(11.dp))
                         .background(meal.color.copy(alpha = 0.16f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(meal.icon, fontSize = 17.sp)
+                    Text(meal.icon, fontSize = if (largerIcon) 20.sp else 17.sp)
                 }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
@@ -640,7 +648,7 @@ private fun MealRowItem(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () 
             Spacer(Modifier.width(6.dp))
             FilledTonalIconButton(
                 onClick = onQuickAdd,
-                modifier = Modifier.size(34.dp),
+                modifier = Modifier.size(quickAddSize),
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                     containerColor = meal.color.copy(alpha = 0.16f),
                     contentColor = meal.color
@@ -649,7 +657,7 @@ private fun MealRowItem(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () 
                 Icon(
                     Icons.Default.Add,
                     contentDescription = "Zu ${meal.label} hinzufügen",
-                    modifier = Modifier.size(17.dp)
+                    modifier = Modifier.size(quickAddIconSize)
                 )
             }
         }
@@ -664,6 +672,13 @@ private fun MealTile(
     onQuickAdd: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val largerQuickAdd = prefs?.get(KEY_TOGGLE_TOUCH_MEAL_QUICKADD) ?: true
+    val largerIcon = prefs?.get(KEY_TOGGLE_TOUCH_MEAL_ICON) ?: true
+    val iconSize = if (largerIcon) 44.dp else 32.dp
+    val quickAddHeight = if (largerQuickAdd) 44.dp else 32.dp
+
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
@@ -681,12 +696,12 @@ private fun MealTile(
             ) {
                 Box(
                     Modifier
-                        .size(32.dp)
+                        .size(iconSize)
                         .clip(RoundedCornerShape(10.dp))
                         .background(meal.color.copy(alpha = 0.22f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(meal.icon, fontSize = 16.sp)
+                    Text(meal.icon, fontSize = if (largerIcon) 18.sp else 16.sp)
                 }
                 Spacer(Modifier.width(6.dp))
                 Column(Modifier.weight(1f)) {
@@ -708,13 +723,13 @@ private fun MealTile(
             Spacer(Modifier.height(4.dp))
             FilledTonalIconButton(
                 onClick = onQuickAdd,
-                modifier = Modifier.fillMaxWidth().height(32.dp),
+                modifier = Modifier.fillMaxWidth().height(quickAddHeight),
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                     containerColor = meal.color.copy(alpha = 0.16f),
                     contentColor = meal.color
                 )
             ) {
-                Icon(Icons.Default.Add, "Zu ${meal.label} hinzufügen", Modifier.size(20.dp))
+                Icon(Icons.Default.Add, "Zu ${meal.label} hinzufügen", Modifier.size(if (largerQuickAdd) 22.dp else 20.dp))
             }
         }
     }
