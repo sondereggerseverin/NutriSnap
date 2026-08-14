@@ -278,6 +278,17 @@ fun DiaryScreen(
             modifier = Modifier.padding(padding),
             window = window
         ) {
+        val isWeekday = remember(state.selectedDate) {
+            val dow = state.selectedDate.dayOfWeek
+            dow != java.time.DayOfWeek.SATURDAY && dow != java.time.DayOfWeek.SUNDAY
+        }
+        val autopilotSuggestions = remember(isWeekday, autopilotTemplates, state.entries) {
+            if (!isWeekday || autopilotTemplates.isEmpty()) emptyList()
+            else {
+                val presentMeals = state.entries.map { it.mealType }.toSet()
+                autopilotTemplates.filter { it.mealType !in presentMeals }
+            }
+        }
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
@@ -339,30 +350,21 @@ fun DiaryScreen(
                     modifier = Modifier.padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs)
                 )
             }
-            // Wochen-Autopilot: Mo–Fr fehlende Mahlzeiten aus Vorlagen vorschlagen
-            val isWeekday = remember(state.selectedDate) {
-                val dow = state.selectedDate.dayOfWeek
-                dow != java.time.DayOfWeek.SATURDAY && dow != java.time.DayOfWeek.SUNDAY
-            }
-            if (isWeekday && autopilotTemplates.isNotEmpty()) {
-                val presentMeals = state.entries.map { it.mealType }.toSet()
-                val suggestions = autopilotTemplates.filter { it.mealType !in presentMeals }
-                if (suggestions.isNotEmpty()) {
-                    item(key = "autopilot_banner") {
-                        AutopilotBanner(
-                            templates = suggestions,
-                            onApply = { t ->
-                                vm.applyAutopilotTemplate(t) { n ->
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar(
-                                            if (n > 0) "${t.name}: $n Einträge übernommen"
-                                            else "${t.name} hat noch keine Lebensmittel"
-                                        )
-                                    }
+            if (autopilotSuggestions.isNotEmpty()) {
+                item(key = "autopilot_banner") {
+                    AutopilotBanner(
+                        templates = autopilotSuggestions,
+                        onApply = { t ->
+                            vm.applyAutopilotTemplate(t) { n ->
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        if (n > 0) "${t.name}: $n Einträge übernommen"
+                                        else "${t.name} hat noch keine Lebensmittel"
+                                    )
                                 }
                             }
-                        )
-                    }
+                        }
+                    )
                 }
             }
             if (state.entries.isEmpty()) {
