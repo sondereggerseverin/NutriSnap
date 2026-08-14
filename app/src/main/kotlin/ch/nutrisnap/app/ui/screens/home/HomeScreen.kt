@@ -16,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.platform.LocalContext
@@ -36,9 +35,7 @@ fun HomeScreen(
     vm: HomeViewModel = viewModel(),
     hcVm: HealthConnectViewModel = viewModel(),
     onNavigateToDiary: (meal: MealType?, autoOpenAdd: Boolean) -> Unit = { _, _ -> },
-    onNavigateToHealth: () -> Unit = {},
-    onNavigateToFoodScan: () -> Unit = {},
-    onNavigateToRecipeImport: () -> Unit = {}
+    onNavigateToHealth: () -> Unit = {}
 ) {
     val state by vm.uiState.collectAsState()
     val hcState by hcVm.uiState.collectAsState()
@@ -72,12 +69,6 @@ fun HomeScreen(
             }
             // Breakdown unter den Mahlzeiten, damit Ring + 4 Kacheln ohne Scrollen passen
             item { CalorieBreakdownCard(state) }
-            item {
-                QuickActionsRow(
-                    onScan = onNavigateToFoodScan,
-                    onRecipeImport = onNavigateToRecipeImport
-                )
-            }
             item { HealthCard(hcState.todayData, hcState.hasPermission, onNavigateToHealth) { showWeightDialog = true } }
             if (state.manualActivityEnabled) {
                 item {
@@ -105,64 +96,6 @@ fun HomeScreen(
             onConfirm = { kcal -> vm.logManualActivity(kcal); showActivityDialog = false },
             onDismiss = { showActivityDialog = false }
         )
-    }
-}
-
-@Composable
-private fun QuickActionsRow(onScan: () -> Unit, onRecipeImport: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.sm),
-        horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
-    ) {
-        QuickActionCard(
-            icon = Icons.Default.PhotoCamera,
-            label = "Essen fotografieren",
-            color = MacroColors.protein,
-            onClick = onScan,
-            modifier = Modifier.weight(1f)
-        )
-        QuickActionCard(
-            icon = Icons.Default.Link,
-            label = "Rezept-Import",
-            color = MacroColors.carbs,
-            onClick = onRecipeImport,
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-@Composable
-private fun QuickActionCard(
-    icon: ImageVector,
-    label: String,
-    color: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(NutriRadius.md),
-        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f))
-    ) {
-        Row(
-            Modifier.padding(NutriSpacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
-        ) {
-            Icon(
-                icon, null,
-                tint = color,
-                modifier = Modifier.size(20.dp)
-            )
-            Text(
-                label,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = color
-            )
-        }
     }
 }
 

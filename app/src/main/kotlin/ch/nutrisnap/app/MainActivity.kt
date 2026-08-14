@@ -343,14 +343,7 @@ fun MainScaffold(
                             restoreState = !autoOpenAdd
                         }
                     },
-                    onNavigateToHealth = { navController.navigate("health") },
-                    onNavigateToFoodScan = { navController.navigate("food_scan") },
-                    onNavigateToRecipeImport = {
-                        navController.navigate(Screen.Recipes.route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true; restoreState = true
-                        }
-                    }
+                    onNavigateToHealth = { navController.navigate("health") }
                 )
             }
             composable(
