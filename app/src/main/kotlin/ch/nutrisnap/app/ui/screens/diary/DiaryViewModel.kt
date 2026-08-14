@@ -275,7 +275,7 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
                     completenessScore = 95
                 )
                 addEntry(food, amountGrams, meal)
-                rememberLastAmount(food.name, amountGrams)
+                rememberLastAmount(food, amountGrams)
                 onDone(food)
             } catch (e: Exception) {
                 onDone(null)
@@ -364,22 +364,44 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun rememberLastAmount(foodName: String, grams: Float) {
-        viewModelScope.launch {
-            val key = floatPreferencesKey("last_amount_" + foodName.lowercase().trim().take(80).hashCode())
-            getApplication<Application>().notifDataStore.edit { it[key] = grams }
+    /** Stabiler Speicher-Key: Barcode bevorzugt (gleiches Produkt), sonst Name. */
+    private fun amountMemoryKey(food: FoodItem): String {
+        val barcode = food.barcode?.trim().orEmpty()
+        return if (barcode.isNotEmpty()) {
+            "last_amount_bc_$barcode"
+        } else {
+            "last_amount_" + food.name.lowercase().trim().take(80).hashCode()
         }
     }
 
-    suspend fun getLastAmount(foodName: String): Float? {
-        val key = floatPreferencesKey("last_amount_" + foodName.lowercase().trim().take(80).hashCode())
+    fun rememberLastAmount(food: FoodItem, grams: Float) {
+        if (grams <= 0f) return
+        viewModelScope.launch {
+            val key = floatPreferencesKey(amountMemoryKey(food))
+            getApplication<Application>().notifDataStore.edit { it[key] = grams }
+            // Zusätzlich unter Namen speichern (Fallback ohne Barcode beim nächsten Mal)
+            val nameKey = floatPreferencesKey(
+                "last_amount_" + food.name.lowercase().trim().take(80).hashCode()
+            )
+            getApplication<Application>().notifDataStore.edit { it[nameKey] = grams }
+        }
+    }
+
+    suspend fun getLastAmount(food: FoodItem): Float? {
         val prefs = getApplication<Application>().notifDataStore.data.first()
-        return prefs[key]
+        // 1) Barcode-Key
+        food.barcode?.trim()?.takeIf { it.isNotEmpty() }?.let { bc ->
+            prefs[floatPreferencesKey("last_amount_bc_$bc")]?.let { if (it > 0f) return it }
+        }
+        // 2) Name-Key (Legacy + Produkte ohne Barcode)
+        return prefs[floatPreferencesKey(
+            "last_amount_" + food.name.lowercase().trim().take(80).hashCode()
+        )]?.takeIf { it > 0f }
     }
 
     fun addEntryWithMemory(food: FoodItem, grams: Float, meal: MealType) {
         addEntry(food, grams, meal)
-        rememberLastAmount(food.name, grams)
+        rememberLastAmount(food, grams)
     }
 
     fun addEntry(food: FoodItem, grams: Float, meal: MealType, date: java.time.LocalDate? = null) {

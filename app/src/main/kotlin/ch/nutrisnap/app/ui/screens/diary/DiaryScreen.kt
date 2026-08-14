@@ -1667,10 +1667,13 @@ private fun SearchTab(
     LaunchedEffect(barcodeResult) {
         barcodeResult?.let { selectedFood = it; vm.clearBarcodeResult() }
     }
+    var rememberedGrams by remember { mutableStateOf<Float?>(null) }
     LaunchedEffect(selectedFood) {
         val food = selectedFood ?: return@LaunchedEffect
-        val last = vm.getLastAmount(food.name)
+        rememberedGrams = null
+        val last = vm.getLastAmount(food)
         if (last != null && last > 0f) {
+            rememberedGrams = last
             amountText = if (last == last.toInt().toFloat()) last.toInt().toString() else "%.0f".format(last)
         }
     }
@@ -1803,11 +1806,30 @@ private fun SearchTab(
         }
         Spacer(Modifier.height(NutriSpacing.md))
         val presets = remember(food) { ch.nutrisnap.app.domain.FoodPortionPresets.forFood(food) }
-        if (presets.isNotEmpty()) {
+        val hasRemembered = rememberedGrams != null && rememberedGrams!! > 0f
+        if (hasRemembered || presets.isNotEmpty()) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm),
                 modifier = Modifier.horizontalScroll(rememberScrollState())
             ) {
+                if (hasRemembered) {
+                    val g = rememberedGrams!!
+                    FilterChip(
+                        selected = amountText.toFloatOrNull() == g,
+                        onClick = {
+                            amountText = if (g == g.toInt().toFloat()) g.toInt().toString() else "%.0f".format(g)
+                        },
+                        label = {
+                            Text(
+                                "Standard ${if (g == g.toInt().toFloat()) g.toInt() else "%.0f".format(g)} g",
+                                fontSize = 12.sp
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.History, null, Modifier.size(16.dp))
+                        }
+                    )
+                }
                 presets.forEach { preset ->
                     FilterChip(
                         selected = amountText.toFloatOrNull() == preset.grams,
