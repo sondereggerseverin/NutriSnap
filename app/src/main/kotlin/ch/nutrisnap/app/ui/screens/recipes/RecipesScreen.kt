@@ -8,10 +8,7 @@ import androidx.activity.result.PickVisualMediaRequest
 
 import android.content.Intent
 import android.net.Uri
-import com.canhub.cropper.CropImageContract
-import com.canhub.cropper.CropImageContractOptions
-import com.canhub.cropper.CropImageOptions
-import com.canhub.cropper.CropImageView
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -1162,59 +1159,24 @@ fun ImportSheet(
     fun decodePickedBitmap(uri: Uri): Bitmap? =
         context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
 
-    val cropPrefs by context.notifDataStore.data.collectAsState(initial = null)
-    val useThemeCropper = cropPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_CROPPER_THEME_COLOR) ?: true
-    val themePrimary = MaterialTheme.colorScheme.primary
-
-    // Crop nach Galerie-Auswahl (reiner Bild-Import)
-    val imageCropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
-        if (!result.isSuccessful) return@rememberLauncherForActivityResult
-        val cropped = result.uriContent ?: return@rememberLauncherForActivityResult
-        runCatching {
-            val bitmap = decodePickedBitmap(cropped)
-                ?: throw IllegalStateException("Bild konnte nicht geladen werden")
-            vm.importFromImage(bitmap)
-        }
-    }
-
-    // Reiner Bild-Import (ohne Link) → Zuschneiden → Import
+    // Bild-Import / Hybrid-Screenshot: kein Crop (OCR braucht volle Tabelle/Text).
+    // Zuschneiden nur bei Rezept-Fotos (RecipeEditSheet).
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
-        imageCropLauncher.launch(
-            CropImageContractOptions(
-                uri = uri,
-                cropImageOptions = ch.nutrisnap.app.ui.theme.CropperDefaults.options(
-                    title = "Rezept zuschneiden",
-                    useTheme = useThemeCropper,
-                    themePrimary = themePrimary
-                )
-            )
-        )
-    }
-
-    // Hybrid-Screenshot: zuschneiden, dann Bitmap behalten
-    val hybridCropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
-        if (!result.isSuccessful) return@rememberLauncherForActivityResult
-        val cropped = result.uriContent ?: return@rememberLauncherForActivityResult
-        hybridScreenshot = decodePickedBitmap(cropped)
+        runCatching {
+            val bitmap = decodePickedBitmap(uri)
+                ?: throw IllegalStateException("Bild konnte nicht geladen werden")
+            vm.importFromImage(bitmap)
+        }
     }
 
     val hybridScreenshotPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
-        hybridCropLauncher.launch(
-            CropImageContractOptions(
-                uri = uri,
-                cropImageOptions = ch.nutrisnap.app.ui.theme.CropperDefaults.options(
-                    title = "Screenshot zuschneiden",
-                    useTheme = useThemeCropper,
-                    themePrimary = themePrimary
-                )
-            )
-        )
+        hybridScreenshot = decodePickedBitmap(uri)
     }
 
     LaunchedEffect(error) {

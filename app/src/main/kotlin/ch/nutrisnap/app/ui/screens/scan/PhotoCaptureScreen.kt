@@ -23,6 +23,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -30,25 +31,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import ch.nutrisnap.app.ui.screens.settings.notifDataStore
+import ch.nutrisnap.app.ui.theme.CropperDefaults
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_CROPPER_THEME_COLOR
 import com.canhub.cropper.CropImageContract
 import com.canhub.cropper.CropImageContractOptions
-import com.canhub.cropper.CropImageOptions
-import com.canhub.cropper.CropImageView
 import java.util.concurrent.Executors
 
 /**
- * Wiederverwendbarer Capture-Screen fuer EIN Foto (im Gegensatz zum
- * BarcodeScannerScreen, der laufend live analysiert). Wird sowohl fuer den
- * Essens-Scan (Kalorienschaetzung) als auch fuer das Fotografieren von
- * Naehrwerttabellen verwendet. Bietet sowohl Kamera-Aufnahme als auch
- * Auswahl eines bestehenden Bilds aus der Galerie.
+ * Capture-Screen für ein Foto (Kamera oder Galerie).
+ *
+ * [enableCrop] nur für Rezept-Fotos true setzen. Nährwerttabellen und
+ * Rezept-Extraktion (OCR) laufen ohne Zuschneiden – der Cropper versteckt
+ * sonst oft den Weiter-Button und stört die Texterkennung.
  */
 @Composable
 fun PhotoCaptureScreen(
     title: String,
     instructions: String,
     onPhotoCaptured: (Bitmap) -> Unit,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    enableCrop: Boolean = false
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -56,6 +59,10 @@ fun PhotoCaptureScreen(
     var isCapturing by remember { mutableStateOf(false) }
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     val executor = remember { Executors.newSingleThreadExecutor() }
+
+    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val useThemeCropper = prefs?.get(KEY_TOGGLE_CROPPER_THEME_COLOR) ?: true
+    val themePrimary = MaterialTheme.colorScheme.primary
 
     fun decodeBitmap(uri: Uri): Bitmap? = try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -87,25 +94,21 @@ fun PhotoCaptureScreen(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        isCapturing = true
-        cropLauncher.launch(
-            CropImageContractOptions(
-                uri = uri,
-                cropImageOptions = CropImageOptions(
-                    guidelines = CropImageView.Guidelines.ON,
-                    outputCompressFormat = Bitmap.CompressFormat.JPEG,
-                    outputCompressQuality = 90,
-                    activityTitle = "Foto zuschneiden",
-                    cropMenuCropButtonTitle = "Fertig",
-                    allowFlipping = true,
-                    allowRotation = true,
-                    fixAspectRatio = false,
-                    // Handles nicht am Bildrand → kein Konflikt mit Notification-Shade
-                    initialCropWindowPaddingRatio = 0.08f,
-                    multiTouchEnabled = true
+        if (enableCrop) {
+            isCapturing = true
+            cropLauncher.launch(
+                CropImageContractOptions(
+                    uri = uri,
+                    cropImageOptions = CropperDefaults.options(
+                        title = "Foto zuschneiden",
+                        useTheme = useThemeCropper,
+                        themePrimary = themePrimary
+                    )
                 )
             )
-        )
+        } else {
+            decodeBitmap(uri)?.let { onPhotoCaptured(it) }
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -173,9 +176,9 @@ fun PhotoCaptureScreen(
                 .padding(top = 48.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)
         ) {
             Column {
-                Text(title, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Spacer(Modifier.height(4.dp))
-                Text(instructions, color = MaterialTheme.colorScheme.onPrimary, fontSize = 13.sp)
+                Text(instructions, color = Color.White, fontSize = 13.sp)
             }
         }
 
@@ -183,14 +186,13 @@ fun PhotoCaptureScreen(
             onClick = onNavigateBack,
             modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
         ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück", tint = MaterialTheme.colorScheme.onPrimary)
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück", tint = Color.White)
         }
 
         if (isCapturing) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         }
 
-        // Galerie-Button (unten links)
         FloatingActionButton(
             onClick = {
                 if (isCapturing) return@FloatingActionButton
@@ -202,7 +204,6 @@ fun PhotoCaptureScreen(
             Icon(Icons.Default.PhotoLibrary, contentDescription = "Aus Galerie wählen")
         }
 
-        // Kamera-Auslöser (unten mittig)
         FloatingActionButton(
             onClick = {
                 val capture = imageCapture ?: return@FloatingActionButton
