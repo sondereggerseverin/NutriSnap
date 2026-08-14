@@ -235,13 +235,15 @@ fun RecipeCardV2(
                         onClick = { onAddToDiary(portions) },
                         modifier = Modifier.size(36.dp),
                         colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
                         )
                     ) {
                         Icon(
                             Icons.Filled.PlaylistAdd,
                             contentDescription = "Ins Tagebuch",
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                 }
@@ -340,13 +342,15 @@ fun RecipeGridCard(
                         onClick = onAddToDiary,
                         modifier = Modifier.size(30.dp),
                         colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.92f)
+                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.92f),
+                            contentColor = MaterialTheme.colorScheme.onPrimary
                         )
                     ) {
                         Icon(
                             Icons.Filled.PlaylistAdd,
                             contentDescription = "Ins Tagebuch",
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                     Box {

@@ -347,25 +347,38 @@ fun RecipesScreen(
 
     Scaffold(
         floatingActionButton = {
+            val scheme = MaterialTheme.colorScheme
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                SmallFloatingActionButton(onClick = { showCookSheet = true },
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer) {
-                    Icon(Icons.Default.Kitchen, "Was koche ich?")
+                SmallFloatingActionButton(
+                    onClick = { showCookSheet = true },
+                    containerColor = scheme.primaryContainer,
+                    contentColor = scheme.onPrimaryContainer
+                ) {
+                    Icon(Icons.Default.Kitchen, "Was koche ich?", tint = scheme.onPrimaryContainer)
                 }
                 Spacer(Modifier.height(8.dp))
-                SmallFloatingActionButton(onClick = { showBatchSheet = true },
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer) {
-                    Icon(Icons.Default.PlaylistAdd, "Mehrere Rezepte importieren")
+                SmallFloatingActionButton(
+                    onClick = { showBatchSheet = true },
+                    containerColor = scheme.secondaryContainer,
+                    contentColor = scheme.onSecondaryContainer
+                ) {
+                    Icon(Icons.Default.PlaylistAdd, "Mehrere Rezepte importieren", tint = scheme.onSecondaryContainer)
                 }
                 Spacer(Modifier.height(8.dp))
-                SmallFloatingActionButton(onClick = { showImportSheet = true },
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer) {
-                    Icon(Icons.Default.Link, "Rezept importieren")
+                SmallFloatingActionButton(
+                    onClick = { showImportSheet = true },
+                    containerColor = scheme.secondaryContainer,
+                    contentColor = scheme.onSecondaryContainer
+                ) {
+                    Icon(Icons.Default.Link, "Rezept importieren", tint = scheme.onSecondaryContainer)
                 }
                 Spacer(Modifier.height(8.dp))
-                FloatingActionButton(onClick = { showCreateSheet = true },
-                    containerColor = MaterialTheme.colorScheme.secondary) {
-                    Icon(Icons.Default.Add, "Freies Rezept erstellen", tint = MaterialTheme.colorScheme.onSecondary)
+                FloatingActionButton(
+                    onClick = { showCreateSheet = true },
+                    containerColor = scheme.primary,
+                    contentColor = scheme.onPrimary
+                ) {
+                    Icon(Icons.Default.Add, "Freies Rezept erstellen", tint = scheme.onPrimary)
                 }
             }
         }
