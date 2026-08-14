@@ -237,6 +237,7 @@ fun DiaryScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val quickAddFavorites by vm.favorites.collectAsState()
+    val autopilotTemplates by vm.autopilotTemplates.collectAsState()
     val recipesVm: ch.nutrisnap.app.ui.screens.recipes.RecipesViewModel = viewModel()
     val recipesState by recipesVm.uiState.collectAsState()
 
@@ -337,6 +338,32 @@ fun DiaryScreen(
                     fat      = state.totalFat,
                     modifier = Modifier.padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs)
                 )
+            }
+            // Wochen-Autopilot: Mo–Fr fehlende Mahlzeiten aus Vorlagen vorschlagen
+            val isWeekday = remember(state.selectedDate) {
+                val dow = state.selectedDate.dayOfWeek
+                dow != java.time.DayOfWeek.SATURDAY && dow != java.time.DayOfWeek.SUNDAY
+            }
+            if (isWeekday && autopilotTemplates.isNotEmpty()) {
+                val presentMeals = state.entries.map { it.mealType }.toSet()
+                val suggestions = autopilotTemplates.filter { it.mealType !in presentMeals }
+                if (suggestions.isNotEmpty()) {
+                    item(key = "autopilot_banner") {
+                        AutopilotBanner(
+                            templates = suggestions,
+                            onApply = { t ->
+                                vm.applyAutopilotTemplate(t) { n ->
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            if (n > 0) "${t.name}: $n Einträge übernommen"
+                                            else "${t.name} hat noch keine Lebensmittel"
+                                        )
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
             }
             if (state.entries.isEmpty()) {
                 item {
@@ -2427,6 +2454,47 @@ private fun MealCopySheet(
             Spacer(Modifier.height(16.dp))
             Button(onClick = { onConfirm(dayCount) }, modifier = Modifier.fillMaxWidth()) {
                 Text("Auf $dayCount Tage kopieren")
+            }
+        }
+    }
+}
+
+@Composable
+private fun AutopilotBanner(
+    templates: List<ch.nutrisnap.app.data.model.MealTemplate>,
+    onApply: (ch.nutrisnap.app.data.model.MealTemplate) -> Unit
+) {
+    Card(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.sm),
+        shape = RoundedCornerShape(NutriRadius.lg),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)
+        )
+    ) {
+        Column(Modifier.padding(NutriSpacing.md)) {
+            Text("Wochen-Autopilot", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(
+                "Mo–Fr · Vorlagen für leere Mahlzeiten",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            templates.forEach { t ->
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(t.name, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                        Text(t.mealType.label(), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    FilledTonalButton(onClick = { onApply(t) }) {
+                        Text("Übernehmen", fontSize = 12.sp)
+                    }
+                }
             }
         }
     }

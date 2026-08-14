@@ -588,4 +588,41 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun saveCustomFood(item: FoodItem) = viewModelScope.launch { foodRepo.saveCustomFood(item) }
+
+    // ── Wochen-Autopilot (Mo–Fr Vorlagen) ─────────────────────────────────────
+    private val templateRepo = ch.nutrisnap.app.data.repository.MealTemplateRepository(db.mealTemplateDao())
+
+    val autopilotTemplates: StateFlow<List<MealTemplate>> = combine(
+        templateRepo.getAll(),
+        getApplication<Application>().notifDataStore.data
+    ) { templates, prefs ->
+        val ids = prefs[ch.nutrisnap.app.ui.screens.mealtemplate.KEY_AUTOPILOT_TEMPLATE_IDS]
+            .orEmpty()
+            .mapNotNull { it.toIntOrNull() }
+            .toSet()
+        templates.filter { it.id in ids }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Alle Items einer Autopilot-Vorlage als manuelle Tagebuch-Einträge anlegen. */
+    fun applyAutopilotTemplate(template: MealTemplate, onDone: (Int) -> Unit = {}) {
+        viewModelScope.launch {
+            val items = templateRepo.getItems(template.id)
+            if (items.isEmpty()) {
+                onDone(0)
+                return@launch
+            }
+            for (item in items) {
+                repo.addManualEntry(
+                    name = item.foodName,
+                    kcal = item.calories,
+                    protein = item.protein,
+                    carbs = item.carbs,
+                    fat = item.fat,
+                    mealType = template.mealType,
+                    date = _date.value
+                )
+            }
+            onDone(items.size)
+        }
+    }
 }

@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.MealTemplate
 import ch.nutrisnap.app.data.model.MealTemplateItem
@@ -25,6 +26,7 @@ fun MealTemplateScreen(
     vm: MealTemplateViewModel = viewModel()
 ) {
     val templates by vm.templates.collectAsState()
+    val autopilotIds by vm.autopilotIds.collectAsState()
     var showCreate by remember { mutableStateOf(false) }
     var toDelete by remember { mutableStateOf<MealTemplate?>(null) }
     val scope = rememberCoroutineScope()
@@ -62,6 +64,8 @@ fun MealTemplateScreen(
                 items(templates, key = { it.id }) { template ->
                     TemplateCard(
                         template = template,
+                        autopilot = template.id in autopilotIds,
+                        onToggleAutopilot = { vm.toggleAutopilot(template.id) },
                         onUse = {
                             scope.launch {
                                 val items: List<MealTemplateItem> = vm.getItems(template.id)
@@ -103,17 +107,43 @@ fun MealTemplateScreen(
 }
 
 @Composable
-private fun TemplateCard(template: MealTemplate, onUse: () -> Unit, onDelete: () -> Unit) {
+private fun TemplateCard(
+    template: MealTemplate,
+    autopilot: Boolean,
+    onToggleAutopilot: () -> Unit,
+    onUse: () -> Unit,
+    onDelete: () -> Unit
+) {
     Card(Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(template.name, fontWeight = FontWeight.SemiBold)
-                Text(template.mealType.label(), style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(template.name, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        template.mealType.label(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                TextButton(onClick = onUse) { Text("Verwenden") }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.DeleteOutline, "Loeschen", tint = MaterialTheme.colorScheme.error)
+                }
             }
-            TextButton(onClick = onUse) { Text("Verwenden") }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.DeleteOutline, "Loeschen", tint = MaterialTheme.colorScheme.error)
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Wochen-Autopilot", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        "Mo–Fr im Tagebuch vorschlagen",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(checked = autopilot, onCheckedChange = { onToggleAutopilot() })
             }
         }
     }
