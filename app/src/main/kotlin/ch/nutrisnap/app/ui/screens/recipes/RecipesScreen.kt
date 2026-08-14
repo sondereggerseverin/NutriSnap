@@ -1165,18 +1165,6 @@ fun ImportSheet(
     val cropPrefs by context.notifDataStore.data.collectAsState(initial = null)
     val useThemeCropper = cropPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_CROPPER_THEME_COLOR) ?: true
     val themePrimary = MaterialTheme.colorScheme.primary
-    val cropToolbarColor = remember(useThemeCropper, themePrimary) {
-        if (useThemeCropper) {
-            android.graphics.Color.argb(
-                (themePrimary.alpha * 255).toInt().coerceIn(0, 255),
-                (themePrimary.red * 255).toInt().coerceIn(0, 255),
-                (themePrimary.green * 255).toInt().coerceIn(0, 255),
-                (themePrimary.blue * 255).toInt().coerceIn(0, 255)
-            )
-        } else {
-            android.graphics.Color.parseColor("#4CAF50")
-        }
-    }
 
     // Crop nach Galerie-Auswahl (reiner Bild-Import)
     val imageCropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
@@ -1197,22 +1185,10 @@ fun ImportSheet(
         imageCropLauncher.launch(
             CropImageContractOptions(
                 uri = uri,
-                cropImageOptions = CropImageOptions(
-                    guidelines = CropImageView.Guidelines.ON,
-                    outputCompressFormat = Bitmap.CompressFormat.JPEG,
-                    outputCompressQuality = 90,
-                    activityTitle = "Rezept zuschneiden",
-                    cropMenuCropButtonTitle = "Fertig",
-                    allowFlipping = true,
-                    allowRotation = true,
-                    fixAspectRatio = false,
-                    // Handles nicht am Bildrand → kein Konflikt mit Notification-Shade
-                    initialCropWindowPaddingRatio = 0.08f,
-                    multiTouchEnabled = true,
-                    toolbarColor = cropToolbarColor,
-                    activityBackgroundColor = android.graphics.Color.BLACK,
-                    toolbarTitleColor = android.graphics.Color.WHITE,
-                    toolbarBackButtonColor = android.graphics.Color.WHITE
+                cropImageOptions = ch.nutrisnap.app.ui.theme.CropperDefaults.options(
+                    title = "Rezept zuschneiden",
+                    useTheme = useThemeCropper,
+                    themePrimary = themePrimary
                 )
             )
         )
@@ -1232,18 +1208,10 @@ fun ImportSheet(
         hybridCropLauncher.launch(
             CropImageContractOptions(
                 uri = uri,
-                cropImageOptions = CropImageOptions(
-                    guidelines = CropImageView.Guidelines.ON,
-                    outputCompressFormat = Bitmap.CompressFormat.JPEG,
-                    outputCompressQuality = 90,
-                    activityTitle = "Screenshot zuschneiden",
-                    cropMenuCropButtonTitle = "Fertig",
-                    allowFlipping = true,
-                    allowRotation = true,
-                    fixAspectRatio = false,
-                    // Handles nicht am Bildrand → kein Konflikt mit Notification-Shade
-                    initialCropWindowPaddingRatio = 0.08f,
-                    multiTouchEnabled = true
+                cropImageOptions = ch.nutrisnap.app.ui.theme.CropperDefaults.options(
+                    title = "Screenshot zuschneiden",
+                    useTheme = useThemeCropper,
+                    themePrimary = themePrimary
                 )
             )
         )
