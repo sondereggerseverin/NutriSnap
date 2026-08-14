@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeCategory
+import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import coil.compose.AsyncImage
 import com.canhub.cropper.CropImageContract
 import com.canhub.cropper.CropImageContractOptions
@@ -73,6 +74,22 @@ fun RecipeEditSheet(
         }
     }
 
+    val cropPrefs by context.notifDataStore.data.collectAsState(initial = null)
+    val useThemeCropper = cropPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_CROPPER_THEME_COLOR) ?: true
+    val themePrimary = MaterialTheme.colorScheme.primary
+    val cropToolbarColor = remember(useThemeCropper, themePrimary) {
+        if (useThemeCropper) {
+            android.graphics.Color.argb(
+                (themePrimary.alpha * 255).toInt().coerceIn(0, 255),
+                (themePrimary.red * 255).toInt().coerceIn(0, 255),
+                (themePrimary.green * 255).toInt().coerceIn(0, 255),
+                (themePrimary.blue * 255).toInt().coerceIn(0, 255)
+            )
+        } else {
+            android.graphics.Color.parseColor("#4CAF50")
+        }
+    }
+
     // Gallery picker → öffnet Cropper
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
@@ -97,7 +114,11 @@ fun RecipeEditSheet(
                     fixAspectRatio = false,
                     // Handles nicht am Bildrand → kein Konflikt mit Notification-Shade
                     initialCropWindowPaddingRatio = 0.08f,
-                    multiTouchEnabled = true
+                    multiTouchEnabled = true,
+                    toolbarColor = cropToolbarColor,
+                    activityBackgroundColor = android.graphics.Color.BLACK,
+                    toolbarTitleColor = android.graphics.Color.WHITE,
+                    toolbarBackButtonColor = android.graphics.Color.WHITE
                 )
             )
         )

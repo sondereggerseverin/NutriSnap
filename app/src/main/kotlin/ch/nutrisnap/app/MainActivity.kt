@@ -300,11 +300,19 @@ fun MainScaffold(
         }
     }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val navPrefs by context.notifDataStore.data.collectAsState(initial = null)
+    val renameNavLabel = navPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_NAV_LABEL_RENAME) ?: false
+
     Scaffold(bottomBar = {
         NavigationBar(
             tonalElevation = NavigationBarDefaults.Elevation
         ) {
             bottomNavItems.forEach { screen ->
+                val label = when {
+                    screen is Screen.Settings && renameNavLabel -> "Einstellungen"
+                    else -> screen.label
+                }
                 NavigationBarItem(
                     selected = currentRoute == screen.route ||
                         currentRoute?.startsWith("${screen.route}?") == true,
@@ -314,8 +322,8 @@ fun MainScaffold(
                             launchSingleTop = true; restoreState = true
                         }
                     },
-                    icon = { Icon(screen.icon, contentDescription = screen.label) },
-                    label = { Text(screen.label, maxLines = 1) }
+                    icon = { Icon(screen.icon, contentDescription = label) },
+                    label = { Text(label, maxLines = 1) }
                 )
             }
         }

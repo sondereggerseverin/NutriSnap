@@ -247,20 +247,27 @@ fun DiaryScreen(
         // Wer bereits im Tagebuch war, hatte keine Moeglichkeit, ohne Umweg ueber
         // "Start" einen Eintrag zu erfassen.
         floatingActionButton = {
-            Column(horizontalAlignment = Alignment.End) {
-                SmallFloatingActionButton(
-                    onClick = {
-                        val meal = initialMeal ?: defaultMealForNow()
-                        onNavigateToPhotoScan(meal)
-                    },
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                ) {
-                    Icon(Icons.Default.PhotoCamera, contentDescription = "Essen fotografieren")
-                }
-                Spacer(Modifier.height(12.dp))
+            val consolidateFab = mealPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_DIARY_FAB_CONSOLIDATION) ?: false
+            if (consolidateFab) {
                 FloatingActionButton(onClick = { showAddSheet = true }) {
                     Icon(Icons.Default.Add, contentDescription = "Eintrag hinzufügen")
+                }
+            } else {
+                Column(horizontalAlignment = Alignment.End) {
+                    SmallFloatingActionButton(
+                        onClick = {
+                            val meal = initialMeal ?: defaultMealForNow()
+                            onNavigateToPhotoScan(meal)
+                        },
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    ) {
+                        Icon(Icons.Default.PhotoCamera, contentDescription = "Essen fotografieren")
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    FloatingActionButton(onClick = { showAddSheet = true }) {
+                        Icon(Icons.Default.Add, contentDescription = "Eintrag hinzufügen")
+                    }
                 }
             }
         }

@@ -185,7 +185,12 @@ fun SettingsScreen(
     ) {
         // ── Header ──────────────────────────────────────────────────────────
         if (section == null) {
-            Text("Mehr", fontWeight = FontWeight.Bold, fontSize = 24.sp)
+            val renameNav = prefs?.get(KEY_TOGGLE_NAV_LABEL_RENAME) ?: false
+            Text(
+                if (renameNav) "Einstellungen" else "Mehr",
+                fontWeight = FontWeight.Bold,
+                fontSize = 24.sp
+            )
             Text(
                 "Einstellungen & Shortcuts",
                 fontSize = 13.sp,
