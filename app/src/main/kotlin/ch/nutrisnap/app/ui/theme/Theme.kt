@@ -240,6 +240,36 @@ val KEY_FRESH_HOME = androidx.datastore.preferences.core.booleanPreferencesKey("
 /** true = klassische 1-Spalten-Liste (bisheriges Design), false/absent = kompakte 2-Spalten-Grid-Übersicht */
 val KEY_CLASSIC_RECIPE_LIST = androidx.datastore.preferences.core.booleanPreferencesKey("classic_recipe_list")
 
+// ── Design-Toggles (Design-Backlog, einzeln schaltbar unter Mehr → Design) ────
+// Touch-Targets (Default an)
+val KEY_TOGGLE_TOUCH_MEAL_QUICKADD = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_touch_meal_quickadd")
+val KEY_TOGGLE_TOUCH_MEAL_ICON = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_touch_meal_icon")
+val KEY_TOGGLE_TOUCH_DIARY_ICONS = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_touch_diary_icons")
+val KEY_TOGGLE_TOUCH_MEAL_HEADER = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_touch_meal_header")
+val KEY_TOGGLE_TOUCH_YESTERDAY_BTN = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_touch_yesterday_btn")
+val KEY_TOGGLE_TOUCH_RECIPE_MENU = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_touch_recipe_menu")
+// Farben (Default aus, außer Cropper)
+val KEY_TOGGLE_MACRO_COLOR_SEPARATION = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_macro_color_separation")
+val KEY_TOGGLE_CARD_ELEVATION = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_card_elevation")
+val KEY_TOGGLE_DARK_MODE_CONTRAST = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_dark_mode_contrast")
+val KEY_TOGGLE_CROPPER_THEME_COLOR = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_cropper_theme_color")
+val KEY_TOGGLE_CALORIES_REMAINING_HIGHLIGHT = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_calories_remaining_highlight")
+// Layout
+val KEY_TOGGLE_SPACING_TOKENS = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_spacing_tokens")
+val KEY_TOGGLE_HOME_ACTIVITY_MERGE = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_home_activity_merge")
+val KEY_TOGGLE_HOME_REORDER = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_home_reorder")
+val KEY_TOGGLE_DIARY_LAYOUT_COMPACT = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_diary_layout_compact")
+// FABs & Buttons
+val KEY_TOGGLE_DIARY_FAB_CONSOLIDATION = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_diary_fab_consolidation")
+val KEY_TOGGLE_RECIPES_FAB_CONSOLIDATION = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_recipes_fab_consolidation")
+val KEY_TOGGLE_BUTTON_STANDARD_SIZING = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_button_standard_sizing")
+val KEY_TOGGLE_RECIPE_CHIP_SIZING = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_recipe_chip_sizing")
+val KEY_TOGGLE_PROGRESS_BAR_COLOR_SHIFT = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_progress_bar_color_shift")
+// Typografie
+val KEY_TOGGLE_TYPOGRAPHY_NUMBERS = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_typography_numbers")
+// Navigation
+val KEY_TOGGLE_NAV_LABEL_RENAME = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_nav_label_rename")
+val KEY_TOGGLE_NAV_SHORTCUTS = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_nav_shortcuts")
 
 // ── Typography ─────────────────────────────────────────────────────────────────
 

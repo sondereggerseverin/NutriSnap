@@ -42,6 +42,29 @@ import ch.nutrisnap.app.ui.theme.KEY_FRESH_UI
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_CARDS
 import ch.nutrisnap.app.ui.theme.KEY_CLASSIC_RECIPE_LIST
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_HOME
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_MEAL_QUICKADD
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_MEAL_ICON
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_DIARY_ICONS
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_MEAL_HEADER
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_YESTERDAY_BTN
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_RECIPE_MENU
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_MACRO_COLOR_SEPARATION
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_CARD_ELEVATION
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_DARK_MODE_CONTRAST
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_CROPPER_THEME_COLOR
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_CALORIES_REMAINING_HIGHLIGHT
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_SPACING_TOKENS
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_HOME_ACTIVITY_MERGE
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_HOME_REORDER
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_DIARY_LAYOUT_COMPACT
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_DIARY_FAB_CONSOLIDATION
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_RECIPES_FAB_CONSOLIDATION
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_BUTTON_STANDARD_SIZING
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_RECIPE_CHIP_SIZING
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_PROGRESS_BAR_COLOR_SHIFT
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TYPOGRAPHY_NUMBERS
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_NAV_LABEL_RENAME
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_NAV_SHORTCUTS
 
 enum class FitnessGoal(val label: String, val emoji: String, val desc: String) {
     LOSE_WEIGHT("Abnehmen",        "\uD83D\uDD25", "–500 kcal vom TDEE · mehr Protein"),
@@ -318,6 +341,229 @@ fun SettingsScreen(
                                 context.notifDataStore.edit { it[KEY_FRESH_HOME] = checked }
                             }
                         }
+                    )
+                }
+                // ── Design-Backlog-Toggles ──────────────────────────────────
+                SettingsCard(title = "Touch-Targets", icon = Icons.Default.TouchApp) {
+                    Text(
+                        "Größere Tip-Flächen für häufig genutzte Aktionen (Material-Minimum 40–48 dp).",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    DesignToggleRow(
+                        title = "Meal-Quick-Add (Home)",
+                        subtitle = "Liste/Grid 44–48 dp statt 32–34 dp",
+                        key = KEY_TOGGLE_TOUCH_MEAL_QUICKADD,
+                        defaultOn = true,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "Meal-Icon-Kreis (Home)",
+                        subtitle = "44–48 dp statt 38 dp",
+                        key = KEY_TOGGLE_TOUCH_MEAL_ICON,
+                        defaultOn = true,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "Diary Zeilen-Icons",
+                        subtitle = "40 dp+ statt 32 dp",
+                        key = KEY_TOGGLE_TOUCH_DIARY_ICONS,
+                        defaultOn = true,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "Meal-Header Copy/Expand",
+                        subtitle = "40 dp+ statt 28 dp",
+                        key = KEY_TOGGLE_TOUCH_MEAL_HEADER,
+                        defaultOn = true,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "„Gestern übernehmen“",
+                        subtitle = "Höhe ≥40 dp / Tonal-Button",
+                        key = KEY_TOGGLE_TOUCH_YESTERDAY_BTN,
+                        defaultOn = true,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "Rezept-Karten-Menü (⋮)",
+                        subtitle = "40 dp+ statt 28 dp",
+                        key = KEY_TOGGLE_TOUCH_RECIPE_MENU,
+                        defaultOn = true,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                }
+                SettingsCard(title = "Farben & Kontrast", icon = Icons.Default.ColorLens) {
+                    DesignToggleRow(
+                        title = "Macro-Farben absetzen",
+                        subtitle = "Komplementär-Hue statt Theme-Primary-Kollision",
+                        key = KEY_TOGGLE_MACRO_COLOR_SEPARATION,
+                        defaultOn = false,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "Card-Elevation erhöhen",
+                        subtitle = "2 dp / surfaceContainer statt 1 dp White",
+                        key = KEY_TOGGLE_CARD_ELEVATION,
+                        defaultOn = false,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "Dark-Mode-Kontrast",
+                        subtitle = "Dedizierte Dark-Primary je Theme (≥4.5:1)",
+                        key = KEY_TOGGLE_DARK_MODE_CONTRAST,
+                        defaultOn = false,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "Cropper Theme-Farbe",
+                        subtitle = "Theme-Primary statt hartkodiertem Grün",
+                        key = KEY_TOGGLE_CROPPER_THEME_COLOR,
+                        defaultOn = true,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "„Noch X kcal übrig“ hervorheben",
+                        subtitle = "Stärker mit Macro-/Primary-Farbe",
+                        key = KEY_TOGGLE_CALORIES_REMAINING_HIGHLIGHT,
+                        defaultOn = false,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                }
+                SettingsCard(title = "Layout", icon = Icons.Default.ViewQuilt) {
+                    DesignToggleRow(
+                        title = "Spacing-Tokens",
+                        subtitle = "Hardcodes → NutriSpacing (Refactor)",
+                        key = KEY_TOGGLE_SPACING_TOKENS,
+                        defaultOn = true,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "Activity-Karten zusammenlegen",
+                        subtitle = "Health Connect + manuelle Aktivität",
+                        key = KEY_TOGGLE_HOME_ACTIVITY_MERGE,
+                        defaultOn = false,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "Home-Reihenfolge neu",
+                        subtitle = "Ring → Meals → Makros → Activity",
+                        key = KEY_TOGGLE_HOME_REORDER,
+                        defaultOn = false,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "Diary kompakter",
+                        subtitle = "„Gestern übernehmen“ in Top-Bar/Navigator",
+                        key = KEY_TOGGLE_DIARY_LAYOUT_COMPACT,
+                        defaultOn = false,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                }
+                SettingsCard(title = "FABs & Buttons", icon = Icons.Default.AddCircle) {
+                    DesignToggleRow(
+                        title = "Diary-FAB konsolidieren",
+                        subtitle = "Kamera-SmallFAB entfernen (bleibt in Add-Sheet)",
+                        key = KEY_TOGGLE_DIARY_FAB_CONSOLIDATION,
+                        defaultOn = false,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "Recipes-FABs konsolidieren",
+                        subtitle = "1 FAB + Overflow statt 4 gestapelter FABs",
+                        key = KEY_TOGGLE_RECIPES_FAB_CONSOLIDATION,
+                        defaultOn = false,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "Button-Standardgröße",
+                        subtitle = "Höhe 48 dp, Ecken NutriRadius.md",
+                        key = KEY_TOGGLE_BUTTON_STANDARD_SIZING,
+                        defaultOn = true,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "Portion-Chips größer",
+                        subtitle = "Klarerer Selected-State (Primary-Container)",
+                        key = KEY_TOGGLE_RECIPE_CHIP_SIZING,
+                        defaultOn = false,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "Progress-Bar bei Überschreitung",
+                        subtitle = "Farbwechsel wenn über Ziel",
+                        key = KEY_TOGGLE_PROGRESS_BAR_COLOR_SHIFT,
+                        defaultOn = false,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                }
+                SettingsCard(title = "Typografie & Navigation", icon = Icons.Default.TextFields) {
+                    DesignToggleRow(
+                        title = "Primärzahlen größer",
+                        subtitle = "titleLarge/headlineSmall, Sekundär min. 12 sp",
+                        key = KEY_TOGGLE_TYPOGRAPHY_NUMBERS,
+                        defaultOn = false,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "Nav-Label „Einstellungen“",
+                        subtitle = "Statt generischem „Mehr“",
+                        key = KEY_TOGGLE_NAV_LABEL_RENAME,
+                        defaultOn = false,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "Nav-Shortcuts sichtbar",
+                        subtitle = "Custom Foods / Meal Templates auf Home",
+                        key = KEY_TOGGLE_NAV_SHORTCUTS,
+                        defaultOn = false,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
                     )
                 }
             }
@@ -708,6 +954,30 @@ private fun SettingsSwitchRow(
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
+}
+
+/** Design-Backlog-Toggle: liest/schreibt Boolean-Preference mit explizitem Default. */
+@Composable
+private fun DesignToggleRow(
+    title: String,
+    subtitle: String,
+    key: androidx.datastore.preferences.core.Preferences.Key<Boolean>,
+    defaultOn: Boolean,
+    prefs: androidx.datastore.preferences.core.Preferences?,
+    scope: kotlinx.coroutines.CoroutineScope,
+    context: android.content.Context
+) {
+    val checked = prefs?.get(key) ?: defaultOn
+    SettingsSwitchRow(
+        title = title,
+        subtitle = subtitle,
+        checked = checked,
+        onCheckedChange = { newValue ->
+            scope.launch {
+                context.notifDataStore.edit { it[key] = newValue }
+            }
+        }
+    )
 }
 
 @Composable
