@@ -266,6 +266,10 @@ val KEY_CLASSIC_RECIPE_LIST = androidx.datastore.preferences.core.booleanPrefere
  */
 val KEY_RECIPE_FAST_AI_PARSE = androidx.datastore.preferences.core.booleanPreferencesKey("recipe_fast_ai_parse")
 val KEY_RECIPE_FAST_SCRAPE = androidx.datastore.preferences.core.booleanPreferencesKey("recipe_fast_scrape")
+/** Persistenter Caption-Cache über App-Neustart (default an). */
+val KEY_RECIPE_PERSISTENT_CACHE = androidx.datastore.preferences.core.booleanPreferencesKey("recipe_persistent_cache")
+/** Bei schwacher Caption Video via Groq-Whisper transkribieren (default aus). */
+val KEY_RECIPE_VIDEO_TRANSCRIPT = androidx.datastore.preferences.core.booleanPreferencesKey("recipe_video_transcript")
 
 // ── Design-Toggles (Design-Backlog, einzeln schaltbar unter Mehr → Design) ────
 // Touch-Targets (Default an)

@@ -14,6 +14,8 @@ import ch.nutrisnap.app.domain.RecipeScraper
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_FAST_AI_PARSE
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_FAST_SCRAPE
+import ch.nutrisnap.app.ui.theme.KEY_RECIPE_PERSISTENT_CACHE
+import ch.nutrisnap.app.ui.theme.KEY_RECIPE_VIDEO_TRANSCRIPT
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -512,7 +514,16 @@ class RecipeRepository(db: NutriDatabase, private val context: Context) {
         }.getOrNull()
         val fastAi = prefs?.get(KEY_RECIPE_FAST_AI_PARSE) ?: false
         val fastScrape = prefs?.get(KEY_RECIPE_FAST_SCRAPE) ?: false
-        val result = scraper.scrape(url, onProgress, fastScrape = fastScrape, fastAi = fastAi)
+        val persistentCache = prefs?.get(KEY_RECIPE_PERSISTENT_CACHE) ?: true
+        val videoTranscript = prefs?.get(KEY_RECIPE_VIDEO_TRANSCRIPT) ?: false
+        val result = scraper.scrape(
+            url,
+            onProgress,
+            fastScrape = fastScrape,
+            fastAi = fastAi,
+            persistentCache = persistentCache,
+            videoTranscript = videoTranscript
+        )
         if (result.success && result.recipe != null) {
             val id = saveRecipe(result.recipe)
             val saved = result.recipe.copy(id = id)

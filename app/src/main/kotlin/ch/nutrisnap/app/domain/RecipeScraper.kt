@@ -27,7 +27,10 @@ class RecipeScraper(private val context: Context) {
         private fun cacheKey(url: String) = url.trim().lowercase().substringBefore("?").trimEnd('/')
     }
 
+    private val persistentStore by lazy { RecipeCaptionStore(context) }
     private var progress: (String) -> Unit = {}
+    private var usePersistentCache: Boolean = true
+    private var useVideoTranscript: Boolean = false
 
     private fun isGoodCaption(text: String?): Boolean {
         if (text.isNullOrBlank()) return false
@@ -74,14 +77,20 @@ class RecipeScraper(private val context: Context) {
     /**
      * @param fastScrape kürzerer IG-Race-Timeout, weniger Mirror-Quellen
      * @param fastAi     Groq 8B Instant statt 70B beim Caption-Parse
+     * @param persistentCache Caption über App-Neustart speichern
+     * @param videoTranscript bei schwacher Caption Whisper-Transkript holen
      */
     suspend fun scrape(
         rawUrl: String,
         onProgress: (String) -> Unit = {},
         fastScrape: Boolean = false,
-        fastAi: Boolean = false
+        fastAi: Boolean = false,
+        persistentCache: Boolean = true,
+        videoTranscript: Boolean = false
     ): RecipeScrapeResult = withContext(Dispatchers.IO) {
         progress = onProgress
+        usePersistentCache = persistentCache
+        useVideoTranscript = videoTranscript
         runCatching {
             val url      = rawUrl.trim()
             val platform = detectPlatform(url)
@@ -102,6 +111,52 @@ class RecipeScraper(private val context: Context) {
                 else ->
                     RecipeScrapeResult(success = false, error = "Fehler: ${e.message}")
             }
+        }
+    }
+
+    private fun loadCachedCaption(key: String): String {
+        captionCache[key]?.let { if (isGoodCaption(it)) return it }
+        if (usePersistentCache) {
+            persistentStore.get(key)?.let { c ->
+                if (isGoodCaption(c)) {
+                    captionCache[key] = c
+                    return c
+                }
+            }
+        }
+        return ""
+    }
+
+    private fun saveCachedCaption(key: String, caption: String) {
+        if (!isGoodCaption(caption)) return
+        captionCache[key] = caption
+        if (usePersistentCache) persistentStore.put(key, caption)
+    }
+
+    /**
+     * Bei schwacher Caption optional Whisper-Transkript anhängen.
+     */
+    private suspend fun enrichWithTranscript(
+        platform: String,
+        url: String,
+        shortcode: String?,
+        caption: String
+    ): String {
+        if (!useVideoTranscript) return caption
+        if (!VideoTranscriptService.isWeakCaption(caption) && isGoodCaption(caption)) return caption
+        progress("Video-Transkript…")
+        val mediaUrl = when (platform) {
+            "tiktok" -> VideoTranscriptService.resolveTikTokMediaUrl(url)
+            "instagram" -> shortcode?.let { VideoTranscriptService.resolveInstagramMediaUrl(it) }
+            else -> null
+        } ?: return caption
+        val transcript = VideoTranscriptService.transcribe(mediaUrl) ?: return caption
+        return buildString {
+            if (caption.isNotBlank()) {
+                append(caption.trim())
+                append("\n\n--- Transkript ---\n")
+            }
+            append(transcript.trim())
         }
     }
 
@@ -130,15 +185,14 @@ class RecipeScraper(private val context: Context) {
         var thumbnail = oEmbed?.get("thumbnail_url")
         val author = oEmbed?.get("author_name")
 
-        // Cache: gleiche Shortcode nicht nochmal scrapen (unabhängig von /p/ vs /reel/)
-        var caption = captionCache[key].orEmpty()
+        // Cache: Prozess + optional persistent
+        var caption = loadCachedCaption(key)
         if (isGoodCaption(caption)) {
             progress("Aus Cache…")
         } else {
             progress(if (fastScrape) "Seite laden (schnell)…" else "Seite laden (parallel)…")
-            // WebView mit allen kanonischen URLs (reel + p), Mirrors über shortcode
             caption = raceInstagramCaption(canonicalUrls.first(), shortcode, fastScrape)
-            if (isGoodCaption(caption)) captionCache[key] = caption
+            if (isGoodCaption(caption)) saveCachedCaption(key, caption)
         }
 
         if (thumbnail.isNullOrBlank() && shortcode != null) {
@@ -152,6 +206,10 @@ class RecipeScraper(private val context: Context) {
         if (!isGoodCaption(caption) && isGoodCaption(oEmbedTitle)) {
             caption = oEmbedTitle
         }
+
+        // Optional: Whisper wenn Caption dünn (Toggle)
+        caption = enrichWithTranscript("instagram", url, shortcode, caption)
+        if (isGoodCaption(caption)) saveCachedCaption(key, caption)
 
         if (!isGoodCaption(caption)) throw InstagramBlockedException(url)
 
@@ -556,7 +614,7 @@ class RecipeScraper(private val context: Context) {
         }.getOrDefault(url)
         val key = cacheKey(expandedUrl)
 
-        var caption: String? = captionCache[key]
+        var caption: String? = loadCachedCaption(key).ifBlank { null }
         var thumbnail: String? = null
         var author: String? = null
 
@@ -568,7 +626,14 @@ class RecipeScraper(private val context: Context) {
             caption = raced.first
             thumbnail = raced.second
             author = raced.third
-            if (isGoodCaption(caption)) captionCache[key] = caption!!
+            if (isGoodCaption(caption)) saveCachedCaption(key, caption!!)
+        }
+
+        // Optional Whisper bei schwacher Caption
+        val enriched = enrichWithTranscript("tiktok", expandedUrl, null, caption.orEmpty())
+        if (enriched.isNotBlank()) {
+            caption = enriched
+            if (isGoodCaption(caption)) saveCachedCaption(key, caption!!)
         }
 
         if (caption.isNullOrBlank()) {

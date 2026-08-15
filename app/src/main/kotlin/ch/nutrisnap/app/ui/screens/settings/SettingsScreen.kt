@@ -43,6 +43,8 @@ import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_CARDS
 import ch.nutrisnap.app.ui.theme.KEY_CLASSIC_RECIPE_LIST
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_FAST_AI_PARSE
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_FAST_SCRAPE
+import ch.nutrisnap.app.ui.theme.KEY_RECIPE_PERSISTENT_CACHE
+import ch.nutrisnap.app.ui.theme.KEY_RECIPE_VIDEO_TRANSCRIPT
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_HOME
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_MEAL_QUICKADD
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_MEAL_ICON
@@ -329,6 +331,28 @@ fun SettingsScreen(
                         onCheckedChange = { checked ->
                             scope.launch {
                                 context.notifDataStore.edit { it[KEY_RECIPE_FAST_SCRAPE] = checked }
+                            }
+                        }
+                    )
+                    val persistentCache = prefs?.get(KEY_RECIPE_PERSISTENT_CACHE) ?: true
+                    val videoTranscript = prefs?.get(KEY_RECIPE_VIDEO_TRANSCRIPT) ?: false
+                    SettingsSwitchRow(
+                        title = "Caption-Cache speichern",
+                        subtitle = "Gleiche Links nach App-Neustart ohne erneutes Scraping",
+                        checked = persistentCache,
+                        onCheckedChange = { checked ->
+                            scope.launch {
+                                context.notifDataStore.edit { it[KEY_RECIPE_PERSISTENT_CACHE] = checked }
+                            }
+                        }
+                    )
+                    SettingsSwitchRow(
+                        title = "Video-Transkript (Whisper)",
+                        subtitle = "Bei dünner Caption Audio/Video transkribieren (langsamer, Groq)",
+                        checked = videoTranscript,
+                        onCheckedChange = { checked ->
+                            scope.launch {
+                                context.notifDataStore.edit { it[KEY_RECIPE_VIDEO_TRANSCRIPT] = checked }
                             }
                         }
                     )
