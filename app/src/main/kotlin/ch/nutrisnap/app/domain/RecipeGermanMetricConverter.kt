@@ -201,7 +201,13 @@ object RecipeGermanMetricConverter {
      * Wird immer angewendet (auch als Nachbearbeitung nach KI).
      */
     private val NAME_MAP: List<Pair<Regex, String>> = listOf(
-        // Abschnitte
+        // Abschnitte (inkl. "For the …")
+        Regex("""(?i)^for\s+the\s+sauce\s*:?\s*$""") to "Für die Sauce:",
+        Regex("""(?i)^for\s+the\s+marinade\s*:?\s*$""") to "Für die Marinade:",
+        Regex("""(?i)^for\s+the\s+dressing\s*:?\s*$""") to "Für das Dressing:",
+        Regex("""(?i)^for\s+the\s+topping\s*:?\s*$""") to "Für den Belag:",
+        Regex("""(?i)^for\s+the\s+(.+?)\s+mash\s*:?\s*$""") to "Für den $1-Stampf:",
+        Regex("""(?i)^for\s+the\s+(.+?)\s*:?\s*$""") to "Für $1:",
         Regex("""(?i)^dough\s*:?\s*$""") to "Teig:",
         Regex("""(?i)^filling\s*:?\s*$""") to "Füllung:",
         Regex("""(?i)^frosting\s*:?\s*$""") to "Glasur:",
@@ -212,9 +218,30 @@ object RecipeGermanMetricConverter {
         Regex("""(?i)^glaze\s*:?\s*$""") to "Glasur:",
         Regex("""(?i)^crust\s*:?\s*$""") to "Boden:",
         Regex("""(?i)^streusel\s*:?\s*$""") to "Streusel:",
-        // Mehrwort-Zutaten (längere zuerst)
+        Regex("""(?i)^mash\s*:?\s*$""") to "Stampf:",
+        // Mehrwort-Zutaten (längere zuerst — wichtig vor Einzelwort-Ersetzungen)
+        Regex("""(?i)\bchicken\s+thigh\s+fillets?\b""") to "Hähnchen-Oberschenkel-Filets",
+        Regex("""(?i)\bchicken\s+thighs?\b""") to "Hähnchen-Oberschenkel",
+        Regex("""(?i)\bthigh\s+fillets?\b""") to "Oberschenkel-Filets",
+        Regex("""(?i)\bchicken\s+breast\s+fillets?\b""") to "Hähnchenbrustfilets",
+        Regex("""(?i)\bchicken\s+breast\b""") to "Hähnchenbrust",
+        Regex("""(?i)\bboneless\s+skinless\s+chicken\b""") to "Hähnchen ohne Haut und Knochen",
+        Regex("""(?i)\btaco\s+seasoning\b""") to "Taco-Gewürz",
+        Regex("""(?i)\bchilli?\s+flakes?\b""") to "Chiliflocken",
+        Regex("""(?i)\bred\s+pepper\s+flakes?\b""") to "Chiliflocken",
+        Regex("""(?i)\bsweet\s+corn\b""") to "Zuckermais",
+        Regex("""(?i)\bsweetcorn\b""") to "Zuckermais",
+        Regex("""(?i)\bdrained\s+weight\b""") to "Abtropfgewicht",
+        Regex("""(?i)\bblack\s+beans?\b""") to "schwarze Bohnen",
+        Regex("""(?i)\bsmall\s+handful\s+of\b""") to "eine kleine Handvoll",
+        Regex("""(?i)\bhandful\s+of\b""") to "eine Handvoll",
+        Regex("""(?i)\ba\s+handful\b""") to "eine Handvoll",
+        Regex("""(?i)\bgreek\s+joghurt\b""") to "griechischer Joghurt",
+        Regex("""(?i)\bsweet\s+potato(?:es)?\b""") to "Süsskartoffeln",
+        Regex("""(?i)\bsweet\s+kartoffeln\b""") to "Süsskartoffeln",
         Regex("""(?i)\bcottage\s+cheese\b""") to "Hüttenkäse",
         Regex("""(?i)\bgreek\s+yogurt\b""") to "griechischer Joghurt",
+        Regex("""(?i)\bgreek\s+yoghurt\b""") to "griechischer Joghurt",
         Regex("""(?i)\bplain\s+yogurt\b""") to "Naturjoghurt",
         Regex("""(?i)\braw\s+milk\b""") to "Rohmilch",
         Regex("""(?i)\bwhole\s+milk\b""") to "Vollmilch",
@@ -260,9 +287,15 @@ object RecipeGermanMetricConverter {
         Regex("""(?i)\bred\s+onion\b""") to "rote Zwiebel",
         Regex("""(?i)\bgreen\s+onion\b""") to "Frühlingszwiebel",
         Regex("""(?i)\bbell\s+pepper\b""") to "Paprika",
-        Regex("""(?i)\bchicken\s+breast\b""") to "Hühnerbrust",
         Regex("""(?i)\bground\s+beef\b""") to "Rinderhackfleisch",
         // Einzelwörter
+        Regex("""(?i)\bcoriander\b""") to "Koriander",
+        Regex("""(?i)\bcilantro\b""") to "Koriander",
+        Regex("""(?i)\bfillets?\b""") to "Filets",
+        Regex("""(?i)\bthighs?\b""") to "Oberschenkel",
+        Regex("""(?i)\bseasoning\b""") to "Gewürz",
+        Regex("""(?i)\bflakes?\b""") to "Flocken",
+        Regex("""(?i)\bmash\b""") to "Stampf",
         Regex("""(?i)\beggs?\b""") to "Eier",
         Regex("""(?i)\bbutter\b""") to "Butter",
         Regex("""(?i)\bflour\b""") to "Mehl",
@@ -277,6 +310,7 @@ object RecipeGermanMetricConverter {
         Regex("""(?i)\bwater\b""") to "Wasser",
         Regex("""(?i)\byogurt\b""") to "Joghurt",
         Regex("""(?i)\byoghurt\b""") to "Joghurt",
+        Regex("""(?i)\bjoghurt\b""") to "Joghurt",
         Regex("""(?i)\bonion\b""") to "Zwiebel",
         Regex("""(?i)\bgarlic\b""") to "Knoblauch",
         Regex("""(?i)\btomato(?:es)?\b""") to "Tomaten",
@@ -295,7 +329,8 @@ object RecipeGermanMetricConverter {
         Regex("""(?i)\bbroccoli\b""") to "Brokkoli",
         Regex("""(?i)\bcarrot\b""") to "Karotte",
         Regex("""(?i)\bpotato(?:es)?\b""") to "Kartoffeln",
-        Regex("""(?i)\bchicken\b""") to "Huhn",
+        Regex("""(?i)\bchicken\b""") to "Hähnchen",
+        Regex("""(?i)\bhuhn\b""") to "Hähnchen",
         Regex("""(?i)\bbeef\b""") to "Rindfleisch",
         Regex("""(?i)\bpork\b""") to "Schwein",
         Regex("""(?i)\bsalmon\b""") to "Lachs",
@@ -438,16 +473,21 @@ object RecipeGermanMetricConverter {
     private fun buildConvertPrompt(recipe: Recipe): String = """
 Du bist ein Schweizer/deutscher Koch-Assistent. Übersetze das Rezept VOLLSTÄNDIG ins Deutsche und rechne alle Mengen metrisch um.
 
-PFLICHT:
-- JEDEN Zutatennamen auf Deutsch — nichts Englisches stehen lassen
-  (raw milk → Rohmilch, melted butter → geschmolzene Butter, large eggs → grosse Eier,
-   baking powder → Backpulver, baking soda → Natron, vanilla extract → Vanilleextrakt,
-   protein powder → Proteinpulver, ground cinnamon → gemahlener Zimt, flour → Mehl).
-- Abschnitte: dough → Teig, filling → Füllung, frosting/glaze → Glasur, topping → Belag.
-- ALLE Zubereitungsschritte auf Deutsch (Preheat → Vorheizen, Grease → Fetten, blend → pürieren, …).
+PFLICHT — 100 % Deutsch, null Englisch:
+- JEDEN Zutatennamen komplett auf Deutsch. Keine Mischformen wie „Huhn Thigh Fillets“.
+  Beispiele: chicken thigh fillets → Hähnchen-Oberschenkel-Filets,
+  taco seasoning → Taco-Gewürz, chilli flakes → Chiliflocken,
+  sweetcorn (drained weight) → Zuckermais (Abtropfgewicht),
+  black beans → schwarze Bohnen, small handful of coriander → eine kleine Handvoll Koriander,
+  greek yoghurt → griechischer Joghurt, sweet potatoes → Süsskartoffeln,
+  salted butter → gesalzene Butter.
+- Abschnittsüberschriften übersetzen: „For the Sauce“ → „Für die Sauce:“,
+  „For the Sweet Potato Mash“ → „Für den Süsskartoffel-Stampf:“,
+  dough → Teig, filling → Füllung, topping → Belag.
+- ALLE Zubereitungsschritte auf Deutsch.
 - FESTE Zutaten in g, FLÜSSIGE in ml (nicht cups/tbsp/oz/°F).
-- Markennamen dürfen bleiben (Milfina, …).
-- Keine Zutaten erfinden. Mengen sinnvoll runden.
+- Markennamen dürfen bleiben. Keine Zutaten erfinden. Mengen sinnvoll runden.
+- Wenn ein Wort unsicher ist: beste deutsche Küchenbezeichnung wählen, nicht Englisch stehen lassen.
 
 Originaltitel: ${recipe.title}
 Beschreibung:
