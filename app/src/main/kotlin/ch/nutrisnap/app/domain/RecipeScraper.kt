@@ -91,7 +91,7 @@ class RecipeScraper(private val context: Context) {
                 "tiktok"    -> scrapeTikTok(url, fastAi)
                 else        -> {
                     progress("Seite laden…")
-                    scrapeWeb(url, platform)
+                    scrapeWeb(url, platform, fastAi)
                 }
             }
             RecipeScrapeResult(success = true, recipe = recipe)
@@ -671,20 +671,51 @@ class RecipeScraper(private val context: Context) {
 
     // ── GENERIC WEB ────────────────────────────────────────────────────────────
 
-    private fun scrapeWeb(url: String, platform: String): Recipe {
+    /**
+     * 1) schema.org/Recipe JSON-LD (inkl. nutrition) – kein AI nötig
+     * 2) Falls JSON-LD schwach/fehlend → AI auf vorgefiltertem Seitentext
+     * 3) Letzter Fallback: og-Tags + Listen-Selektoren
+     */
+    private suspend fun scrapeWeb(url: String, platform: String, fastAi: Boolean = false): Recipe {
         val doc = jsoupGet(url)
 
         val jsonLdBlocks = doc.select("script[type='application/ld+json']").map { it.data() }
         for (raw in jsonLdBlocks) {
             val recipeJson = extractRecipeFromJsonLd(raw) ?: continue
-            return parseJsonLd(recipeJson, url, platform, doc)
+            val fromLd = parseJsonLd(recipeJson, url, platform, doc)
+            // Nur akzeptieren wenn echte Zutaten da sind – sonst AI-Fallback
+            if (fromLd.ingredients.length >= 20 &&
+                !fromLd.ingredients.contains("Nicht gefunden", ignoreCase = true)
+            ) {
+                progress("JSON-LD erkannt…")
+                return fromLd
+            }
+        }
+
+        // AI auf bereinigtem Seitentext (ohne Scripts/Nav/Footer)
+        val pageText = extractReadableRecipeText(doc)
+        val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
+        if (pageText.length >= 80 && apiKey.isNotBlank()) {
+            progress("Rezept per KI extrahieren…")
+            val parsed = RecipeAiParser.parse(pageText, url, platform, extractOgImage(doc), apiKey, fastModel = fastAi)
+            if (parsed.ingredients.length >= 20 &&
+                !parsed.ingredients.contains("nicht gefunden", ignoreCase = true)
+            ) {
+                return parsed.copy(
+                    imageUrl = parsed.imageUrl ?: extractOgImage(doc),
+                    sourceUrl = url,
+                    platform = platform
+                )
+            }
         }
 
         val title = doc.select("meta[property=og:title]").attr("content").ifBlank { doc.title() }
         val desc  = doc.select("meta[property=og:description]").attr("content")
-        val image = doc.select("meta[property=og:image]").attr("content").ifBlank { null }
+        val image = extractOgImage(doc)
         val lists = doc.select("ul li, ol li").take(30)
-            .joinToString("\n") { "• ${it.text().trim()}" }
+            .map { it.text().trim() }
+            .filter { it.length in 3..120 }
+            .joinToString("\n") { "• $it" }
 
         return Recipe(
             title        = cleanTitle(title, url),
@@ -698,17 +729,37 @@ class RecipeScraper(private val context: Context) {
         )
     }
 
+    /** Sichtbarer Rezept-Text für AI – Scripts/Styles/Nav entfernt, max. ~6k Zeichen. */
+    private fun extractReadableRecipeText(doc: Document): String {
+        val clone = doc.clone()
+        clone.select("script, style, noscript, nav, footer, header, iframe, svg, form").remove()
+        val main = clone.select("article, [itemtype*=Recipe], main, .recipe, #recipe, .entry-content")
+            .firstOrNull()?.text()?.trim().orEmpty()
+        val body = main.ifBlank { clone.body()?.text()?.trim().orEmpty() }
+        return body.take(6000)
+    }
+
+    private fun isRecipeType(obj: org.json.JSONObject): Boolean {
+        val t = obj.opt("@type") ?: return false
+        return when (t) {
+            is String -> t.contains("Recipe", ignoreCase = true)
+            is org.json.JSONArray ->
+                (0 until t.length()).any { t.optString(it).contains("Recipe", ignoreCase = true) }
+            else -> false
+        }
+    }
+
     private fun extractRecipeFromJsonLd(raw: String): String? {
         if (raw.isBlank()) return null
         return try {
             val obj = org.json.JSONObject(raw)
             when {
-                obj.optString("@type").contains("Recipe", ignoreCase = true) -> raw
+                isRecipeType(obj) -> obj.toString()
                 obj.has("@graph") -> {
                     val graph = obj.getJSONArray("@graph")
                     (0 until graph.length())
                         .map { graph.getJSONObject(it) }
-                        .firstOrNull { it.optString("@type").contains("Recipe", ignoreCase = true) }
+                        .firstOrNull { isRecipeType(it) }
                         ?.toString()
                 }
                 else -> null
@@ -718,42 +769,132 @@ class RecipeScraper(private val context: Context) {
                 val arr = org.json.JSONArray(raw)
                 (0 until arr.length())
                     .map { arr.getJSONObject(it) }
-                    .firstOrNull { it.optString("@type").contains("Recipe", ignoreCase = true) }
+                    .firstOrNull { isRecipeType(it) }
                     ?.toString()
             } catch (_: Exception) { null }
         }
     }
 
     private fun parseJsonLd(json: String, url: String, platform: String, doc: Document): Recipe {
-        fun field(key: String) = Regex(""""$key"\s*:\s*"([^"]*?)"""").find(json)?.groupValues?.get(1)
-        fun listField(key: String): List<String> {
-            val arr = Regex(""""$key"\s*:\s*\[([^\]]*?)]""", RegexOption.DOT_MATCHES_ALL)
-                .find(json)?.groupValues?.get(1) ?: return emptyList()
-            val strings = Regex(""""([^"]+)"""").findAll(arr).map { it.groupValues[1] }.toList()
-            if (strings.isNotEmpty()) return strings
-            return Regex(""""text"\s*:\s*"([^"]+)"""").findAll(arr).map { it.groupValues[1] }.toList()
-        }
-        fun parseDur(iso: String) =
-            (Regex("""(\d+)H""").find(iso)?.groupValues?.get(1)?.toIntOrNull() ?: 0) * 60 +
-            (Regex("""(\d+)M""").find(iso)?.groupValues?.get(1)?.toIntOrNull() ?: 0)
+        val obj = runCatching { org.json.JSONObject(json) }.getOrNull()
+            ?: return Recipe(
+                title = cleanTitle(doc.title(), url),
+                sourceUrl = url,
+                platform = platform,
+                ingredients = "Nicht gefunden.",
+                tags = platform
+            )
 
-        val yieldRaw = field("recipeYield") ?: ""
-        val servings = Regex("""\d+""").find(yieldRaw)?.value?.toIntOrNull() ?: 1
-        val ingredients  = listField("recipeIngredient")
-        val instructions = listField("recipeInstructions").ifEmpty { listField("text") }
+        fun str(key: String): String? {
+            if (!obj.has(key) || obj.isNull(key)) return null
+            return when (val v = obj.opt(key)) {
+                is String -> v.trim().takeIf { it.isNotBlank() }
+                is Number -> v.toString()
+                is org.json.JSONArray -> v.optString(0)?.trim()?.takeIf { it.isNotBlank() }
+                is org.json.JSONObject ->
+                    v.optString("text").ifBlank { v.optString("name") }.ifBlank { v.optString("@value") }
+                        .trim().takeIf { it.isNotBlank() }
+                else -> null
+            }
+        }
+
+        fun listStr(key: String): List<String> {
+            if (!obj.has(key) || obj.isNull(key)) return emptyList()
+            return when (val v = obj.opt(key)) {
+                is org.json.JSONArray -> (0 until v.length()).mapNotNull { i ->
+                    when (val item = v.opt(i)) {
+                        is String -> item.trim().takeIf { it.isNotBlank() }
+                        is org.json.JSONObject ->
+                            item.optString("text").ifBlank { item.optString("name") }
+                                .trim().takeIf { it.isNotBlank() }
+                        else -> item?.toString()?.trim()?.takeIf { it.isNotBlank() }
+                    }
+                }
+                is String -> listOf(v.trim()).filter { it.isNotBlank() }
+                else -> emptyList()
+            }
+        }
+
+        fun parseDur(iso: String?): Int? {
+            if (iso.isNullOrBlank()) return null
+            val h = Regex("""(\d+)H""", RegexOption.IGNORE_CASE).find(iso)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            val m = Regex("""(\d+)M""", RegexOption.IGNORE_CASE).find(iso)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            val total = h * 60 + m
+            return total.takeIf { it > 0 }
+                ?: Regex("""\d+""").find(iso)?.value?.toIntOrNull()?.takeIf { it > 0 && it < 24 * 60 }
+        }
+
+        fun parseNum(raw: String?): Float? {
+            if (raw.isNullOrBlank()) return null
+            return Regex("""\d+(?:[.,]\d+)?""").find(raw.replace(',', '.'))
+                ?.value?.toFloatOrNull()?.takeIf { it > 0f }
+        }
+
+        // schema.org NutritionInformation – Werte sind üblicherweise pro Portion
+        val nutrition = obj.optJSONObject("nutrition")
+        val calPerServing = parseNum(nutrition?.optString("calories")?.ifBlank { null }
+            ?: nutrition?.opt("calories")?.toString())
+        val proteinG = parseNum(nutrition?.optString("proteinContent")?.ifBlank { null }
+            ?: nutrition?.opt("proteinContent")?.toString())
+        val carbsG = parseNum(nutrition?.optString("carbohydrateContent")?.ifBlank { null }
+            ?: nutrition?.opt("carbohydrateContent")?.toString())
+        val fatG = parseNum(nutrition?.optString("fatContent")?.ifBlank { null }
+            ?: nutrition?.opt("fatContent")?.toString())
+
+        val yieldRaw = str("recipeYield") ?: ""
+        val servings = Regex("""\d+""").find(yieldRaw)?.value?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+        val ingredients = listStr("recipeIngredient")
+        val instructions = listStr("recipeInstructions").ifEmpty {
+            // HowToStep-Objekte oder einfacher Text
+            when (val inst = obj.opt("recipeInstructions")) {
+                is String -> listOf(inst)
+                else -> emptyList()
+            }
+        }
+
+        val image = when (val img = obj.opt("image")) {
+            is String -> img.takeIf { it.startsWith("http") }
+            is org.json.JSONArray -> (0 until img.length()).mapNotNull { i ->
+                when (val e = img.opt(i)) {
+                    is String -> e.takeIf { it.startsWith("http") }
+                    is org.json.JSONObject -> e.optString("url").takeIf { it.startsWith("http") }
+                    else -> null
+                }
+            }.firstOrNull()
+            is org.json.JSONObject -> img.optString("url").takeIf { it.startsWith("http") }
+            else -> null
+        } ?: extractOgImage(doc)
+
+        val prep = parseDur(str("prepTime")) ?: parseDur(str("totalTime")) ?: parseDur(str("cookTime"))
+
+        val macroLine = buildString {
+            calPerServing?.let { append("${it.toInt()} kcal") }
+            proteinG?.let { append(" · ${it.toInt()}g Protein") }
+            carbsG?.let { append(" · ${it.toInt()}g Kohlenhydrate") }
+            fatG?.let { append(" · ${it.toInt()}g Fett") }
+        }.trim()
+        val baseDesc = (str("description") ?: "").take(400)
+        val description = when {
+            baseDesc.isNotBlank() && macroLine.isNotBlank() -> "$baseDesc\n\n📊 Pro Portion: $macroLine"
+            macroLine.isNotBlank() -> "📊 Pro Portion: $macroLine"
+            else -> baseDesc
+        }
 
         return Recipe(
-            title           = cleanTitle(field("name") ?: doc.title(), url),
-            description     = (field("description") ?: "").take(400),
-            imageUrl        = field("image") ?: doc.select("meta[property=og:image]").attr("content").ifBlank { null },
+            title           = cleanTitle(str("name") ?: doc.title(), url),
+            description     = description,
+            imageUrl        = image,
             sourceUrl       = url,
             platform        = platform,
             ingredients     = ingredients.joinToString("\n") { "• $it" }.ifBlank { "Nicht gefunden." },
-            instructions    = instructions.mapIndexed { i, s -> "${i+1}. $s" }.joinToString("\n").ifBlank { "" },
+            instructions    = instructions.mapIndexed { i, s -> "${i + 1}. $s" }.joinToString("\n").ifBlank { "" },
             servings        = servings,
-            prepTimeMinutes = field("prepTime")?.let { parseDur(it) }?.takeIf { it > 0 },
-            tags            = (field("keywords") ?: platform).take(200),
-            totalCalories   = null
+            prepTimeMinutes = prep,
+            tags            = (str("keywords") ?: platform).take(200),
+            totalCalories   = calPerServing?.let { it * servings },
+            proteinPerServing = proteinG,
+            carbsPerServing = carbsG,
+            fatPerServing   = fatG
         )
     }
 
