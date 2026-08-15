@@ -259,6 +259,14 @@ val KEY_FRESH_HOME = androidx.datastore.preferences.core.booleanPreferencesKey("
 /** true = klassische 1-Spalten-Liste (bisheriges Design), false/absent = kompakte 2-Spalten-Grid-Übersicht */
 val KEY_CLASSIC_RECIPE_LIST = androidx.datastore.preferences.core.booleanPreferencesKey("classic_recipe_list")
 
+/**
+ * Rezept-Import-Experimente (default aus = bisheriges Verhalten).
+ * Fast AI: Groq llama-3.1-8b-instant statt llama-3.3-70b-versatile.
+ * Fast Scrape: kürzerer Instagram-Race-Timeout, weniger Late-Mirrors.
+ */
+val KEY_RECIPE_FAST_AI_PARSE = androidx.datastore.preferences.core.booleanPreferencesKey("recipe_fast_ai_parse")
+val KEY_RECIPE_FAST_SCRAPE = androidx.datastore.preferences.core.booleanPreferencesKey("recipe_fast_scrape")
+
 // ── Design-Toggles (Design-Backlog, einzeln schaltbar unter Mehr → Design) ────
 // Touch-Targets (Default an)
 val KEY_TOGGLE_TOUCH_MEAL_QUICKADD = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_touch_meal_quickadd")

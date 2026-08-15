@@ -71,9 +71,15 @@ class RecipeScraper(private val context: Context) {
         }
         .build()
 
+    /**
+     * @param fastScrape kürzerer IG-Race-Timeout, weniger Mirror-Quellen
+     * @param fastAi     Groq 8B Instant statt 70B beim Caption-Parse
+     */
     suspend fun scrape(
         rawUrl: String,
-        onProgress: (String) -> Unit = {}
+        onProgress: (String) -> Unit = {},
+        fastScrape: Boolean = false,
+        fastAi: Boolean = false
     ): RecipeScrapeResult = withContext(Dispatchers.IO) {
         progress = onProgress
         runCatching {
@@ -81,8 +87,8 @@ class RecipeScraper(private val context: Context) {
             val platform = detectPlatform(url)
             progress("Link erkennen…")
             val recipe   = when (platform) {
-                "instagram" -> scrapeInstagram(url)
-                "tiktok"    -> scrapeTikTok(url)
+                "instagram" -> scrapeInstagram(url, fastScrape, fastAi)
+                "tiktok"    -> scrapeTikTok(url, fastAi)
                 else        -> {
                     progress("Seite laden…")
                     scrapeWeb(url, platform)
@@ -108,7 +114,7 @@ class RecipeScraper(private val context: Context) {
 
     // ── INSTAGRAM ──────────────────────────────────────────────────────────────
 
-    private suspend fun scrapeInstagram(url: String): Recipe {
+    private suspend fun scrapeInstagram(url: String, fastScrape: Boolean = false, fastAi: Boolean = false): Recipe {
         val shortcode = extractInstagramShortcode(url)
         // Collection-/F12-Links sind oft /p/SHORTCODE auch bei Reels.
         // Share-Link aus der App ist korrekt /reel/… — beide Varianten versuchen.
@@ -129,9 +135,9 @@ class RecipeScraper(private val context: Context) {
         if (isGoodCaption(caption)) {
             progress("Aus Cache…")
         } else {
-            progress("Seite laden (parallel)…")
+            progress(if (fastScrape) "Seite laden (schnell)…" else "Seite laden (parallel)…")
             // WebView mit allen kanonischen URLs (reel + p), Mirrors über shortcode
-            caption = raceInstagramCaption(canonicalUrls.first(), shortcode)
+            caption = raceInstagramCaption(canonicalUrls.first(), shortcode, fastScrape)
             if (isGoodCaption(caption)) captionCache[key] = caption
         }
 
@@ -152,7 +158,7 @@ class RecipeScraper(private val context: Context) {
         progress("Rezept extrahieren…")
         val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
         val parsed = if (apiKey.isNotBlank()) {
-            RecipeAiParser.parse(caption, url, "instagram", thumbnail, apiKey)
+            RecipeAiParser.parse(caption, url, "instagram", thumbnail, apiKey, fastModel = fastAi)
         } else {
             RecipeAiParser.fallbackParse(caption, url, "instagram", thumbnail)
         }
@@ -187,12 +193,14 @@ class RecipeScraper(private val context: Context) {
      * Startet WebView + Embed + Mirror + Reader-Proxies parallel und nimmt die
      * erste brauchbare Caption. Gesamtdauer typisch unter ~22s.
      */
-    private suspend fun raceInstagramCaption(url: String, shortcode: String?): String =
+    private suspend fun raceInstagramCaption(url: String, shortcode: String?, fastScrape: Boolean = false): String =
         coroutineScope {
             data class Cap(val text: String, val source: String)
 
             val desktopUa =
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            // Fast: nur schnelle, oft erfolgreiche Quellen; Standard: volle Mirror-Liste.
+            val raceTimeoutMs = if (fastScrape) 10_000L else 22_000L
 
             val jobs = buildList {
                 // 1) WebView mit Geräte-Cookies (beste Chance bei Login auf dem Gerät)
@@ -275,67 +283,70 @@ class RecipeScraper(private val context: Context) {
                             extractCaptionFromHtml(html, embed)?.let { Cap(it, "allorigins-embed") }
                         }.getOrNull()?.takeIf { isGoodCaption(it.text) }
                     })
-                    add(async {
-                        runCatching {
-                            val doc = jsoupGet("https://imginn.com/p/$shortcode/")
-                            val t = doc.select(".desc, .photo-desc, [class*=desc], [class*=caption]").text()
-                                .ifBlank { doc.select("meta[property=og:description]").attr("content") }
-                            Cap(t, "imginn").takeIf { isGoodCaption(it.text) }
-                        }.getOrNull()
-                    })
-                    add(async {
-                        runCatching {
-                            val doc = jsoupGet("https://www.picuki.com/media/$shortcode")
-                            val t = doc.select(".photo-description, .description, [class*=caption], [class*=desc]").text()
-                                .ifBlank { doc.select("meta[property=og:description]").attr("content") }
-                                .ifBlank { doc.select("meta[name=description]").attr("content") }
-                            Cap(t, "picuki").takeIf { isGoodCaption(it.text) }
-                        }.getOrNull()
-                    })
-                    add(async {
-                        runCatching {
-                            val ezUrl = url.replace("www.instagram.com", "www.instagramez.com")
-                                .replace("instagram.com", "instagramez.com")
-                            val doc = jsoupGetWithUA(ezUrl, desktopUa)
-                            val t = doc.select("meta[property=og:description]").attr("content")
-                                .ifBlank { doc.select("meta[name=description]").attr("content") }
-                            Cap(t, "instagramez").takeIf { isGoodCaption(it.text) }
-                        }.getOrNull()
-                    })
-                    add(async {
-                        runCatching {
-                            val ddUrl = url.replace("www.instagram.com", "www.ddinstagram.com")
-                                .replace("instagram.com", "ddinstagram.com")
-                            val doc = jsoupGetWithUA(ddUrl, desktopUa)
-                            val t = doc.select("meta[property=og:description]").attr("content")
-                                .ifBlank { doc.select("meta[name=description]").attr("content") }
-                                .ifBlank { doc.select("p, .caption, [class*=caption]").text() }
-                            Cap(t, "ddinstagram").takeIf { isGoodCaption(it.text) }
-                        }.getOrNull()
-                    })
-                    add(async {
-                        runCatching {
-                            val wUrl = "https://ddinstagram.com/p/$shortcode"
-                            val doc = jsoupGetWithUA(wUrl, desktopUa)
-                            val t = doc.select("meta[property=og:description]").attr("content")
-                                .ifBlank { doc.select("meta[name=description]").attr("content") }
-                            Cap(t, "ddinstagram-apex").takeIf { isGoodCaption(it.text) }
-                        }.getOrNull()
-                    })
-                    // Weitere Mirror (Worker-Frontends)
-                    add(async {
-                        runCatching {
-                            val doc = jsoupGetWithUA("https://www.instagrapi.com/p/$shortcode", desktopUa)
-                            val t = doc.select("meta[property=og:description]").attr("content")
-                                .ifBlank { doc.select("[class*=caption], .caption, p").text() }
-                            Cap(t, "instagrapi").takeIf { isGoodCaption(it.text) }
-                        }.getOrNull()
-                    })
+                    // Langsame Mirror-Sites nur im Standard-Modus (nicht bei Fast-Scrape)
+                    if (!fastScrape) {
+                        add(async {
+                            runCatching {
+                                val doc = jsoupGet("https://imginn.com/p/$shortcode/")
+                                val t = doc.select(".desc, .photo-desc, [class*=desc], [class*=caption]").text()
+                                    .ifBlank { doc.select("meta[property=og:description]").attr("content") }
+                                Cap(t, "imginn").takeIf { isGoodCaption(it.text) }
+                            }.getOrNull()
+                        })
+                        add(async {
+                            runCatching {
+                                val doc = jsoupGet("https://www.picuki.com/media/$shortcode")
+                                val t = doc.select(".photo-description, .description, [class*=caption], [class*=desc]").text()
+                                    .ifBlank { doc.select("meta[property=og:description]").attr("content") }
+                                    .ifBlank { doc.select("meta[name=description]").attr("content") }
+                                Cap(t, "picuki").takeIf { isGoodCaption(it.text) }
+                            }.getOrNull()
+                        })
+                        add(async {
+                            runCatching {
+                                val ezUrl = url.replace("www.instagram.com", "www.instagramez.com")
+                                    .replace("instagram.com", "instagramez.com")
+                                val doc = jsoupGetWithUA(ezUrl, desktopUa)
+                                val t = doc.select("meta[property=og:description]").attr("content")
+                                    .ifBlank { doc.select("meta[name=description]").attr("content") }
+                                Cap(t, "instagramez").takeIf { isGoodCaption(it.text) }
+                            }.getOrNull()
+                        })
+                        add(async {
+                            runCatching {
+                                val ddUrl = url.replace("www.instagram.com", "www.ddinstagram.com")
+                                    .replace("instagram.com", "ddinstagram.com")
+                                val doc = jsoupGetWithUA(ddUrl, desktopUa)
+                                val t = doc.select("meta[property=og:description]").attr("content")
+                                    .ifBlank { doc.select("meta[name=description]").attr("content") }
+                                    .ifBlank { doc.select("p, .caption, [class*=caption]").text() }
+                                Cap(t, "ddinstagram").takeIf { isGoodCaption(it.text) }
+                            }.getOrNull()
+                        })
+                        add(async {
+                            runCatching {
+                                val wUrl = "https://ddinstagram.com/p/$shortcode"
+                                val doc = jsoupGetWithUA(wUrl, desktopUa)
+                                val t = doc.select("meta[property=og:description]").attr("content")
+                                    .ifBlank { doc.select("meta[name=description]").attr("content") }
+                                Cap(t, "ddinstagram-apex").takeIf { isGoodCaption(it.text) }
+                            }.getOrNull()
+                        })
+                        // Weitere Mirror (Worker-Frontends)
+                        add(async {
+                            runCatching {
+                                val doc = jsoupGetWithUA("https://www.instagrapi.com/p/$shortcode", desktopUa)
+                                val t = doc.select("meta[property=og:description]").attr("content")
+                                    .ifBlank { doc.select("[class*=caption], .caption, p").text() }
+                                Cap(t, "instagrapi").takeIf { isGoodCaption(it.text) }
+                            }.getOrNull()
+                        })
+                    }
                 }
             }
 
-            // Erste brauchbare Caption innerhalb 22s
-            val winner = withTimeoutOrNull(22_000L) {
+            // Erste brauchbare Caption (10 s Fast / 22 s Standard)
+            val winner = withTimeoutOrNull(raceTimeoutMs) {
                 val pending = jobs.toMutableList()
                 while (pending.isNotEmpty()) {
                     val done = select {
@@ -535,7 +546,7 @@ class RecipeScraper(private val context: Context) {
     //  4. Generic og:description via Jsoup
     //  5. oEmbed title (lowest quality, no body text)
 
-    private suspend fun scrapeTikTok(url: String): Recipe {
+    private suspend fun scrapeTikTok(url: String, fastAi: Boolean = false): Recipe {
         progress("Link auflösen…")
         val expandedUrl = runCatching {
             if ("vm.tiktok.com" in url || "vt.tiktok.com" in url) {
@@ -575,7 +586,7 @@ class RecipeScraper(private val context: Context) {
         progress("Rezept extrahieren…")
         val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
         val parsed = if (apiKey.isNotBlank()) {
-            RecipeAiParser.parse(caption!!, url, "tiktok", thumbnail, apiKey)
+            RecipeAiParser.parse(caption!!, url, "tiktok", thumbnail, apiKey, fastModel = fastAi)
         } else {
             RecipeAiParser.fallbackParse(caption!!, url, "tiktok", thumbnail)
         }

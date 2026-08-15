@@ -41,6 +41,8 @@ import ch.nutrisnap.app.ui.theme.KEY_AGGRESSIVE_SPORT_DAY
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_UI
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_CARDS
 import ch.nutrisnap.app.ui.theme.KEY_CLASSIC_RECIPE_LIST
+import ch.nutrisnap.app.ui.theme.KEY_RECIPE_FAST_AI_PARSE
+import ch.nutrisnap.app.ui.theme.KEY_RECIPE_FAST_SCRAPE
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_HOME
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_MEAL_QUICKADD
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_MEAL_ICON
@@ -297,6 +299,36 @@ fun SettingsScreen(
                         onCheckedChange = { checked ->
                             scope.launch {
                                 context.notifDataStore.edit { it[KEY_CLASSIC_RECIPE_LIST] = checked }
+                            }
+                        }
+                    )
+                }
+                SettingsCard(title = "Rezept-Import (Experiment)", icon = Icons.Default.Bolt) {
+                    Text(
+                        "Schnellerer Import von Instagram/TikTok/Web. Standard aus = bisherige Qualität und Quellen. Bei Problemen einfach wieder ausschalten.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(NutriSpacing.sm))
+                    val fastAi = prefs?.get(KEY_RECIPE_FAST_AI_PARSE) ?: false
+                    val fastScrape = prefs?.get(KEY_RECIPE_FAST_SCRAPE) ?: false
+                    SettingsSwitchRow(
+                        title = "Schnelles KI-Parsing",
+                        subtitle = "Groq 8B Instant statt 70B (oft ~1 s, etwas weniger präzise)",
+                        checked = fastAi,
+                        onCheckedChange = { checked ->
+                            scope.launch {
+                                context.notifDataStore.edit { it[KEY_RECIPE_FAST_AI_PARSE] = checked }
+                            }
+                        }
+                    )
+                    SettingsSwitchRow(
+                        title = "Schnelle Link-Extraktion",
+                        subtitle = "Kürzerer Timeout, weniger Mirror-Quellen (IG)",
+                        checked = fastScrape,
+                        onCheckedChange = { checked ->
+                            scope.launch {
+                                context.notifDataStore.edit { it[KEY_RECIPE_FAST_SCRAPE] = checked }
                             }
                         }
                     )

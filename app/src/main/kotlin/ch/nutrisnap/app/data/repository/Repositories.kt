@@ -11,10 +11,14 @@ import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.data.supabase.SupabaseSync
 import ch.nutrisnap.app.data.supabase.SyncStatusHolder
 import ch.nutrisnap.app.domain.RecipeScraper
+import ch.nutrisnap.app.ui.screens.settings.notifDataStore
+import ch.nutrisnap.app.ui.theme.KEY_RECIPE_FAST_AI_PARSE
+import ch.nutrisnap.app.ui.theme.KEY_RECIPE_FAST_SCRAPE
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -384,7 +388,7 @@ class DiaryRepository(db: NutriDatabase) {
     }
 }
 
-class RecipeRepository(db: NutriDatabase, context: Context) {
+class RecipeRepository(db: NutriDatabase, private val context: Context) {
     private val dao           = db.recipeDao()
     private val componentDao  = db.recipeComponentDao()
     private val scraper       = RecipeScraper(context)
@@ -502,7 +506,13 @@ class RecipeRepository(db: NutriDatabase, context: Context) {
     }
 
     suspend fun importFromUrl(url: String, onProgress: (String) -> Unit = {}): RecipeScrapeResult {
-        val result = scraper.scrape(url, onProgress)
+        // Experiment-Toggles aus Settings (default = bisheriges Verhalten)
+        val prefs = runCatching {
+            context.notifDataStore.data.first()
+        }.getOrNull()
+        val fastAi = prefs?.get(KEY_RECIPE_FAST_AI_PARSE) ?: false
+        val fastScrape = prefs?.get(KEY_RECIPE_FAST_SCRAPE) ?: false
+        val result = scraper.scrape(url, onProgress, fastScrape = fastScrape, fastAi = fastAi)
         if (result.success && result.recipe != null) {
             val id = saveRecipe(result.recipe)
             val saved = result.recipe.copy(id = id)

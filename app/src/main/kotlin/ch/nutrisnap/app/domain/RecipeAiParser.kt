@@ -43,16 +43,21 @@ object RecipeAiParser {
      * @param imageUrl  Thumbnail from oEmbed (kept as-is)
      * @param apiKey    Groq API key from BuildConfig
      */
+    /**
+     * @param fastModel true → Groq llama-3.1-8b-instant (schneller, etwas weniger präzise).
+     *                  false → llama-3.3-70b-versatile (Default).
+     */
     suspend fun parse(
         caption:  String,
         sourceUrl: String?,
         platform:  String,
         imageUrl:  String?,
-        apiKey:    String
+        apiKey:    String,
+        fastModel: Boolean = false
     ): Recipe = withContext(Dispatchers.IO) {
         val cleaned = cleanCaption(caption)
         val fallback = fallbackParse(cleaned, sourceUrl, platform, imageUrl)
-        val aiResult = runCatching { callLlm(cleaned, apiKey) }.getOrNull()
+        val aiResult = runCatching { callLlm(cleaned, apiKey, fastModel) }.getOrNull()
         // AI oft mit title=null / leeren Zutaten → mit Regex-Fallback mergen
         mergeWithFallback(aiResult, fallback, cleaned)
     }
@@ -212,11 +217,11 @@ Rules:
      * sequentiellen Request zu starten. Vermeidet die worst-case Latenz von
      * "Gemini-Timeout + Groq-Call" (~30s+) zugunsten von max(Gemini, Groq).
      */
-    private suspend fun callLlm(caption: String, apiKey: String): Recipe = coroutineScope {
+    private suspend fun callLlm(caption: String, apiKey: String, fastModel: Boolean = false): Recipe = coroutineScope {
         val userMessage = "Extract recipe from this caption:\n\n$caption"
 
         if (!GeminiService.isAvailable()) {
-            return@coroutineScope callGroq(caption, apiKey)
+            return@coroutineScope callGroq(caption, apiKey, fastModel)
         }
 
         val geminiJob: Deferred<Result<Recipe>> = async {
@@ -235,7 +240,7 @@ Rules:
             }
         }
         val groqJob: Deferred<Result<Recipe>> = async {
-            runCatching { callGroq(caption, apiKey) }
+            runCatching { callGroq(caption, apiKey, fastModel) }
         }
 
         val (winnerJob, winnerResult) = select<Pair<Deferred<Result<Recipe>>, Result<Recipe>>> {
@@ -254,11 +259,13 @@ Rules:
         }
     }
 
-    private fun callGroq(caption: String, apiKey: String): Recipe {
+    private fun callGroq(caption: String, apiKey: String, fastModel: Boolean = false): Recipe {
         val userMessage = "Extract recipe from this caption:\n\n$caption"
+        // 8B Instant: deutlich niedrigere Latenz auf Groq Free-Tier; 70B: bessere Struktur.
+        val modelId = if (fastModel) "llama-3.1-8b-instant" else "llama-3.3-70b-versatile"
 
         val body = JSONObject().apply {
-            put("model", "llama-3.3-70b-versatile")
+            put("model", modelId)
             put("max_tokens", 2000)
             put("temperature", 0.1)
             put("messages", JSONArray().apply {
