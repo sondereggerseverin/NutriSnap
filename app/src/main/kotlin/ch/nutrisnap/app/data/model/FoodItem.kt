@@ -89,5 +89,7 @@ enum class FoodSource {
     USDA,
     NUTRITIONIX,
     MANUAL,
-    SWISS_FSVO
+    SWISS_FSVO,
+    /** Bundeslebensmittelschlüssel (DE) – Datenquelle vorbereitet, Backend folgt. */
+    BLS
 }

@@ -64,7 +64,33 @@ class ExportViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    suspend fun buildWeightCsv(): String = withContext(Dispatchers.IO) {
+    /** JSON-Export analog OpenNutriTracker (stabile Schema-Felder). */
+    suspend fun buildDiaryJson(): String = withContext(Dispatchers.IO) {
+        val entries = db.diaryDao().getAllOnce()
+        buildString {
+            append("{\n  \"format\": \"nutrisnap-diary-v1\",\n  \"entries\": [\n")
+            entries.forEachIndexed { i, e ->
+                if (i > 0) append(",\n")
+                append("    {")
+                append("\"id\":").append(e.id).append(",")
+                append("\"date\":\"").append(e.dateStr).append("\",")
+                append("\"meal\":\"").append(e.mealType.name).append("\",")
+                append("\"name\":\"").append(e.foodName.replace("\\", "\\\\").replace("\"", "\\\"")).append("\",")
+                append("\"amountGrams\":").append(e.amountGrams).append(",")
+                append("\"calories\":").append(e.calories).append(",")
+                append("\"protein\":").append(e.protein).append(",")
+                append("\"carbs\":").append(e.carbs).append(",")
+                append("\"fat\":").append(e.fat).append(",")
+                append("\"fiber\":").append(e.fiber)
+                e.snapshotBrand?.let { append(",\"brand\":\"").append(it.replace("\"", "'")).append("\"") }
+                e.snapshotBarcode?.let { append(",\"barcode\":\"").append(it).append("\"") }
+                append("}")
+            }
+            append("\n  ]\n}")
+        }
+    }
+
+        suspend fun buildWeightCsv(): String = withContext(Dispatchers.IO) {
         val rows = db.weightDao().getAllOnce()
         buildString {
             appendLine("Datum,Gewicht_kg")
@@ -146,7 +172,7 @@ fun ExportScreen(
             )
 
             ExportCard(
-                title = "Ernährungstagebuch",
+                title = "Ernährungstagebuch (CSV)",
                 subtitle = "$diaryCount Einträge",
                 icon = Icons.Default.MenuBook,
                 onSave = {
@@ -156,6 +182,28 @@ fun ExportScreen(
                     }
                 },
                 onShare = { scope.launch { share(vm.buildDiaryCsv()) } }
+            )
+
+            ExportCard(
+                title = "Ernährungstagebuch (JSON)",
+                subtitle = "nutrisnap-diary-v1 · inkl. Snapshot-Felder",
+                icon = Icons.Default.Code,
+                onSave = {
+                    scope.launch {
+                        pendingContent = vm.buildDiaryJson()
+                        saveLauncher.launch("nutrisnap_tagebuch.json")
+                    }
+                },
+                onShare = {
+                    scope.launch {
+                        val json = vm.buildDiaryJson()
+                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "application/json"
+                            putExtra(android.content.Intent.EXTRA_TEXT, json)
+                        }
+                        context.startActivity(android.content.Intent.createChooser(intent, "JSON teilen"))
+                    }
+                }
             )
 
             ExportCard(

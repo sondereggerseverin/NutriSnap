@@ -158,6 +158,51 @@ fun parseMealOrder(stored: String?): List<MealType> {
     return parsed + defaults.filter { it !in parsed }
 }
 
+/** Standard-Mahlzeiten-Split (Anteil am Tagesziel). Summe ≈ 1.0 */
+val DEFAULT_MEAL_SPLIT: Map<MealType, Float> = mapOf(
+    MealType.BREAKFAST to 0.25f,
+    MealType.LUNCH to 0.35f,
+    MealType.DINNER to 0.30f,
+    MealType.SNACK to 0.10f
+)
+
+/** Presets analog OpenNutriTracker */
+enum class MealSplitPreset(val label: String, val splits: Map<MealType, Float>) {
+    STANDARD("Standard (3+Snack)", DEFAULT_MEAL_SPLIT),
+    OMAD("OMAD (1 Mahlzeit)", mapOf(
+        MealType.BREAKFAST to 0f, MealType.LUNCH to 0f, MealType.DINNER to 1f, MealType.SNACK to 0f
+    )),
+    TWO_MEAL("2 Mahlzeiten", mapOf(
+        MealType.BREAKFAST to 0f, MealType.LUNCH to 0.45f, MealType.DINNER to 0.45f, MealType.SNACK to 0.10f
+    )),
+    FIVE_SMALL("5 kleine", mapOf(
+        MealType.BREAKFAST to 0.20f, MealType.LUNCH to 0.20f, MealType.DINNER to 0.20f, MealType.SNACK to 0.40f
+    ))
+}
+
+fun parseMealSplit(stored: String?): Map<MealType, Float> {
+    if (stored.isNullOrBlank()) return DEFAULT_MEAL_SPLIT
+    return runCatching {
+        val cleaned = stored.trim().removePrefix("{").removeSuffix("}")
+        val map = mutableMapOf<MealType, Float>()
+        cleaned.split(",").forEach { part ->
+            val kv = part.split(":")
+            if (kv.size == 2) {
+                val key = kv[0].trim().removeSurrounding(""")
+                val value = kv[1].trim().toFloatOrNull() ?: return@forEach
+                runCatching { MealType.valueOf(key) }.getOrNull()?.let { map[it] = value }
+            }
+        }
+        if (map.isEmpty()) DEFAULT_MEAL_SPLIT else DEFAULT_MEAL_SPLIT + map
+    }.getOrDefault(DEFAULT_MEAL_SPLIT)
+}
+
+fun mealSplitToJson(split: Map<MealType, Float>): String =
+    MealType.entries.joinToString(",", "{", "}") { ""${it.name}":${split[it] ?: 0f}" }
+
+fun mealKcalTarget(dailyGoal: Int, meal: MealType, split: Map<MealType, Float>): Int =
+    ((split[meal] ?: 0f) * dailyGoal).toInt().coerceAtLeast(0)
+
 // ─── Rezept-Tags / Diät-Filter ───────────────────────────────────────────────
 enum class DietTag(val label: String, val emoji: String) {
     VEGAN("Vegan", "🌱"),

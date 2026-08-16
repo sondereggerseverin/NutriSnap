@@ -247,6 +247,8 @@ val LocalAppTheme = staticCompositionLocalOf { AppTheme.FOREST_GREEN }
 
 val KEY_APP_THEME = stringPreferencesKey("app_theme")
 val KEY_MEAL_ORDER = stringPreferencesKey("meal_order")
+/** Anteil am Tages-Kalorienziel pro Mahlzeit, JSON z.B. {"BREAKFAST":0.25,"LUNCH":0.35,"DINNER":0.30,"SNACK":0.10} */
+val KEY_MEAL_SPLIT = stringPreferencesKey("meal_split_json")
 val KEY_AUTO_GERMAN_METRIC = androidx.datastore.preferences.core.booleanPreferencesKey("auto_german_metric")
 val KEY_MANUAL_ACTIVITY_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("manual_activity_enabled")
 val KEY_AGGRESSIVE_SPORT_DAY = androidx.datastore.preferences.core.booleanPreferencesKey("aggressive_sport_day")

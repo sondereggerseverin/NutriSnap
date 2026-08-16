@@ -394,8 +394,14 @@ fun DiaryScreen(
                                 val headerBtnSize = if (largerHeader) 40.dp else 28.dp
                                 val headerIconSize = if (largerHeader) 22.dp else 18.dp
                                 Row(verticalAlignment = Alignment.CenterVertically) {
+                                    val splitMap = ch.nutrisnap.app.data.model.parseMealSplit(
+                                        mealPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_MEAL_SPLIT)
+                                    )
+                                    val mealTarget = ch.nutrisnap.app.data.model.mealKcalTarget(
+                                        state.calorieGoal.toInt(), meal, splitMap
+                                    )
                                     Text(
-                                        "$mealKcal kcal",
+                                        if (mealTarget > 0) "$mealKcal / $mealTarget kcal" else "$mealKcal kcal",
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Medium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
