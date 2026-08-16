@@ -926,9 +926,9 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Schlägt 2 Komponenten (Beilage / Sauce) aus verifizierten Zutaten vor.
-     * Nährwerte = Summe der gematchten Zutaten (Kalorien ändern sich durch Wasseraufnahme nicht).
-     * Kochgewichte bleiben leer – Nutzer trägt die abgewogenen Batch-Gewichte ein.
+     * Schlägt Komponenten aus verifizierten Zutaten vor (beliebig viele Gruppen).
+     * Gruppiert nach [IngredientMatch.componentGroup]; unbekannte Werte werden
+     * heuristisch Beilage vs. Sauce zugeordnet. Kochgewichte bleiben leer.
      */
     suspend fun suggestComponentsFromMatches(recipe: Recipe): List<RecipeComponent> {
         val matches = matchDao.getMatchesForRecipeOnce(recipe.id)
@@ -939,7 +939,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             val n = text.lowercase()
             return listOf(
                 "reis", "basmati", "erbse", "erbsen", "peas", "kartoffel", "nudel", "pasta",
-                "quinoa", "couscous", "bulgur", "beilage", "reisnudeln"
+                "quinoa", "couscous", "bulgur", "beilage", "reisnudeln", "sweet potato",
+                "süsskartoffel", "suesskartoffel"
             ).any { it in n }
         }
         fun isSauce(text: String): Boolean {
@@ -951,47 +952,39 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 "fromage", "rôti", "roti", "kebab"
             ).any { it in n }
         }
-
-        val side = mutableListOf<ch.nutrisnap.app.data.model.IngredientMatch>()
-        val sauce = mutableListOf<ch.nutrisnap.app.data.model.IngredientMatch>()
-        for (m in matches) {
-            when (m.componentGroup) {
-                "side" -> side.add(m)
-                "sauce" -> sauce.add(m)
-                else -> {
-                    val key = "${m.ingredientRaw} ${m.ingredientName} ${m.matchedFoodName.orEmpty()}"
-                    when {
-                        isSide(key) && !isSauce(key) -> side.add(m)
-                        isSauce(key) -> sauce.add(m)
-                        isSide(key) -> side.add(m)
-                        else -> sauce.add(m)
-                    }
-                }
+        fun resolveKey(m: ch.nutrisnap.app.data.model.IngredientMatch): String {
+            val g = m.componentGroup?.trim().orEmpty()
+            if (g.isNotEmpty()) return g
+            val key = "${m.ingredientRaw} ${m.ingredientName} ${m.matchedFoodName.orEmpty()}"
+            return when {
+                isSide(key) && !isSauce(key) -> "side"
+                isSauce(key) -> "sauce"
+                isSide(key) -> "side"
+                else -> "sauce"
             }
         }
+        fun displayName(key: String): String = when (key) {
+            "side" -> "Beilage"
+            "sauce" -> "Sauce / Fleisch"
+            else -> key
+        }
 
-        fun sumComp(name: String, list: List<ch.nutrisnap.app.data.model.IngredientMatch>) =
+        val grouped = matches.groupBy { resolveKey(it) }
+        return grouped.entries.mapIndexed { i, (key, list) ->
             RecipeComponent(
                 recipeId = recipe.id,
-                name = name,
+                name = displayName(key),
                 cookedWeightG = 0f,
                 totalCalories = list.sumOf { (it.matchedCalories ?: 0f).toDouble() }.toFloat(),
                 proteinG = list.sumOf { (it.matchedProtein ?: 0f).toDouble() }.toFloat(),
                 carbsG = list.sumOf { (it.matchedCarbs ?: 0f).toDouble() }.toFloat(),
-                fatG = list.sumOf { (it.matchedFat ?: 0f).toDouble() }.toFloat()
+                fatG = list.sumOf { (it.matchedFat ?: 0f).toDouble() }.toFloat(),
+                sortOrder = i
             )
-
-        return buildList {
-            if (side.isNotEmpty()) add(sumComp("Beilage", side))
-            if (sauce.isNotEmpty()) add(sumComp("Sauce / Fleisch", sauce))
         }
     }
 
-    /**
-     * Analysiert Rezept-Zutaten (OpenFoodFacts/USDA/…).
-     * @param persist true = berechnete Makros in die DB schreiben (Verifizieren / Neu berechnen).
-     *                false = nur in-memory für „Zutaten einsehen“ – überschreibt nie verifizierte Werte.
-     */
+
     fun analyzeNutrition(recipe: Recipe, persist: Boolean = true) {
         viewModelScope.launch {
             _nutritionState.value = NutritionState(isAnalyzing = true, recipeId = recipe.id)

@@ -632,7 +632,7 @@ fun IngredientVerifySheet(
                     Text("Nährwerte übernehmen ($verifiedCount/${verifyStates.size} verifiziert)")
                 }
                 Text(
-                    "Für Beilage/Sauce: Button „Trennen“ neben Verify nutzen.",
+                    "Für mehrere Teile: Button „Trennen“ neben Verify nutzen.",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)

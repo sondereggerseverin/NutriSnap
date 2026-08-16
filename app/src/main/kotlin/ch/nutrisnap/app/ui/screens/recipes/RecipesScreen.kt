@@ -1802,7 +1802,7 @@ fun RecipeDetailSheet(
                 ) {
                     Icon(Icons.Default.Restaurant, null, Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Beilage / Sauce trennen", fontSize = 13.sp)
+                    Text("Komponenten trennen", fontSize = 13.sp)
                 }
                 Spacer(Modifier.height(10.dp))
             }
