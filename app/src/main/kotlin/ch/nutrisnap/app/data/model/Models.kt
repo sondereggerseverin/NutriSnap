@@ -188,7 +188,7 @@ fun parseMealSplit(stored: String?): Map<MealType, Float> {
         cleaned.split(",").forEach { part ->
             val kv = part.split(":")
             if (kv.size == 2) {
-                val key = kv[0].trim().removeSurrounding(""")
+                val key = kv[0].trim().removeSurrounding("\"")
                 val value = kv[1].trim().toFloatOrNull() ?: return@forEach
                 runCatching { MealType.valueOf(key) }.getOrNull()?.let { map[it] = value }
             }
@@ -198,7 +198,7 @@ fun parseMealSplit(stored: String?): Map<MealType, Float> {
 }
 
 fun mealSplitToJson(split: Map<MealType, Float>): String =
-    MealType.entries.joinToString(",", "{", "}") { ""${it.name}":${split[it] ?: 0f}" }
+    MealType.entries.joinToString(",", "{", "}") { "\"${it.name}\":${split[it] ?: 0f}" }
 
 fun mealKcalTarget(dailyGoal: Int, meal: MealType, split: Map<MealType, Float>): Int =
     ((split[meal] ?: 0f) * dailyGoal).toInt().coerceAtLeast(0)
