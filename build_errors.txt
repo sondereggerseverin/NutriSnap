@@ -1,18 +1,17 @@
-# Build errors - run 782
+# Build errors - run 783
 
 ## Error lines
 ```
-Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libbarhopper_v3.so, libdatastore_shared_counter.so, libimage_processing_util_jni.so. Run with --info option to learn more.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/home/HomeScreen.kt:898:55 Unresolved reference 'estimateKcal'.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/home/HomeScreen.kt:915:57 Unresolved reference 'estimateKcal'.
-> Task :app:compileDebugKotlin FAILED
-   > Compilation error. See log for more details
-Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilation error. See log for more details
-BUILD FAILED in 2m 36s
+e: [ksp] [MissingType]: Element 'ch.nutrisnap.app.data.db.NutriDatabase' references a type that is not present
+> Task :app:kspDebugKotlin FAILED
+   > KSP failed with exit code: PROCESSING_ERROR
+Caused by: java.lang.Exception: KSP failed with exit code: PROCESSING_ERROR
+BUILD FAILED in 52s
 ```
 
 ## Last 150 lines
 ```
+	at org.gradle.internal.execution.steps.CancelExecutionStep.execute(CancelExecutionStep.java:42)
 	at org.gradle.internal.execution.steps.TimeoutStep.executeWithoutTimeout(TimeoutStep.java:75)
 	at org.gradle.internal.execution.steps.TimeoutStep.execute(TimeoutStep.java:55)
 	at org.gradle.internal.execution.steps.PreCreateOutputParentsStep.execute(PreCreateOutputParentsStep.java:50)
@@ -129,9 +128,8 @@ BUILD FAILED in 2m 36s
 	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.run(DefaultBuildController.java:198)
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
-Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilation error. See log for more details
-	at org.jetbrains.kotlin.gradle.tasks.TasksUtilsKt.throwExceptionIfCompilationFailed(tasksUtils.kt:21)
-	at org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork.execute(BuildToolsApiCompilationWork.kt:295)
+Caused by: java.lang.Exception: KSP failed with exit code: PROCESSING_ERROR
+	at com.google.devtools.ksp.gradle.KspAAWorkerAction.execute(KspAATask.kt:768)
 	at org.gradle.workers.internal.DefaultWorkerServer.execute(DefaultWorkerServer.java:63)
 	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:66)
 	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:62)
@@ -161,6 +159,6 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilat
 	... 2 more
 
 
-BUILD FAILED in 2m 36s
-31 actionable tasks: 31 executed
+BUILD FAILED in 52s
+23 actionable tasks: 23 executed
 ```
