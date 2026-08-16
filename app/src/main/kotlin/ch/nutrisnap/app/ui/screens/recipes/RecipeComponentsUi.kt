@@ -259,7 +259,7 @@ fun RecipeComponentsEditorSheet(
                                     )
                                 } else {
                                     Text(
-                                        "Noch keine Zutaten-Zuordnung. Im Verify-Fenster Zutaten in Beilage/Sauce sortieren und Kochgewicht setzen.",
+                                        "Noch keine Zutaten-Zuordnung. Über «Komponenten trennen» Zutaten diesem Teil zuordnen und Kochgewicht setzen.",
                                         fontSize = 12.sp,
                                         color = MaterialTheme.colorScheme.error
                                     )
