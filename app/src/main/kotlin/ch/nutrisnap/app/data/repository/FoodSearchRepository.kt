@@ -287,9 +287,11 @@ class FoodSearchRepository(
     // Bekannte Lebensmittel-Substantive, an denen ein zusammengeschriebenes
     // Kompositum aufgetrennt werden kann (z.B. "süsskartoffelpommes" ->
     // "süsskartoffel pommes"). Bei Bedarf einfach ergänzen.
-    private val compoundSplitWords = listOf(
+        private val compoundSplitWords = listOf(
         "pommes", "kartoffel", "kartoffeln", "curry", "salat", "brot", "suppe",
-        "sauce", "soße", "gemüse", "reis", "nudeln", "wurst", "käse", "brust"
+        "sauce", "sosse", "gemuese", "reis", "nudeln", "wurst", "kaese", "brust",
+        "fleisch", "hackfleisch", "schnitzel", "plaetzli", "steak", "filet",
+        "braten", "voressen"
     )
 
     /**

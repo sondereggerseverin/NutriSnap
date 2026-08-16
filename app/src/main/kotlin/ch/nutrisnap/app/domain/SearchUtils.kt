@@ -112,6 +112,10 @@ object SearchUtils {
         "magerquark" to listOf("quark", "topfen", "cottage cheese"),
         "haferflocken" to listOf("oats", "oatmeal", "porridge"),
         "rinderhack" to listOf("ground beef", "hackfleisch", "faschiertes"),
+        "kalbhack" to listOf("kalbshackfleisch", "kalbfleisch gehackt", "ground veal"),
+        "kalbfleisch" to listOf("kalb", "veal", "kalbshackfleisch", "kalbsplaetzli"),
+        "kalbsplaetzli" to listOf("kalbs plaetzli", "kalbs plätzli", "veal cutlet", "kalbsschnitzel"),
+        "plaetzli" to listOf("plätzli", "schnitzel", "cutlet", "steak"),
         "pommes" to listOf("pommes frites", "fritten", "french fries", "fries"),
         "curry" to listOf("thai curry", "currysauce", "currypaste", "currygericht"),
         "suesskartoffel" to listOf("sweet potato", "suesskartoffeln"),
@@ -135,6 +139,60 @@ object SearchUtils {
      * inkl. umgekehrter Map-Richtung. Wird von der Suche genutzt, um die
      * lokale DB mit mehreren LIKE-Queries abzufragen.
      */
+    /** Bekannte Suffix-Wörter für Kompositum-Auftrennung (lokal + remote). */
+    private val COMPOUND_SUFFIXES = listOf(
+        "pommes", "kartoffel", "kartoffeln", "curry", "salat", "brot", "suppe",
+        "sauce", "sosse", "gemuese", "reis", "nudeln", "wurst", "kaese",
+        "brust", "fleisch", "hackfleisch", "schnitzel", "plaetzli", "steak",
+        "filet", "braten", "voressen"
+    )
+
+    /**
+     * Query-Varianten für lokale LIKE-Suche: Original, Kompositum mit Leerzeichen,
+     * ohne Leerzeichen, signifikante Tokens. Max. 6 Varianten.
+     * Beispiel: "kalbsplaetzli" → ["kalbsplaetzli", "kalbs plaetzli", "kalbs", "plaetzli"]
+     */
+    fun localQueryVariants(query: String): List<String> {
+        val raw = query.trim()
+        if (raw.length < 2) return listOf(raw)
+        val out = linkedSetOf<String>()
+        out += raw
+        val norm = normalize(raw)
+        if (norm.isNotBlank() && norm != raw.lowercase()) out += norm
+
+        // Kompositum auftrennen (nur wenn kein Leerzeichen)
+        if (!raw.contains(' ') && raw.length >= 6) {
+            val q = norm.ifBlank { raw.lowercase() }
+            for (suffix in COMPOUND_SUFFIXES) {
+                val s = normalize(suffix)
+                if (q.endsWith(s) && q.length > s.length + 2) {
+                    val head = q.removeSuffix(s).trim()
+                    if (head.length >= 2) {
+                        out += "$head $s"
+                        out += head
+                        out += s
+                    }
+                    break
+                }
+            }
+        }
+
+        // Leerzeichen entfernen (DB-Name zusammengeschrieben)
+        if (raw.contains(' ')) {
+            out += raw.replace(" ", "")
+            val n = normalize(raw).replace(" ", "")
+            if (n.isNotBlank()) out += n
+        }
+
+        // Signifikante Tokens
+        raw.split(Regex("\\s+")).filter { it.length >= 4 }.forEach { out += it }
+
+        // Wenige Synonyme
+        synonymsOf(norm.ifBlank { raw.lowercase() }).take(3).forEach { out += it }
+
+        return out.filter { it.isNotBlank() }.take(6)
+    }
+
     fun synonymsOf(normalizedQuery: String): List<String> {
         val q = normalizedQuery.trim().lowercase()
         if (q.isBlank()) return emptyList()

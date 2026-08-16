@@ -11,6 +11,7 @@ import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.data.supabase.SupabaseSync
 import ch.nutrisnap.app.data.supabase.SyncStatusHolder
 import ch.nutrisnap.app.domain.RecipeScraper
+import ch.nutrisnap.app.domain.SearchUtils
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_FAST_AI_PARSE
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_FAST_SCRAPE
@@ -622,23 +623,19 @@ class FoodItemRepository(db: NutriDatabase) {
             val barcodeResult = remoteRepo.searchByBarcode(query)
             if (barcodeResult != null) return listOf(barcodeResult)
         }
-        // BUG-FIX: dao.search() gecachte lokale API-Treffer koennen ueber mehrere Suchen
-        // hinweg als echte Duplikate im Cache landen (insertAll nutzt OnConflictStrategy.
-        // IGNORE auf einer autogenerierten ID, die bei jedem Insert neu vergeben wird -
-        // "Konflikt" tritt also nie ein). distinctBy hier faengt das an der Anzeige ab,
-        // ohne die Cache-Tabelle selbst migrieren zu muessen.
-        val local  = dao.search(query).distinctBy { it.barcode ?: it.name.lowercase().trim() }
-        // BUG-FIX: der importierte Yazio-/Eigenprodukt-Katalog (custom_foods, befuellt
-        // ueber YazioImportViewModel.importBundledFoods) wurde bisher komplett ignoriert -
-        // die Suche kannte nur food_items (API-Cache). Eigene Produkte wie "Sour Cream"
-        // waren dadurch nie auffindbar, obwohl sie in der DB lagen.
-        val custom = customFoodDao.searchOnce(query).map { it.toFoodItem() }
+        // Lokale Queries mit Varianten (Kompositum-Split, Tokens, Synonyme),
+        // damit z.B. "kalbsplätzli" auch "Kalbs Plätzli" in custom_foods findet.
+        val variants = SearchUtils.localQueryVariants(query)
+        val local = variants.flatMap { q ->
+            runCatching { dao.search(q) }.getOrDefault(emptyList())
+        }.distinctBy { it.barcode ?: it.name.lowercase().trim() }
+        val custom = variants.flatMap { q ->
+            runCatching { customFoodDao.searchOnce(q) }.getOrDefault(emptyList())
+        }.map { it.toFoodItem() }
+            .distinctBy { it.barcode ?: it.name.lowercase().trim() }
         val remoteList = remoteRepo.search(query)
-        val names      = (local + custom).map { it.name.lowercase() }.toSet()
-        val combined   = local + custom + remoteList.filter { it.name.lowercase() !in names }
-        // local ist eine rohe DB-LIKE-Query ohne Relevanz-Reihenfolge — ohne diese
-        // Sortierung landen zufällige lokale Cache-Treffer vor besser passenden
-        // Remote-Ergebnissen (z.B. "Mini Chinois" vor "Apfel naturtrüb" bei Suche "apfel").
+        val names = (local + custom).map { it.name.lowercase() }.toSet()
+        val combined = local + custom + remoteList.filter { it.name.lowercase() !in names }
         return combined
             .distinctBy { it.barcode ?: (it.name.lowercase().trim() + "|" + (it.brand?.lowercase()?.trim() ?: "")) }
             .sortedWith(FoodSearchRepository.relevanceComparator(query))
