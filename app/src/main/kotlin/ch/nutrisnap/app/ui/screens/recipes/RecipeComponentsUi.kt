@@ -655,24 +655,18 @@ internal fun parseIngredientSections(ingredients: String): List<Pair<String, Lis
         if (d.startsWith("•") || d.startsWith("-") || d.startsWith("*")) return false
         if (d.first().isDigit()) return false
         if (d.first().isWhitespace()) return false
+        // Menge in der Zeile → Zutat, kein Header
+        if (Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tbsp|tsp|cup|oz)\b""", RegexOption.IGNORE_CASE).containsMatchIn(d)) {
+            return false
+        }
         val lc = d.lowercase()
-        // Explizite Abschnitts-Muster (DE/EN)
+        // Explizite Abschnitts-Muster
         if (lc.startsWith("für die ") || lc.startsWith("für den ") || lc.startsWith("für das ") ||
-            lc.startsWith("for the ") || lc.startsWith("for ") ||
-            lc.endsWith(":") ||
-            lc.startsWith("sauce") || lc.startsWith("marinade") || lc.startsWith("dressing") ||
-            lc.startsWith("topping") || lc.startsWith("beilage")
+            lc.startsWith("for the ") || lc.startsWith("for ") || lc.endsWith(":")
         ) return true
-        // Wie Rezept-Ansicht: kein Bullet, keine Ziffer – aber nur wenn KEINE Mengenangabe
-        val hasAmount = Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tbsp|tsp|cup|oz)\b""", RegexOption.IGNORE_CASE).containsMatchIn(d)
-        if (hasAmount) return false
-        // Zeile ohne Menge und ohne typische Zutat-Wörter → Header (z.B. "Charred Zuckermais & Beans")
-        val looksLikeIngredient = listOf(
-            "hähnchen", "huhn", "chicken", "fleisch", "filet", "mais", "bohne", "bohnen",
-            "kartoffel", "zwiebel", "joghurt", "honig", "öl", "butter", "milch", "limette",
-            "paprika", "knoblauch", "gewürz", "salz", "pfeffer", "reis", "nudel"
-        ).any { it in lc }
-        return !looksLikeIngredient
+        // Kurze Titel ohne Bullet/Ziffer (wie Rezept-Ansicht): "Fleisch", "Sauce", "Mais & Bohnen"
+        // Keine typische Zutaten-Formulierung mit Menge/Einheit oben schon ausgeschlossen
+        return true
     }
 
     fun flush() {
@@ -919,16 +913,16 @@ fun ComponentSplitSheet(
     // Index-basiert: bei doppelten Zutatenzeilen (Rezept x2) sonst Kollisionen
     var groups by remember {
         mutableStateOf(
-            if (ingredientSections.isNotEmpty()) assignMatchesToSections(matches, ingredientSections)
-            else matches.mapIndexed { i, m -> i to defaultPartKey(m, ingredientSections) }.toMap()
+            if (ingredientSections.size >= 2) assignMatchesToSections(matches, ingredientSections)
+            else matches.mapIndexed { i, m -> i to defaultPartKey(m, emptyList()) }.toMap()
         )
     }
     LaunchedEffect(matches, ingredientSections) {
         if (matches.isEmpty()) return@LaunchedEffect
-        groups = if (ingredientSections.isNotEmpty()) {
+        groups = if (ingredientSections.size >= 2) {
             assignMatchesToSections(matches, ingredientSections)
         } else {
-            matches.mapIndexed { i, m -> i to defaultPartKey(m, ingredientSections) }.toMap()
+            matches.mapIndexed { i, m -> i to defaultPartKey(m, emptyList()) }.toMap()
         }
     }
 
