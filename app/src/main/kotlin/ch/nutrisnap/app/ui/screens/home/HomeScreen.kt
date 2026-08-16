@@ -93,7 +93,11 @@ fun HomeScreen(
     if (showActivityDialog) {
         ManualActivityDialog(
             currentKcal = state.manualActivityKcal,
-            onConfirm = { kcal -> vm.logManualActivity(kcal); showActivityDialog = false },
+            weightKg = state.lastWeightKg ?: 75f,
+            onConfirm = { kcal, name, dur, mets ->
+                vm.logManualActivity(kcal, name, dur, mets)
+                showActivityDialog = false
+            },
             onDismiss = { showActivityDialog = false }
         )
     }
@@ -856,12 +860,15 @@ private fun ManualActivityCard(
 @Composable
 private fun ManualActivityDialog(
     currentKcal: Float?,
-    onConfirm: (Float) -> Unit,
+    weightKg: Float,
+    onConfirm: (kcal: Float, name: String?, durationMin: Float?, mets: Float?) -> Unit,
     onDismiss: () -> Unit
 ) {
     var text by remember {
         mutableStateOf(currentKcal?.takeIf { it > 0f }?.let { it.toInt().toString() } ?: "")
     }
+    var selectedPreset by remember { mutableStateOf<ch.nutrisnap.app.data.model.ActivityPreset?>(null) }
+    var durationText by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -869,14 +876,58 @@ private fun ManualActivityDialog(
         text = {
             Column {
                 Text(
-                    "Kalorien aus Sport/Bewegung, die nicht (vollständig) über Health Connect kommen. Werden zur HC-Aktivität addiert.",
+                    "Zusätzlich zu Health Connect. Preset nutzt MET × Gewicht × Dauer.",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(10.dp))
+                // Presets
+                ch.nutrisnap.app.data.model.ACTIVITY_PRESETS.chunked(2).forEach { row ->
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        row.forEach { preset ->
+                            val selected = selectedPreset?.name == preset.name
+                            FilterChip(
+                                selected = selected,
+                                onClick = {
+                                    selectedPreset = preset
+                                    durationText = preset.defaultDurationMin.toInt().toString()
+                                    val dur = preset.defaultDurationMin
+                                    val kcal = preset.estimateKcal(weightKg, dur)
+                                    text = kcal.toInt().toString()
+                                },
+                                label = { Text(preset.name, fontSize = 11.sp) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        if (row.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                    Spacer(Modifier.height(4.dp))
+                }
+                if (selectedPreset != null) {
+                    OutlinedTextField(
+                        value = durationText,
+                        onValueChange = { raw ->
+                            durationText = raw.filter { it.isDigit() || it == ',' || it == '.' }
+                            val dur = durationText.replace(',', '.').toFloatOrNull() ?: selectedPreset!!.defaultDurationMin
+                            val kcal = selectedPreset!!.estimateKcal(weightKg, dur)
+                            text = kcal.toInt().toString()
+                        },
+                        label = { Text("Dauer (Minuten)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
                 OutlinedTextField(
                     value = text,
-                    onValueChange = { text = it.filter { ch -> ch.isDigit() || ch == ',' || ch == '.' } },
+                    onValueChange = {
+                        text = it.filter { ch -> ch.isDigit() || ch == ',' || ch == '.' }
+                        selectedPreset = null // manuelle kcal → Preset lösen
+                    },
                     label = { Text("Aktivitätskalorien (kcal)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
@@ -887,7 +938,13 @@ private fun ManualActivityDialog(
         confirmButton = {
             TextButton(onClick = {
                 val v = text.replace(',', '.').toFloatOrNull() ?: 0f
-                onConfirm(v.coerceAtLeast(0f))
+                val dur = durationText.replace(',', '.').toFloatOrNull()
+                onConfirm(
+                    v.coerceAtLeast(0f),
+                    selectedPreset?.name,
+                    dur ?: selectedPreset?.defaultDurationMin,
+                    selectedPreset?.mets
+                )
             }) { Text("Speichern") }
         },
         dismissButton = {

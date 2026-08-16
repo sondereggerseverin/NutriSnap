@@ -303,7 +303,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun logManualActivity(kcal: Float) {
+    fun logManualActivity(
+        kcal: Float,
+        activityName: String? = null,
+        durationMin: Float? = null,
+        mets: Float? = null
+    ) {
         viewModelScope.launch {
             if (kcal <= 0f) {
                 manualActivityDao.delete(LocalDate.now().toString())
@@ -311,7 +316,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 manualActivityDao.upsert(
                     ManualActivityEntry(
                         dateStr = LocalDate.now().toString(),
-                        activeCaloriesKcal = kcal
+                        activeCaloriesKcal = kcal,
+                        activityName = activityName,
+                        durationMin = durationMin,
+                        mets = mets
                     )
                 )
             }

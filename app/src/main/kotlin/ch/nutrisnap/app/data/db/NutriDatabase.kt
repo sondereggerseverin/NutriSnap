@@ -80,7 +80,7 @@ interface UserProfileDao {
         RecipeComponent::class,
         FrozenMeal::class
     ],
-    version = 31,
+    version = 32,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -656,6 +656,15 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // Manuelle Aktivität: Name, Dauer, MET (OpenNutriTracker-ähnlich)
+        private val MIGRATION_31_32 = object : Migration(31, 32) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE manual_activity ADD COLUMN activityName TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE manual_activity ADD COLUMN durationMin REAL DEFAULT NULL")
+                db.execSQL("ALTER TABLE manual_activity ADD COLUMN mets REAL DEFAULT NULL")
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -671,7 +680,7 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
                         MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
                         MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28,
-                        MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31
+                        MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32
                     )
                     .build()
                     .also { INSTANCE = it }
