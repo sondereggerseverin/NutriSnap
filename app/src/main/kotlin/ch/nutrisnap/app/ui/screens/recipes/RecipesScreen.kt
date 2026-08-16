@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -1608,11 +1609,22 @@ fun RecipeDetailSheet(
 
     // Swipe-to-dismiss aus: Scrollen im Sheet soll nicht schliessen.
     // Schliessen nur per System-Back, Scrim oder explizitem X-Button.
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // (sheetGesturesEnabled gibt es in der aktuellen Material3-Version noch nicht)
+    var allowSheetDismiss by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { newValue ->
+            // Gesture-Hide blockieren, explizites Schliessen (Back/X/Scrim) erlauben
+            if (newValue == SheetValue.Hidden) allowSheetDismiss else true
+        }
+    )
+    fun requestDismiss() {
+        allowSheetDismiss = true
+        onDismiss()
+    }
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { requestDismiss() },
         sheetState = sheetState,
-        sheetGesturesEnabled = false,
         modifier = Modifier.fillMaxHeight(0.94f)
     ) {
         LazyColumn(
@@ -1665,7 +1677,7 @@ fun RecipeDetailSheet(
                     IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
                         Icon(Icons.Default.Edit, "Bearbeiten", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                     }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                    IconButton(onClick = { requestDismiss() }, modifier = Modifier.size(36.dp)) {
                         Icon(Icons.Default.Close, contentDescription = "Schliessen", modifier = Modifier.size(20.dp))
                     }
                 }

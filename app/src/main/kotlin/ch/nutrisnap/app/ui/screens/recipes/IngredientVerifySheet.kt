@@ -381,11 +381,20 @@ fun IngredientVerifySheet(
     }
 
     // Swipe-to-dismiss aus: Scrollen soll das Sheet nicht schliessen (nur Back / X).
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var allowSheetDismiss by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { newValue ->
+            if (newValue == SheetValue.Hidden) allowSheetDismiss else true
+        }
+    )
+    fun requestDismiss() {
+        allowSheetDismiss = true
+        onDismiss()
+    }
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { requestDismiss() },
         sheetState = sheetState,
-        sheetGesturesEnabled = false,
         modifier = Modifier.fillMaxHeight(0.95f)
     ) {
         LazyColumn(
@@ -410,7 +419,7 @@ fun IngredientVerifySheet(
                             fontSize = 20.sp,
                             modifier = Modifier.weight(1f)
                         )
-                        IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                        IconButton(onClick = { requestDismiss() }, modifier = Modifier.size(36.dp)) {
                             Icon(Icons.Default.Close, contentDescription = "Schliessen")
                         }
                     }
