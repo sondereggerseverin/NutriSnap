@@ -1,4 +1,4 @@
-# Build errors - run 784
+# Build errors - run 785
 
 ## Error lines
 ```
@@ -6,7 +6,7 @@ e: [ksp] [MissingType]: Element 'ch.nutrisnap.app.data.db.NutriDatabase' referen
 > Task :app:kspDebugKotlin FAILED
    > KSP failed with exit code: PROCESSING_ERROR
 Caused by: java.lang.Exception: KSP failed with exit code: PROCESSING_ERROR
-BUILD FAILED in 1m 13s
+BUILD FAILED in 1m 7s
 ```
 
 ## Last 150 lines
@@ -159,6 +159,6 @@ Caused by: java.lang.Exception: KSP failed with exit code: PROCESSING_ERROR
 	... 2 more
 
 
-BUILD FAILED in 1m 13s
+BUILD FAILED in 1m 7s
 23 actionable tasks: 23 executed
 ```
