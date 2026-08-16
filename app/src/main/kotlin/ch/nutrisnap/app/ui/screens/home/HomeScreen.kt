@@ -97,8 +97,8 @@ fun HomeScreen(
         ManualActivityDialog(
             currentKcal = state.manualActivityKcal,
             weightKg = state.lastWeightKg ?: 75f,
-            onConfirm = { kcal, name, dur, mets ->
-                vm.logManualActivity(kcal, name, dur, mets)
+            onConfirm = { kcal ->
+                vm.logManualActivity(kcal)
                 showActivityDialog = false
             },
             onDismiss = { showActivityDialog = false }
@@ -864,7 +864,7 @@ private fun ManualActivityCard(
 private fun ManualActivityDialog(
     currentKcal: Float?,
     weightKg: Float,
-    onConfirm: (kcal: Float, name: String?, durationMin: Float?, mets: Float?) -> Unit,
+    onConfirm: (kcal: Float) -> Unit,
     onDismiss: () -> Unit
 ) {
     var text by remember {
@@ -942,12 +942,7 @@ private fun ManualActivityDialog(
             TextButton(onClick = {
                 val v = text.replace(',', '.').toFloatOrNull() ?: 0f
                 val dur = durationText.replace(',', '.').toFloatOrNull()
-                onConfirm(
-                    v.coerceAtLeast(0f),
-                    selectedPreset?.name,
-                    dur ?: selectedPreset?.defaultDurationMin,
-                    selectedPreset?.mets
-                )
+                onConfirm(v.coerceAtLeast(0f))
             }) { Text("Speichern") }
         },
         dismissButton = {

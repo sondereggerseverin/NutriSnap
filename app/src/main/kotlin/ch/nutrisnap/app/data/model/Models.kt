@@ -465,15 +465,11 @@ data class RecipeScrapeResult(
 @Entity(tableName = "weight_entries")
 data class WeightEntry(@PrimaryKey val dateStr: String, val weightKg: Float)
 
-/** Manuell erfasste Aktivitätskalorien pro Tag (zusätzlich zu Health Connect).
- *  Optional Name/Dauer/MET (OpenNutriTracker-Ansatz) für nachvollziehbare Einträge. */
+/** Manuell erfasste Aktivitätskalorien pro Tag (zusätzlich zu Health Connect). */
 @Entity(tableName = "manual_activity")
 data class ManualActivityEntry(
     @PrimaryKey val dateStr: String,  // yyyy-MM-dd
-    val activeCaloriesKcal: Float,
-    @ColumnInfo(defaultValue = "NULL") val activityName: String? = null,
-    @ColumnInfo(defaultValue = "NULL") val durationMin: Float? = null,
-    @ColumnInfo(defaultValue = "NULL") val mets: Float? = null
+    val activeCaloriesKcal: Float
 )
 
 // ─── Favorites ───────────────────────────────────────────────────────────────
