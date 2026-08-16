@@ -161,7 +161,16 @@ fun RecipeComponentsEditorSheet(
                 .padding(bottom = 24.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            Text("Komponenten", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Komponenten", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Schliessen")
+                }
+            }
             Spacer(Modifier.height(4.dp))
             Text(
                 "Nur Kochgewicht eintragen. Nährwerte kommen automatisch aus den verifizierten Zutaten – keine manuelle Eingabe.",
@@ -420,7 +429,16 @@ fun MultiComponentAddToDiarySheet(
                 .padding(bottom = 16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            Text("Ins Tagebuch", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Ins Tagebuch", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Schliessen")
+                }
+            }
             Spacer(Modifier.height(4.dp))
             Text(recipe.displayTitle(), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(10.dp))
@@ -693,7 +711,21 @@ fun ComponentSplitSheet(
                 .padding(bottom = 24.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            Text("Beilage / Sauce trennen", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Beilage / Sauce trennen",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Schliessen")
+                }
+            }
             Text(
                 recipe.displayTitle(),
                 fontSize = 13.sp,
