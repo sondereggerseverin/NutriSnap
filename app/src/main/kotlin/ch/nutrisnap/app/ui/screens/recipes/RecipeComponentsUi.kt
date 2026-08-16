@@ -654,9 +654,25 @@ internal fun parseIngredientSections(ingredients: String): List<Pair<String, Lis
         if (d.length <= 2) return false
         if (d.startsWith("•") || d.startsWith("-") || d.startsWith("*")) return false
         if (d.first().isDigit()) return false
-        // "100g X" ist Zutat, "Für die Sauce" ist Header
         if (d.first().isWhitespace()) return false
-        return true
+        val lc = d.lowercase()
+        // Explizite Abschnitts-Muster (DE/EN)
+        if (lc.startsWith("für die ") || lc.startsWith("für den ") || lc.startsWith("für das ") ||
+            lc.startsWith("for the ") || lc.startsWith("for ") ||
+            lc.endsWith(":") ||
+            lc.startsWith("sauce") || lc.startsWith("marinade") || lc.startsWith("dressing") ||
+            lc.startsWith("topping") || lc.startsWith("beilage")
+        ) return true
+        // Wie Rezept-Ansicht: kein Bullet, keine Ziffer – aber nur wenn KEINE Mengenangabe
+        val hasAmount = Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tbsp|tsp|cup|oz)\b""", RegexOption.IGNORE_CASE).containsMatchIn(d)
+        if (hasAmount) return false
+        // Zeile ohne Menge und ohne typische Zutat-Wörter → Header (z.B. "Charred Zuckermais & Beans")
+        val looksLikeIngredient = listOf(
+            "hähnchen", "huhn", "chicken", "fleisch", "filet", "mais", "bohne", "bohnen",
+            "kartoffel", "zwiebel", "joghurt", "honig", "öl", "butter", "milch", "limette",
+            "paprika", "knoblauch", "gewürz", "salz", "pfeffer", "reis", "nudel"
+        ).any { it in lc }
+        return !looksLikeIngredient
     }
 
     fun flush() {
@@ -693,16 +709,37 @@ internal fun matchToSectionKey(
 ): String? {
     if (sections.isEmpty()) return null
     val raw = m.ingredientRaw.lowercase().trim()
+        .trimStart('•', '-', '*', ' ')
     val name = m.ingredientName.lowercase().trim()
+    val matched = m.matchedFoodName.orEmpty().lowercase().trim()
+
+    fun coreOf(s: String): String =
+        s.lowercase()
+            .trimStart('•', '-', '*', ' ')
+            .replace(Regex("""^\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tbsp|tsp|cup|oz)?\s*"""), "")
+            .trim()
+
+    val rawCore = coreOf(raw)
+    val nameCore = coreOf(name).ifBlank { rawCore }
+
     for ((sectionName, lines) in sections) {
         for (line in lines) {
-            val l = line.lowercase()
-            if (raw.isNotBlank() && (l.contains(raw.take(12)) || raw.contains(l.take(12)))) {
+            val l = coreOf(line)
+            if (l.length < 3) continue
+            // Direkte Teilstring-Übereinstimmung
+            if (rawCore.length >= 3 && (l.contains(rawCore.take(14)) || rawCore.contains(l.take(14)))) {
                 return sectionName
             }
-            // Kernname ohne Menge
-            val core = l.replace(Regex("""^\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tbsp|tsp)?\s*"""), "").trim()
-            if (core.length >= 4 && (name.contains(core.take(10)) || core.contains(name.take(10)))) {
+            if (nameCore.length >= 3 && (l.contains(nameCore.take(14)) || nameCore.contains(l.take(14)))) {
+                return sectionName
+            }
+            if (matched.length >= 3 && l.contains(matched.take(12))) {
+                return sectionName
+            }
+            // Token-Overlap (mind. ein signifikantes Wort >= 4 Zeichen)
+            val tokensL = l.split(Regex("""[\s,;/&]+""")).filter { it.length >= 4 }
+            val tokensM = (rawCore + " " + nameCore).split(Regex("""[\s,;/&]+""")).filter { it.length >= 4 }
+            if (tokensL.any { t -> tokensM.any { it.startsWith(t.take(5)) || t.startsWith(it.take(5)) } }) {
                 return sectionName
             }
         }
@@ -720,16 +757,34 @@ private fun defaultPartKey(
     m: IngredientMatch,
     sections: List<Pair<String, List<String>>> = emptyList()
 ): String {
-    m.componentGroup?.let { g ->
-        if (g.isNotBlank()) return g
-    }
+    // Abschnitte aus Zutaten-Text haben Vorrang vor alter side/sauce-Zuordnung
     matchToSectionKey(m, sections)?.let { return it }
+    val g = m.componentGroup?.trim().orEmpty()
+    if (g.isNotBlank() && g != "side" && g != "sauce") return g
+    // side/sauce nur behalten wenn keine Abschnitte vorhanden
+    if (sections.isEmpty() && (g == "side" || g == "sauce")) return g
     val n = "${m.ingredientRaw} ${m.ingredientName} ${m.matchedFoodName.orEmpty()}".lowercase()
     val sideKeys = listOf(
         "reis", "basmati", "erbse", "erbsen", "peas", "kartoffel", "nudel", "pasta",
         "quinoa", "couscous", "bulgur", "beilage", "hafer", "flocken", "sweet potato",
         "süsskartoffel", "suesskartoffel"
     )
+    if (sections.isNotEmpty()) {
+        // Fallback: erste/letzte Sektion nach Heuristik
+        return if (sideKeys.any { it in n }) {
+            sections.firstOrNull { (name, _) ->
+                name.lowercase().let { n ->
+                    listOf("stampf", "mash", "beilage", "kartoffel", "reis").any { it in n }
+                }
+            }?.first ?: sections.first().first
+        } else {
+            sections.firstOrNull { (name, _) ->
+                name.lowercase().let { n ->
+                    listOf("sauce", "fleisch", "hähnchen", "huhn", "chicken", "honig").any { it in n }
+                }
+            }?.first ?: sections.last().first
+        }
+    }
     return if (sideKeys.any { it in n }) "side" else "sauce"
 }
 
@@ -799,25 +854,6 @@ fun ComponentSplitSheet(
     LaunchedEffect(matches, ingredientSections) {
         if (matches.isEmpty()) return@LaunchedEffect
         groups = matches.associate { it.ingredientRaw to defaultPartKey(it, ingredientSections) }
-    }
-    LaunchedEffect(initialComponents) {
-        if (initialComponents.isEmpty()) return@LaunchedEffect
-        val fromDb = initialComponents.mapIndexed { i, c ->
-            val key = when {
-                c.name.contains("beilage", true) -> "side"
-                c.name.contains("sauce", true) || c.name.contains("fleisch", true) -> "sauce"
-                else -> c.name.ifBlank { "teil$i" }
-            }
-            SplitPart(
-                key = key,
-                name = c.name.ifBlank { displayNameForKey(key) },
-                weightText = c.cookedWeightG.takeIf { it > 0f }?.toInt()?.toString() ?: ""
-            )
-        }
-        // Nur übernehmen wenn aktuelle Gewichte noch leer
-        if (parts.all { it.weightText.isBlank() }) {
-            parts = fromDb
-        }
     }
 
     fun sumFor(key: String): Triple<Float, Float, Float> {
@@ -980,20 +1016,28 @@ fun ComponentSplitSheet(
             }
 
             // Zutaten ohne Zuordnung (falls key fehlt)
-            val orphan = matches.filter { groups[it.ingredientRaw] !in parts.map { p -> p.key }.toSet() }
+            val partKeys = parts.map { it.key }.toSet()
+            val orphan = matches.filter { groups[it.ingredientRaw] !in partKeys }
             if (orphan.isNotEmpty()) {
                 Text("Nicht zugeordnet", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.error)
+                Text(
+                    "Tippe auf einen Teil, um zuzuordnen.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 orphan.forEach { m ->
-                    Row(
-                        Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(m.ingredientRaw, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                        parts.firstOrNull()?.let { p ->
-                            AssistChip(
-                                onClick = { groups = groups + (m.ingredientRaw to p.key) },
-                                label = { Text("→ ${p.name}", fontSize = 11.sp) }
-                            )
+                    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Text(m.ingredientRaw, fontSize = 13.sp)
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            parts.forEach { p ->
+                                AssistChip(
+                                    onClick = { groups = groups + (m.ingredientRaw to p.key) },
+                                    label = { Text(p.name.take(18), fontSize = 10.sp) }
+                                )
+                            }
                         }
                     }
                 }
