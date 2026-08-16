@@ -703,48 +703,118 @@ internal fun parseIngredientSections(ingredients: String): List<Pair<String, Lis
 }
 
 /** Ordnet eine Match-Zeile einem Abschnitts-Key zu (Name-Ähnlichkeit). */
+/**
+ * Score 0..100 wie gut ein Match zu einer Abschnitts-Zutatenzeile passt.
+ */
+internal fun scoreMatchToLine(m: IngredientMatch, line: String): Int {
+    fun coreOf(s: String): String =
+        s.lowercase()
+            .trim()
+            .trimStart('•', '-', '*', ' ')
+            .replace(Regex("""^\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tbsp|tsp|cup|oz)?\s*"""), "")
+            .trim()
+
+    val rawCore = coreOf(m.ingredientRaw)
+    val nameCore = coreOf(m.ingredientName).ifBlank { rawCore }
+    val matched = coreOf(m.matchedFoodName.orEmpty())
+    val l = coreOf(line)
+    if (l.length < 2) return 0
+
+    var best = 0
+    if (rawCore.length >= 3 && (l == rawCore || l.contains(rawCore) || rawCore.contains(l))) best = maxOf(best, 90)
+    if (nameCore.length >= 3 && (l == nameCore || l.contains(nameCore) || nameCore.contains(l))) best = maxOf(best, 85)
+    if (matched.length >= 3 && (l.contains(matched) || matched.contains(l))) best = maxOf(best, 70)
+
+    val tokensL = l.split(Regex("""[\s,;/&]+""")).filter { it.length >= 4 }
+    val tokensM = ("$rawCore $nameCore $matched").split(Regex("""[\s,;/&]+""")).filter { it.length >= 4 }
+    val overlap = tokensL.count { t -> tokensM.any { it.startsWith(t.take(5)) || t.startsWith(it.take(5)) } }
+    if (overlap > 0) best = maxOf(best, 40 + overlap * 15)
+    return best.coerceAtMost(100)
+}
+
+/**
+ * Ordnet jeden Match genau einem Abschnitt zu (beste Score, 1:1 pro Zeile wenn möglich).
+ * Verhindert, dass dieselbe Zutat in mehreren Teilen landet.
+ */
+internal fun assignMatchesToSections(
+    matches: List<IngredientMatch>,
+    sections: List<Pair<String, List<String>>>
+): Map<Int, String> {
+    if (matches.isEmpty()) return emptyMap()
+    if (sections.isEmpty()) return emptyMap()
+
+    data class Cand(val matchIdx: Int, val section: String, val lineIdx: Int, val score: Int)
+
+    val cands = mutableListOf<Cand>()
+    matches.forEachIndexed { mi, m ->
+        sections.forEach { (sectionName, lines) ->
+            lines.forEachIndexed { li, line ->
+                val s = scoreMatchToLine(m, line)
+                if (s >= 40) cands += Cand(mi, sectionName, li, s)
+            }
+        }
+    }
+    // Beste zuerst
+    cands.sortByDescending { it.score }
+
+    val assignedMatch = mutableSetOf<Int>()
+    // Pro Abschnitt+Zeile nur ein Match (wichtig bei x2-Rezept: zwei identische Zeilen → zwei Slots)
+    val assignedLine = mutableSetOf<String>() // "section|lineIdx" but allow same line text twice via index
+    val result = mutableMapOf<Int, String>()
+
+    for (c in cands) {
+        if (c.matchIdx in assignedMatch) continue
+        val lineKey = "${c.section}\u0000${c.lineIdx}"
+        // Zeile darf mehrfach vergeben werden wenn Score sehr hoch und weitere Matches warten
+        // (x2-Rezept: zwei "600g Hähnchen" → beide auf Hähnchen-Zeile)
+        // Deshalb line-Lock nur bei mittlerem Score
+        if (c.score < 80 && lineKey in assignedLine) continue
+        assignedMatch += c.matchIdx
+        assignedLine += lineKey
+        result[c.matchIdx] = c.section
+    }
+
+    // Rest: Fallback-Heuristik pro Match
+    matches.forEachIndexed { mi, m ->
+        if (mi in result) return@forEachIndexed
+        val n = "${m.ingredientRaw} ${m.ingredientName}".lowercase()
+        val sideKeys = listOf("reis", "kartoffel", "süsskartoffel", "suesskartoffel", "mais", "bohne", "stampf", "mash")
+        val pick = when {
+            sideKeys.any { it in n } ->
+                sections.firstOrNull { (name, _) ->
+                    name.lowercase().let { s ->
+                        listOf("stampf", "mash", "beilage", "kartoffel", "mais", "bohne").any { it in s }
+                    }
+                }?.first
+            else ->
+                sections.firstOrNull { (name, _) ->
+                    name.lowercase().let { s ->
+                        listOf("fleisch", "hähnchen", "huhn", "chicken", "sauce", "honig").any { it in s }
+                    }
+                }?.first
+        }
+        result[mi] = pick ?: sections.first().first
+    }
+    return result
+}
+
 internal fun matchToSectionKey(
     m: IngredientMatch,
     sections: List<Pair<String, List<String>>>
 ): String? {
     if (sections.isEmpty()) return null
-    val raw = m.ingredientRaw.lowercase().trim()
-        .trimStart('•', '-', '*', ' ')
-    val name = m.ingredientName.lowercase().trim()
-    val matched = m.matchedFoodName.orEmpty().lowercase().trim()
-
-    fun coreOf(s: String): String =
-        s.lowercase()
-            .trimStart('•', '-', '*', ' ')
-            .replace(Regex("""^\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tbsp|tsp|cup|oz)?\s*"""), "")
-            .trim()
-
-    val rawCore = coreOf(raw)
-    val nameCore = coreOf(name).ifBlank { rawCore }
-
+    var bestSection: String? = null
+    var bestScore = 0
     for ((sectionName, lines) in sections) {
         for (line in lines) {
-            val l = coreOf(line)
-            if (l.length < 3) continue
-            // Direkte Teilstring-Übereinstimmung
-            if (rawCore.length >= 3 && (l.contains(rawCore.take(14)) || rawCore.contains(l.take(14)))) {
-                return sectionName
-            }
-            if (nameCore.length >= 3 && (l.contains(nameCore.take(14)) || nameCore.contains(l.take(14)))) {
-                return sectionName
-            }
-            if (matched.length >= 3 && l.contains(matched.take(12))) {
-                return sectionName
-            }
-            // Token-Overlap (mind. ein signifikantes Wort >= 4 Zeichen)
-            val tokensL = l.split(Regex("""[\s,;/&]+""")).filter { it.length >= 4 }
-            val tokensM = (rawCore + " " + nameCore).split(Regex("""[\s,;/&]+""")).filter { it.length >= 4 }
-            if (tokensL.any { t -> tokensM.any { it.startsWith(t.take(5)) || t.startsWith(it.take(5)) } }) {
-                return sectionName
+            val s = scoreMatchToLine(m, line)
+            if (s > bestScore) {
+                bestScore = s
+                bestSection = sectionName
             }
         }
     }
-    return null
+    return if (bestScore >= 40) bestSection else null
 }
 
 private data class SplitPart(
@@ -846,18 +916,24 @@ fun ComponentSplitSheet(
         )
     }
 
+    // Index-basiert: bei doppelten Zutatenzeilen (Rezept x2) sonst Kollisionen
     var groups by remember {
         mutableStateOf(
-            matches.associate { it.ingredientRaw to defaultPartKey(it, ingredientSections) }
+            if (ingredientSections.isNotEmpty()) assignMatchesToSections(matches, ingredientSections)
+            else matches.mapIndexed { i, m -> i to defaultPartKey(m, ingredientSections) }.toMap()
         )
     }
     LaunchedEffect(matches, ingredientSections) {
         if (matches.isEmpty()) return@LaunchedEffect
-        groups = matches.associate { it.ingredientRaw to defaultPartKey(it, ingredientSections) }
+        groups = if (ingredientSections.isNotEmpty()) {
+            assignMatchesToSections(matches, ingredientSections)
+        } else {
+            matches.mapIndexed { i, m -> i to defaultPartKey(m, ingredientSections) }.toMap()
+        }
     }
 
     fun sumFor(key: String): Triple<Float, Float, Float> {
-        val list = matches.filter { groups[it.ingredientRaw] == key }
+        val list = matches.filterIndexed { i, _ -> groups[i] == key }
         val kcal = list.sumOf { (it.matchedCalories ?: 0f).toDouble() }.toFloat()
         val prot = list.sumOf { (it.matchedProtein ?: 0f).toDouble() }.toFloat()
         val carbs = list.sumOf { (it.matchedCarbs ?: 0f).toDouble() }.toFloat()
@@ -865,7 +941,7 @@ fun ComponentSplitSheet(
         return Triple(kcal, prot, carbs) // fat separately if needed
     }
     fun fatFor(key: String): Float =
-        matches.filter { groups[it.ingredientRaw] == key }
+        matches.filterIndexed { i, _ -> groups[i] == key }
             .sumOf { (it.matchedFat ?: 0f).toDouble() }.toFloat()
 
     // Swipe-to-dismiss aus: Scrollen soll das Sheet nicht schliessen (nur X / Abbrechen).
@@ -951,7 +1027,7 @@ fun ComponentSplitSheet(
             parts.forEachIndexed { index, part ->
                 val (kcal, prot, carbs) = sumFor(part.key)
                 val fat = fatFor(part.key)
-                val partMatches = matches.filter { groups[it.ingredientRaw] == part.key }
+                val partMatches = matches.mapIndexed { i, m -> i to m }.filter { groups[it.first] == part.key }
 
                 Text(part.name, fontWeight = FontWeight.SemiBold)
                 Text(
@@ -985,7 +1061,7 @@ fun ComponentSplitSheet(
                     }
                 }
 
-                partMatches.forEach { m ->
+                partMatches.forEach { (mi, m) ->
                     Row(
                         Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -1003,7 +1079,7 @@ fun ComponentSplitSheet(
                         if (parts.size > 1) {
                             AssistChip(
                                 onClick = {
-                                    groups = groups + (m.ingredientRaw to parts[nextIdx].key)
+                                    groups = groups + (mi to parts[nextIdx].key)
                                 },
                                 label = {
                                     Text("→ ${parts[nextIdx].name}", fontSize = 11.sp)
@@ -1017,7 +1093,7 @@ fun ComponentSplitSheet(
 
             // Zutaten ohne Zuordnung (falls key fehlt)
             val partKeys = parts.map { it.key }.toSet()
-            val orphan = matches.filter { groups[it.ingredientRaw] !in partKeys }
+            val orphan = matches.mapIndexed { i, m -> i to m }.filter { groups[it.first] !in partKeys }
             if (orphan.isNotEmpty()) {
                 Text("Nicht zugeordnet", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.error)
                 Text(
@@ -1025,7 +1101,7 @@ fun ComponentSplitSheet(
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                orphan.forEach { m ->
+                orphan.forEach { (mi, m) ->
                     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                         Text(m.ingredientRaw, fontSize = 13.sp)
                         Row(
@@ -1034,7 +1110,7 @@ fun ComponentSplitSheet(
                         ) {
                             parts.forEach { p ->
                                 AssistChip(
-                                    onClick = { groups = groups + (m.ingredientRaw to p.key) },
+                                    onClick = { groups = groups + (mi to p.key) },
                                     label = { Text(p.name.take(18), fontSize = 10.sp) }
                                 )
                             }
@@ -1089,8 +1165,8 @@ fun ComponentSplitSheet(
                             sortOrder = i
                         )
                     }
-                    val updatedMatches = matches.map { m ->
-                        m.copy(componentGroup = groups[m.ingredientRaw] ?: parts.firstOrNull()?.key ?: "sauce")
+                    val updatedMatches = matches.mapIndexed { i, m ->
+                        m.copy(componentGroup = groups[i] ?: parts.firstOrNull()?.key ?: "sauce")
                     }
                     if (comps.isNotEmpty()) onSave(comps, updatedMatches)
                     requestDismiss()
