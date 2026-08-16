@@ -93,7 +93,14 @@ class DiaryRepository(db: NutriDatabase) {
                 sugar       = (food.sugar ?: 0f) * f,
                 saturatedFat = (food.saturatedFat ?: 0f) * f,
                 salt        = (food.salt ?: 0f) * f,
-                sodium      = (food.sodium ?: 0f) * f
+                sodium      = (food.sodium ?: 0f) * f,
+                snapshotBrand = food.brand,
+                snapshotBarcode = food.barcode,
+                snapshotCaloriesPer100g = food.calories,
+                snapshotProteinPer100g = food.protein,
+                snapshotCarbsPer100g = food.carbs,
+                snapshotFatPer100g = food.fat,
+                snapshotSource = food.source.name
             )
         )
         dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }

@@ -51,7 +51,16 @@ data class DiaryEntry(
     val matchedCustomFoodId: Int? = null,
     /** Verknüpfung zu recipes.id, falls dieser Eintrag einem importierten Rezept
      *  zugeordnet werden konnte. */
-    val matchedRecipeId: Long? = null
+    val matchedRecipeId: Long? = null,
+    // ── Snapshot zum Log-Zeitpunkt (OpenNutriTracker-Ansatz): bleibt stabil,
+    // auch wenn FoodItem später geändert/gelöscht wird. Nullable = Legacy-Zeilen.
+    @ColumnInfo(defaultValue = "NULL") val snapshotBrand: String? = null,
+    @ColumnInfo(defaultValue = "NULL") val snapshotBarcode: String? = null,
+    @ColumnInfo(defaultValue = "NULL") val snapshotCaloriesPer100g: Float? = null,
+    @ColumnInfo(defaultValue = "NULL") val snapshotProteinPer100g: Float? = null,
+    @ColumnInfo(defaultValue = "NULL") val snapshotCarbsPer100g: Float? = null,
+    @ColumnInfo(defaultValue = "NULL") val snapshotFatPer100g: Float? = null,
+    @ColumnInfo(defaultValue = "NULL") val snapshotSource: String? = null
 )
 
 enum class MealType { BREAKFAST, LUNCH, DINNER, SNACK }

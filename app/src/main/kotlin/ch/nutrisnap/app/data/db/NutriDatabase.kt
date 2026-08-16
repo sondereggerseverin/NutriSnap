@@ -80,7 +80,7 @@ interface UserProfileDao {
         RecipeComponent::class,
         FrozenMeal::class
     ],
-    version = 30,
+    version = 31,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -643,6 +643,19 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // Diary-Snapshot: Brand/Barcode/pro-100g zum Log-Zeitpunkt (Historie stabil)
+        private val MIGRATION_30_31 = object : Migration(30, 31) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE diary_entries ADD COLUMN snapshotBrand TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE diary_entries ADD COLUMN snapshotBarcode TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE diary_entries ADD COLUMN snapshotCaloriesPer100g REAL DEFAULT NULL")
+                db.execSQL("ALTER TABLE diary_entries ADD COLUMN snapshotProteinPer100g REAL DEFAULT NULL")
+                db.execSQL("ALTER TABLE diary_entries ADD COLUMN snapshotCarbsPer100g REAL DEFAULT NULL")
+                db.execSQL("ALTER TABLE diary_entries ADD COLUMN snapshotFatPer100g REAL DEFAULT NULL")
+                db.execSQL("ALTER TABLE diary_entries ADD COLUMN snapshotSource TEXT DEFAULT NULL")
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -658,7 +671,7 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
                         MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
                         MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28,
-                        MIGRATION_28_29, MIGRATION_29_30
+                        MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31
                     )
                     .build()
                     .also { INSTANCE = it }
