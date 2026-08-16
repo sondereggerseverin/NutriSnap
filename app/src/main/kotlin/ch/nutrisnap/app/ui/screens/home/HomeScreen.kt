@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.MealType
-import ACTIVITY_PRESETS
+import ch.nutrisnap.app.domain.ACTIVITY_PRESETS
 import ch.nutrisnap.app.domain.ActivityPreset
 import ch.nutrisnap.app.domain.estimateKcal
 import ch.nutrisnap.app.ui.components.MacroRing
