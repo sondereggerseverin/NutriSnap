@@ -150,8 +150,22 @@ fun RecipeComponentsEditorSheet(
         onRequestSuggest()
     }
 
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    // Swipe-to-dismiss aus: Scrollen soll das Sheet nicht schliessen (nur X / Abbrechen).
+    var allowSheetDismiss by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { newValue ->
+            if (newValue == SheetValue.Hidden) allowSheetDismiss else true
+        }
+    )
+    fun requestDismiss() {
+        allowSheetDismiss = true
+        onDismiss()
+    }
+    ModalBottomSheet(
+        onDismissRequest = { requestDismiss() },
+        sheetState = sheetState
+    ) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -167,7 +181,7 @@ fun RecipeComponentsEditorSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Komponenten", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
-                IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = { requestDismiss() }, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.Close, contentDescription = "Schliessen")
                 }
             }
@@ -420,7 +434,21 @@ fun MultiComponentAddToDiarySheet(
         c.scaledTo(effectiveGrams[c.id] ?: 0f).protein.toDouble()
     }.toFloat()
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    var allowTrackDismiss by remember { mutableStateOf(false) }
+    val trackSheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { newValue ->
+            if (newValue == SheetValue.Hidden) allowTrackDismiss else true
+        }
+    )
+    fun requestTrackDismiss() {
+        allowTrackDismiss = true
+        onDismiss()
+    }
+    ModalBottomSheet(
+        onDismissRequest = { requestTrackDismiss() },
+        sheetState = trackSheetState
+    ) {
         Column(
             Modifier
                 .padding(horizontal = 16.dp)
@@ -435,7 +463,7 @@ fun MultiComponentAddToDiarySheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Ins Tagebuch", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
-                IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = { requestTrackDismiss() }, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.Close, contentDescription = "Schliessen")
                 }
             }
@@ -553,7 +581,7 @@ fun MultiComponentAddToDiarySheet(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                OutlinedButton(onClick = { requestTrackDismiss() }, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.Close, null, Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("Abbrechen")
@@ -709,8 +737,22 @@ fun ComponentSplitSheet(
         matches.filter { groups[it.ingredientRaw] == key }
             .sumOf { (it.matchedFat ?: 0f).toDouble() }.toFloat()
 
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    // Swipe-to-dismiss aus: Scrollen soll das Sheet nicht schliessen (nur X / Abbrechen).
+    var allowSheetDismiss by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { newValue ->
+            if (newValue == SheetValue.Hidden) allowSheetDismiss else true
+        }
+    )
+    fun requestDismiss() {
+        allowSheetDismiss = true
+        onDismiss()
+    }
+    ModalBottomSheet(
+        onDismissRequest = { requestDismiss() },
+        sheetState = sheetState
+    ) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -731,7 +773,7 @@ fun ComponentSplitSheet(
                     fontSize = 18.sp,
                     modifier = Modifier.weight(1f)
                 )
-                IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = { requestDismiss() }, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.Close, contentDescription = "Schliessen")
                 }
             }
@@ -749,7 +791,7 @@ fun ComponentSplitSheet(
                     fontSize = 13.sp
                 )
                 Spacer(Modifier.height(12.dp))
-                TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("Schliessen") }
+                TextButton(onClick = { requestDismiss() }, modifier = Modifier.fillMaxWidth()) { Text("Schliessen") }
                 return@Column
             }
 
@@ -912,7 +954,7 @@ fun ComponentSplitSheet(
                         m.copy(componentGroup = groups[m.ingredientRaw] ?: parts.firstOrNull()?.key ?: "sauce")
                     }
                     if (comps.isNotEmpty()) onSave(comps, updatedMatches)
-                    onDismiss()
+                    requestDismiss()
                 },
                 enabled = parts.any {
                     it.weightText.replace(',', '.').toFloatOrNull()?.let { w -> w > 0f } == true
@@ -923,7 +965,7 @@ fun ComponentSplitSheet(
                 Spacer(Modifier.width(8.dp))
                 Text("Trennung speichern")
             }
-            TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("Abbrechen") }
+            TextButton(onClick = { requestDismiss() }, modifier = Modifier.fillMaxWidth()) { Text("Abbrechen") }
         }
     }
 }
