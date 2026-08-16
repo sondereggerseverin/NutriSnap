@@ -639,16 +639,91 @@ fun MultiComponentAddToDiarySheet(
  * Rückwärtskompatibel zu "side"/"sauce" (angezeigt als Beilage / Sauce / Fleisch).
  * Unabhängig vom Verify-Flow (der nur Nährwerte prüft).
  */
+/**
+ * Liest Abschnittsüberschriften aus dem Zutaten-Text (wie in der Rezept-Ansicht).
+ * Header = Zeile ohne •/-/Ziffer am Anfang. Liefert (Abschnittsname → Zutatenzeilen).
+ */
+internal fun parseIngredientSections(ingredients: String): List<Pair<String, List<String>>> {
+    if (ingredients.isBlank()) return emptyList()
+    val sections = mutableListOf<Pair<String, MutableList<String>>>()
+    var currentName: String? = null
+    var currentLines = mutableListOf<String>()
+
+    fun isHeader(line: String): Boolean {
+        val d = line.trim()
+        if (d.length <= 2) return false
+        if (d.startsWith("•") || d.startsWith("-") || d.startsWith("*")) return false
+        if (d.first().isDigit()) return false
+        // "100g X" ist Zutat, "Für die Sauce" ist Header
+        if (d.first().isWhitespace()) return false
+        return true
+    }
+
+    fun flush() {
+        val name = currentName ?: return
+        if (currentLines.isNotEmpty() || sections.isEmpty()) {
+            sections += name to currentLines
+        }
+        currentLines = mutableListOf()
+    }
+
+    for (raw in ingredients.lineSequence()) {
+        val line = raw.trim()
+        if (line.isBlank()) continue
+        if (isHeader(line)) {
+            flush()
+            currentName = line.trimEnd(':').trim()
+            currentLines = mutableListOf()
+        } else {
+            if (currentName == null) {
+                currentName = "Sonstiges"
+            }
+            currentLines += line.trimStart('•', '-', '*', ' ').trim()
+        }
+    }
+    flush()
+    // Mindestens 2 Abschnitte mit Zutaten, sonst nicht brauchbar
+    return sections.filter { it.second.isNotEmpty() }
+}
+
+/** Ordnet eine Match-Zeile einem Abschnitts-Key zu (Name-Ähnlichkeit). */
+internal fun matchToSectionKey(
+    m: IngredientMatch,
+    sections: List<Pair<String, List<String>>>
+): String? {
+    if (sections.isEmpty()) return null
+    val raw = m.ingredientRaw.lowercase().trim()
+    val name = m.ingredientName.lowercase().trim()
+    for ((sectionName, lines) in sections) {
+        for (line in lines) {
+            val l = line.lowercase()
+            if (raw.isNotBlank() && (l.contains(raw.take(12)) || raw.contains(l.take(12)))) {
+                return sectionName
+            }
+            // Kernname ohne Menge
+            val core = l.replace(Regex("""^\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tbsp|tsp)?\s*"""), "").trim()
+            if (core.length >= 4 && (name.contains(core.take(10)) || core.contains(name.take(10)))) {
+                return sectionName
+            }
+        }
+    }
+    return null
+}
+
 private data class SplitPart(
     val key: String,
     val name: String,
     val weightText: String
 )
 
-private fun defaultPartKey(m: IngredientMatch): String {
+private fun defaultPartKey(
+    m: IngredientMatch,
+    sections: List<Pair<String, List<String>>> = emptyList()
+): String {
     m.componentGroup?.let { g ->
         if (g.isNotBlank()) return g
     }
+    matchToSectionKey(m, sections)?.let { return it }
     val n = "${m.ingredientRaw} ${m.ingredientName} ${m.matchedFoodName.orEmpty()}".lowercase()
     val sideKeys = listOf(
         "reis", "basmati", "erbse", "erbsen", "peas", "kartoffel", "nudel", "pasta",
@@ -673,37 +748,57 @@ fun ComponentSplitSheet(
     onSave: (components: List<RecipeComponent>, matches: List<IngredientMatch>) -> Unit,
     onDismiss: () -> Unit
 ) {
-    // Teile aus gespeicherten Komponenten oder Defaults (Beilage + Sauce)
+    // Abschnitte aus Zutaten-Text (z.B. "Für die Sauce", "Charred Zuckermais & Beans")
+    val ingredientSections = remember(recipe.id, recipe.ingredients) {
+        parseIngredientSections(recipe.ingredients)
+    }
+
+    // Teile: Zutaten-Abschnitte haben Vorrang (wie im Rezept), sonst gespeicherte
+    // Komponenten, sonst Beilage+Sauce. Gewichte aus initialComponents per Name übernehmen.
     var parts by remember {
         mutableStateOf(
-            if (initialComponents.isNotEmpty()) {
-                initialComponents.mapIndexed { i, c ->
-                    val key = when {
-                        c.name.contains("beilage", true) -> "side"
-                        c.name.contains("sauce", true) || c.name.contains("fleisch", true) -> "sauce"
-                        else -> c.name.ifBlank { "teil$i" }
+            run {
+                fun weightFor(name: String): String {
+                    val match = initialComponents.firstOrNull {
+                        it.name.equals(name, true) ||
+                            (name.contains("sauce", true) && it.name.contains("sauce", true)) ||
+                            (name.contains("beilage", true) && it.name.contains("beilage", true))
                     }
-                    SplitPart(
-                        key = key,
-                        name = c.name.ifBlank { displayNameForKey(key) },
-                        weightText = c.cookedWeightG.takeIf { it > 0f }?.toInt()?.toString() ?: ""
+                    return match?.cookedWeightG?.takeIf { it > 0f }?.toInt()?.toString() ?: ""
+                }
+                when {
+                    ingredientSections.size >= 2 -> ingredientSections.map { (name, _) ->
+                        SplitPart(key = name, name = name, weightText = weightFor(name))
+                    }
+                    initialComponents.isNotEmpty() -> initialComponents.mapIndexed { i, c ->
+                        val key = when {
+                            c.name.contains("beilage", true) -> "side"
+                            c.name.contains("sauce", true) || c.name.contains("fleisch", true) -> "sauce"
+                            else -> c.name.ifBlank { "teil$i" }
+                        }
+                        SplitPart(
+                            key = key,
+                            name = c.name.ifBlank { displayNameForKey(key) },
+                            weightText = c.cookedWeightG.takeIf { it > 0f }?.toInt()?.toString() ?: ""
+                        )
+                    }
+                    else -> listOf(
+                        SplitPart("side", "Beilage", ""),
+                        SplitPart("sauce", "Sauce / Fleisch", "")
                     )
                 }
-            } else {
-                listOf(
-                    SplitPart("side", "Beilage", ""),
-                    SplitPart("sauce", "Sauce / Fleisch", "")
-                )
             }
         )
     }
 
     var groups by remember {
-        mutableStateOf(matches.associate { it.ingredientRaw to defaultPartKey(it) })
+        mutableStateOf(
+            matches.associate { it.ingredientRaw to defaultPartKey(it, ingredientSections) }
+        )
     }
-    LaunchedEffect(matches) {
+    LaunchedEffect(matches, ingredientSections) {
         if (matches.isEmpty()) return@LaunchedEffect
-        groups = matches.associate { it.ingredientRaw to defaultPartKey(it) }
+        groups = matches.associate { it.ingredientRaw to defaultPartKey(it, ingredientSections) }
     }
     LaunchedEffect(initialComponents) {
         if (initialComponents.isEmpty()) return@LaunchedEffect
