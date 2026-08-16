@@ -987,39 +987,45 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Analyze recipe ingredients via OpenFoodFacts and update macros in DB */
-    fun analyzeNutrition(recipe: Recipe) {
+    /**
+     * Analysiert Rezept-Zutaten (OpenFoodFacts/USDA/…).
+     * @param persist true = berechnete Makros in die DB schreiben (Verifizieren / Neu berechnen).
+     *                false = nur in-memory für „Zutaten einsehen“ – überschreibt nie verifizierte Werte.
+     */
+    fun analyzeNutrition(recipe: Recipe, persist: Boolean = true) {
         viewModelScope.launch {
             _nutritionState.value = NutritionState(isAnalyzing = true, recipeId = recipe.id)
             val result = runCatching { RecipeNutritionAnalyzer.analyze(recipe) }
             result.onSuccess { analysis ->
-                // Update recipe in DB with calculated macros
-                val macroLine = "📊 Pro Portion: ${analysis.caloriesPerServing.toInt()} kcal" +
-                    " · ${analysis.proteinPerServing.toInt()}g Protein" +
-                    " · ${analysis.carbsPerServing.toInt()}g Kohlenhydrate" +
-                    " · ${analysis.fatPerServing.toInt()}g Fett"
-                val baseDesc = recipe.description.lines()
-                    .filterNot { it.startsWith("📊") }.joinToString("\n").trim()
-                val newDesc = if (baseDesc.isNotBlank()) "$baseDesc\n\n$macroLine" else macroLine
-                val servDiv = recipe.servings.coerceAtLeast(1)
-                val updated = recipe.copy(
-                    totalCalories     = analysis.totalCalories,
-                    proteinPerServing = analysis.proteinPerServing,
-                    carbsPerServing   = analysis.carbsPerServing,
-                    fatPerServing     = analysis.fatPerServing,
-                    // Ballaststoffe & Co. wurden bisher berechnet aber nie persistiert,
-                    // daher liefen Tagebuch-Summe/Home-Übersicht immer auf 0 zurück.
-                    // Bei unvollständigen Zutaten-Daten wird die (ggf. unvollständige)
-                    // Summe trotzdem gespeichert statt verworfen — die Karte zeigt in
-                    // dem Fall zusätzlich einen Hinweis (siehe fiberComplete).
-                    fiberPerServing        = analysis.totalMicros["fiber"]?.div(servDiv) ?: recipe.fiberPerServing,
-                    sugarPerServing        = analysis.totalMicros["sugar"]?.div(servDiv) ?: recipe.sugarPerServing,
-                    saturatedFatPerServing = analysis.totalMicros["saturatedFat"]?.div(servDiv) ?: recipe.saturatedFatPerServing,
-                    saltPerServing         = analysis.totalMicros["salt"]?.div(servDiv) ?: recipe.saltPerServing,
-                    sodiumPerServing       = analysis.totalMicros["sodium"]?.div(servDiv) ?: recipe.sodiumPerServing,
-                    description       = newDesc
-                )
-                repo.updateRecipe(updated)
+                if (persist) {
+                    // Update recipe in DB with calculated macros
+                    val macroLine = "📊 Pro Portion: ${analysis.caloriesPerServing.toInt()} kcal" +
+                        " · ${analysis.proteinPerServing.toInt()}g Protein" +
+                        " · ${analysis.carbsPerServing.toInt()}g Kohlenhydrate" +
+                        " · ${analysis.fatPerServing.toInt()}g Fett"
+                    val baseDesc = recipe.description.lines()
+                        .filterNot { it.startsWith("📊") }.joinToString("\n").trim()
+                    val newDesc = if (baseDesc.isNotBlank()) "$baseDesc\n\n$macroLine" else macroLine
+                    val servDiv = recipe.servings.coerceAtLeast(1)
+                    val updated = recipe.copy(
+                        totalCalories     = analysis.totalCalories,
+                        proteinPerServing = analysis.proteinPerServing,
+                        carbsPerServing   = analysis.carbsPerServing,
+                        fatPerServing     = analysis.fatPerServing,
+                        // Ballaststoffe & Co. wurden bisher berechnet aber nie persistiert,
+                        // daher liefen Tagebuch-Summe/Home-Übersicht immer auf 0 zurück.
+                        // Bei unvollständigen Zutaten-Daten wird die (ggf. unvollständige)
+                        // Summe trotzdem gespeichert statt verworfen — die Karte zeigt in
+                        // dem Fall zusätzlich einen Hinweis (siehe fiberComplete).
+                        fiberPerServing        = analysis.totalMicros["fiber"]?.div(servDiv) ?: recipe.fiberPerServing,
+                        sugarPerServing        = analysis.totalMicros["sugar"]?.div(servDiv) ?: recipe.sugarPerServing,
+                        saturatedFatPerServing = analysis.totalMicros["saturatedFat"]?.div(servDiv) ?: recipe.saturatedFatPerServing,
+                        saltPerServing         = analysis.totalMicros["salt"]?.div(servDiv) ?: recipe.saltPerServing,
+                        sodiumPerServing       = analysis.totalMicros["sodium"]?.div(servDiv) ?: recipe.sodiumPerServing,
+                        description       = newDesc
+                    )
+                    repo.updateRecipe(updated)
+                }
                 _nutritionState.value = NutritionState(result = analysis, recipeId = recipe.id)
             }.onFailure { e ->
                 _nutritionState.value = NutritionState(error = e.message, recipeId = recipe.id)

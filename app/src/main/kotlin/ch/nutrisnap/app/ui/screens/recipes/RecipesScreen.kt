@@ -802,8 +802,9 @@ fun RecipesScreen(
                 if (hasResult) {
                     showVerifySheet = true
                 } else {
+                    // Nur ansehen: Analyse in-memory, NIEMALS verifizierte Nährwerte überschreiben
                     pendingViewOnly = true
-                    vm.analyzeNutrition(live)
+                    vm.analyzeNutrition(live, persist = false)
                 }
             },
             onSplitComponents = {
