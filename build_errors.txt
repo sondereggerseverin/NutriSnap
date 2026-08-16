@@ -1,14 +1,14 @@
-# Build errors - run 779
+# Build errors - run 782
 
 ## Error lines
 ```
 Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libbarhopper_v3.so, libdatastore_shared_counter.so, libimage_processing_util_jni.so. Run with --info option to learn more.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:388:9 No parameter with name 'sheetGesturesEnabled' found.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:1615:9 No parameter with name 'sheetGesturesEnabled' found.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/home/HomeScreen.kt:898:55 Unresolved reference 'estimateKcal'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/home/HomeScreen.kt:915:57 Unresolved reference 'estimateKcal'.
 > Task :app:compileDebugKotlin FAILED
    > Compilation error. See log for more details
 Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilation error. See log for more details
-BUILD FAILED in 1m 55s
+BUILD FAILED in 2m 36s
 ```
 
 ## Last 150 lines
@@ -161,6 +161,6 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilat
 	... 2 more
 
 
-BUILD FAILED in 1m 55s
+BUILD FAILED in 2m 36s
 31 actionable tasks: 31 executed
 ```
