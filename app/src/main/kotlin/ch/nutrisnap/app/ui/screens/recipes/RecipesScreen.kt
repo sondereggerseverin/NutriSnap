@@ -1606,10 +1606,13 @@ fun RecipeDetailSheet(
     var scanTargetIdx by remember { mutableStateOf<Int?>(null) }
     var showMoreOptions by remember { mutableStateOf(false) }
 
+    // Swipe-to-dismiss aus: Scrollen im Sheet soll nicht schliessen.
+    // Schliessen nur per System-Back, Scrim oder explizitem X-Button.
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
+        sheetGesturesEnabled = false,
         modifier = Modifier.fillMaxHeight(0.94f)
     ) {
         LazyColumn(
@@ -1661,6 +1664,9 @@ fun RecipeDetailSheet(
                     }
                     IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
                         Icon(Icons.Default.Edit, "Bearbeiten", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    }
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Schliessen", modifier = Modifier.size(20.dp))
                     }
                 }
                 Row(

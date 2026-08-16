@@ -380,10 +380,12 @@ fun IngredientVerifySheet(
         return
     }
 
+    // Swipe-to-dismiss aus: Scrollen soll das Sheet nicht schliessen (nur Back / X).
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
+        sheetGesturesEnabled = false,
         modifier = Modifier.fillMaxHeight(0.95f)
     ) {
         LazyColumn(
@@ -397,7 +399,21 @@ fun IngredientVerifySheet(
             // Header
             item {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    Text(if (readOnly) "Zutaten einsehen" else "Zutaten verifizieren", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            if (readOnly) "Zutaten einsehen" else "Zutaten verifizieren",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Schliessen")
+                        }
+                    }
                     Text(
                         "$recipeName · $servings Portion${if (servings != 1) "en" else ""}",
                         fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
