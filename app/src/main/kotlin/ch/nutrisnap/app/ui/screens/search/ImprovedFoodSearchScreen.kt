@@ -177,6 +177,7 @@ private fun FoodListItem(food: FoodItem, onClick: () -> Unit) {
                     FoodSource.NUTRITIONIX -> "NTX"
                     FoodSource.MANUAL -> "✏️"
                     FoodSource.SWISS_FSVO -> "🇨🇭"
+                    FoodSource.BLS -> "BLS"
                 },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant

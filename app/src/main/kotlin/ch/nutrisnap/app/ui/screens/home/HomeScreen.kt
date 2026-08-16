@@ -23,6 +23,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.MealType
+import ACTIVITY_PRESETS
+import ch.nutrisnap.app.domain.ActivityPreset
+import ch.nutrisnap.app.domain.estimateKcal
 import ch.nutrisnap.app.ui.components.MacroRing
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_HOME
@@ -867,7 +870,7 @@ private fun ManualActivityDialog(
     var text by remember {
         mutableStateOf(currentKcal?.takeIf { it > 0f }?.let { it.toInt().toString() } ?: "")
     }
-    var selectedPreset by remember { mutableStateOf<ch.nutrisnap.app.data.model.ActivityPreset?>(null) }
+    var selectedPreset by remember { mutableStateOf<ActivityPreset?>(null) }
     var durationText by remember { mutableStateOf("") }
 
     AlertDialog(
@@ -882,7 +885,7 @@ private fun ManualActivityDialog(
                 )
                 Spacer(Modifier.height(10.dp))
                 // Presets
-                ch.nutrisnap.app.data.model.ACTIVITY_PRESETS.chunked(2).forEach { row ->
+                ACTIVITY_PRESETS.chunked(2).forEach { row ->
                     Row(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
