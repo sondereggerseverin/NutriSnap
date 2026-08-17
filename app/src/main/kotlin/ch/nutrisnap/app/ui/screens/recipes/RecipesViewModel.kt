@@ -417,8 +417,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
                 _importState.update { it.copy(isImporting = false, lastImport = saved) }
-                // Auto-Nährwerte aus Zutaten berechnen
-                analyzeNutrition(saved)
+                // Auto-Nährwerte aus Zutaten berechnen und persistieren
+                analyzeNutrition(saved, persist = true)
             } catch (e: Exception) {
                 _importState.update {
                     it.copy(isImporting = false, importError = e.message ?: "Fehler beim Bild-Import")
@@ -530,7 +530,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                         }
                     }
                     _importState.update { it.copy(isImporting = false, importPhase = null, lastImport = saved) }
-                    analyzeNutrition(saved)
+                    analyzeNutrition(saved, persist = true)
                     return@launch
                 }
 
@@ -621,7 +621,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 _importState.update {
                     it.copy(isImporting = false, importPhase = null, lastImport = base)
                 }
-                analyzeNutrition(base)
+                analyzeNutrition(base, persist = true)
             } catch (e: Exception) {
                 _importState.update {
                     it.copy(
@@ -985,7 +985,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     }
 
 
-    fun analyzeNutrition(recipe: Recipe, persist: Boolean = true) {
+    fun analyzeNutrition(recipe: Recipe, persist: Boolean = false) {
         viewModelScope.launch {
             _nutritionState.value = NutritionState(isAnalyzing = true, recipeId = recipe.id)
             val result = runCatching { RecipeNutritionAnalyzer.analyze(recipe) }

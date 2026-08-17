@@ -782,7 +782,7 @@ fun RecipesScreen(
             onDismiss    = { selectedRecipe = null }, // Nutrition behalten → Re-Verify ändert keine Matches
             onAddToDiary = { r -> addToDiaryRecipe = r; selectedRecipe = null },
             onEdit       = { editRecipe = live; selectedRecipe = null },
-            onAnalyze    = { vm.analyzeNutrition(live) },
+            onAnalyze    = { vm.analyzeNutrition(live, persist = true) },
             onVerify     = {
                 verifyReadOnly = false
                 val hasResult = state.nutritionState.result != null &&
@@ -791,8 +791,9 @@ fun RecipesScreen(
                 if (hasResult) {
                     showVerifySheet = true
                 } else {
+                    // Analyse nur in-memory – Persistenz erst bei explizitem «Nährwerte übernehmen»
                     pendingVerify = true
-                    vm.analyzeNutrition(live)
+                    vm.analyzeNutrition(live, persist = false)
                 }
             },
             onViewIngredients = {
