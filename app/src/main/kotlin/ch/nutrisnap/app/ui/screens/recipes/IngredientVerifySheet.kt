@@ -160,12 +160,52 @@ fun mergeIngredientOverrides(
     overrides: Map<String, IngredientOverride>
 ): List<IngredientVerifyState> = ingredients.mapNotNull { result ->
     val ov = overrides[result.line]
+        ?: overrides.entries.firstOrNull { (k, _) ->
+            k.trim().equals(result.line.trim(), ignoreCase = true)
+        }?.value
     when {
         ov?.deleted == true -> null
         ov != null -> IngredientVerifyState(result, ov.override, ov.manualFiber, ov.amountOverride)
         else -> IngredientVerifyState(result)
     }
 }
+
+/**
+ * Rekonstruiert Session-Overrides aus persistenten [IngredientMatch]-Zeilen.
+ * Key = ingredientRaw (Zeilentext), damit mergeIngredientOverrides greift.
+ */
+fun matchesToOverrides(matches: List<IngredientMatch>): Map<String, IngredientOverride> {
+    if (matches.isEmpty()) return emptyMap()
+    return matches.associate { m ->
+        val amount = m.manualAmountG ?: m.amountGrams.takeIf { it > 0f }
+        val per100 = amount?.takeIf { it > 0f } ?: 100f
+        val food = if (m.matchedFoodName != null || m.matchedCalories != null) {
+            FoodItem(
+                id = m.matchedFoodItemId?.toInt() ?: 0,
+                name = m.matchedFoodName ?: m.ingredientName,
+                calories = m.matchedCalories?.let { it / per100 * 100f },
+                protein = m.matchedProtein?.let { it / per100 * 100f },
+                carbs = m.matchedCarbs?.let { it / per100 * 100f },
+                fat = m.matchedFat?.let { it / per100 * 100f },
+                fiber = m.manualFiberG?.let { it / per100 * 100f }
+            )
+        } else null
+        m.ingredientRaw to IngredientOverride(
+            override = food,
+            manualFiber = m.manualFiberG,
+            amountOverride = m.manualAmountG,
+            deleted = m.isDeleted,
+            componentGroup = m.componentGroup
+        )
+    }
+}
+
+/** True, wenn Matches manuelle Anpassungen oder Komponenten-Zuordnung tragen. */
+fun matchesHaveOverrides(matches: List<IngredientMatch>): Boolean =
+    matches.any {
+        it.manualAmountG != null || it.manualFiberG != null || it.isDeleted ||
+            !it.componentGroup.isNullOrBlank() || it.matchedFoodItemId != null
+    }
 
 /** Reine Summierungslogik, wiederverwendbar sowohl im Sheet (Live-Anzeige) als
  *  auch im ViewModel (Button "Auswahl übernehmen", ohne Sheet zu öffnen). */

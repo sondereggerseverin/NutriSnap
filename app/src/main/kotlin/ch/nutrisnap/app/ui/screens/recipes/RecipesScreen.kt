@@ -708,11 +708,14 @@ fun RecipesScreen(
     val showVerifyNow = showVerifySheet && verifyRecipe != null && verifyResult != null
     if (showVerifyNow) {
         val existingComps by vm.getComponents(verifyRecipe!!.id).collectAsState(initial = emptyList())
+        val storedMatches by vm.getMatches(verifyRecipe.id).collectAsState(initial = emptyList())
+        val sessionOv = vm.getOverridesFor(verifyRecipe.id)
+        val initialOv = if (sessionOv.isNotEmpty()) sessionOv else matchesToOverrides(storedMatches)
         IngredientVerifySheet(
             analysisResult = verifyResult!!,
             recipeName     = verifyRecipe!!.displayTitle(),
             servings       = verifyRecipe.servings,
-            initialOverrides = vm.getOverridesFor(verifyRecipe.id),
+            initialOverrides = initialOv,
             onOverridesChanged = { vm.setOverridesFor(verifyRecipe.id, it) },
             onDismiss      = { showVerifySheet = false; pendingVerify = false; pendingViewOnly = false; verifyReadOnly = false },
             readOnly       = verifyReadOnly,
@@ -776,6 +779,7 @@ fun RecipesScreen(
     if (!showVerifyNow && !showSplitSheet) selectedRecipe?.let { recipe ->
         // Always show latest version from state
         val live = state.recipes.find { it.id == recipe.id } ?: recipe
+        val liveMatches by vm.getMatches(live.id).collectAsState(initial = emptyList())
         RecipeDetailSheet(
             recipe       = live,
             nutritionState = state.nutritionState,
@@ -815,7 +819,8 @@ fun RecipesScreen(
                 selectedRecipe = null
             },
             onRecalculateFromOverrides = { vm.recalculateFromOverrides(live) },
-            hasStoredOverrides = vm.getOverridesFor(live.id).isNotEmpty(),
+            hasStoredOverrides = vm.getOverridesFor(live.id).isNotEmpty() ||
+                matchesHaveOverrides(liveMatches),
             onAddToShoppingList = { r ->
                 val ratio = r.servings.toFloat() / live.servings.coerceAtLeast(1).toFloat()
                 val names = live.ingredients.lines().mapNotNull { rawLine ->

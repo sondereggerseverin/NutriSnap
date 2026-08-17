@@ -192,12 +192,19 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     private val _batchState     = MutableStateFlow(BatchImportState())
     val batchState: StateFlow<BatchImportState> = _batchState.asStateFlow()
 
-    // Manuelle Zutaten-Anpassungen aus dem Verifizieren-Sheet, pro Rezept-ID.
-    // Überleben Schließen des Sheets UND "Neu berechnen" (frische AnalysisResult).
-    private val _ingredientOverrides = MutableStateFlow<Map<Long, Map<String, IngredientOverride>>>(emptyMap())
-    fun getOverridesFor(recipeId: Long): Map<String, IngredientOverride> = _ingredientOverrides.value[recipeId] ?: emptyMap()
+    // Session-Cache für unbestätigte Verify-Edits (überleben Sheet-Schließen in derselben Session).
+    // Persistente Quelle der Wahrheit: IngredientMatch (manualAmountG/manualFiberG/isDeleted/componentGroup).
+    private val _sessionOverrides = MutableStateFlow<Map<Long, Map<String, IngredientOverride>>>(emptyMap())
+    fun getOverridesFor(recipeId: Long): Map<String, IngredientOverride> =
+        _sessionOverrides.value[recipeId] ?: emptyMap()
     fun setOverridesFor(recipeId: Long, overrides: Map<String, IngredientOverride>) {
-        _ingredientOverrides.update { it + (recipeId to overrides) }
+        _sessionOverrides.update { it + (recipeId to overrides) }
+    }
+    /** Session + persistente Matches → Overrides-Map für Verify/Recalculate. */
+    suspend fun resolveOverrides(recipeId: Long): Map<String, IngredientOverride> {
+        val session = _sessionOverrides.value[recipeId]
+        if (!session.isNullOrEmpty()) return session
+        return matchesToOverrides(matchDao.getMatchesForRecipeOnce(recipeId))
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -743,18 +750,21 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun recalculateFromOverrides(recipe: Recipe) {
         val result = _nutritionState.value.result.takeIf { _nutritionState.value.recipeId == recipe.id } ?: return
-        val overrides = getOverridesFor(recipe.id)
-        val states = mergeIngredientOverrides(result.ingredients, overrides)
-        val totals = computeVerifiedTotals(states)
-        val servDiv = recipe.servings.coerceAtLeast(1)
-        val totalWeight = states.sumOf { it.effectiveAmountG.toDouble() }.toFloat().takeIf { it > 0f }
-        applyVerifiedNutrition(
-            recipe,
-            totals.kcal / servDiv, totals.protein / servDiv, totals.carbs / servDiv, totals.fat / servDiv,
-            totals.fiber?.div(servDiv), totals.sugar?.div(servDiv), totals.saturatedFat?.div(servDiv),
-            totals.salt?.div(servDiv), totals.sodium?.div(servDiv),
-            totalIngredientWeightG = totalWeight
-        )
+        viewModelScope.launch {
+            val overrides = resolveOverrides(recipe.id)
+            if (overrides.isEmpty()) return@launch
+            val states = mergeIngredientOverrides(result.ingredients, overrides)
+            val totals = computeVerifiedTotals(states)
+            val servDiv = recipe.servings.coerceAtLeast(1)
+            val totalWeight = states.sumOf { it.effectiveAmountG.toDouble() }.toFloat().takeIf { it > 0f }
+            applyVerifiedNutrition(
+                recipe,
+                totals.kcal / servDiv, totals.protein / servDiv, totals.carbs / servDiv, totals.fat / servDiv,
+                totals.fiber?.div(servDiv), totals.sugar?.div(servDiv), totals.saturatedFat?.div(servDiv),
+                totals.salt?.div(servDiv), totals.sodium?.div(servDiv),
+                totalIngredientWeightG = totalWeight
+            )
+        }
     }
 
     fun updateRecipe(recipe: Recipe) {
@@ -1093,8 +1103,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 ingredients       = ingredientsText?.takeIf { it.isNotBlank() } ?: recipe.ingredients
             )
             repo.updateRecipe(updated)
-            // Overrides löschen – Zutatenliste ist jetzt die Quelle der Wahrheit
-            _ingredientOverrides.update { it - recipe.id }
+            // Session-Overrides räumen – Persistenz liegt in IngredientMatch
+            _sessionOverrides.update { it - recipe.id }
             _nutritionState.value = NutritionState()
         }
     }
