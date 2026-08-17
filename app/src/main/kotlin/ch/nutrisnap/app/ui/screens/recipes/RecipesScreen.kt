@@ -749,6 +749,10 @@ fun RecipesScreen(
         val live = state.recipes.find { it.id == recipe.id } ?: recipe
         val liveMatches by vm.getMatches(live.id).collectAsState(initial = emptyList())
         val imageRefresh by vm.imageRefreshState.collectAsState()
+        // Caption-Klumpen einmalig in saubere Zeilen zerlegen und speichern
+        LaunchedEffect(live.id, live.ingredients) {
+            vm.repairMashedIngredientsIfNeeded(live)
+        }
         RecipeDetailSheet(
             recipe       = live,
             nutritionState = state.nutritionState,

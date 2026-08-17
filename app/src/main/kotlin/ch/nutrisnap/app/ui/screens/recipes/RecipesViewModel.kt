@@ -771,6 +771,19 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { repo.updateRecipe(recipe) }
     }
 
+    /**
+     * Einmalige Reparatur: Caption-Klumpen in saubere Zutatenzeilen zerlegen
+     * und speichern. No-op wenn Text bereits strukturiert ist.
+     */
+    fun repairMashedIngredientsIfNeeded(recipe: Recipe) {
+        if (!RecipeAiParser.looksMashed(recipe.ingredients)) return
+        val fixed = RecipeAiParser.formatIngredientText(recipe.ingredients)
+        if (fixed.isBlank() || fixed == recipe.ingredients.trim()) return
+        viewModelScope.launch {
+            repo.updateRecipe(recipe.copy(ingredients = fixed))
+        }
+    }
+
     private val _imageRefreshState = MutableStateFlow<Pair<Long, String?>>(0L to null)
     /** recipeId → Status: null = idle, "loading", "ok", "fail" */
     val imageRefreshState: StateFlow<Pair<Long, String?>> = _imageRefreshState.asStateFlow()

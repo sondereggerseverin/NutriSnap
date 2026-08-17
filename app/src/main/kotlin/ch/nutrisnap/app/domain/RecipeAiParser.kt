@@ -91,11 +91,13 @@ object RecipeAiParser {
             else -> "Rezept"
         }
 
-        val ingredients = when {
+        val ingredientsRaw = when {
             !isWeakIngredients(ai.ingredients) -> ai.ingredients
             !isWeakIngredients(fallback.ingredients) -> fallback.ingredients
             else -> ai.ingredients.ifBlank { fallback.ingredients }
         }
+        // Caption-Klumpen in saubere Zeilen + Abschnitte zerlegen
+        val ingredients = formatIngredientText(ingredientsRaw)
 
         val instructions = ai.instructions.trim()
             .takeUnless { it.isBlank() || it.equals("null", true) }
@@ -140,17 +142,106 @@ object RecipeAiParser {
         if (c.contains("* ") && !c.contains("\n")) {
             c = c.replace(Regex("\\*(?=\\s*\\d|\\s*[¼½¾])"), "\n•")
         }
-        // Normalize Instagram captions with no newlines but numbered steps/sections
-        // e.g. "Zutaten:200g Mehl1 Ei..." → add newlines before numbers+units or section keywords
-        if (!c.contains("\n") && c.length > 100) {
-            // Before quantities like "200g", "1 EL", "2 TL", "1/2 cup"
-            c = c.replace(Regex("(?<=[a-zäöüA-ZÄÖÜ,)])(?=\\d+[\\s,./]*(g|kg|ml|l|EL|TL|cup|tbsp|tsp|oz|lb|Stück|Stk|pcs|Scheiben|Zehe|Zweig|Prise)\\b)"), "\n")
-            // Before section headers like "Für die Sauce", "Topping:", "Zubereitung:"
-            c = c.replace(Regex("(?=(?:Für |For |Sauce|Dressing|Topping|Marinade|Zubereitung|Instructions?|Preparation|Steps?|Method):?)"), "\n")
-            // Before numbered steps "1.", "2.", etc.
-            c = c.replace(Regex("(?<=\\s)(?=[2-9]\\.|1[0-9]\\.)"), "\n")
-        }
+        // Immer Mengen/Abschnitte trennen – auch wenn schon einzelne Newlines da sind
+        // (sonst bleibt "600g Hähnchen 15 ml Öl 1 Tsp Paprika" in einer Zeile)
+        c = splitInlineIngredients(c)
         return c.ifBlank { raw.trim() }
+    }
+
+    /**
+     * Zerlegt Caption-/Zutaten-Blöcke, in denen mehrere Zutaten in einer Zeile
+     * kleben (typisch TikTok/Instagram), in saubere Zeilen mit Abschnitts-Headern.
+     * Entfernt Hashtags. Idempotent auf bereits formatierten Listen.
+     */
+    fun formatIngredientText(raw: String): String {
+        if (raw.isBlank()) return raw
+        var t = raw.trim()
+        // Hashtags am Ende entfernen
+        t = t.replace(Regex("""(?:\s*#\w+)+[\s:]*$""", RegexOption.IGNORE_CASE), "").trim()
+        t = t.replace(Regex("""#\w+"""), " ").trim()
+        t = splitInlineIngredients(t)
+        // Doppelte Leerzeilen kollabieren, Aufzählungszeichen vereinheitlichen
+        return t.lines()
+            .map { it.trim().trimStart('•', '-', '*', ' ').trim() }
+            .filter { it.isNotBlank() }
+            .joinToString("\n") { line ->
+                if (isSectionHeaderLine(line)) line.trimEnd(':').trim()
+                else "• $line"
+            }
+    }
+
+    /** True wenn der Text wie ein ungegliederter Caption-Klumpen aussieht. */
+    fun looksMashed(ingredients: String): Boolean {
+        val lines = ingredients.lines().map { it.trim() }.filter { it.isNotBlank() }
+        if (lines.isEmpty()) return false
+        val qtyHits = Regex(
+            """\d+[.,]?\d*\s*(?:g|kg|ml|l|el|tl|tsp|tbsp|cup|oz)\b""",
+            RegexOption.IGNORE_CASE
+        ).findAll(ingredients).count()
+        // Viele Mengen, wenige Zeilen → klar zerquetscht
+        return qtyHits >= 4 && lines.size < qtyHits * 0.6
+    }
+
+    private fun isSectionHeaderLine(line: String): Boolean {
+        val d = line.trim().trimStart('•', '-', '*', ' ').trim()
+        if (d.length < 3) return false
+        val lower = d.lowercase()
+        if (lower.startsWith("für ") || lower.startsWith("for ") ||
+            lower.startsWith("ingredients") || lower.startsWith("zutaten")
+        ) return true
+        // Kurzer Titel ohne Menge
+        if (Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tsp|tbsp)\b""", RegexOption.IGNORE_CASE)
+                .containsMatchIn(d)
+        ) return false
+        if (d.first().isDigit()) return false
+        // Emoji + kurzer Name (z.B. "Charred Zuckermais & beans 🫘")
+        val withoutEmoji = d.replace(Regex("""[\p{So}\p{Cn}]"""), "").trim()
+        return withoutEmoji.length in 3..48 &&
+            !withoutEmoji.contains(Regex("""\d+\s*(g|ml)""", RegexOption.IGNORE_CASE))
+    }
+
+    /**
+     * Fügt Newlines vor Mengen und Abschnitts-Markern ein.
+     */
+    private fun splitInlineIngredients(input: String): String {
+        var c = input
+        // Abschnitts-Marker (Wortanfang, damit "for" in "Ingredients for" nicht splitet)
+        c = c.replace(
+            Regex(
+                """(?<=\S)\s*(?=(?:Für\s+\p{L}|For the\s+\p{L}|Charred\s+\p{L}|Hot Honig\s+\p{L}|Hot Honey\s+\p{L}|Ingredients for\s+\d|Zutaten(?:\s+für)?\s+\p{L}))""",
+                RegexOption.IGNORE_CASE
+            ),
+            "\n"
+        )
+        // Vor Mengen: 600g / 15 ml / 1 Tsp / 2 Tbsp / 76.5 g / 1/2 Limette
+        val unit = """g|kg|ml|l|EL|TL|Tsp|Tbsp|tsp|tbsp|cup|cups|oz|lb|Stück|Stk|pcs|Prise|Tasse"""
+        // Nach Buchstabe/Klammer → neue Menge mit Einheit
+        c = c.replace(
+            Regex(
+                """(?<=[a-zäöüßA-ZÄÖÜ)])\s+(?=(\d+[.,]?\d*|\d+/\d+)\s*($unit)\b)""",
+                RegexOption.IGNORE_CASE
+            ),
+            "\n"
+        )
+        // Nach Nicht-Ziffer vor Menge mit Einheit (Emoji etc.)
+        c = c.replace(
+            Regex(
+                """(?<=[^\d\s.,/])\s+(?=(\d+[.,]?\d*|\d+/\d+)\s*($unit)\b)""",
+                RegexOption.IGNORE_CASE
+            ),
+            "\n"
+        )
+        // Brüche ohne Einheit: "1/2 Limette", "1/2 rote Zwiebel"
+        c = c.replace(
+            Regex("""(?<=[^\d\s.,/])\s+(?=\d+/\d+\s+\p{L})"""),
+            "\n"
+        )
+        // Newlines vor "Ingredients for N servings"
+        c = c.replace(
+            Regex("""(?i)(?<=\S)\s*(?=Ingredients\s+for\s+\d+)"""),
+            "\n"
+        )
+        return c
     }
 
     /**
@@ -319,7 +410,7 @@ Rules:
                     if (i < sectionsArr.length() - 1) append("\n")
                 }
             }
-        }.trim()
+        }.trim().let { formatIngredientText(it) }
 
         // optString liefert bei JSON-null den Literal-String "null" — daher safeString.
         val instructions = j.safeString("instructions")
@@ -454,7 +545,8 @@ Rules:
         return Recipe(
             title           = title,
             description     = cals?.let { "📊 Pro Portion: ${it.toInt()} kcal" } ?: "",
-            ingredients     = ingredients.ifBlank { "Tippe ✏️ um Zutaten hinzuzufügen." },
+            ingredients     = formatIngredientText(ingredients)
+                .ifBlank { "Tippe ✏️ um Zutaten hinzuzufügen." },
             instructions    = instructions,
             servings        = servings,
             totalCalories   = cals?.let { it * servings },
