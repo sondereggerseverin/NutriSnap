@@ -27,7 +27,7 @@ fun NutritionLabelScanScreen(
     when (val s = state) {
         is LabelScanState.Capturing -> PhotoCaptureScreen(
             title = "Nährwerttabelle scannen",
-            instructions = "Foto der Nährwerttabelle machen – Werte pro 100g werden automatisch erkannt",
+            instructions = "Auslösen → scharfes Foto → Werte werden danach ausgelesen",
             onPhotoCaptured = { bitmap -> vm.analyzePhoto(bitmap) },
             onNavigateBack = onNavigateBack
         )
