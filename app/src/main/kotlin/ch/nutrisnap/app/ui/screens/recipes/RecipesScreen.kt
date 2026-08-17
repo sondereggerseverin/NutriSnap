@@ -820,7 +820,8 @@ fun RecipesScreen(
                 assignCollectionRecipe = live
             },
             onRetryImage = { vm.refreshRecipeImage(live) },
-            imageRefreshStatus = imageRefresh.takeIf { it.first == live.id }?.second
+            imageRefreshStatus = imageRefresh.takeIf { it.first == live.id }?.second,
+            ingredientMatches = liveMatches
         )
     }
 
@@ -1591,7 +1592,9 @@ fun RecipeDetailSheet(
     onToggleFavorite: () -> Unit = {},
     onAssignCollection: () -> Unit = {},
     onRetryImage: (() -> Unit)? = null,
-    imageRefreshStatus: String? = null
+    imageRefreshStatus: String? = null,
+    /** Persistierte Matches – wenn componentGroup gesetzt, Zutaten gruppiert anzeigen. */
+    ingredientMatches: List<ch.nutrisnap.app.data.model.IngredientMatch> = emptyList()
 ) {
     val context = LocalContext.current
     var servings   by remember(recipe.id) { mutableStateOf(recipe.servings) }
@@ -1969,22 +1972,71 @@ fun RecipeDetailSheet(
                     // ── Ansicht mit Status-Icons ──
                     // itemsIndexed + Index-Key: identische Zutatenzeilen (z.B. 2× „• 1 shot Espresso“)
                     // würden sonst denselben LazyColumn-Key erzeugen → Crash beim Scrollen.
-                    val rawLines = recipe.ingredients.lines()
+                    // Wenn Text flach ist, aber Matches componentGroup haben → gruppiert anzeigen.
+                    val rawLines = recipe.ingredients.lines().filter { it.isNotBlank() }
+                    val textHasHeaders = rawLines.any { line ->
+                        val d = line.trim()
+                        !d.startsWith("•") && !d.startsWith("-") && d.length > 2 &&
+                            !d.first().isDigit() && !d.startsWith(" ") &&
+                            !Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl)\b""", RegexOption.IGNORE_CASE).containsMatchIn(d)
+                    }
+                    val groupedFromMatches = !textHasHeaders &&
+                        ingredientMatches.any { !it.componentGroup.isNullOrBlank() }
+                    val displayBlocks: List<Pair<String?, String>> = if (groupedFromMatches) {
+                        val order = linkedMapOf<String, MutableList<String>>()
+                        for (m in ingredientMatches.filter { !it.isDeleted }) {
+                            val g = m.componentGroup?.trim().orEmpty().ifBlank { "sauce" }
+                            val label = when (g) {
+                                "side" -> "Beilage"
+                                "sauce" -> "Sauce / Fleisch"
+                                else -> g
+                            }
+                            order.getOrPut(label) { mutableListOf() }.add(
+                                m.ingredientRaw.ifBlank { m.ingredientName }
+                            )
+                        }
+                        val covered = ingredientMatches.flatMap {
+                            listOf(it.ingredientRaw, it.ingredientName)
+                        }.map { it.trim().lowercase() }.toSet()
+                        val rest = rawLines.filter {
+                            val t = it.trimStart('•', '-', ' ').trim().lowercase()
+                            t.isNotEmpty() && t !in covered
+                        }
+                        if (rest.isNotEmpty()) order.getOrPut("Weitere") { mutableListOf() }.addAll(rest)
+                        buildList {
+                            for ((header, lines) in order) {
+                                add(header to "")
+                                for (line in lines) add(null to line)
+                            }
+                        }
+                    } else {
+                        rawLines.map { line ->
+                            val d = line.trim()
+                            val isHeader = !d.startsWith("•") && !d.startsWith("-") &&
+                                d.length > 2 && !d.first().isDigit() && !d.startsWith(" ") &&
+                                !Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl)\b""", RegexOption.IGNORE_CASE).containsMatchIn(d)
+                            if (isHeader) d.trimEnd(':') to "" else null to line
+                        }
+                    }
                     itemsIndexed(
-                        rawLines,
-                        key = { index, line -> "${index}\u0000$line" }
-                    ) { _, rawLine ->
-                        if (rawLine.isBlank()) { Spacer(Modifier.height(4.dp)); return@itemsIndexed }
-                        val scaled  = if (ratio != 1f) scaleNumbers(rawLine, ratio) else rawLine
-                        val display = if (metricMode) convertToMetric(scaled) else scaled
-                        val isHeader = !display.startsWith("•") && !display.startsWith("-") &&
-                            display.length > 2 && !display.first().isDigit() && !display.startsWith(" ")
-                        if (isHeader) {
+                        displayBlocks,
+                        key = { index, pair -> "${index}\u0000${pair.first}\u0000${pair.second}" }
+                    ) { _, (header, rawLine) ->
+                        if (header != null) {
                             Spacer(Modifier.height(10.dp))
-                            Text(display.trimEnd(':'), fontWeight=FontWeight.SemiBold, fontSize=13.sp, color=MaterialTheme.colorScheme.primary)
-                        } else {
-                            Row(Modifier.fillMaxWidth().padding(vertical=3.dp), verticalAlignment=Alignment.Top) {
-                                // Status icon: green check if has amount, red question if not
+                            Text(
+                                header,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else if (rawLine.isNotBlank()) {
+                            val scaled = if (ratio != 1f) scaleNumbers(rawLine, ratio) else rawLine
+                            val display = if (metricMode) convertToMetric(scaled) else scaled
+                            Row(
+                                Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
                                 val parsed = parseIngredientLine(display)
                                 val hasAmount = parsed.amount.isNotBlank() && parsed.amount.toFloatOrNull() != null
                                 Icon(
@@ -1994,7 +2046,12 @@ fun RecipeDetailSheet(
                                     modifier = Modifier.size(16.dp).padding(top = 2.dp)
                                 )
                                 Spacer(Modifier.width(6.dp))
-                                Text(display.trimStart('•','-',' '), fontSize=14.sp, lineHeight=20.sp, modifier=Modifier.weight(1f))
+                                Text(
+                                    display.trimStart('•', '-', ' '),
+                                    fontSize = 14.sp,
+                                    lineHeight = 20.sp,
+                                    modifier = Modifier.weight(1f)
+                                )
                             }
                         }
                     }

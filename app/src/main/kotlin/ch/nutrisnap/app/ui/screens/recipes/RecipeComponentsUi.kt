@@ -939,8 +939,9 @@ private fun defaultPartKey(
     val sideKeys = listOf(
         "reis", "basmati", "erbse", "erbsen", "peas", "kartoffel", "nudel", "pasta",
         "quinoa", "couscous", "bulgur", "beilage", "hafer", "flocken", "sweet potato",
-        "süsskartoffel", "suesskartoffel", "mais", "bohne", "bean", "milch", "butter",
-        "milk"
+        "süsskartoffel", "suesskartoffel", "süßkartoffel", "mais", "zuckermais",
+        "sweetcorn", "bohne", "bean", "milch", "butter", "milk", "zwiebel", "onion",
+        "stampf", "mash"
     )
     if (sections.isNotEmpty()) {
         return if (sideKeys.any { it in n }) {
@@ -1031,31 +1032,45 @@ fun ComponentSplitSheet(
         )
     }
 
-    // Index-basiert: bei doppelten Zutatenzeilen (Rezept x2) sonst Kollisionen
+    // Index-basiert: bei doppelten Zutatenzeilen (Rezept x2) sonst Kollisionen.
+    // HARTE REGEL: jede Zutat landet in einem existierenden Part – nie «Nicht zugeordnet».
+    fun clampToPart(raw: String?, m: IngredientMatch): String {
+        val partKeySet = parts.map { it.key }.toSet()
+        if (partKeySet.isEmpty()) return raw ?: "sauce"
+        if (raw != null && raw in partKeySet) return raw
+        val norm = normalizeGroupKey(raw)
+        if (norm != null) {
+            partKeySet.firstOrNull { it == norm }?.let { return it }
+            partKeySet.firstOrNull { normalizeGroupKey(it) == norm }?.let { return it }
+        }
+        val d = defaultPartKey(m, ingredientSections)
+        if (d in partKeySet) return d
+        partKeySet.firstOrNull { normalizeGroupKey(it) == d }?.let { return it }
+        partKeySet.firstOrNull { normalizeGroupKey(it) == "side" && defaultPartKey(m, emptyList()) == "side" }
+            ?.let { return it }
+        return partKeySet.first()
+    }
+
     fun buildGroups(): Map<Int, String> {
         if (matches.isEmpty()) return emptyMap()
         if (ingredientSections.size >= 2) {
-            return assignMatchesToSections(matches, ingredientSections)
+            val assigned = assignMatchesToSections(matches, ingredientSections)
+            return matches.mapIndexed { i, m ->
+                i to clampToPart(assigned[i] ?: m.componentGroup, m)
+            }.toMap()
         }
         // Primär: bereits persistierte componentGroup (normalisiert auf part-keys)
-        val partKeySet = parts.map { it.key }.toSet()
         return matches.mapIndexed { i, m ->
             val fromMatch = normalizeGroupKey(m.componentGroup)
             val key = when {
-                fromMatch != null && fromMatch in partKeySet -> fromMatch
-                fromMatch == "side" && partKeySet.any { normalizeGroupKey(it) == "side" } ->
-                    partKeySet.first { normalizeGroupKey(it) == "side" }
-                fromMatch == "sauce" && partKeySet.any { normalizeGroupKey(it) == "sauce" } ->
-                    partKeySet.first { normalizeGroupKey(it) == "sauce" }
-                else -> {
-                    val d = defaultPartKey(m, emptyList())
-                    if (d in partKeySet) d
-                    else partKeySet.firstOrNull { normalizeGroupKey(it) == d }
-                        ?: partKeySet.firstOrNull()
-                        ?: d
-                }
+                fromMatch != null && fromMatch in parts.map { it.key }.toSet() -> fromMatch
+                fromMatch == "side" && parts.any { normalizeGroupKey(it.key) == "side" } ->
+                    parts.first { normalizeGroupKey(it.key) == "side" }.key
+                fromMatch == "sauce" && parts.any { normalizeGroupKey(it.key) == "sauce" } ->
+                    parts.first { normalizeGroupKey(it.key) == "sauce" }.key
+                else -> defaultPartKey(m, emptyList())
             }
-            i to key
+            i to clampToPart(key, m)
         }.toMap()
     }
     var groups by remember { mutableStateOf(buildGroups()) }
@@ -1223,34 +1238,8 @@ fun ComponentSplitSheet(
                 Spacer(Modifier.height(12.dp))
             }
 
-            // Zutaten ohne Zuordnung (falls key fehlt)
-            val partKeys = parts.map { it.key }.toSet()
-            val orphan = matches.mapIndexed { i, m -> i to m }.filter { groups[it.first] !in partKeys }
-            if (orphan.isNotEmpty()) {
-                Text("Nicht zugeordnet", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.error)
-                Text(
-                    "Tippe auf einen Teil, um zuzuordnen.",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                orphan.forEach { (mi, m) ->
-                    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                        Text(m.ingredientRaw, fontSize = 13.sp)
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            parts.forEach { p ->
-                                AssistChip(
-                                    onClick = { groups = groups + (mi to p.key) },
-                                    label = { Text(p.name.take(18), fontSize = 10.sp) }
-                                )
-                            }
-                        }
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-            }
+            // Orphans werden in buildGroups/clampToPart bereits einem Part zugewiesen –
+            // kein «Nicht zugeordnet»-Block mehr.
 
             TextButton(
                 onClick = {
