@@ -40,6 +40,7 @@ import ch.nutrisnap.app.ui.theme.KEY_MANUAL_ACTIVITY_ENABLED
 import ch.nutrisnap.app.ui.theme.KEY_AGGRESSIVE_SPORT_DAY
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_UI
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_CARDS
+import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_DETAIL
 import ch.nutrisnap.app.ui.theme.KEY_CLASSIC_RECIPE_LIST
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_FAST_AI_PARSE
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_FAST_SCRAPE
@@ -367,6 +368,7 @@ fun SettingsScreen(
                     val freshUi = prefs?.get(KEY_FRESH_UI) ?: false
                     val freshCards = prefs?.get(KEY_FRESH_RECIPE_CARDS) ?: false
                     val freshHome = prefs?.get(KEY_FRESH_HOME) ?: false
+                    val freshDetail = prefs?.get(KEY_FRESH_RECIPE_DETAIL) ?: false
                     SettingsSwitchRow(
                         title = "Frisches Design (Master)",
                         subtitle = "Aktiviert die Unteroptionen",
@@ -378,6 +380,7 @@ fun SettingsScreen(
                                     if (checked) {
                                         it[KEY_FRESH_RECIPE_CARDS] = true
                                         it[KEY_FRESH_HOME] = true
+                                        it[KEY_FRESH_RECIPE_DETAIL] = true
                                     }
                                 }
                             }
@@ -400,6 +403,16 @@ fun SettingsScreen(
                         onCheckedChange = { checked ->
                             scope.launch {
                                 context.notifDataStore.edit { it[KEY_FRESH_HOME] = checked }
+                            }
+                        }
+                    )
+                    SettingsSwitchRow(
+                        title = "Strukturierte Rezept-Detail",
+                        subtitle = "Menge | Einheit | Name ausgerichtet, klarere Gruppen",
+                        checked = freshDetail || freshUi,
+                        onCheckedChange = { checked ->
+                            scope.launch {
+                                context.notifDataStore.edit { it[KEY_FRESH_RECIPE_DETAIL] = checked }
                             }
                         }
                     )

@@ -55,6 +55,7 @@ import ch.nutrisnap.app.domain.RecipeGermanMetricConverter
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_RATINGS
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_UI
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_CARDS
+import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_DETAIL
 import ch.nutrisnap.app.ui.theme.KEY_CLASSIC_RECIPE_LIST
 import ch.nutrisnap.app.ui.components.RecipeGridCard
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
@@ -1602,6 +1603,9 @@ fun RecipeDetailSheet(
     ingredientMatches: List<ch.nutrisnap.app.data.model.IngredientMatch> = emptyList()
 ) {
     val context = LocalContext.current
+    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val freshRecipeDetail = (prefs?.get(KEY_FRESH_RECIPE_DETAIL) ?: false) ||
+        (prefs?.get(KEY_FRESH_UI) ?: false)
     var servings   by remember(recipe.id) { mutableStateOf(recipe.servings) }
     var metricMode by remember { mutableStateOf(false) }
     val ratio      = servings.toFloat() / recipe.servings.coerceAtLeast(1).toFloat()
@@ -2033,35 +2037,51 @@ fun RecipeDetailSheet(
                         key = { index, pair -> "${index}\u0000${pair.first}\u0000${pair.second}" }
                     ) { _, (header, rawLine) ->
                         if (header != null) {
-                            Spacer(Modifier.height(10.dp))
-                            Text(
-                                header,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            Spacer(Modifier.height(if (freshRecipeDetail) 14.dp else 10.dp))
+                            if (freshRecipeDetail) {
+                                Text(
+                                    header.uppercase(),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    letterSpacing = 0.8.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                HorizontalDivider(
+                                    Modifier.padding(top = 4.dp, bottom = 2.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                                )
+                            } else {
+                                Text(
+                                    header,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         } else if (rawLine.isNotBlank()) {
                             val scaled = if (ratio != 1f) scaleNumbers(rawLine, ratio) else rawLine
                             val display = if (metricMode) convertToMetric(scaled) else scaled
+                            val parsed = parseIngredientLine(display)
+                            val hasAmount = parsed.amount.isNotBlank() &&
+                                (parsed.amount.toFloatOrNull() != null || parsed.amount.any { it.isDigit() })
+                            val match = matchByKey[rawLine.trim().trimStart('•', '-', ' ').lowercase()]
+                            val (statusIcon, statusColor, statusLabel) = when {
+                                match?.matchedFoodItemId != null ||
+                                    (match != null && match.matchSource != MatchSource.UNMATCHED) ->
+                                    Triple(Icons.Default.CheckCircle, MacroColors.calories, "Verifiziert")
+                                hasAmount ->
+                                    Triple(Icons.Default.ErrorOutline, MacroColors.carbs, "Menge erkannt, noch nicht gematcht")
+                                else ->
+                                    Triple(
+                                        Icons.Default.RadioButtonUnchecked,
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                        "Noch nicht gematcht"
+                                    )
+                            }
                             Row(
-                                Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                                Modifier.fillMaxWidth().padding(vertical = if (freshRecipeDetail) 4.dp else 3.dp),
                                 verticalAlignment = Alignment.Top
                             ) {
-                                val parsed = parseIngredientLine(display)
-                                val hasAmount = parsed.amount.isNotBlank() && parsed.amount.toFloatOrNull() != null
-                                val match = matchByKey[rawLine.trim().trimStart('•', '-', ' ').lowercase()]
-                                val (statusIcon, statusColor, statusLabel) = when {
-                                    match?.matchedFoodItemId != null || (match != null && match.matchSource != MatchSource.UNMATCHED) ->
-                                        Triple(Icons.Default.CheckCircle, MacroColors.calories, "Verifiziert")
-                                    hasAmount ->
-                                        Triple(Icons.Default.ErrorOutline, MacroColors.carbs, "Menge erkannt, noch nicht gematcht")
-                                    else ->
-                                        Triple(
-                                            Icons.Default.RadioButtonUnchecked,
-                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                            "Noch nicht gematcht"
-                                        )
-                                }
                                 Icon(
                                     statusIcon,
                                     statusLabel,
@@ -2069,12 +2089,39 @@ fun RecipeDetailSheet(
                                     modifier = Modifier.size(16.dp).padding(top = 2.dp)
                                 )
                                 Spacer(Modifier.width(6.dp))
-                                Text(
-                                    display.trimStart('•', '-', ' '),
-                                    fontSize = 14.sp,
-                                    lineHeight = 20.sp,
-                                    modifier = Modifier.weight(1f)
-                                )
+                                if (freshRecipeDetail && hasAmount) {
+                                    // Ausgerichtete Spalten: Menge | Einheit | Name
+                                    Text(
+                                        parsed.amount,
+                                        fontSize = 14.sp,
+                                        lineHeight = 20.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        textAlign = TextAlign.End,
+                                        modifier = Modifier.width(48.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        parsed.unit,
+                                        fontSize = 13.sp,
+                                        lineHeight = 20.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.width(44.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        parsed.name,
+                                        fontSize = 14.sp,
+                                        lineHeight = 20.sp,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                } else {
+                                    Text(
+                                        display.trimStart('•', '-', ' '),
+                                        fontSize = 14.sp,
+                                        lineHeight = 20.sp,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
                             }
                         }
                     }
