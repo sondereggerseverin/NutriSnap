@@ -830,26 +830,40 @@ internal fun assignMatchesToSections(
         result[c.matchIdx] = c.section
     }
 
-    // Rest: Fallback-Heuristik pro Match
+    // Rest: Fallback-Heuristik pro Match (nie unzugeordnet lassen)
     matches.forEachIndexed { mi, m ->
         if (mi in result) return@forEachIndexed
+        // Persistierte Gruppe hat Vorrang
+        normalizeGroupKey(m.componentGroup)?.let { ng ->
+            sections.firstOrNull { it.first.equals(m.componentGroup, true) }?.let {
+                result[mi] = it.first
+                return@forEachIndexed
+            }
+            sections.firstOrNull { normalizeGroupKey(it.first) == ng }?.let {
+                result[mi] = it.first
+                return@forEachIndexed
+            }
+        }
         val n = "${m.ingredientRaw} ${m.ingredientName}".lowercase()
-        val sideKeys = listOf("reis", "kartoffel", "süsskartoffel", "suesskartoffel", "mais", "bohne", "stampf", "mash")
+        val sideKeys = listOf(
+            "reis", "kartoffel", "süsskartoffel", "suesskartoffel", "mais", "bohne",
+            "stampf", "mash", "milch", "butter", "milk", "bean", "potato"
+        )
         val pick = when {
             sideKeys.any { it in n } ->
                 sections.firstOrNull { (name, _) ->
                     name.lowercase().let { s ->
-                        listOf("stampf", "mash", "beilage", "kartoffel", "mais", "bohne").any { it in s }
+                        listOf("stampf", "mash", "beilage", "kartoffel", "mais", "bohne", "potato").any { it in s }
                     }
                 }?.first
             else ->
                 sections.firstOrNull { (name, _) ->
                     name.lowercase().let { s ->
-                        listOf("fleisch", "hähnchen", "huhn", "chicken", "sauce", "honig").any { it in s }
+                        listOf("fleisch", "hähnchen", "huhn", "chicken", "sauce", "honig", "marinade").any { it in s }
                     }
                 }?.first
         }
-        result[mi] = pick ?: sections.first().first
+        result[mi] = pick ?: sections.lastOrNull()?.first ?: sections.first().first
     }
     return result
 }
@@ -879,35 +893,69 @@ private data class SplitPart(
     val weightText: String
 )
 
+/** Mappt beliebige componentGroup/Abschnittsnamen auf side/sauce oder behält den Key. */
+private fun normalizeGroupKey(raw: String?): String? {
+    val g = raw?.trim().orEmpty()
+    if (g.isEmpty()) return null
+    if (g == "side" || g == "sauce") return g
+    val n = g.lowercase()
+    return when {
+        listOf(
+            "beilage", "side", "stampf", "mash", "mais", "sweetcorn", "bohne", "bean",
+            "reis", "kartoffel", "potato", "süsskartoffel", "suesskartoffel", "quinoa"
+        ).any { it in n } -> "side"
+        listOf(
+            "sauce", "fleisch", "meat", "hähnchen", "huhn", "chicken", "poulet",
+            "marinade", "honig", "honey", "dressing"
+        ).any { it in n } -> "sauce"
+        else -> g // eigener Abschnitt (z. B. "Sweet potato mash")
+    }
+}
+
 private fun defaultPartKey(
     m: IngredientMatch,
     sections: List<Pair<String, List<String>>> = emptyList()
 ): String {
-    // Abschnitte aus Zutaten-Text haben Vorrang vor alter side/sauce-Zuordnung
+    // 1) Bereits gesetzte componentGroup (nach Normalisierung)
+    normalizeGroupKey(m.componentGroup)?.let { normalized ->
+        if (sections.isEmpty()) {
+            // Binary-Modus: nur side/sauce erlauben
+            if (normalized == "side" || normalized == "sauce") return normalized
+            // Custom-Key nur behalten wenn Abschnitte existieren
+        } else {
+            // Abschnitts-Modus: exact match auf Section-Name, sonst normalisiert
+            sections.firstOrNull { it.first.equals(m.componentGroup, true) }?.let { return it.first }
+            sections.firstOrNull { it.first.equals(normalized, true) }?.let { return it.first }
+            if (normalized == "side" || normalized == "sauce") {
+                sections.firstOrNull { (name, _) ->
+                    normalizeGroupKey(name) == normalized
+                }?.let { return it.first }
+            }
+        }
+    }
+    // 2) Abschnitte aus Zutaten-Text
     matchToSectionKey(m, sections)?.let { return it }
-    val g = m.componentGroup?.trim().orEmpty()
-    if (g.isNotBlank() && g != "side" && g != "sauce") return g
-    // side/sauce nur behalten wenn keine Abschnitte vorhanden
-    if (sections.isEmpty() && (g == "side" || g == "sauce")) return g
     val n = "${m.ingredientRaw} ${m.ingredientName} ${m.matchedFoodName.orEmpty()}".lowercase()
     val sideKeys = listOf(
         "reis", "basmati", "erbse", "erbsen", "peas", "kartoffel", "nudel", "pasta",
         "quinoa", "couscous", "bulgur", "beilage", "hafer", "flocken", "sweet potato",
-        "süsskartoffel", "suesskartoffel"
+        "süsskartoffel", "suesskartoffel", "mais", "bohne", "bean", "milch", "butter",
+        "milk"
     )
     if (sections.isNotEmpty()) {
-        // Fallback: erste/letzte Sektion nach Heuristik
         return if (sideKeys.any { it in n }) {
             sections.firstOrNull { (name, _) ->
-                name.lowercase().let { n ->
-                    listOf("stampf", "mash", "beilage", "kartoffel", "reis").any { it in n }
-                }
+                normalizeGroupKey(name) == "side" ||
+                    name.lowercase().let { s ->
+                        listOf("stampf", "mash", "beilage", "kartoffel", "mais", "bohne", "potato").any { it in s }
+                    }
             }?.first ?: sections.first().first
         } else {
             sections.firstOrNull { (name, _) ->
-                name.lowercase().let { n ->
-                    listOf("sauce", "fleisch", "hähnchen", "huhn", "chicken", "honig").any { it in n }
-                }
+                normalizeGroupKey(name) == "sauce" ||
+                    name.lowercase().let { s ->
+                        listOf("sauce", "fleisch", "hähnchen", "huhn", "chicken", "honig", "marinade").any { it in s }
+                    }
             }?.first ?: sections.last().first
         }
     }
@@ -933,9 +981,12 @@ fun ComponentSplitSheet(
     val ingredientSections = remember(recipe.id, recipe.ingredients) {
         parseIngredientSections(recipe.ingredients)
     }
+    // Falls Abschnitte fehlen: Gruppen aus bereits gesetzten Match.componentGroup ableiten
+    val groupsFromMatches = remember(matches) {
+        matches.mapNotNull { normalizeGroupKey(it.componentGroup) }.distinct()
+    }
 
-    // Teile: Zutaten-Abschnitte haben Vorrang (wie im Rezept), sonst gespeicherte
-    // Komponenten, sonst Beilage+Sauce. Gewichte aus initialComponents per Name übernehmen.
+    // Teile: 1) Zutaten-Abschnitte 2) Match-componentGroups 3) gespeicherte Komponenten 4) Beilage+Sauce
     var parts by remember {
         mutableStateOf(
             run {
@@ -943,7 +994,8 @@ fun ComponentSplitSheet(
                     val match = initialComponents.firstOrNull {
                         it.name.equals(name, true) ||
                             (name.contains("sauce", true) && it.name.contains("sauce", true)) ||
-                            (name.contains("beilage", true) && it.name.contains("beilage", true))
+                            (name.contains("beilage", true) && it.name.contains("beilage", true)) ||
+                            (normalizeGroupKey(it.name) == normalizeGroupKey(name))
                     }
                     return match?.cookedWeightG?.takeIf { it > 0f }?.toInt()?.toString() ?: ""
                 }
@@ -951,8 +1003,15 @@ fun ComponentSplitSheet(
                     ingredientSections.size >= 2 -> ingredientSections.map { (name, _) ->
                         SplitPart(key = name, name = name, weightText = weightFor(name))
                     }
+                    groupsFromMatches.size >= 2 -> groupsFromMatches.map { key ->
+                        SplitPart(
+                            key = key,
+                            name = displayNameForKey(key),
+                            weightText = weightFor(displayNameForKey(key))
+                        )
+                    }
                     initialComponents.isNotEmpty() -> initialComponents.mapIndexed { i, c ->
-                        val key = when {
+                        val key = normalizeGroupKey(c.name) ?: when {
                             c.name.contains("beilage", true) -> "side"
                             c.name.contains("sauce", true) || c.name.contains("fleisch", true) -> "sauce"
                             else -> c.name.ifBlank { "teil$i" }
@@ -973,19 +1032,36 @@ fun ComponentSplitSheet(
     }
 
     // Index-basiert: bei doppelten Zutatenzeilen (Rezept x2) sonst Kollisionen
-    var groups by remember {
-        mutableStateOf(
-            if (ingredientSections.size >= 2) assignMatchesToSections(matches, ingredientSections)
-            else matches.mapIndexed { i, m -> i to defaultPartKey(m, emptyList()) }.toMap()
-        )
-    }
-    LaunchedEffect(matches, ingredientSections) {
-        if (matches.isEmpty()) return@LaunchedEffect
-        groups = if (ingredientSections.size >= 2) {
-            assignMatchesToSections(matches, ingredientSections)
-        } else {
-            matches.mapIndexed { i, m -> i to defaultPartKey(m, emptyList()) }.toMap()
+    fun buildGroups(): Map<Int, String> {
+        if (matches.isEmpty()) return emptyMap()
+        if (ingredientSections.size >= 2) {
+            return assignMatchesToSections(matches, ingredientSections)
         }
+        // Primär: bereits persistierte componentGroup (normalisiert auf part-keys)
+        val partKeySet = parts.map { it.key }.toSet()
+        return matches.mapIndexed { i, m ->
+            val fromMatch = normalizeGroupKey(m.componentGroup)
+            val key = when {
+                fromMatch != null && fromMatch in partKeySet -> fromMatch
+                fromMatch == "side" && partKeySet.any { normalizeGroupKey(it) == "side" } ->
+                    partKeySet.first { normalizeGroupKey(it) == "side" }
+                fromMatch == "sauce" && partKeySet.any { normalizeGroupKey(it) == "sauce" } ->
+                    partKeySet.first { normalizeGroupKey(it) == "sauce" }
+                else -> {
+                    val d = defaultPartKey(m, emptyList())
+                    if (d in partKeySet) d
+                    else partKeySet.firstOrNull { normalizeGroupKey(it) == d }
+                        ?: partKeySet.firstOrNull()
+                        ?: d
+                }
+            }
+            i to key
+        }.toMap()
+    }
+    var groups by remember { mutableStateOf(buildGroups()) }
+    LaunchedEffect(matches, ingredientSections, parts.map { it.key }) {
+        if (matches.isEmpty()) return@LaunchedEffect
+        groups = buildGroups()
     }
 
     fun sumFor(key: String): Triple<Float, Float, Float> {

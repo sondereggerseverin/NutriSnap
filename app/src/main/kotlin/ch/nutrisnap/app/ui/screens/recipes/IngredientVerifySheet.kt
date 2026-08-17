@@ -650,9 +650,27 @@ fun IngredientVerifySheet(
                         val servDiv = servings.coerceAtLeast(1)
                         val totalWeight = verifyStates.sumOf { it.effectiveAmountG.toDouble() }.toFloat()
                             .takeIf { it > 0f }
-                        val ingredientsText = verifyStates.joinToString("\n") { s ->
-                            formatVerifyLineTitle(s)
-                        }
+                        // Abschnitts-Header aus groups beibehalten (nicht flach speichern!)
+                        val ingredientsText = buildString {
+                            val orderedKeys = verifyStates
+                                .map { groups[it.result.line] ?: "sauce" }
+                                .distinct()
+                            val multi = orderedKeys.size >= 2
+                            for (key in orderedKeys) {
+                                if (multi) {
+                                    val header = when (key) {
+                                        "side" -> "Beilage"
+                                        "sauce" -> "Sauce / Fleisch"
+                                        else -> key
+                                    }
+                                    append(header).append('\n')
+                                }
+                                verifyStates.filter { groups[it.result.line] == key }.forEach { s ->
+                                    append("• ").append(formatVerifyLineTitle(s)).append('\n')
+                                }
+                                if (multi) append('\n')
+                            }
+                        }.trim()
                         // Matches inkl. componentGroup aus Abschnitten/UI persistieren
                         onSaveMatches?.invoke(
                             verifyStates.map { s ->
