@@ -2025,10 +2025,8 @@ fun RecipeDetailSheet(
                     }
                     // Lookup echter Match-Status pro Zeile (statt reiner "hat Zahl"-Heuristik):
                     // grün = mit FoodItem verifiziert, orange = Menge erkannt aber ungematcht, grau = kein Match-Versuch.
-                    val matchByKey = remember(ingredientMatches) {
-                        ingredientMatches.filter { !it.isDeleted }.associateBy {
-                            it.ingredientRaw.trim().trimStart('•', '-', ' ').lowercase()
-                        }
+                    val matchByKey = ingredientMatches.filter { !it.isDeleted }.associateBy {
+                        it.ingredientRaw.trim().trimStart('•', '-', ' ').lowercase()
                     }
                     itemsIndexed(
                         displayBlocks,
