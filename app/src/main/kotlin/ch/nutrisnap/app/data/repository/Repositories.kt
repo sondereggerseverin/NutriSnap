@@ -413,15 +413,41 @@ class RecipeRepository(db: NutriDatabase, private val context: Context) {
         componentDao.getForRecipeOnce(recipeId)
 
     /**
-     * Ersetzt alle Komponenten eines Rezepts. Leere Liste = One-Pot (kein Multi-Komponenten-Modus).
+     * Merged Komponenten eines Rezepts per ID (kein blindes delete-all → insert-all).
+     * - Bestehende Zeilen mit id > 0 werden per @Update aktualisiert
+     * - Neue Zeilen (id == 0) werden eingefügt
+     * - DB-Zeilen, die in [components] nicht mehr vorkommen, werden gelöscht
+     * Leere Liste = One-Pot (alle Komponenten entfernen).
      */
     suspend fun setComponents(recipeId: Long, components: List<RecipeComponent>) {
-        componentDao.deleteForRecipe(recipeId)
-        if (components.isEmpty()) return
-        val withIds = components.mapIndexed { index, c ->
-            c.copy(id = 0, recipeId = recipeId, sortOrder = index)
+        val existing = componentDao.getForRecipeOnce(recipeId)
+        if (components.isEmpty()) {
+            if (existing.isNotEmpty()) componentDao.deleteForRecipe(recipeId)
+            return
         }
-        componentDao.insertAll(withIds)
+        val incomingById = components.filter { it.id > 0L }.associateBy { it.id }
+        // Update vorhandene
+        for (old in existing) {
+            val neu = incomingById[old.id]
+            if (neu != null) {
+                val idx = components.indexOfFirst { it.id == old.id }.coerceAtLeast(0)
+                componentDao.update(
+                    neu.copy(id = old.id, recipeId = recipeId, sortOrder = idx)
+                )
+            } else {
+                // Nicht mehr in der Liste → entfernen
+                componentDao.delete(old)
+            }
+        }
+        // Insert neue (id == 0 oder unbekannte id)
+        val existingIds = existing.map { it.id }.toSet()
+        components.forEachIndexed { index, c ->
+            if (c.id == 0L || c.id !in existingIds) {
+                componentDao.insert(
+                    c.copy(id = 0, recipeId = recipeId, sortOrder = index)
+                )
+            }
+        }
     }
 
     suspend fun deleteComponents(recipeId: Long) {

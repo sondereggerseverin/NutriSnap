@@ -22,6 +22,12 @@ interface IngredientMatchDao {
     @Update
     suspend fun updateMatch(match: IngredientMatch)
 
+    @Delete
+    suspend fun deleteMatch(match: IngredientMatch)
+
+    @Query("DELETE FROM ingredient_matches WHERE id = :id")
+    suspend fun deleteMatchById(id: Long)
+
     @Query("DELETE FROM ingredient_matches WHERE recipeId = :recipeId")
     suspend fun deleteMatchesForRecipe(recipeId: Long)
 
