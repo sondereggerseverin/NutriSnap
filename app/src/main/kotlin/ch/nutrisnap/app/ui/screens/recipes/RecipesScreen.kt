@@ -2514,17 +2514,21 @@ fun AddToDiarySheet(
             Spacer(Modifier.height(8.dp))
             Text("Tag:", fontSize=13.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 val today = java.time.LocalDate.now()
                 listOf(
-                    today to "Heute",
+                    today.minusDays(2) to "Vorgestern",
                     today.minusDays(1) to "Gestern",
-                    today.minusDays(2) to "Vorgestern"
+                    today to "Heute",
+                    today.plusDays(1) to "Morgen"
                 ).forEach { (d, label) ->
                     FilterChip(
                         selected = selectedDate == d,
                         onClick = { selectedDate = d },
-                        label = { Text(label, fontSize = 12.sp) }
+                        label = { Text(label, fontSize = 11.sp) }
                     )
                 }
             }

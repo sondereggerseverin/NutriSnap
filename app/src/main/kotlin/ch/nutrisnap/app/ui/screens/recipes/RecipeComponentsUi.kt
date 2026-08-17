@@ -639,6 +639,28 @@ fun MultiComponentAddToDiarySheet(
                 }
             }
 
+            Spacer(Modifier.height(12.dp))
+            Text("Tag", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Spacer(Modifier.height(4.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                val today = LocalDate.now()
+                listOf(
+                    today.minusDays(2) to "Vorgestern",
+                    today.minusDays(1) to "Gestern",
+                    today to "Heute",
+                    today.plusDays(1) to "Morgen"
+                ).forEach { (d, label) ->
+                    FilterChip(
+                        selected = selectedDate == d,
+                        onClick = { selectedDate = d },
+                        label = { Text(label, fontSize = 11.sp) }
+                    )
+                }
+            }
+
             Spacer(Modifier.height(16.dp))
             Row(
                 Modifier.fillMaxWidth(),
