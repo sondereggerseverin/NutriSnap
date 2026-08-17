@@ -68,40 +68,7 @@ import ch.nutrisnap.app.ui.theme.MacroColors
 import coil.compose.AsyncImage
 
 // ── Unit conversions (Brüche + cups/tbsp/°F → metrisch) ───────────────────────
-/**
- * Sofortige, suspend-freie Korrektur: wenn jede Komponente die vollen Rezept-kcal
- * trägt, proportional zum Kochgewicht aufteilen. Kein DB-Zugriff.
- */
-private fun healComponentsProportional(
-    recipe: Recipe,
-    components: List<RecipeComponent>
-): List<RecipeComponent> {
-    if (components.size <= 1) return components
-    val recipeTotal = recipe.totalCalories ?: 0f
-    if (recipeTotal <= 0f) return components
-    val duplicated = components.all { c ->
-        c.totalCalories > 0f &&
-            kotlin.math.abs(c.totalCalories - recipeTotal) / recipeTotal < 0.08f
-    }
-    val sumTooHigh = components.sumOf { it.totalCalories.toDouble() }.toFloat() > recipeTotal * 1.35f
-    if (!duplicated && !sumTooHigh) return components
-    val serv = recipe.servings.coerceAtLeast(1).toFloat()
-    val sourceProt = (recipe.proteinPerServing ?: 0f) * serv
-    val sourceCarbs = (recipe.carbsPerServing ?: 0f) * serv
-    val sourceFat = (recipe.fatPerServing ?: 0f) * serv
-    val sourceFiber = (recipe.fiberPerServing ?: 0f) * serv
-    val wSum = components.sumOf { it.cookedWeightG.toDouble() }.toFloat().coerceAtLeast(1f)
-    return components.map { c ->
-        val f = if (c.cookedWeightG > 0f) c.cookedWeightG / wSum else 1f / components.size
-        c.copy(
-            totalCalories = recipeTotal * f,
-            proteinG = sourceProt * f,
-            carbsG = sourceCarbs * f,
-            fatG = sourceFat * f,
-            fiberG = sourceFiber * f
-        )
-    }
-}
+/* healComponentsProportional entfernt – ersetzt durch enrichComponentsFromMatches */
 
 private fun convertToMetric(text: String): String =
     runCatching { RecipeGermanMetricConverter.convertUnitsToMetric(text) }.getOrDefault(text)
@@ -901,8 +868,9 @@ fun RecipesScreen(
 
     addToDiaryRecipe?.let { recipe ->
         val components by vm.getComponents(recipe.id).collectAsState(initial = emptyList())
-        // Persistente Heilung bei Duplikat-kcal (einmal pro Öffnen)
-        LaunchedEffect(recipe.id, components) {
+        val diaryMatches by vm.getMatches(recipe.id).collectAsState(initial = emptyList())
+        // Persistente Korrektur: Nährwerte aus Matches ableiten (einmal pro Öffnen)
+        LaunchedEffect(recipe.id, components, diaryMatches) {
             if (components.size > 1) {
                 val healed = vm.healComponentNutrition(recipe, components)
                 if (healed != components) {
@@ -910,9 +878,8 @@ fun RecipesScreen(
                 }
             }
         }
-        // Sofort nutzbare, ggf. proportional korrigierte Liste (ohne Suspend)
-        val safeComponents = remember(recipe.id, components, recipe.totalCalories) {
-            healComponentsProportional(recipe, components)
+        val safeComponents = remember(recipe.id, components, diaryMatches, recipe.totalCalories) {
+            enrichComponentsFromMatches(recipe, components, diaryMatches)
         }
 
         if (components.isNotEmpty()) {

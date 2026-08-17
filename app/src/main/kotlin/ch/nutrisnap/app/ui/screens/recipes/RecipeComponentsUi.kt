@@ -349,14 +349,76 @@ fun RecipeComponentsEditorSheet(
  * Optional: „Gleichmässig aufteilen“ (Meal-Prep) – eine Portionszahl, Ratio bleibt.
  */
 /**
- * Heilt offensichtliche Duplikat-Nährwerte (jede Komponente trägt die vollen
- * Rezept-kcal) rein clientseitig für die Anzeige/Skalierung, ohne DB-Schreiben.
- * Persistente Heilung läuft über [RecipesViewModel.healComponentNutrition].
+ * Kanonische Ableitung: Nährwerte einer Komponenten-Gruppe aus IngredientMatch-
+ * Zeilen summieren. cookedWeightG bleibt der manuell erfasste Wert (kann nicht
+ * aus Zutaten abgeleitet werden).
  */
-private fun displayHealedComponents(
+fun deriveComponentNutrition(
+    matches: List<IngredientMatch>,
+    componentKey: String,
+    cookedWeightG: Float,
+    recipeId: Long = 0L,
+    name: String = componentKey,
+    sortOrder: Int = 0
+): RecipeComponent {
+    val key = componentKey.trim().lowercase()
+    val group = matches.filter { m ->
+        if (m.isDeleted) return@filter false
+        val g = m.componentGroup?.trim()?.lowercase().orEmpty()
+        when {
+            g.isNotEmpty() && g == key -> true
+            g.isEmpty() && key in setOf("side", "beilage") ->
+                defaultComponentGroup("${m.ingredientRaw} ${m.ingredientName}") == "side"
+            g.isEmpty() && key in setOf("sauce", "fleisch") ->
+                defaultComponentGroup("${m.ingredientRaw} ${m.ingredientName}") == "sauce"
+            else -> g == key
+        }
+    }
+    return RecipeComponent(
+        recipeId = recipeId,
+        name = name,
+        cookedWeightG = cookedWeightG,
+        totalCalories = group.sumOf { (it.matchedCalories ?: 0f).toDouble() }.toFloat(),
+        proteinG = group.sumOf { (it.matchedProtein ?: 0f).toDouble() }.toFloat(),
+        carbsG = group.sumOf { (it.matchedCarbs ?: 0f).toDouble() }.toFloat(),
+        fatG = group.sumOf { (it.matchedFat ?: 0f).toDouble() }.toFloat(),
+        fiberG = group.sumOf { (it.manualFiberG ?: 0f).toDouble() }.toFloat(),
+        sortOrder = sortOrder
+    )
+}
+
+/**
+ * Reichert gespeicherte Komponenten mit frisch aus Matches abgeleiteten
+ * Nährwerten an. Fallback: proportionale Aufteilung am Rezept-Total, wenn
+ * Matches fehlen und die Snapshot-Werte offensichtlich kaputt sind.
+ */
+fun enrichComponentsFromMatches(
     recipe: Recipe,
-    components: List<RecipeComponent>
+    components: List<RecipeComponent>,
+    matches: List<IngredientMatch>
 ): List<RecipeComponent> {
+    if (components.isEmpty()) return components
+    val usable = matches.filter { !it.isDeleted && ((it.matchedCalories ?: 0f) > 0f || it.amountGrams > 0f) }
+    if (usable.isNotEmpty()) {
+        return components.mapIndexed { i, c ->
+            val key = when {
+                c.name.contains("beilage", true) || c.name.contains("side", true) -> "side"
+                c.name.contains("sauce", true) || c.name.contains("fleisch", true) -> "sauce"
+                else -> c.name.trim().lowercase()
+            }
+            val derived = deriveComponentNutrition(
+                matches = usable,
+                componentKey = key,
+                cookedWeightG = c.cookedWeightG,
+                recipeId = c.recipeId,
+                name = c.name,
+                sortOrder = c.sortOrder
+            )
+            // Nur überschreiben wenn Ableitung echte kcal hat
+            if (derived.totalCalories > 0f) derived.copy(id = c.id) else c
+        }
+    }
+    // Fallback: proportionale Heilung bei Duplikat-Snapshots
     if (components.size <= 1) return components
     val recipeTotal = recipe.totalCalories ?: 0f
     if (recipeTotal <= 0f) return components
@@ -393,8 +455,8 @@ fun MultiComponentAddToDiarySheet(
     onDismiss: () -> Unit,
     onFreeze: ((gramsByComponentId: Map<Long, Float>, quantity: Int) -> Unit)? = null
 ) {
-    // Sofortige Korrektur bei kaputten Bestandsdaten (Duplikat-kcal)
-    val comps = remember(recipe.id, components) { displayHealedComponents(recipe, components) }
+    // Nährwerte bevorzugt aus Matches ableiten (Fallback: proportionale Heilung)
+    val comps = remember(recipe.id, components) { enrichComponentsFromMatches(recipe, components, emptyList()) }
     var equalMode by remember { mutableStateOf(false) }
     var portionsText by remember { mutableStateOf(recipe.servings.coerceAtLeast(1).toString()) }
     var gramsTexts by remember(comps) {

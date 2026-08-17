@@ -872,88 +872,16 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Korrigiert Komponenten-Nährwerte wenn:
-     * - alle kcal ≤ 0, oder
-     * - die kcal jeder Komponente ≈ dem Rezept-Total sind (klassischer
-     *   Duplikat-Bug: beide Teile tragen 5579 kcal statt den Anteil), oder
-     * - alle Komponenten die gleiche kcal/100g-Dichte haben (proportionale
-     *   Gewichtsaufteilung statt Zutaten-Split – z. B. Beilage und Sauce
-     *   beide 88 kcal/100g).
+     * Korrigiert Komponenten-Nährwerte kanonisch über [enrichComponentsFromMatches]
+     * (Matches → Ableitung, sonst proportionale Fallback-Heilung).
      */
     suspend fun healComponentNutrition(
         recipe: Recipe,
         components: List<RecipeComponent>
     ): List<RecipeComponent> {
         if (components.isEmpty()) return components
-        val recipeTotal = recipe.totalCalories ?: 0f
-        val sumComp = components.sumOf { it.totalCalories.toDouble() }.toFloat()
-        val allZero = components.all { it.totalCalories <= 0f }
-        // Duplikat: jede Komponente hat (fast) die vollen Rezept-kcal
-        val duplicated = components.size > 1 && recipeTotal > 0f &&
-            components.all { c ->
-                c.totalCalories > 0f &&
-                    kotlin.math.abs(c.totalCalories - recipeTotal) / recipeTotal < 0.08f
-            }
-        // Summe der Komponenten deutlich über Rezept-Total (z.B. 2×)
-        val sumTooHigh = recipeTotal > 0f && sumComp > recipeTotal * 1.35f
-        // Gleiche Dichte = fast sicher Gewichts-Split statt Zutaten-Split
-        val densities = components.map { c ->
-            if (c.cookedWeightG > 0f && c.totalCalories > 0f) c.totalCalories / c.cookedWeightG else -1f
-        }
-        val validDens = densities.filter { it > 0f }
-        val sameDensity = components.size > 1 && validDens.size == components.size &&
-            validDens.all { d ->
-                kotlin.math.abs(d - validDens[0]) / validDens[0].coerceAtLeast(0.001f) < 0.05f
-            }
-
-        if (!allZero && !duplicated && !sumTooHigh && !sameDensity) return components
-
-        val suggested = suggestComponentsFromMatches(recipe)
-        // Echter Zutaten-Split (mind. 2 Komponenten mit kcal) hat Vorrang
-        val usableSuggest = suggested.filter { it.totalCalories > 0f && it.name != "Gesamt" }
-        if (usableSuggest.isNotEmpty()) {
-            return components.map { c ->
-                val s = usableSuggest.firstOrNull { it.name.equals(c.name, ignoreCase = true) }
-                    ?: usableSuggest.firstOrNull {
-                        // Beilage / Side-Aliase
-                        val cn = c.name.lowercase()
-                        val sn = it.name.lowercase()
-                        (cn.contains("beilage") && sn.contains("beilage")) ||
-                            (cn.contains("sauce") && sn.contains("sauce")) ||
-                            (cn.contains("fleisch") && sn.contains("fleisch"))
-                    }
-                if (s != null) {
-                    c.copy(
-                        totalCalories = s.totalCalories,
-                        proteinG = s.proteinG,
-                        carbsG = s.carbsG,
-                        fatG = s.fatG,
-                        fiberG = s.fiberG
-                    )
-                } else c
-            }
-        }
-
-        // Fallback: proportional zum Kochgewicht aus Rezept-Totals splitten
-        val sourceKcal = if (recipeTotal > 0f) recipeTotal
-            else components.maxOfOrNull { it.totalCalories } ?: 0f
-        if (sourceKcal <= 0f) return components
-        val serv = recipe.servings.coerceAtLeast(1).toFloat()
-        val sourceProt = (recipe.proteinPerServing ?: 0f) * serv
-        val sourceCarbs = (recipe.carbsPerServing ?: 0f) * serv
-        val sourceFat = (recipe.fatPerServing ?: 0f) * serv
-        val sourceFiber = (recipe.fiberPerServing ?: 0f) * serv
-        val wSum = components.sumOf { it.cookedWeightG.toDouble() }.toFloat().coerceAtLeast(1f)
-        return components.map { c ->
-            val f = if (c.cookedWeightG > 0f) c.cookedWeightG / wSum else 1f / components.size
-            c.copy(
-                totalCalories = sourceKcal * f,
-                proteinG = sourceProt * f,
-                carbsG = sourceCarbs * f,
-                fatG = sourceFat * f,
-                fiberG = sourceFiber * f
-            )
-        }
+        val matches = matchDao.getMatchesForRecipeOnce(recipe.id)
+        return enrichComponentsFromMatches(recipe, components, matches)
     }
 
     /**
