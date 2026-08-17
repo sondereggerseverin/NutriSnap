@@ -285,28 +285,22 @@ fun IngredientVerifySheet(
     var verifyStates by remember {
         mutableStateOf(mergeIngredientOverrides(analysisResult.ingredients, initialOverrides))
     }
-    // Abschnitte aus Rezept-Text (z. B. "Hot honey cajun chicken" / "For the sauce")
+    // Abschnitte aus Rezept-Text – Namen 1:1 behalten (kein Collapse auf side/sauce).
+    // side/sauce nur als Fallback, wenn gar keine Abschnitte im Text stehen.
     val sectionByLine = remember(recipeIngredients) {
+        val sections = parseIngredientSections(recipeIngredients)
         val map = mutableMapOf<String, String>()
-        for ((sectionName, lines) in parseIngredientSections(recipeIngredients)) {
-            val key = sectionName.trim().lowercase().let { n ->
-                when {
-                    n.contains("sauce") || n.contains("marinade") || n.contains("dressing") ||
-                        n.contains("fleisch") || n.contains("chicken") || n.contains("hähnchen") ||
-                        n.contains("poulet") -> "sauce"
-                    n.contains("beilage") || n.contains("side") || n.contains("mash") ||
-                        n.contains("reis") || n.contains("potato") || n.contains("mais") ||
-                        n.contains("bean") || n.contains("sweetcorn") -> "side"
-                    else -> sectionName.trim().ifBlank { "sauce" }
+        if (sections.size >= 2) {
+            for ((sectionName, lines) in sections) {
+                val key = sectionName.trim().ifBlank { "Sonstiges" }
+                for (line in lines) {
+                    map[line.trim().lowercase()] = key
                 }
-            }
-            for (line in lines) {
-                map[line.trim().lowercase()] = key
             }
         }
         map
     }
-    // Zutat → "side" | "sauce" | Abschnittsname
+    // Zutat → Abschnittsname | "side" | "sauce"
     var groups by remember {
         mutableStateOf(
             mergeIngredientOverrides(analysisResult.ingredients, initialOverrides).associate { s ->
@@ -320,6 +314,15 @@ fun IngredientVerifySheet(
                     ?: defaultComponentGroup(key))
             }
         )
+    }
+    // Verfügbare Gruppen für →-Button: Abschnitte aus Text, sonst side/sauce
+    val availableGroupKeys = remember(sectionByLine, groups) {
+        val fromSections = sectionByLine.values.distinct()
+        when {
+            fromSections.size >= 2 -> fromSections
+            groups.values.distinct().size >= 2 -> groups.values.filterNotNull().distinct()
+            else -> listOf("side", "sauce")
+        }
     }
     var sideWeightText by remember {
         mutableStateOf(initialSideWeightG?.takeIf { it > 0f }?.toInt()?.toString() ?: "")
@@ -619,8 +622,17 @@ fun IngredientVerifySheet(
                             updateOverride(line, updated[index].toOverride(null))
                         }
                     },
-                    componentGroup = null,
-                    onMoveComponent = null
+                    componentGroup = groups[line],
+                    availableGroups = availableGroupKeys,
+                    onMoveComponent = {
+                        val keys = availableGroupKeys
+                        if (keys.isNotEmpty()) {
+                            val cur = groups[line] ?: keys.first()
+                            val idx = keys.indexOf(cur).let { if (it < 0) 0 else it }
+                            val next = keys[(idx + 1) % keys.size]
+                            setGroup(line, next)
+                        }
+                    }
                 )
                 HorizontalDivider(
                     Modifier.padding(horizontal = 16.dp),
@@ -789,6 +801,7 @@ private fun IngredientVerifyRow(
     onAmountSaved: (Float) -> Unit,
     componentGroup: String? = null,
     onMoveComponent: (() -> Unit)? = null,
+    availableGroups: List<String> = listOf("side", "sauce"),
     readOnly: Boolean = false
 ) {
     val isOverride = state.override != null
@@ -922,8 +935,16 @@ private fun IngredientVerifyRow(
             }
         }
 
-        // Schnell umhängen: Beilage ↔ Sauce
-        if (onMoveComponent != null && componentGroup != null) {
+        // Schnell umhängen: nächste Gruppe in availableGroups
+        if (onMoveComponent != null && componentGroup != null && availableGroups.size >= 2) {
+            val curIdx = availableGroups.indexOf(componentGroup).let { if (it < 0) 0 else it }
+            val nextLabel = availableGroups[(curIdx + 1) % availableGroups.size].let { k ->
+                when (k) {
+                    "side" -> "Beilage"
+                    "sauce" -> "Sauce / Fleisch"
+                    else -> k
+                }
+            }
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -933,10 +954,7 @@ private fun IngredientVerifyRow(
                 AssistChip(
                     onClick = onMoveComponent,
                     label = {
-                        Text(
-                            if (componentGroup == "side") "→ Sauce / Fleisch" else "→ Beilage",
-                            fontSize = 11.sp
-                        )
+                        Text("→ $nextLabel", fontSize = 11.sp)
                     },
                     modifier = Modifier.height(28.dp)
                 )
