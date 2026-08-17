@@ -116,6 +116,14 @@ private fun RecipeStarsRow(stars: Int, modifier: Modifier = Modifier) {
     }
 }
 
+/** Normalisiert einen Zutatentext für robusten Abgleich: nur Kleinbuchstaben + Ziffern,
+ *  keine Leerzeichen/Satzzeichen/Einheiten-Formatierung. So matchen "200g Haferflocken"
+ *  und "200 g Haferflocken" trotz unterschiedlicher Formatierung. */
+private fun normalizeForCoverageMatch(s: String): String =
+    s.lowercase()
+        .replace(Regex("""^added_\d+_"""), "")
+        .replace(Regex("""[^a-zäöüß0-9]"""), "")
+
 private data class ParsedIngredient(val amount: String, val unit: String, val name: String)
 /** Anzeige-Einheiten im Dropdown (kurz, lesbar). */
 private val INGREDIENT_UNITS = listOf("g", "ml", "kg", "l", "EL", "TL", "Stück", "Prise", "Bund", "Dose", "Packung", "Scheibe", "Zehe")
@@ -767,12 +775,22 @@ fun RecipesScreen(
                 val hasResult = state.nutritionState.result != null &&
                     state.nutritionState.recipeId == live.id &&
                     !state.nutritionState.isAnalyzing
-                if (hasResult) {
-                    showVerifySheet = true
-                } else {
-                    // Analyse nur in-memory – Persistenz erst bei explizitem «Nährwerte übernehmen»
-                    pendingVerify = true
-                    vm.analyzeNutrition(live, persist = false)
+                // Bereits verifizierte Zutaten sind vorhanden -> direkt daraus anzeigen,
+                // statt jedes Mal neu (und ggf. mit abweichenden Treffern) zu suchen.
+                val fromStored = if (!hasResult) {
+                    ch.nutrisnap.app.domain.RecipeNutritionAnalyzer.fromStoredMatches(live, liveMatches)
+                } else null
+                when {
+                    hasResult -> showVerifySheet = true
+                    fromStored != null -> {
+                        vm.setNutritionFromStoredMatches(fromStored, live.id)
+                        showVerifySheet = true
+                    }
+                    else -> {
+                        // Analyse nur in-memory – Persistenz erst bei explizitem «Nährwerte übernehmen»
+                        pendingVerify = true
+                        vm.analyzeNutrition(live, persist = false)
+                    }
                 }
             },
             onViewIngredients = {
@@ -780,12 +798,21 @@ fun RecipesScreen(
                 val hasResult = state.nutritionState.result != null &&
                     state.nutritionState.recipeId == live.id &&
                     !state.nutritionState.isAnalyzing
-                if (hasResult) {
-                    showVerifySheet = true
-                } else {
-                    // Nur ansehen: Analyse in-memory, NIEMALS verifizierte Nährwerte überschreiben
-                    pendingViewOnly = true
-                    vm.analyzeNutrition(live, persist = false)
+                // Nur ansehen: nie neu suchen, wenn schon verifizierte Matches existieren.
+                val fromStored = if (!hasResult) {
+                    ch.nutrisnap.app.domain.RecipeNutritionAnalyzer.fromStoredMatches(live, liveMatches)
+                } else null
+                when {
+                    hasResult -> showVerifySheet = true
+                    fromStored != null -> {
+                        vm.setNutritionFromStoredMatches(fromStored, live.id)
+                        showVerifySheet = true
+                    }
+                    else -> {
+                        // Analyse nur in-memory, NIEMALS verifizierte Nährwerte überschreiben
+                        pendingViewOnly = true
+                        vm.analyzeNutrition(live, persist = false)
+                    }
                 }
             },
             onSplitComponents = {
@@ -2004,12 +2031,17 @@ fun RecipeDetailSheet(
                                 m.ingredientRaw.ifBlank { m.ingredientName }
                             )
                         }
-                        val covered = ingredientMatches.flatMap {
-                            listOf(it.ingredientRaw, it.ingredientName)
-                        }.map { it.trim().lowercase() }.toSet()
-                        val rest = rawLines.filter {
-                            val t = it.trimStart('•', '-', ' ').trim().lowercase()
-                            t.isNotEmpty() && t !in covered
+                        // Robuster Abgleich: nicht auf exakte Text-Gleichheit verlassen (Formatierung von
+                        // recipe.ingredients und IngredientMatch.ingredientRaw kann leicht abweichen,
+                        // z.B. "200g" vs "200 g"), sondern normalisiert per Namens-Substring prüfen.
+                        // Sonst landet fälschlich alles doppelt unter "Weitere".
+                        val coveredNames = ingredientMatches
+                            .flatMap { listOf(it.ingredientRaw, it.ingredientName) }
+                            .map { normalizeForCoverageMatch(it) }
+                            .filter { it.isNotBlank() }
+                        val rest = rawLines.filter { line ->
+                            val norm = normalizeForCoverageMatch(line.trimStart('•', '-', ' '))
+                            norm.isNotEmpty() && coveredNames.none { c -> c.length >= 3 && (norm.contains(c) || c.contains(norm)) }
                         }
                         if (rest.isNotEmpty()) order.getOrPut("Weitere") { mutableListOf() }.addAll(rest)
                         buildList {
@@ -2029,8 +2061,18 @@ fun RecipeDetailSheet(
                     }
                     // Lookup echter Match-Status pro Zeile (statt reiner "hat Zahl"-Heuristik):
                     // grün = mit FoodItem verifiziert, orange = Menge erkannt aber ungematcht, grau = kein Match-Versuch.
-                    val matchByKey = ingredientMatches.filter { !it.isDeleted }.associateBy {
-                        it.ingredientRaw.trim().trimStart('•', '-', ' ').lowercase()
+                    // Normalisierter Substring-Abgleich statt exakter Text-Gleichheit, da sich die
+                    // Formatierung von recipe.ingredients und IngredientMatch.ingredientRaw unterscheiden kann.
+                    val activeMatches = ingredientMatches.filter { !it.isDeleted }
+                    fun findMatchForLine(line: String): ch.nutrisnap.app.data.model.IngredientMatch? {
+                        val norm = normalizeForCoverageMatch(line.trimStart('•', '-', ' '))
+                        if (norm.isEmpty()) return null
+                        return activeMatches.firstOrNull { m ->
+                            val rawN = normalizeForCoverageMatch(m.ingredientRaw)
+                            val nameN = normalizeForCoverageMatch(m.ingredientName)
+                            (rawN.length >= 3 && (norm.contains(rawN) || rawN.contains(norm))) ||
+                                (nameN.length >= 3 && (norm.contains(nameN) || nameN.contains(norm)))
+                        }
                     }
                     itemsIndexed(
                         displayBlocks,
@@ -2064,7 +2106,7 @@ fun RecipeDetailSheet(
                             val parsed = parseIngredientLine(display)
                             val hasAmount = parsed.amount.isNotBlank() &&
                                 (parsed.amount.toFloatOrNull() != null || parsed.amount.any { it.isDigit() })
-                            val match = matchByKey[rawLine.trim().trimStart('•', '-', ' ').lowercase()]
+                            val match = findMatchForLine(rawLine)
                             val (statusIcon, statusColor, statusLabel) = when {
                                 match?.matchedFoodItemId != null ||
                                     (match != null && match.matchSource != MatchSource.UNMATCHED) ->

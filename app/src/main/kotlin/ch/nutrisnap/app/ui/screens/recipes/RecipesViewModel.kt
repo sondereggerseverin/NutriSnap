@@ -1015,6 +1015,16 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Setzt das Nährwert-Ergebnis direkt aus bereits gespeicherten IngredientMatches
+     * (siehe [ch.nutrisnap.app.domain.RecipeNutritionAnalyzer.fromStoredMatches]) — OHNE
+     * DB-/Netzwerk-Neuanalyse. Für "Einsehen"/"Verify" bei bereits verifizierten Rezepten,
+     * damit nicht bei jedem Öffnen neu (und ggf. mit abweichenden Treffern) gesucht wird.
+     */
+    fun setNutritionFromStoredMatches(result: ch.nutrisnap.app.domain.RecipeNutritionAnalyzer.AnalysisResult, recipeId: Long) {
+        _nutritionState.value = NutritionState(result = result, recipeId = recipeId)
+    }
+
     fun applyVerifiedNutrition(
         recipe: Recipe,
         kcalPerServ: Float,

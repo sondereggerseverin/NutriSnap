@@ -442,6 +442,73 @@ object RecipeNutritionAnalyzer {
     }
 
     /**
+     * Baut ein [AnalysisResult] direkt aus bereits verifizierten [ch.nutrisnap.app.data.model.IngredientMatch]-
+     * Einträgen zusammen — OHNE erneute DB-/OpenFoodFacts-Suche. Für "Einsehen" (readOnly) und "Verify",
+     * damit ein Rezept mit bereits bestätigten Zutaten nicht bei jedem Öffnen neu (und ggf. mit
+     * abweichenden Treffern) analysiert wird. Gibt null zurück, wenn keine verwertbaren Matches vorhanden
+     * sind — dann muss der Aufrufer auf [analyze] zurückfallen.
+     */
+    fun fromStoredMatches(
+        recipe: Recipe,
+        matches: List<ch.nutrisnap.app.data.model.IngredientMatch>
+    ): AnalysisResult? {
+        val active = matches.filter { !it.isDeleted }
+        if (active.isEmpty()) return null
+
+        val ingredientResults = active.map { m ->
+            val amountG = m.manualAmountG ?: m.amountGrams
+            val matched = m.matchedFoodItemId != null ||
+                m.matchSource != ch.nutrisnap.app.data.model.MatchSource.UNMATCHED
+            val foodItem = if (matched && m.matchedFoodName != null && amountG > 0f) {
+                FoodItem(
+                    name     = m.matchedFoodName,
+                    calories = (m.matchedCalories ?: 0f) / amountG * 100f,
+                    protein  = (m.matchedProtein ?: 0f) / amountG * 100f,
+                    carbs    = (m.matchedCarbs ?: 0f) / amountG * 100f,
+                    fat      = (m.matchedFat ?: 0f) / amountG * 100f,
+                    source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
+                )
+            } else null
+            IngredientResult(
+                line     = m.ingredientRaw.ifBlank { m.ingredientName },
+                parsed   = ParsedIngredient(amountG = amountG, name = m.ingredientName),
+                foodItem = foodItem,
+                calories = m.matchedCalories ?: 0f,
+                protein  = m.matchedProtein ?: 0f,
+                carbs    = m.matchedCarbs ?: 0f,
+                fat      = m.matchedFat ?: 0f,
+                matched  = matched,
+                micros   = m.manualFiberG?.let { mapOf("fiber" to it) } ?: emptyMap()
+            )
+        }
+
+        val servDiv = recipe.servings.coerceAtLeast(1)
+        val totalCalories = ingredientResults.sumOf { it.calories.toDouble() }.toFloat()
+        val totalProtein  = ingredientResults.sumOf { it.protein.toDouble() }.toFloat()
+        val totalCarbs    = ingredientResults.sumOf { it.carbs.toDouble() }.toFloat()
+        val totalFat      = ingredientResults.sumOf { it.fat.toDouble() }.toFloat()
+        val totalFiber    = ingredientResults.sumOf { (it.micros["fiber"] ?: 0f).toDouble() }.toFloat()
+
+        return AnalysisResult(
+            ingredients        = ingredientResults,
+            totalCalories      = totalCalories,
+            totalProtein       = totalProtein,
+            totalCarbs         = totalCarbs,
+            totalFat           = totalFat,
+            caloriesPerServing = totalCalories / servDiv,
+            proteinPerServing  = totalProtein / servDiv,
+            carbsPerServing    = totalCarbs / servDiv,
+            fatPerServing      = totalFat / servDiv,
+            matchedCount       = ingredientResults.count { it.matched },
+            totalCount         = ingredientResults.size,
+            estimatedCount     = 0,
+            totalMicros        = if (totalFiber > 0f) mapOf("fiber" to totalFiber) else emptyMap(),
+            // Nur Ballaststoffe aus manuellen Angaben verfügbar -> nie "vollständig".
+            fiberComplete      = false
+        )
+    }
+
+    /**
      * Wie [analyze], aber für Zutatenzeilen, die nicht aus einem [Recipe] stammen
      * (z.B. von der mehrstufigen KI-Foto-Analyse produzierte "150g Reis"-Zeilen).
      * [servings] = 1, da eine fotografierte Mahlzeit bereits die gesamte Portion ist.

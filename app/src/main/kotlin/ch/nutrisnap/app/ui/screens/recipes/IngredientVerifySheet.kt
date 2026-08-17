@@ -689,7 +689,11 @@ fun IngredientVerifySheet(
                                 val food = s.effectiveFood
                                 IngredientMatch(
                                     recipeId = recipeIdForComponents,
-                                    ingredientRaw = s.result.line,
+                                    // WICHTIG: Muss exakt dem Text entsprechen, der in recipe.ingredients
+                                    // gespeichert wird (siehe ingredientsText oben), sonst erkennt die
+                                    // "bereits gematcht"-Prüfung in RecipesScreen die Zutat nicht wieder
+                                    // und zeigt sie fälschlich nochmals unter "Weitere" an (Duplikate).
+                                    ingredientRaw = formatVerifyLineTitle(s),
                                     ingredientName = s.result.parsed?.name
                                         ?: food?.name
                                         ?: s.result.line,
