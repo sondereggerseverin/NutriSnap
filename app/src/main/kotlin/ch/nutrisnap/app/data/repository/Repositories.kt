@@ -480,6 +480,20 @@ class RecipeRepository(db: NutriDatabase, private val context: Context) {
     }
 
     /**
+     * Nachladen des Rezept-Bildes via oEmbed/og:image, ohne neu zu scrapen.
+     * @return aktualisiertes Rezept oder null wenn kein Bild gefunden.
+     */
+    suspend fun refreshRecipeImage(recipe: Recipe): Recipe? {
+        val url = recipe.sourceUrl?.trim().orEmpty()
+        if (url.isBlank()) return null
+        val thumb = scraper.fetchThumbnailUrl(url, recipe.platform) ?: return null
+        if (thumb.isBlank()) return null
+        val updated = recipe.copy(imageUrl = thumb)
+        updateRecipe(updated)
+        return updated
+    }
+
+    /**
      * Korrigiert gespeicherte „null“-/„undefined“-Titel und -Beschreibungen
      * (Android JSONObject.optString-Artefakt bei LLM-Antworten).
      * @return Anzahl bereinigter Rezepte

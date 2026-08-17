@@ -973,6 +973,36 @@ class RecipeScraper(private val context: Context) {
         }
     }
 
+    /**
+     * Versucht nur das Thumbnail nachzuladen (oEmbed), ohne neu zu scrapen.
+     * Für Rezepte mit sourceUrl aber ohne imageUrl.
+     */
+    suspend fun fetchThumbnailUrl(sourceUrl: String, platform: String?): String? =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val url = sourceUrl.trim()
+            if (url.isBlank()) return@withContext null
+            val p = (platform ?: "").lowercase()
+            runCatching {
+                when {
+                    p.contains("tiktok") || "tiktok.com" in url.lowercase() ->
+                        fetchOEmbed("https://www.tiktok.com/oembed?url=${encode(url)}")["thumbnail_url"]
+                    p.contains("instagram") || "instagram.com" in url.lowercase() || "instagr.am" in url.lowercase() -> {
+                        val o = fetchOEmbed("https://api.instagram.com/oembed/?url=${encode(url)}&omitscript=true")
+                        o["thumbnail_url"] ?: run {
+                            val sc = Regex("""/(?:p|reel|tv)/([A-Za-z0-9_-]+)""").find(url)?.groupValues?.get(1)
+                            sc?.let { "https://www.instagram.com/p/$it/media/?size=l" }
+                        }
+                    }
+                    else -> {
+                        // Generisches og:image
+                        val doc = jsoupGet(url)
+                        doc.select("meta[property=og:image]").firstOrNull()?.attr("content")
+                            ?.takeIf { it.isNotBlank() }
+                    }
+                }
+            }.getOrNull()?.takeIf { !it.isNullOrBlank() }
+        }
+
     private fun cleanTitle(raw: String, sourceUrl: String? = null): String {
         val cleaned = raw.replace(Regex("""\s*[-|].*$"""), "").trim()
         if (cleaned.isNotBlank()) return cleaned

@@ -771,6 +771,23 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { repo.updateRecipe(recipe) }
     }
 
+    private val _imageRefreshState = MutableStateFlow<Pair<Long, String?>>(0L to null)
+    /** recipeId → Status: null = idle, "loading", "ok", "fail" */
+    val imageRefreshState: StateFlow<Pair<Long, String?>> = _imageRefreshState.asStateFlow()
+
+    /** Thumbnail nachladen (oEmbed), wenn imageUrl fehlt. */
+    fun refreshRecipeImage(recipe: Recipe) {
+        if (recipe.sourceUrl.isNullOrBlank()) {
+            _imageRefreshState.value = recipe.id to "fail"
+            return
+        }
+        viewModelScope.launch {
+            _imageRefreshState.value = recipe.id to "loading"
+            val updated = runCatching { repo.refreshRecipeImage(recipe) }.getOrNull()
+            _imageRefreshState.value = recipe.id to if (updated != null) "ok" else "fail"
+        }
+    }
+
     /**
      * Freies Rezept ohne Import: Titel + Zutatenzeilen (+ optional Zubereitung).
      * Speichert mit platform=manual; nach dem Speichern als lastImport melden,

@@ -748,6 +748,7 @@ fun RecipesScreen(
         // Always show latest version from state
         val live = state.recipes.find { it.id == recipe.id } ?: recipe
         val liveMatches by vm.getMatches(live.id).collectAsState(initial = emptyList())
+        val imageRefresh by vm.imageRefreshState.collectAsState()
         RecipeDetailSheet(
             recipe       = live,
             nutritionState = state.nutritionState,
@@ -817,7 +818,9 @@ fun RecipesScreen(
             onToggleFavorite = { vm.toggleFavorite(live) },
             onAssignCollection = {
                 assignCollectionRecipe = live
-            }
+            },
+            onRetryImage = { vm.refreshRecipeImage(live) },
+            imageRefreshStatus = imageRefresh.takeIf { it.first == live.id }?.second
         )
     }
 
@@ -1074,7 +1077,9 @@ private fun RecipeThumbnail(
     recipe:   Recipe,
     modifier: Modifier = Modifier,
     size:     androidx.compose.ui.unit.Dp? = null,
-    shape:    RoundedCornerShape = RoundedCornerShape(10.dp)
+    shape:    RoundedCornerShape = RoundedCornerShape(10.dp),
+    onRetryImage: (() -> Unit)? = null,
+    imageRefreshStatus: String? = null
 ) {
     val box = if (size != null) modifier.then(Modifier.size(size)) else modifier
     val url = recipe.imageUrl
@@ -1094,8 +1099,24 @@ private fun RecipeThumbnail(
             modifier = box.clip(shape).background(Brush.linearGradient(gradientColors)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, contentDescription = null, tint = Color.White.copy(alpha = 0.9f),
-                modifier = Modifier.size((size ?: 64.dp) * 0.4f))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(icon, contentDescription = null, tint = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.size((size ?: 64.dp) * 0.35f))
+                if (onRetryImage != null && !recipe.sourceUrl.isNullOrBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    when (imageRefreshStatus) {
+                        "loading" -> CircularProgressIndicator(
+                            Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp
+                        )
+                        "fail" -> TextButton(onClick = onRetryImage) {
+                            Text("Kein Bild – erneut", color = Color.White, fontSize = 11.sp)
+                        }
+                        else -> TextButton(onClick = onRetryImage) {
+                            Text("Bild nachladen", color = Color.White, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -1568,7 +1589,9 @@ fun RecipeDetailSheet(
     onEditComponents: () -> Unit = {},
     onStartCooking: () -> Unit = {},
     onToggleFavorite: () -> Unit = {},
-    onAssignCollection: () -> Unit = {}
+    onAssignCollection: () -> Unit = {},
+    onRetryImage: (() -> Unit)? = null,
+    imageRefreshStatus: String? = null
 ) {
     val context = LocalContext.current
     var servings   by remember(recipe.id) { mutableStateOf(recipe.servings) }
@@ -1615,7 +1638,9 @@ fun RecipeDetailSheet(
                     RecipeThumbnail(
                         recipe = recipe,
                         modifier = Modifier.fillMaxWidth().height(140.dp),
-                        shape = RoundedCornerShape(14.dp)
+                        shape = RoundedCornerShape(14.dp),
+                        onRetryImage = onRetryImage,
+                        imageRefreshStatus = imageRefreshStatus
                     )
                 }
                 Spacer(Modifier.height(10.dp))
