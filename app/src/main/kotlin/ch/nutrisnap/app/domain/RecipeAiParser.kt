@@ -77,11 +77,22 @@ object RecipeAiParser {
                 t.equals("Instagram Rezept", true) ||
                 t.equals("TikTok Rezept", true)
 
-        fun isWeakIngredients(s: String) =
-            s.isBlank() ||
-                s.equals("Zutaten nicht gefunden.", true) ||
-                s.startsWith("Tippe") ||
-                s.length < 20
+        fun isWeakIngredients(s: String): Boolean {
+            if (s.isBlank() || s.equals("Zutaten nicht gefunden.", true) ||
+                s.startsWith("Tippe") || s.length < 20
+            ) return true
+            val lines = s.lines().map { it.trim() }.filter { it.isNotBlank() }
+            if (lines.isEmpty()) return true
+            // Viele Junk-Zeilen (Makros/Schritte) → schwach, Fallback nutzen
+            val junk = lines.count { isJunkIngredientLine(it) }
+            if (junk >= 2 && junk >= lines.size / 2) return true
+            // Keine echte Mengenangabe → schwach
+            val hasQty = lines.any {
+                Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tsp|tbsp)\b""", RegexOption.IGNORE_CASE)
+                    .containsMatchIn(it)
+            }
+            return !hasQty
+        }
 
         val titleFromCaption = extractTitle(cleanedCaption, fallback = "")
         val title = when {
@@ -99,9 +110,11 @@ object RecipeAiParser {
         // Caption-Klumpen in saubere Zeilen + Abschnitte zerlegen
         val ingredients = formatIngredientText(ingredientsRaw)
 
-        val instructions = ai.instructions.trim()
-            .takeUnless { it.isBlank() || it.equals("null", true) }
-            ?: fallback.instructions
+        val instructions = formatInstructionsText(
+            ai.instructions.trim()
+                .takeUnless { it.isBlank() || it.equals("null", true) }
+                ?: fallback.instructions
+        )
 
         val description = ai.description.trim()
             .takeUnless { it.isBlank() || it.equals("null", true) }
@@ -151,18 +164,22 @@ object RecipeAiParser {
     /**
      * Zerlegt Caption-/Zutaten-Blöcke, in denen mehrere Zutaten in einer Zeile
      * kleben (typisch TikTok/Instagram), in saubere Zeilen mit Abschnitts-Headern.
-     * Entfernt Hashtags. Idempotent auf bereits formatierten Listen.
+     * Entfernt Hashtags, Makro-Zeilen und Zubereitungsschritte.
+     * Idempotent auf bereits formatierten Listen.
      */
     fun formatIngredientText(raw: String): String {
         if (raw.isBlank()) return raw
         var t = raw.trim()
-        // Hashtags am Ende entfernen
+        // Hashtags entfernen
         t = t.replace(Regex("""(?:\s*#\w+)+[\s:]*$""", RegexOption.IGNORE_CASE), "").trim()
         t = t.replace(Regex("""#\w+"""), " ").trim()
         t = splitInlineIngredients(t)
-        // Doppelte Leerzeilen kollabieren, Aufzählungszeichen vereinheitlichen
+        // Ab erstem echten Methodenschritt abschneiden (falls Zutaten+Schritte gemischt)
+        t = cutOffInstructions(t)
         return t.lines()
             .map { it.trim().trimStart('•', '-', '*', ' ').trim() }
+            .filter { it.isNotBlank() && !isJunkIngredientLine(it) }
+            .map { cleanIngredientLineNoise(it) }
             .filter { it.isNotBlank() }
             .joinToString("\n") { line ->
                 if (isSectionHeaderLine(line)) line.trimEnd(':').trim()
@@ -170,7 +187,86 @@ object RecipeAiParser {
             }
     }
 
-    /** True wenn der Text wie ein ungegliederter Caption-Klumpen aussieht. */
+    /** Makros, Methodenschritte, Promo, leere Meta-Zeilen — keine Zutaten. */
+    fun isJunkIngredientLine(line: String): Boolean {
+        val d = line.trim().trimStart('•', '-', '*', ' ').trim()
+        if (d.isBlank()) return true
+        val lower = d.lowercase()
+        // Makro-Zusammenfassungen: "265 kcals | P:", "39g | C:", "20g | F:", "5g per cup"
+        if (Regex(
+                """^\d+[.,]?\d*\s*(kcals?|calories?|kcal)\b""",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(d)
+        ) return true
+        if (Regex("""^\d+[.,]?\d*\s*g\s*[|/:]\s*[pcf]\b""", RegexOption.IGNORE_CASE).containsMatchIn(d)) return true
+        if (Regex("""^\d+[.,]?\d*\s*g\s*per\s+(cup|serving|portion)""", RegexOption.IGNORE_CASE).containsMatchIn(d)) return true
+        if (Regex("""^[pcf]\s*:\s*$""", RegexOption.IGNORE_CASE).containsMatchIn(d)) return true
+        // Nummerierte Zubereitungsschritte
+        if (Regex("""^\d+[.)]\s+\p{L}""").containsMatchIn(d) &&
+            Regex(
+                """\b(mix|add|stir|pour|bake|cook|heat|divide|refrigerate|spoon|blend|whisk|fold|spread|save|method)\b""",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(d)
+        ) return true
+        if (lower == "method" || lower.startsWith("method ") || lower == "zubereitung" ||
+            lower.startsWith("instructions") || lower.startsWith("directions")
+        ) return true
+        // Social / Promo
+        if (lower.startsWith("save this") || lower.startsWith("comment ") ||
+            lower.startsWith("link in bio") || lower.startsWith("dm me") ||
+            lower.contains("all prozis") || lower.contains("products linked")
+        ) return true
+        // Reine Hashtag-/Code-Zeilen
+        if (d.startsWith("@") && d.length < 40) return true
+        if (!d.any { it.isLetter() }) return true
+        return false
+    }
+
+    /** @prozis, doppelte (80 g)-Klammern o.ä. aus Zutatenzeilen entfernen. */
+    private fun cleanIngredientLineNoise(line: String): String {
+        var s = line
+        s = s.replace(Regex("""@\w+"""), "").trim()
+        // "40g Haferflocken Mehl (80 g )" → erste Menge behalten, Klammer-Menge weg
+        s = s.replace(Regex("""\s*\(\s*\d+[.,]?\d*\s*g\s*\)\s*""", RegexOption.IGNORE_CASE), " ").trim()
+        s = s.replace(Regex("""\s{2,}"""), " ").trim()
+        return s.trimEnd(':', ',', ';', ' ')
+    }
+
+    /** Schneidet ab erstem klaren Methodenschritt ab. */
+    private fun cutOffInstructions(text: String): String {
+        val lines = text.lines()
+        val cut = lines.indexOfFirst { line ->
+            val d = line.trim().trimStart('•', '-', '*', ' ').trim()
+            val lower = d.lowercase()
+            lower == "method" || lower == "zubereitung" || lower == "instructions" ||
+                lower == "directions" || lower == "preparation" ||
+                (Regex("""^\d+[.)]\s+""").containsMatchIn(d) &&
+                    Regex(
+                        """\b(mix|add|stir|pour|bake|cook|heat|divide|refrigerate|spoon|blend)\b""",
+                        RegexOption.IGNORE_CASE
+                    ).containsMatchIn(d))
+        }.takeIf { it > 0 } ?: return text
+        return lines.take(cut).joinToString("\n")
+    }
+
+    /** Bereinigt Zubereitungstext: Hashtags, Promo, reine Meta-Zeilen raus. */
+    fun formatInstructionsText(raw: String): String {
+        if (raw.isBlank()) return raw
+        return raw.lines()
+            .map { it.trim() }
+            .filter { line ->
+                line.isNotBlank() &&
+                    !line.startsWith("#") &&
+                    !line.lowercase().startsWith("save this") &&
+                    !line.lowercase().contains("products linked") &&
+                    !line.lowercase().contains("link in bio") &&
+                    !(line.startsWith("@") && line.length < 40)
+            }
+            .joinToString("\n")
+            .trim()
+    }
+
+    /** True wenn der Text zerquetscht ist ODER viele Junk-Zeilen (Makros/Schritte) enthält. */
     fun looksMashed(ingredients: String): Boolean {
         val lines = ingredients.lines().map { it.trim() }.filter { it.isNotBlank() }
         if (lines.isEmpty()) return false
@@ -179,7 +275,10 @@ object RecipeAiParser {
             RegexOption.IGNORE_CASE
         ).findAll(ingredients).count()
         // Viele Mengen, wenige Zeilen → klar zerquetscht
-        return qtyHits >= 4 && lines.size < qtyHits * 0.6
+        if (qtyHits >= 4 && lines.size < qtyHits * 0.6) return true
+        // Makros / Methodenschritte in der Zutatenliste
+        val junk = lines.count { isJunkIngredientLine(it) }
+        return junk >= 2
     }
 
     private fun isSectionHeaderLine(line: String): Boolean {
@@ -292,10 +391,12 @@ Rules:
   3. NEVER use: likes/comments counts, usernames, dates, hashtags, promotional text, generic phrases like "Check this out"
   4. If truly no dish name exists, construct one from the main ingredients (e.g. "Pasta Salat mit Thunfisch")
 - servings: extract the number of PORTIONS/SERVINGS this recipe makes. Look for "Makes X", "Ergibt X", "für X Personen", "X Portionen". If the caption says "Per Burrito" or "Per Serving" that means 1 serving in the macros. Default to 1 if unclear, NOT a random number.
-- ingredient_sections: group by section headers (e.g. "Marinade", "Sauce", "Topping"). Items separated by "-", "•", "*", or newlines. If no sections, use one section named "".
+- ingredient_sections: group by section headers (e.g. "Marinade", "Sauce", "Topping", "Ganache"). Items separated by "-", "•", "*", or newlines. If no sections, use one section named "".
 - CRITICAL: Each ingredient item must be ONE ingredient only (e.g. "200g Hähnchenbrust"), NOT a full sentence or instruction.
+- NEVER put into ingredient items: macro summaries ("265 kcals", "39g | P", "20g | C", "5g per cup"), numbered method steps ("1. Mix…"), hashtags, @mentions, "Method", "Zubereitung", promo ("Save this", "link in bio").
+- Prefer lines that look like "40g oat flour", "250g Greek yoghurt" over any surrounding caption noise.
 - calories_per_serving / protein_g / carbs_g / fat_g: extract PER SERVING values if mentioned, else null
-- instructions: numbered steps only, no ingredient lists. null if not present.
+- instructions: numbered cooking steps only. No ingredient lists, no hashtags, no promo lines. null if not present.
 - tags: comma-separated, max 5, lowercase
 - All numeric fields must be numbers (not strings), null if unknown
 - Ignore: "Comment X for...", "DM me for...", "Link in bio", hashtags, storage/heating tips unless they are actual steps
@@ -413,7 +514,7 @@ Rules:
         }.trim().let { formatIngredientText(it) }
 
         // optString liefert bei JSON-null den Literal-String "null" — daher safeString.
-        val instructions = j.safeString("instructions")
+        val instructions = formatInstructionsText(j.safeString("instructions"))
         val servings = j.optInt("servings", 1).coerceAtLeast(1)
         val cals = if (j.isNull("calories_per_serving")) null
                    else j.optDouble("calories_per_serving").toFloat().takeIf { it > 0 }
@@ -547,7 +648,7 @@ Rules:
             description     = cals?.let { "📊 Pro Portion: ${it.toInt()} kcal" } ?: "",
             ingredients     = formatIngredientText(ingredients)
                 .ifBlank { "Tippe ✏️ um Zutaten hinzuzufügen." },
-            instructions    = instructions,
+            instructions    = formatInstructionsText(instructions),
             servings        = servings,
             totalCalories   = cals?.let { it * servings },
             sourceUrl       = sourceUrl,
