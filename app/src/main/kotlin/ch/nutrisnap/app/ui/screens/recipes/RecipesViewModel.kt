@@ -1140,7 +1140,10 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                         matchedCarbs = m.matchedCarbs ?: old.matchedCarbs,
                         matchedFat = m.matchedFat ?: old.matchedFat,
                         matchSource = if (m.matchSource != ch.nutrisnap.app.data.model.MatchSource.UNMATCHED)
-                            m.matchSource else old.matchSource
+                            m.matchSource else old.matchSource,
+                        manualAmountG = m.manualAmountG ?: old.manualAmountG,
+                        manualFiberG = m.manualFiberG ?: old.manualFiberG,
+                        isDeleted = m.isDeleted
                     )
                     matchDao.updateMatch(merged)
                 } else {

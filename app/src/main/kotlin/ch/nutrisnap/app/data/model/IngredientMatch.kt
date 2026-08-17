@@ -25,7 +25,13 @@ data class IngredientMatch(
     val matchedFat: Float? = null,
     val matchSource: MatchSource = MatchSource.UNMATCHED,
     /** "side" | "sauce" | null (Heuristik beim Split). */
-    val componentGroup: String? = null
+    val componentGroup: String? = null,
+    /** Manuell korrigierte Menge in g (überschreibt amountGrams in der UI). */
+    val manualAmountG: Float? = null,
+    /** Manuell nachgetragene Ballaststoffe für die verwendete Menge (nicht pro 100g). */
+    val manualFiberG: Float? = null,
+    /** True = Zutat vom User entfernt; bei Summen/Split übersprungen. */
+    val isDeleted: Boolean = false
 )
 
 enum class MatchSource {

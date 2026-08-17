@@ -607,7 +607,10 @@ fun IngredientVerifySheet(
                                         s.isVerified -> MatchSource.DATABASE
                                         else -> MatchSource.UNMATCHED
                                     },
-                                    componentGroup = null
+                                    componentGroup = null,
+                                    manualAmountG = s.amountOverride,
+                                    manualFiberG = s.manualFiber,
+                                    isDeleted = false
                                 )
                             }
                         )
