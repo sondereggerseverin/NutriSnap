@@ -27,7 +27,7 @@ fun FoodScanScreen(
     when (val s = state) {
         is FoodScanState.Capturing -> PhotoCaptureScreen(
             title = "Essen scannen",
-            instructions = "Foto vom Teller machen – die KI erkennt und trennt jede einzelne Zutat",
+            instructions = "Auslösen → scharfes Foto → KI analysiert danach (nicht halten)",
             onPhotoCaptured = { bitmap -> vm.analyzePhoto(bitmap) },
             onNavigateBack = onNavigateBack
         )

@@ -57,8 +57,12 @@ fun PhotoCaptureScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     var hasPermission by remember { mutableStateOf(false) }
     var isCapturing by remember { mutableStateOf(false) }
+    var captureHint by remember { mutableStateOf<String?>(null) }
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
+    var cameraControl by remember { mutableStateOf<CameraControl?>(null) }
+    var cameraInfo by remember { mutableStateOf<CameraInfo?>(null) }
     val executor = remember { Executors.newSingleThreadExecutor() }
+    val mainExecutor = remember { ContextCompat.getMainExecutor(context) }
 
     val prefs by context.notifDataStore.data.collectAsState(initial = null)
     val useThemeCropper = prefs?.get(KEY_TOGGLE_CROPPER_THEME_COLOR) ?: true
@@ -142,26 +146,37 @@ fun PhotoCaptureScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
             factory = { ctx ->
-                val previewView = PreviewView(ctx)
+                val previewView = PreviewView(ctx).apply {
+                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                    scaleType = PreviewView.ScaleType.FILL_CENTER
+                }
                 val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
                 cameraProviderFuture.addListener({
                     val cameraProvider = cameraProviderFuture.get()
                     val preview = Preview.Builder().build().also {
                         it.setSurfaceProvider(previewView.surfaceProvider)
                     }
+                    // Scharfes Foto statt schnellstes (unscharfes) Frame
                     val capture = ImageCapture.Builder()
-                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                        .setJpegQuality(92)
                         .build()
                     imageCapture = capture
                     try {
                         cameraProvider.unbindAll()
-                        cameraProvider.bindToLifecycle(
+                        val camera = cameraProvider.bindToLifecycle(
                             lifecycleOwner,
                             CameraSelector.DEFAULT_BACK_CAMERA,
                             preview,
                             capture
                         )
-                    } catch (e: Exception) { /* Kamera nicht verfuegbar */ }
+                        cameraControl = camera.cameraControl
+                        cameraInfo = camera.cameraInfo
+                        // Einmal zentral fokussieren, sobald die Kamera läuft
+                        previewView.post {
+                            focusCenter(previewView, camera.cameraControl)
+                        }
+                    } catch (_: Exception) { /* Kamera nicht verfügbar */ }
                 }, ContextCompat.getMainExecutor(ctx))
                 previewView
             },
@@ -190,7 +205,18 @@ fun PhotoCaptureScreen(
         }
 
         if (isCapturing) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            Column(
+                Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                CircularProgressIndicator(color = Color.White)
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    captureHint ?: "Foto wird aufgenommen…",
+                    color = Color.White,
+                    fontSize = 14.sp
+                )
+            }
         }
 
         FloatingActionButton(
@@ -209,29 +235,78 @@ fun PhotoCaptureScreen(
                 val capture = imageCapture ?: return@FloatingActionButton
                 if (isCapturing) return@FloatingActionButton
                 isCapturing = true
-                capture.takePicture(executor, object : ImageCapture.OnImageCapturedCallback() {
-                    override fun onCaptureSuccess(image: ImageProxy) {
-                        val buffer = image.planes[0].buffer
-                        val bytes = ByteArray(buffer.remaining())
-                        buffer.get(bytes)
-                        var bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                        val rotation = image.imageInfo.rotationDegrees
-                        image.close()
-                        if (bitmap != null && rotation != 0) {
-                            val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
-                            bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+                captureHint = "Fokussiere…"
+
+                fun doTakePicture() {
+                    captureHint = "Foto…"
+                    capture.takePicture(executor, object : ImageCapture.OnImageCapturedCallback() {
+                        override fun onCaptureSuccess(image: ImageProxy) {
+                            val buffer = image.planes[0].buffer
+                            val bytes = ByteArray(buffer.remaining())
+                            buffer.get(bytes)
+                            var bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                            val rotation = image.imageInfo.rotationDegrees
+                            image.close()
+                            if (bitmap != null && rotation != 0) {
+                                val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
+                                bitmap = Bitmap.createBitmap(
+                                    bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
+                                )
+                            }
+                            mainExecutor.execute {
+                                isCapturing = false
+                                captureHint = null
+                                bitmap?.let { onPhotoCaptured(it) }
+                            }
                         }
-                        isCapturing = false
-                        bitmap?.let { onPhotoCaptured(it) }
+                        override fun onError(exc: ImageCaptureException) {
+                            mainExecutor.execute {
+                                isCapturing = false
+                                captureHint = null
+                            }
+                        }
+                    })
+                }
+
+                // Kurz AF, dann Foto – Analyse läuft danach auf dem Bild (kein Halten)
+                val ctrl = cameraControl
+                if (ctrl != null) {
+                    val point = SurfaceOrientedMeteringPointFactory(1f, 1f).createPoint(0.5f, 0.5f)
+                    val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF)
+                        .setAutoCancelDuration(2, java.util.concurrent.TimeUnit.SECONDS)
+                        .build()
+                    val future = runCatching { ctrl.startFocusAndMetering(action) }.getOrNull()
+                    if (future != null) {
+                        // Max. ~1.2 s auf Fokus warten, dann immer auslösen
+                        val focused = java.util.concurrent.atomic.AtomicBoolean(false)
+                        future.addListener({
+                            if (focused.compareAndSet(false, true)) doTakePicture()
+                        }, mainExecutor)
+                        mainExecutor.execute {
+                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                if (focused.compareAndSet(false, true)) doTakePicture()
+                            }, 1200L)
+                        }
+                    } else {
+                        doTakePicture()
                     }
-                    override fun onError(exc: ImageCaptureException) {
-                        isCapturing = false
-                    }
-                })
+                } else {
+                    doTakePicture()
+                }
             },
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp)
         ) {
             Icon(Icons.Default.Camera, contentDescription = "Foto aufnehmen")
         }
     }
+}
+
+/** Einmaliger AF auf Bildmitte (nach Kamera-Start). */
+private fun focusCenter(previewView: PreviewView, control: CameraControl) {
+    val factory = previewView.meteringPointFactory
+    val point = factory.createPoint(previewView.width / 2f, previewView.height / 2f)
+    val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF)
+        .setAutoCancelDuration(3, java.util.concurrent.TimeUnit.SECONDS)
+        .build()
+    runCatching { control.startFocusAndMetering(action) }
 }
