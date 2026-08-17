@@ -23,6 +23,7 @@ import ch.nutrisnap.app.data.model.IngredientMatch
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeComponent
+import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import java.time.LocalDate
 import kotlinx.coroutines.delay
 
@@ -982,27 +983,52 @@ fun ComponentSplitSheet(
     val ingredientSections = remember(recipe.id, recipe.ingredients) {
         parseIngredientSections(recipe.ingredients)
     }
-    // Falls Abschnitte fehlen: Gruppen aus bereits gesetzten Match.componentGroup ableiten
-    val groupsFromMatches = remember(matches) {
-        matches.mapNotNull { normalizeGroupKey(it.componentGroup) }.distinct()
+
+    // Ohne Verify: Zutatenzeilen aus Abschnitten als Matches synthetisieren
+    // → Abschnitte werden automatisch zu Komponenten, kein manuelles Zuordnen.
+    val workingMatches = remember(matches, ingredientSections, recipe.id) {
+        if (matches.isNotEmpty()) matches
+        else if (ingredientSections.size >= 2) {
+            ingredientSections.flatMap { (sectionName, lines) ->
+                lines.map { line ->
+                    val grams = RecipeNutritionAnalyzer.parseIngredientLine(line)?.amountG ?: 0f
+                    IngredientMatch(
+                        recipeId = recipe.id,
+                        ingredientRaw = line,
+                        ingredientName = line.trimStart('•', '-', ' ').trim(),
+                        amountGrams = grams,
+                        componentGroup = sectionName
+                    )
+                }
+            }
+        } else emptyList()
+    }
+
+    val groupsFromMatches = remember(workingMatches) {
+        workingMatches.mapNotNull { normalizeGroupKey(it.componentGroup) }.distinct()
     }
 
     // Teile: 1) Zutaten-Abschnitte 2) Match-componentGroups 3) gespeicherte Komponenten 4) Beilage+Sauce
     var parts by remember {
         mutableStateOf(
             run {
-                fun weightFor(name: String): String {
+                fun weightFor(name: String, sectionLines: List<String> = emptyList()): String {
                     val match = initialComponents.firstOrNull {
                         it.name.equals(name, true) ||
                             (name.contains("sauce", true) && it.name.contains("sauce", true)) ||
                             (name.contains("beilage", true) && it.name.contains("beilage", true)) ||
                             (normalizeGroupKey(it.name) == normalizeGroupKey(name))
                     }
-                    return match?.cookedWeightG?.takeIf { it > 0f }?.toInt()?.toString() ?: ""
+                    match?.cookedWeightG?.takeIf { it > 0f }?.toInt()?.toString()?.let { return it }
+                    // Vorschlag: Summe der Roh-Gramm aus dem Abschnitt
+                    val sumG = sectionLines.mapNotNull {
+                        RecipeNutritionAnalyzer.parseIngredientLine(it)?.amountG
+                    }.sum().takeIf { it > 0f }
+                    return sumG?.toInt()?.toString() ?: ""
                 }
                 when {
-                    ingredientSections.size >= 2 -> ingredientSections.map { (name, _) ->
-                        SplitPart(key = name, name = name, weightText = weightFor(name))
+                    ingredientSections.size >= 2 -> ingredientSections.map { (name, lines) ->
+                        SplitPart(key = name, name = name, weightText = weightFor(name, lines))
                     }
                     groupsFromMatches.size >= 2 -> groupsFromMatches.map { key ->
                         SplitPart(
@@ -1052,15 +1078,21 @@ fun ComponentSplitSheet(
     }
 
     fun buildGroups(): Map<Int, String> {
-        if (matches.isEmpty()) return emptyMap()
+        if (workingMatches.isEmpty()) return emptyMap()
+        // Direkt aus Abschnitts-Text: componentGroup == Section-Name
         if (ingredientSections.size >= 2) {
-            val assigned = assignMatchesToSections(matches, ingredientSections)
-            return matches.mapIndexed { i, m ->
+            val byExact = workingMatches.mapIndexed { i, m ->
+                val cg = m.componentGroup?.trim()
+                if (cg != null && parts.any { it.key == cg }) i to cg
+                else null
+            }
+            if (byExact.all { it != null }) return byExact.mapNotNull { it }.toMap()
+            val assigned = assignMatchesToSections(workingMatches, ingredientSections)
+            return workingMatches.mapIndexed { i, m ->
                 i to clampToPart(assigned[i] ?: m.componentGroup, m)
             }.toMap()
         }
-        // Primär: bereits persistierte componentGroup (normalisiert auf part-keys)
-        return matches.mapIndexed { i, m ->
+        return workingMatches.mapIndexed { i, m ->
             val fromMatch = normalizeGroupKey(m.componentGroup)
             val key = when {
                 fromMatch != null && fromMatch in parts.map { it.key }.toSet() -> fromMatch
@@ -1074,21 +1106,20 @@ fun ComponentSplitSheet(
         }.toMap()
     }
     var groups by remember { mutableStateOf(buildGroups()) }
-    LaunchedEffect(matches, ingredientSections, parts.map { it.key }) {
-        if (matches.isEmpty()) return@LaunchedEffect
+    LaunchedEffect(workingMatches, ingredientSections, parts.map { it.key }) {
+        if (workingMatches.isEmpty()) return@LaunchedEffect
         groups = buildGroups()
     }
 
     fun sumFor(key: String): Triple<Float, Float, Float> {
-        val list = matches.filterIndexed { i, _ -> groups[i] == key }
+        val list = workingMatches.filterIndexed { i, _ -> groups[i] == key }
         val kcal = list.sumOf { (it.matchedCalories ?: 0f).toDouble() }.toFloat()
         val prot = list.sumOf { (it.matchedProtein ?: 0f).toDouble() }.toFloat()
         val carbs = list.sumOf { (it.matchedCarbs ?: 0f).toDouble() }.toFloat()
-        val fat = list.sumOf { (it.matchedFat ?: 0f).toDouble() }.toFloat()
-        return Triple(kcal, prot, carbs) // fat separately if needed
+        return Triple(kcal, prot, carbs)
     }
     fun fatFor(key: String): Float =
-        matches.filterIndexed { i, _ -> groups[i] == key }
+        workingMatches.filterIndexed { i, _ -> groups[i] == key }
             .sumOf { (it.matchedFat ?: 0f).toDouble() }.toFloat()
 
     // Swipe-to-dismiss aus: Scrollen soll das Sheet nicht schliessen (nur X / Abbrechen).
@@ -1138,15 +1169,24 @@ fun ComponentSplitSheet(
             )
             Spacer(Modifier.height(8.dp))
 
-            if (matches.isEmpty()) {
+            if (workingMatches.isEmpty()) {
                 Text(
-                    "Zuerst «Verify» ausführen – ohne verifizierte Zutaten keine Trennung möglich.",
+                    "Keine Zutaten gefunden. Rezept-Text prüfen oder «Verify» ausführen.",
                     color = MaterialTheme.colorScheme.error,
                     fontSize = 13.sp
                 )
                 Spacer(Modifier.height(12.dp))
                 TextButton(onClick = { requestDismiss() }, modifier = Modifier.fillMaxWidth()) { Text("Schliessen") }
                 return@Column
+            }
+
+            if (ingredientSections.size >= 2 && matches.isEmpty()) {
+                Text(
+                    "Abschnitte aus dem Rezept übernommen – Kochgewichte prüfen und speichern.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.height(8.dp))
             }
 
             // Status-Banner für bereits gesetzte Gewichte
@@ -1174,12 +1214,15 @@ fun ComponentSplitSheet(
             parts.forEachIndexed { index, part ->
                 val (kcal, prot, carbs) = sumFor(part.key)
                 val fat = fatFor(part.key)
-                val partMatches = matches.mapIndexed { i, m -> i to m }.filter { groups[it.first] == part.key }
+                val partMatches = workingMatches.mapIndexed { i, m -> i to m }.filter { groups[it.first] == part.key }
 
                 Text(part.name, fontWeight = FontWeight.SemiBold)
                 Text(
-                    if (kcal > 0f) "${fmtNum(kcal)} kcal aus Zutaten"
-                    else "Keine Zutaten zugeordnet",
+                    when {
+                        kcal > 0f -> "${fmtNum(kcal)} kcal aus Zutaten"
+                        partMatches.isNotEmpty() -> "${partMatches.size} Zutaten aus Abschnitt"
+                        else -> "Keine Zutaten zugeordnet"
+                    },
                     fontSize = 12.sp,
                     color = if (kcal > 0f) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.onSurfaceVariant
@@ -1270,11 +1313,26 @@ fun ComponentSplitSheet(
             Spacer(Modifier.height(12.dp))
             Button(
                 onClick = {
-                    val comps = parts.mapIndexedNotNull { i, part ->
+                    val withWeights = parts.mapIndexedNotNull { i, part ->
                         val w = part.weightText.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
                             ?: return@mapIndexedNotNull null
-                        val (kcal, prot, carbs) = sumFor(part.key)
-                        val fat = fatFor(part.key)
+                        Triple(i, part, w)
+                    }
+                    val weightSum = withWeights.sumOf { it.third.toDouble() }.toFloat().coerceAtLeast(1f)
+                    val serv = recipe.servings.coerceAtLeast(1).toFloat()
+                    val recipeKcal = recipe.totalCalories ?: 0f
+                    val recipeProt = (recipe.proteinPerServing ?: 0f) * serv
+                    val recipeCarbs = (recipe.carbsPerServing ?: 0f) * serv
+                    val recipeFat = (recipe.fatPerServing ?: 0f) * serv
+                    val comps = withWeights.map { (i, part, w) ->
+                        val (kcalM, protM, carbsM) = sumFor(part.key)
+                        val fatM = fatFor(part.key)
+                        // Ohne Verify: anteilig aus Rezept-Total nach Kochgewicht
+                        val frac = w / weightSum
+                        val kcal = if (kcalM > 0f) kcalM else recipeKcal * frac
+                        val prot = if (protM > 0f) protM else recipeProt * frac
+                        val carbs = if (carbsM > 0f) carbsM else recipeCarbs * frac
+                        val fat = if (fatM > 0f) fatM else recipeFat * frac
                         RecipeComponent(
                             recipeId = recipe.id,
                             name = part.name.ifBlank { displayNameForKey(part.key) },
@@ -1286,7 +1344,7 @@ fun ComponentSplitSheet(
                             sortOrder = i
                         )
                     }
-                    val updatedMatches = matches.mapIndexed { i, m ->
+                    val updatedMatches = workingMatches.mapIndexed { i, m ->
                         m.copy(componentGroup = groups[i] ?: parts.firstOrNull()?.key ?: "sauce")
                     }
                     if (comps.isNotEmpty()) onSave(comps, updatedMatches)
