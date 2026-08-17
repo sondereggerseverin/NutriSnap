@@ -49,6 +49,7 @@ import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeComponent
 import ch.nutrisnap.app.data.model.RecipeCategory
+import ch.nutrisnap.app.data.model.MatchSource
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import ch.nutrisnap.app.domain.RecipeGermanMetricConverter
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_RATINGS
@@ -2022,6 +2023,13 @@ fun RecipeDetailSheet(
                             if (isHeader) d.trimEnd(':') to "" else null to line
                         }
                     }
+                    // Lookup echter Match-Status pro Zeile (statt reiner "hat Zahl"-Heuristik):
+                    // grün = mit FoodItem verifiziert, orange = Menge erkannt aber ungematcht, grau = kein Match-Versuch.
+                    val matchByKey = remember(ingredientMatches) {
+                        ingredientMatches.filter { !it.isDeleted }.associateBy {
+                            it.ingredientRaw.trim().trimStart('•', '-', ' ').lowercase()
+                        }
+                    }
                     itemsIndexed(
                         displayBlocks,
                         key = { index, pair -> "${index}\u0000${pair.first}\u0000${pair.second}" }
@@ -2043,10 +2051,23 @@ fun RecipeDetailSheet(
                             ) {
                                 val parsed = parseIngredientLine(display)
                                 val hasAmount = parsed.amount.isNotBlank() && parsed.amount.toFloatOrNull() != null
+                                val match = matchByKey[rawLine.trim().trimStart('•', '-', ' ').lowercase()]
+                                val (statusIcon, statusColor, statusLabel) = when {
+                                    match?.matchedFoodItemId != null || (match != null && match.matchSource != MatchSource.UNMATCHED) ->
+                                        Triple(Icons.Default.CheckCircle, MacroColors.calories, "Verifiziert")
+                                    hasAmount ->
+                                        Triple(Icons.Default.ErrorOutline, MacroColors.carbs, "Menge erkannt, noch nicht gematcht")
+                                    else ->
+                                        Triple(
+                                            Icons.Default.RadioButtonUnchecked,
+                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                            "Noch nicht gematcht"
+                                        )
+                                }
                                 Icon(
-                                    if (hasAmount) Icons.Default.CheckCircle else Icons.Default.HelpOutline,
-                                    null,
-                                    tint = if (hasAmount) MacroColors.calories else MaterialTheme.colorScheme.error,
+                                    statusIcon,
+                                    statusLabel,
+                                    tint = statusColor,
                                     modifier = Modifier.size(16.dp).padding(top = 2.dp)
                                 )
                                 Spacer(Modifier.width(6.dp))
