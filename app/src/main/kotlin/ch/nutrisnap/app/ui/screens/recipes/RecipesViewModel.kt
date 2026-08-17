@@ -319,6 +319,14 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             _importState.update {
                 it.copy(isImporting = true, importPhase = "Starte…", importError = null, instagramBlocked = false)
             }
+            // Bestehendes Rezept unter dieser URL nicht neu scrapen/übersetzen/überschreiben
+            val existing = repo.findBySourceUrl(url)
+            if (existing != null) {
+                _importState.update {
+                    it.copy(isImporting = false, importPhase = null, lastImport = existing)
+                }
+                return@launch
+            }
             val result: RecipeScrapeResult = repo.importFromUrl(url) { phase ->
                 _importState.update { s -> s.copy(importPhase = phase) }
             }
@@ -451,6 +459,19 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 if (trimmedUrl.isBlank()) {
                     _importState.update {
                         it.copy(isImporting = false, importPhase = null, importError = "Bitte Link einfügen")
+                    }
+                    return@launch
+                }
+
+                // Bereits gespeichert unter dieser URL? → unverändert öffnen, kein Re-Scrape/Overwrite
+                val existingByUrl = repo.findBySourceUrl(trimmedUrl)
+                if (existingByUrl != null) {
+                    _importState.update {
+                        it.copy(
+                            isImporting = false,
+                            importPhase = null,
+                            lastImport = existingByUrl
+                        )
                     }
                     return@launch
                 }

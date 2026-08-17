@@ -430,16 +430,16 @@ class RecipeRepository(db: NutriDatabase, private val context: Context) {
 
     /**
      * Speichert ein Rezept. Bei gleichem Inhalts-Fingerprint (sourceUrl oder
-     * Titel+Zutaten+kcal) wird das bestehende aktualisiert statt ein Duplikat
-     * anzulegen — verhindert 10× denselben Import.
+     * Titel+Zutaten+kcal) wird das **bestehende** Rezept unverändert zurückgegeben
+     * — kein stilles Full-Overwrite mehr. Bewusste Änderungen laufen über
+     * [updateRecipe]. Verhindert, dass ein erneuter Import Zutaten, Matches und
+     * Komponenten still überschreibt.
      */
     suspend fun saveRecipe(r: Recipe): Long {
         val clean = r.withoutNullArtifacts().withGuessedCategoryIfEmpty()
         val existing = findByFingerprint(contentFingerprint(clean))
         if (existing != null && (clean.id == 0L || clean.id == existing.id)) {
-            val merged = clean.copy(id = existing.id, savedAt = existing.savedAt)
-            dao.update(merged)
-            pushSafely { SupabaseSync.upsertRecipe(merged) }
+            // Bestehendes Rezept unangetastet lassen (kein dao.update)
             return existing.id
         }
         val id = dao.insert(clean)
@@ -495,6 +495,18 @@ class RecipeRepository(db: NutriDatabase, private val context: Context) {
     suspend fun findByFingerprint(fp: String): Recipe? =
         dao.getAllOnce().firstOrNull { contentFingerprint(it) == fp }
 
+    /** Liefert ein bestehendes Rezept anhand der normalisierten sourceUrl, oder null. */
+    suspend fun findBySourceUrl(url: String): Recipe? {
+        val normalized = url.trim().lowercase().trimEnd('/')
+        if (normalized.isBlank()) return null
+        // Exact match first (häufigste Form), dann normalisierter Vergleich
+        return dao.findBySourceUrlExact(url.trim())
+            ?: dao.findBySourceUrlExact(normalized)
+            ?: dao.getAllOnce().firstOrNull {
+                it.sourceUrl?.trim()?.lowercase()?.trimEnd('/') == normalized
+            }
+    }
+
     /**
      * Entfernt lokale Rezept-Duplikate (gleicher Fingerprint). Behält den
      * ältesten Eintrag (kleinste id), löscht die restlichen inkl. Supabase-Push.
@@ -516,6 +528,14 @@ class RecipeRepository(db: NutriDatabase, private val context: Context) {
     }
 
     suspend fun importFromUrl(url: String, onProgress: (String) -> Unit = {}): RecipeScrapeResult {
+        // Bereits vorhanden? → kein erneutes Scrapen/Extrahieren (spart API-Kosten,
+        // verhindert stilles Überschreiben von Zutaten/Matches/Komponenten).
+        val existing = findBySourceUrl(url)
+        if (existing != null) {
+            onProgress("Bereits gespeichert")
+            return RecipeScrapeResult(success = true, recipe = existing)
+        }
+
         // Experiment-Toggles aus Settings (default = bisheriges Verhalten)
         val prefs = runCatching {
             context.notifDataStore.data.first()
@@ -534,7 +554,8 @@ class RecipeRepository(db: NutriDatabase, private val context: Context) {
         )
         if (result.success && result.recipe != null) {
             val id = saveRecipe(result.recipe)
-            val saved = result.recipe.copy(id = id)
+            // Falls per Fingerprint ein bestehendes Rezept matchte: DB-Stand zurück
+            val saved = dao.getById(id) ?: result.recipe.copy(id = id)
             return result.copy(recipe = saved)
         }
         return result

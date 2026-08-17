@@ -116,6 +116,10 @@ interface RecipeDao {
 
     @Query("SELECT * FROM recipes ORDER BY savedAt DESC")
     suspend fun getAllOnce(): List<Recipe>
+
+    /** Exact sourceUrl lookup (Normalisierung erfolgt im Repository). */
+    @Query("SELECT * FROM recipes WHERE sourceUrl = :url LIMIT 1")
+    suspend fun findBySourceUrlExact(url: String): Recipe?
 }
 
 @Dao
