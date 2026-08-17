@@ -710,7 +710,8 @@ fun RecipesScreen(
             initialSauceWeightG = existingComps.firstOrNull {
                 it.name.contains("sauce", ignoreCase = true) ||
                     it.name.contains("fleisch", ignoreCase = true)
-            }?.cookedWeightG
+            }?.cookedWeightG,
+            recipeIngredients = verifyRecipe.ingredients
         )
     }
 
