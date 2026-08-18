@@ -43,59 +43,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.FileProvider
-import com.canhub.cropper.CropImageView
 import ch.nutrisnap.app.utils.ImageDecodeUtils
+import com.canhub.cropper.CropImageView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.io.FileOutputStream
-import kotlin.coroutines.resume
 
 /**
- * Croppt off-Main über die Async-API der Lib (croppedImageAsync +
- * OnCropImageCompleteListener). Grosse Kamerafotos (12+ MP) brauchen für
- * Decode/Transform/Skalierung teils mehrere Sekunden – ruft man stattdessen
- * das synchrone getCroppedImage() auf (auch in einer Coroutine mit
- * Dispatchers.Main.immediate), blockiert das den Main-Thread und löst einen
- * ANR aus ("App reagiert nicht").
- */
-private suspend fun CropImageView.cropAsync(reqWidth: Int, reqHeight: Int): Bitmap? =
-    suspendCancellableCoroutine { cont ->
-        setOnCropImageCompleteListener { _, result ->
-            if (cont.isActive) {
-                cont.resume(if (result.isSuccessful) result.bitmap else null)
-            }
-        }
-        croppedImageAsync(reqWidth = reqWidth, reqHeight = reqHeight)
-    }
-
-/**
- * Lädt [sourceUri] downgesampelt (max. 2048px, [ImageDecodeUtils]) und schreibt
- * sie in eine Cache-Datei. Kamerafotos mit 12+ MP würden sonst unskaliert in
- * die CropImageView geladen und die App mit OOM abstürzen lassen.
- * Fällt auf [sourceUri] zurück, falls das Downsampling fehlschlägt.
- */
-private suspend fun prepareForCrop(context: android.content.Context, sourceUri: Uri): Uri =
-    withContext(Dispatchers.IO) {
-        val bitmap = ImageDecodeUtils.decodeUri(context, sourceUri) ?: return@withContext sourceUri
-        runCatching {
-            val outFile = File(context.cacheDir, "crop_src_${System.currentTimeMillis()}.jpg")
-            FileOutputStream(outFile).use { fos ->
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos)
-            }
-            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", outFile)
-        }.getOrElse { sourceUri }.also {
-            runCatching { if (!bitmap.isRecycled) bitmap.recycle() }
-        }
-    }
-
-/**
- * Eigener Zuschneide-Screen mit **immer sichtbarem** Speichern-Button unten.
+ * Zuschneide-Screen mit **immer sichtbarem Speichern-Button**.
  *
- * Ersetzt die deprecated CropImageActivity (Toolbar unter Edge-to-Edge unsichtbar).
- * Crop/Encode laufen im Hintergrund – große Kamera-Fotos sollen die UI nicht einfrieren.
+ * Wichtig gegen ANR/OOM:
+ * - Bild wird zuerst auf max. 1600px skaliert (IO-Thread)
+ * - In die CropImageView per [CropImageView.setImageBitmap] (kein erneutes Full-Decode)
+ * - Speichern: synchrone Crop-API nur auf begrenztem Bitmap, Encode auf IO
+ * - Timeout + Fallback auf Original, falls etwas hängen bleibt
  */
 @Composable
 fun ComposeCropScreen(
@@ -107,14 +71,33 @@ fun ComposeCropScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var cropView by remember { mutableStateOf<CropImageView?>(null) }
+    var sourceBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
     var isSaving by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
-    var preparedUri by remember(imageUri) { mutableStateOf<Uri?>(null) }
 
-    // Downsampling VOR dem Laden in die CropImageView – sonst OOM-Crash bei
-    // hochauflösenden Kamerafotos.
+    // Einmalig skaliert laden – nie das 12-MP-Original in die View
     LaunchedEffect(imageUri) {
-        preparedUri = prepareForCrop(context, imageUri)
+        isLoading = true
+        errorText = null
+        val bmp = withContext(Dispatchers.IO) {
+            ImageDecodeUtils.decodeUri(context, imageUri, maxEdgePx = 1600)
+        }
+        if (bmp == null) {
+            errorText = "Bild konnte nicht geladen werden"
+            isLoading = false
+            return@LaunchedEffect
+        }
+        sourceBitmap = bmp
+        isLoading = false
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            cropView = null
+            sourceBitmap?.let { b -> runCatching { if (!b.isRecycled) b.recycle() } }
+            sourceBitmap = null
+        }
     }
 
     Column(
@@ -147,13 +130,9 @@ fun ComposeCropScreen(
             )
             IconButton(
                 onClick = { runCatching { cropView?.rotateImage(90) } },
-                enabled = !isSaving
+                enabled = !isSaving && sourceBitmap != null
             ) {
-                Icon(
-                    Icons.Default.RotateRight,
-                    contentDescription = "Drehen",
-                    tint = Color.White
-                )
+                Icon(Icons.Default.RotateRight, contentDescription = "Drehen", tint = Color.White)
             }
         }
 
@@ -162,23 +141,30 @@ fun ComposeCropScreen(
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            val readyUri = preparedUri
-            if (readyUri != null) {
+            val bmp = sourceBitmap
+            if (bmp != null && !isLoading) {
                 AndroidView(
                     factory = { ctx ->
                         CropImageView(ctx).apply {
                             guidelines = CropImageView.Guidelines.ON
                             isAutoZoomEnabled = true
-                            runCatching { setImageUriAsync(readyUri) }
+                            // Bitmap bereits skaliert – kein setImageUriAsync (lädt sonst nochmal)
+                            setImageBitmap(bmp)
                             cropView = this
                         }
                     },
                     modifier = Modifier.fillMaxSize(),
-                    update = { view -> cropView = view }
+                    update = { view ->
+                        cropView = view
+                    }
                 )
             } else {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Color.White)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = Color.White)
+                        Spacer(Modifier.height(12.dp))
+                        Text("Bild wird vorbereitet…", color = Color.White, fontSize = 14.sp)
+                    }
                 }
             }
 
@@ -192,7 +178,7 @@ fun ComposeCropScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(color = Color.White)
                         Spacer(Modifier.height(12.dp))
-                        Text("Zuschneiden…", color = Color.White, fontSize = 14.sp)
+                        Text("Speichern…", color = Color.White, fontSize = 14.sp)
                     }
                 }
             }
@@ -226,57 +212,51 @@ fun ComposeCropScreen(
             }
             Button(
                 onClick = {
-                    val view = cropView ?: return@Button
-                    if (isSaving) return@Button
+                    val view = cropView
+                    if (view == null || isSaving) return@Button
                     isSaving = true
                     errorText = null
                     scope.launch {
-                        val resultUri = runCatching {
-                            // Crop läuft async in der Lib (kein Main-Block, kein ANR)
-                            // Begrenzte Ausgabegröße → weniger RAM, weniger OOM
-                            val bitmap = view.cropAsync(1600, 1600)
-                                ?: view.cropAsync(0, 0)
-                                ?: return@runCatching null
-
-                            withContext(Dispatchers.IO) {
-                                val outFile = File(
-                                    context.cacheDir,
-                                    "crop_${System.currentTimeMillis()}.jpg"
-                                )
-                                FileOutputStream(outFile).use { fos ->
-                                    bitmap.compress(Bitmap.CompressFormat.JPEG, 85, fos)
+                        val out = withTimeoutOrNull(12_000L) {
+                            runCatching {
+                                // Begrenztes Bitmap – getCroppedImage auf schon kleinem Source
+                                val cropped = withContext(Dispatchers.Main.immediate) {
+                                    view.getCroppedImage(1280, 1280) ?: view.getCroppedImage()
+                                } ?: return@runCatching null
+                                withContext(Dispatchers.IO) {
+                                    val outFile = File(
+                                        context.cacheDir,
+                                        "crop_${System.currentTimeMillis()}.jpg"
+                                    )
+                                    FileOutputStream(outFile).use { fos ->
+                                        cropped.compress(Bitmap.CompressFormat.JPEG, 85, fos)
+                                    }
+                                    runCatching { if (!cropped.isRecycled) cropped.recycle() }
+                                    FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.fileprovider",
+                                        outFile
+                                    )
                                 }
-                                runCatching { if (!bitmap.isRecycled) bitmap.recycle() }
-                                FileProvider.getUriForFile(
-                                    context,
-                                    "${context.packageName}.fileprovider",
-                                    outFile
-                                )
-                            }
-                        }.getOrElse { t ->
-                            errorText = t.message ?: "Fehler beim Speichern"
-                            null
+                            }.getOrNull()
                         }
-                        if (resultUri != null) {
-                            onCropped(resultUri)
+                        if (out != null) {
+                            onCropped(out)
                         } else {
-                            // Fallback: Original ohne Crop, App soll nicht stecken bleiben
+                            // Timeout/Fehler: Original (bereits skaliert, falls Cache) übernehmen
+                            errorText = "Zuschneiden dauerte zu lange – Original wird verwendet"
                             onCropped(imageUri)
                         }
                         isSaving = false
                     }
                 },
-                enabled = !isSaving,
+                enabled = !isSaving && sourceBitmap != null,
                 modifier = Modifier.weight(1.4f)
             ) {
-                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Check, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Speichern", fontWeight = FontWeight.Bold)
             }
         }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose { cropView = null }
     }
 }
