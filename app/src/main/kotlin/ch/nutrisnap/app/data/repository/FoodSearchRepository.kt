@@ -92,20 +92,42 @@ class FoodSearchRepository(
                 GroqFoodEstimatorApi.estimate(effectiveQuery)?.let { combined = combined + it }
             }
 
+            // Lokale Referenz (IngredientNutritionDatabase): Ausreißer wie
+            // "Mais 433 kcal/100g" statt ~86 verwerfen, solange genug Alternativen bleiben.
+            val localRef = ch.nutrisnap.app.domain.IngredientNutritionDatabase.lookup(effectiveQuery)
+                ?: ch.nutrisnap.app.domain.IngredientNutritionDatabase.lookup(query)
+
             val result = combined
                 .distinctBy { normalizeKey(it) }
                 .let { list ->
                     val usable = list.filter { hasUsableNutrition(it) }
+                    val plausible = if (localRef != null && localRef.calories > 0f) {
+                        val filtered = usable.filter { item ->
+                            val kcal = item.calories ?: return@filter true
+                            val ratio = kcal / localRef.calories
+                            ratio in 0.4f..2.2f
+                        }
+                        if (filtered.isNotEmpty()) filtered else usable
+                    } else usable
                     // Spezifische Treffer (relevance ≥ 2) bevorzugen — sonst
                     // fluten generische "Hähnchen…" die Liste bei "poulet kebabfleisch"
-                    val specific = usable.filter { relevance(it, effectiveQuery) >= 2 }
+                    val specific = plausible.filter { relevance(it, effectiveQuery) >= 2 }
                     when {
                         specific.size >= 3 -> specific
-                        usable.size >= 3 -> usable
+                        plausible.size >= 3 -> plausible
                         else -> list
                     }
                 }
-                .sortedWith(relevanceComparator(effectiveQuery))
+                .sortedWith(
+                    compareByDescending<FoodItem> { relevance(it, effectiveQuery) }
+                        .thenByDescending {
+                            when (it.source) {
+                                ch.nutrisnap.app.data.model.FoodSource.SWISS_FSVO -> 3
+                                ch.nutrisnap.app.data.model.FoodSource.MANUAL -> 2
+                                else -> 0
+                            }
+                        }
+                )
 
             foodItemDao.insertAll(result.filter { it.source != FoodSource.MANUAL }.take(20))
             result

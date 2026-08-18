@@ -148,6 +148,37 @@ fun defaultComponentGroup(text: String): String {
     }
 }
 
+/**
+ * Ob für diese Zutat Ballaststoffe erwartet werden.
+ * Bei Milch, Fleisch, Öl, reinem Whey o.ä. ist fehlender Fiber-Wert normal — keine Warnung.
+ */
+fun expectsDietaryFiber(text: String): Boolean {
+    val n = text.lowercase()
+        .replace(Regex("""added_\d+_"""), "") // Scan-Prefix entfernen
+    // Explizit ohne Ballaststoffe (oder vernachlässigbar)
+    val noFiber = listOf(
+        "milch", "milk", "sahne", "cream", "quark", "joghurt", "yogurt", "skyr",
+        "käse", "kaese", "cheese", "butter", "ei ", "eier", "egg", "eiweiss",
+        "whey", "isolat", "isolate", "casein", "protein pulver", "proteinpulver",
+        "öl", "oil", "wasser", "water", "salz", "salt", "pfeffer", "pepper",
+        "hähnchen", "haehnchen", "poulet", "chicken", "rind", "schwein", "fleisch",
+        "lachs", "fisch", "fish", "thunfisch", "garnelen", "schinken", "speck",
+        "wein", "weinbrand", "brühe", "bruehe", "fond", "bouillon"
+    )
+    if (noFiber.any { it in n }) return false
+    // Typische Ballaststoff-Träger
+    val hasFiber = listOf(
+        "hafer", "oat", "flocken", "chia", "leinsamen", "psyllium", "vollkorn",
+        "mehl", "flour", "brot", "bread", "nudel", "pasta", "reis", "rice",
+        "quinoa", "bulgur", "couscous", "gemüse", "gemuese", "vegetable",
+        "spinat", "brokkoli", "bohne", "linse", "erbse", "kicher", "apfel",
+        "banane", "beere", "obst", "fruit", "nuss", "mandel", "walnuss",
+        "keks", "cookie", "oreo", "kakao", "cacao", "cocoa", "schokolade",
+        "mais", "kartoffel", "potato", "süßkartoffel", "avocado", "tomate"
+    )
+    return hasFiber.any { it in n }
+}
+
 data class VerifiedTotals(
     val kcal: Float, val protein: Float, val carbs: Float, val fat: Float,
     val fiber: Float?, val sugar: Float?, val saturatedFat: Float?, val salt: Float?, val sodium: Float?
@@ -417,10 +448,15 @@ fun IngredientVerifySheet(
     val totalSatFat = microTotal("saturatedFat")
     val totalSalt   = microTotal("salt")
     val totalSodium = microTotal("sodium")
-    // Zutaten, die die Ballaststoff-Warnung auslösen: verifiziert, aber ohne Fiber-Wert
-    val missingFiberStates = verifyStates.filter { it.isVerified && !it.effectiveMicros.containsKey("fiber") }
-    val fiberComplete = verifyStates.filter { it.isVerified }
-        .let { verified -> verified.isNotEmpty() && missingFiberStates.isEmpty() }
+    // Warnung nur bei Zutaten, die typischerweise Ballaststoffe haben (Getreide, Samen,
+    // Gemüse, Obst …). Milch, Fleisch, Öl, reines Proteinpulver nicht bemängeln —
+    // sonst steht bei fast jedem Rezept eine lange rote Liste.
+    val missingFiberStates = verifyStates.filter { s ->
+        s.isVerified &&
+            !s.effectiveMicros.containsKey("fiber") &&
+            expectsDietaryFiber(s.result.parsed?.name ?: s.result.line)
+    }
+    val fiberComplete = missingFiberStates.isEmpty()
 
     // Nested ModalBottomSheets crashen oft (Verify + Identify). Deshalb:
     // entweder Identify ODER Verify, nie beides gleichzeitig.
@@ -558,29 +594,39 @@ fun IngredientVerifySheet(
                         Spacer(Modifier.height(6.dp))
                         Text(
                             "Ballaststoffe: ${"%.1f".format(it)} g" +
-                                if (!fiberComplete) " (unvollständig – manuell prüfen)" else "",
+                                if (!fiberComplete) " (teilweise geschätzt)" else "",
                             fontSize = 12.sp,
-                            fontWeight = if (!fiberComplete) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (!fiberComplete) MaterialTheme.colorScheme.error
-                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                            fontWeight = FontWeight.Normal,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    if (!fiberComplete && missingFiberStates.isNotEmpty()) {
+                    // Nur bei pflanzlichen Zutaten ohne Fiber-Wert – max. 3 Zeilen, kein Drama
+                    if (missingFiberStates.isNotEmpty()) {
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            if (missingFiberStates.size == 1) "Unvollständige Zutat:" else "Unvollständige Zutaten:",
-                            fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.error
+                            "Ballaststoffe fehlen bei:",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        missingFiberStates.forEach { s ->
+                        missingFiberStates.take(3).forEach { s ->
+                            val label = s.result.line
+                                .replace(Regex("""added_\d+_"""), "")
+                                .trimStart('•', '-', ' ')
                             Text(
-                                "• ${s.result.line.trimStart('•', '-', ' ')} – Ballaststoffe fehlen",
+                                "• $label",
                                 fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.error,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable { jumpToFiberEdit(s.result.line) }
-                                    .padding(vertical = 2.dp)
+                                    .padding(vertical = 1.dp)
+                            )
+                        }
+                        if (missingFiberStates.size > 3) {
+                            Text(
+                                "… und ${missingFiberStates.size - 3} weitere",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }

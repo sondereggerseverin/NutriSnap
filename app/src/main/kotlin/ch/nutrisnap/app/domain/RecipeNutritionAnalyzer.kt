@@ -407,8 +407,14 @@ object RecipeNutritionAnalyzer {
 
     private fun searchOFFSingle(searchTerm: String, originalName: String): FoodItem? {
         return runCatching {
+            // Lokale Referenz (DE/CH-typische Werte) — OFF-Treffer, die stark abweichen, verwerfen
+            val localRef = IngredientNutritionDatabase.lookup(originalName)
+                ?: IngredientNutritionDatabase.lookup(searchTerm)
+
             val encoded = java.net.URLEncoder.encode(searchTerm.take(50), "UTF-8")
-            val url = "https://world.openfoodfacts.org/cgi/search.pl?search_terms=$encoded&search_simple=1&action=process&json=1&page_size=5&fields=product_name,brands,nutriments"
+            val url = "https://world.openfoodfacts.org/cgi/search.pl?search_terms=$encoded" +
+                "&search_simple=1&action=process&json=1&page_size=8" +
+                "&fields=product_name,brands,nutriments,countries_tags"
             val req = Request.Builder().url(url).header("User-Agent", "NutriSnap/1.0 (Android)").build()
             val body = client.newCall(req).execute().use { it.body?.string() ?: return null }
             val products = JSONObject(body).optJSONArray("products") ?: return null
@@ -418,6 +424,11 @@ object RecipeNutritionAnalyzer {
                 val kcal = (n.optDouble("energy-kcal_100g", -1.0).toFloat()
                     .takeIf { it > 0 } ?: n.optDouble("energy_kcal_100g", -1.0).toFloat()
                     .takeIf { it > 0 }) ?: continue
+                // Ausreißer-Check: z.B. Mais 433 kcal/100g statt ~86 → verwerfen
+                if (localRef != null && localRef.calories > 0f) {
+                    val ratio = kcal / localRef.calories
+                    if (ratio > 2.2f || ratio < 0.4f) continue
+                }
                 val name = p.optString("product_name", originalName).ifBlank { originalName }
                 fun g(key: String): Float? =
                     if (n.has(key) && !n.isNull(key)) n.optDouble(key, Double.NaN).toFloat().takeIf { !it.isNaN() } else null
@@ -427,6 +438,19 @@ object RecipeNutritionAnalyzer {
                     protein  = g("proteins_100g"),
                     carbs    = g("carbohydrates_100g"),
                     fat      = g("fat_100g"),
+                    fiber    = g("fiber_100g") ?: g("fibers_100g"),
+                    source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
+                )
+            }
+            // Kein plausibler OFF-Treffer → lokale Referenz als FoodItem nutzen
+            if (localRef != null) {
+                return FoodItem(
+                    name     = originalName,
+                    calories = localRef.calories,
+                    protein  = localRef.protein,
+                    carbs    = localRef.carbs,
+                    fat      = localRef.fat,
+                    fiber    = localRef.fiber.takeIf { it > 0f },
                     source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
                 )
             }
