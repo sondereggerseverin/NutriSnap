@@ -1408,7 +1408,7 @@ private fun ReorderableMealEntries(
     }
 }
 
-enum class AddFoodTab { SEARCH, MANUAL }
+enum class AddFoodTab { SEARCH, AI, MANUAL }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1601,12 +1601,21 @@ fun AddFoodSheet(
                 }
             }
 
-            TabRow(selectedTabIndex = activeTab.ordinal) {
+            ScrollableTabRow(
+                selectedTabIndex = activeTab.ordinal,
+                edgePadding = 0.dp
+            ) {
                 Tab(
                     selected = activeTab == AddFoodTab.SEARCH,
                     onClick  = { activeTab = AddFoodTab.SEARCH },
-                    text     = { Text("Suche & Barcode") },
+                    text     = { Text("Suche") },
                     icon     = { Icon(Icons.Default.Search, null, Modifier.size(16.dp)) }
+                )
+                Tab(
+                    selected = activeTab == AddFoodTab.AI,
+                    onClick  = { activeTab = AddFoodTab.AI },
+                    text     = { Text("KI schätzen") },
+                    icon     = { Icon(Icons.Default.AutoAwesome, null, Modifier.size(16.dp)) }
                 )
                 Tab(
                     selected = activeTab == AddFoodTab.MANUAL,
@@ -1663,6 +1672,12 @@ fun AddFoodSheet(
                     initialMeal = initialMeal,
                     barcodeStatus = barcodeStatus,
                     onOpenScanner = { showScanner = true },
+                    onSwitchToAi = { activeTab = AddFoodTab.AI },
+                    onDismiss = onDismiss
+                )
+                AddFoodTab.AI -> AiEstimateTab(
+                    vm = vm,
+                    initialMeal = initialMeal,
                     onDismiss = onDismiss
                 )
                 AddFoodTab.MANUAL -> ManualEntryTab(
@@ -1685,6 +1700,7 @@ private fun SearchTab(
     initialMeal: MealType? = null,
     barcodeStatus: String,
     onOpenScanner: () -> Unit,
+    onSwitchToAi: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     var query        by remember { mutableStateOf("") }
@@ -1775,12 +1791,26 @@ private fun SearchTab(
         }
 
         if (results.isEmpty() && query.length > 1 && !searching) {
-            Text(
-                "Keine Treffer",
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = NutriSpacing.sm)
-            )
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = NutriSpacing.sm),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "Keine Treffer in der Datenbank",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(
+                    onClick = onSwitchToAi,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.AutoAwesome, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Mit KI schätzen")
+                }
+            }
         }
 
         LazyColumn(Modifier.heightIn(max = 300.dp)) {
@@ -1989,6 +2019,188 @@ private fun SearchTab(
                     }) { Text("Trotzdem & fertig") }
                 }
             )
+        }
+    }
+}
+
+/**
+ * KI-Schätzung wie bei Rezept-Zutaten: zuerst lokale Referenz-DB,
+ * sonst Groq/Gemini. Ergebnis pro 100g, Menge + Mahlzeit wählbar.
+ */
+@Composable
+private fun AiEstimateTab(
+    vm: DiaryViewModel,
+    initialMeal: MealType? = null,
+    onDismiss: () -> Unit
+) {
+    var query by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    var result by remember { mutableStateOf<FoodItem?>(null) }
+    var sourceLabel by remember { mutableStateOf("") }
+    var errorMsg by remember { mutableStateOf<String?>(null) }
+    var amountText by remember { mutableStateOf("100") }
+    var selectedMeal by remember { mutableStateOf(initialMeal ?: MealType.LUNCH) }
+    val scope = rememberCoroutineScope()
+
+    fun runEstimate(name: String) {
+        val q = name.trim()
+        if (q.length < 2) return
+        scope.launch {
+            isLoading = true
+            errorMsg = null
+            result = null
+            // 1) Lokale Referenz (USDA-nah) – nichts erfinden
+            val local = ch.nutrisnap.app.domain.IngredientNutritionDatabase.lookup(q)
+            if (local != null) {
+                result = FoodItem(
+                    name = q,
+                    brand = "Referenzdatenbank",
+                    calories = local.calories,
+                    protein = local.protein,
+                    carbs = local.carbs,
+                    fat = local.fat,
+                    fiber = local.fiber,
+                    servingSize = 100f,
+                    servingUnit = "g",
+                    source = FoodSource.MANUAL,
+                    completenessScore = 80
+                )
+                sourceLabel = "Lokale Referenz (USDA-nah)"
+                isLoading = false
+                return@launch
+            }
+            // 2) KI-Schätzung
+            val estimated = runCatching {
+                ch.nutrisnap.app.data.api.GroqFoodEstimatorApi.estimate(q)
+            }.getOrNull()
+            if (estimated != null) {
+                result = estimated
+                sourceLabel = "KI-Schätzung (nicht verifiziert)"
+            } else {
+                errorMsg = "Keine Schätzung möglich – probiere Suche oder Manuell."
+            }
+            isLoading = false
+        }
+    }
+
+    Column(
+        Modifier.verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(NutriSpacing.md)
+    ) {
+        Text(
+            "Name eingeben – zuerst Referenzwerte, sonst KI pro 100g",
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            label = { Text("Lebensmittel (z.B. Hähnchenbrust, Reis)") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            shape = RoundedCornerShape(NutriRadius.md),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Text,
+                imeAction = ImeAction.Search
+            ),
+            keyboardActions = KeyboardActions(
+                onSearch = { runEstimate(query) }
+            ),
+            trailingIcon = {
+                IconButton(
+                    onClick = { runEstimate(query) },
+                    enabled = query.trim().length >= 2 && !isLoading
+                ) {
+                    if (isLoading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                    else Icon(Icons.Default.AutoAwesome, "Schätzen")
+                }
+            }
+        )
+        Button(
+            onClick = { runEstimate(query) },
+            enabled = query.trim().length >= 2 && !isLoading,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.AutoAwesome, null, Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(if (isLoading) "Schätze…" else "Mit KI schätzen")
+        }
+
+        errorMsg?.let {
+            Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+        }
+
+        result?.let { food ->
+            Card(
+                shape = RoundedCornerShape(NutriRadius.md),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(food.name, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                    Text(
+                        sourceLabel,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("${food.calories?.toInt() ?: "–"} kcal", fontWeight = FontWeight.Bold, color = MacroColors.calories)
+                        Text("P ${food.protein?.let { "%.1f".format(it) } ?: "–"} g", fontSize = 13.sp, color = MacroColors.protein)
+                        Text("K ${food.carbs?.let { "%.1f".format(it) } ?: "–"} g", fontSize = 13.sp, color = MacroColors.carbs)
+                        Text("F ${food.fat?.let { "%.1f".format(it) } ?: "–"} g", fontSize = 13.sp, color = MacroColors.fat)
+                    }
+                    Text("pro 100 g", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = { amountText = it.filter { ch -> ch.isDigit() || ch == '.' || ch == ',' } },
+                    label = { Text("Menge g") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    shape = RoundedCornerShape(NutriRadius.md)
+                )
+                MealPicker(selected = selectedMeal) { selectedMeal = it }
+            }
+
+            val grams = amountText.replace(',', '.').toFloatOrNull() ?: 0f
+            val factor = grams / 100f
+            if (grams > 0f) {
+                val kcal = (food.calories ?: 0f) * factor
+                val p = (food.protein ?: 0f) * factor
+                val k = (food.carbs ?: 0f) * factor
+                val f = (food.fat ?: 0f) * factor
+                Text(
+                    "→ ${kcal.toInt()} kcal · P ${p.toInt()}g · K ${k.toInt()}g · F ${f.toInt()}g",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            Button(
+                onClick = {
+                    if (grams > 0f) {
+                        vm.addEntryWithMemory(food, grams, selectedMeal)
+                        onDismiss()
+                    }
+                },
+                enabled = grams > 0f,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Add, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Ins Tagebuch")
+            }
         }
     }
 }
