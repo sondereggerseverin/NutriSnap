@@ -28,6 +28,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.FileProvider
 import com.canhub.cropper.CropImageView
+import ch.nutrisnap.app.utils.ImageDecodeUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -70,6 +72,26 @@ private suspend fun CropImageView.cropAsync(reqWidth: Int, reqHeight: Int): Bitm
     }
 
 /**
+ * Lädt [sourceUri] downgesampelt (max. 2048px, [ImageDecodeUtils]) und schreibt
+ * sie in eine Cache-Datei. Kamerafotos mit 12+ MP würden sonst unskaliert in
+ * die CropImageView geladen und die App mit OOM abstürzen lassen.
+ * Fällt auf [sourceUri] zurück, falls das Downsampling fehlschlägt.
+ */
+private suspend fun prepareForCrop(context: android.content.Context, sourceUri: Uri): Uri =
+    withContext(Dispatchers.IO) {
+        val bitmap = ImageDecodeUtils.decodeUri(context, sourceUri) ?: return@withContext sourceUri
+        runCatching {
+            val outFile = File(context.cacheDir, "crop_src_${System.currentTimeMillis()}.jpg")
+            FileOutputStream(outFile).use { fos ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos)
+            }
+            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", outFile)
+        }.getOrElse { sourceUri }.also {
+            runCatching { if (!bitmap.isRecycled) bitmap.recycle() }
+        }
+    }
+
+/**
  * Eigener Zuschneide-Screen mit **immer sichtbarem** Speichern-Button unten.
  *
  * Ersetzt die deprecated CropImageActivity (Toolbar unter Edge-to-Edge unsichtbar).
@@ -87,6 +109,13 @@ fun ComposeCropScreen(
     var cropView by remember { mutableStateOf<CropImageView?>(null) }
     var isSaving by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
+    var preparedUri by remember(imageUri) { mutableStateOf<Uri?>(null) }
+
+    // Downsampling VOR dem Laden in die CropImageView – sonst OOM-Crash bei
+    // hochauflösenden Kamerafotos.
+    LaunchedEffect(imageUri) {
+        preparedUri = prepareForCrop(context, imageUri)
+    }
 
     Column(
         modifier = Modifier
@@ -133,18 +162,25 @@ fun ComposeCropScreen(
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            AndroidView(
-                factory = { ctx ->
-                    CropImageView(ctx).apply {
-                        guidelines = CropImageView.Guidelines.ON
-                        isAutoZoomEnabled = true
-                        runCatching { setImageUriAsync(imageUri) }
-                        cropView = this
-                    }
-                },
-                modifier = Modifier.fillMaxSize(),
-                update = { view -> cropView = view }
-            )
+            val readyUri = preparedUri
+            if (readyUri != null) {
+                AndroidView(
+                    factory = { ctx ->
+                        CropImageView(ctx).apply {
+                            guidelines = CropImageView.Guidelines.ON
+                            isAutoZoomEnabled = true
+                            runCatching { setImageUriAsync(readyUri) }
+                            cropView = this
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    update = { view -> cropView = view }
+                )
+            } else {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Color.White)
+                }
+            }
 
             if (isSaving) {
                 Box(
