@@ -1192,10 +1192,11 @@ fun ImportSheet(
     val isInstagram = "instagram.com" in url.lowercase() || "instagr.am" in url.lowercase()
 
     fun decodePickedBitmap(uri: Uri): Bitmap? =
-        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+        ch.nutrisnap.app.utils.ImageDecodeUtils.decodeUri(context, uri, maxEdgePx = 2048)
 
     // Bild-Import / Hybrid-Screenshot: kein Crop (OCR braucht volle Tabelle/Text).
     // Zuschneiden nur bei Rezept-Fotos (RecipeEditSheet).
+    // Decode immer mit Downsampling – volle Kamera-MP → sonst OOM/Hänger.
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->

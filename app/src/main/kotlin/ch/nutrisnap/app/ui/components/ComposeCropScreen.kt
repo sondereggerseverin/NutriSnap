@@ -24,7 +24,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +31,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,14 +43,17 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.FileProvider
 import com.canhub.cropper.CropImageView
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
 /**
  * Eigener Zuschneide-Screen mit **immer sichtbarem** Speichern-Button unten.
  *
- * Ersetzt die deprecated CropImageActivity, deren Toolbar unter Edge-to-Edge
- * (targetSdk 35+) auf vielen Geräten unsichtbar/nicht antippbar war.
+ * Ersetzt die deprecated CropImageActivity (Toolbar unter Edge-to-Edge unsichtbar).
+ * Crop/Encode laufen im Hintergrund – große Kamera-Fotos sollen die UI nicht einfrieren.
  */
 @Composable
 fun ComposeCropScreen(
@@ -60,6 +63,7 @@ fun ComposeCropScreen(
     onCancel: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var cropView by remember { mutableStateOf<CropImageView?>(null) }
     var isSaving by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
@@ -71,7 +75,6 @@ fun ComposeCropScreen(
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {
-        // Titelzeile
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -79,7 +82,7 @@ fun ComposeCropScreen(
                 .padding(horizontal = 4.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onCancel) {
+            IconButton(onClick = onCancel, enabled = !isSaving) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Abbrechen",
@@ -94,7 +97,7 @@ fun ComposeCropScreen(
                 modifier = Modifier.weight(1f)
             )
             IconButton(
-                onClick = { cropView?.rotateImage(90) },
+                onClick = { runCatching { cropView?.rotateImage(90) } },
                 enabled = !isSaving
             ) {
                 Icon(
@@ -105,7 +108,6 @@ fun ComposeCropScreen(
             }
         }
 
-        // Crop-View
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -116,14 +118,12 @@ fun ComposeCropScreen(
                     CropImageView(ctx).apply {
                         guidelines = CropImageView.Guidelines.ON
                         isAutoZoomEnabled = true
-                        setImageUriAsync(imageUri)
+                        runCatching { setImageUriAsync(imageUri) }
                         cropView = this
                     }
                 },
                 modifier = Modifier.fillMaxSize(),
-                update = { view ->
-                    cropView = view
-                }
+                update = { view -> cropView = view }
             )
 
             if (isSaving) {
@@ -153,7 +153,6 @@ fun ComposeCropScreen(
             )
         }
 
-        // Unten: immer sichtbare Buttons
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -175,29 +174,39 @@ fun ComposeCropScreen(
                     if (isSaving) return@Button
                     isSaving = true
                     errorText = null
-                    try {
-                        val bitmap = view.getCroppedImage()
-                        if (bitmap == null) {
-                            errorText = "Zuschneiden fehlgeschlagen – bitte erneut versuchen"
-                            isSaving = false
-                            return@Button
+                    scope.launch {
+                        val resultUri = runCatching {
+                            // View-Zugriff auf Main; Encode im Hintergrund
+                            val bitmap = withContext(Dispatchers.Main.immediate) {
+                                // Begrenzte Ausgabegröße → weniger RAM, weniger OOM
+                                view.getCroppedImage(1600, 1600) ?: view.getCroppedImage()
+                            } ?: return@runCatching null
+
+                            withContext(Dispatchers.IO) {
+                                val outFile = File(
+                                    context.cacheDir,
+                                    "crop_${System.currentTimeMillis()}.jpg"
+                                )
+                                FileOutputStream(outFile).use { fos ->
+                                    bitmap.compress(Bitmap.CompressFormat.JPEG, 85, fos)
+                                }
+                                runCatching { if (!bitmap.isRecycled) bitmap.recycle() }
+                                FileProvider.getUriForFile(
+                                    context,
+                                    "${context.packageName}.fileprovider",
+                                    outFile
+                                )
+                            }
+                        }.getOrElse { t ->
+                            errorText = t.message ?: "Fehler beim Speichern"
+                            null
                         }
-                        val outFile = File(context.cacheDir, "crop_${System.currentTimeMillis()}.jpg")
-                        FileOutputStream(outFile).use { fos ->
-                            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos)
+                        if (resultUri != null) {
+                            onCropped(resultUri)
+                        } else {
+                            // Fallback: Original ohne Crop, App soll nicht stecken bleiben
+                            onCropped(imageUri)
                         }
-                        // Bitmap freigeben, wenn die View eine Kopie geliefert hat
-                        if (!bitmap.isRecycled) {
-                            // getCroppedImage liefert oft eine neue Bitmap – recycle ok wenn nicht mehr gebraucht
-                        }
-                        val outUri = FileProvider.getUriForFile(
-                            context,
-                            "${context.packageName}.fileprovider",
-                            outFile
-                        )
-                        onCropped(outUri)
-                    } catch (e: Exception) {
-                        errorText = e.message ?: "Fehler beim Speichern"
                         isSaving = false
                     }
                 },
@@ -212,8 +221,6 @@ fun ComposeCropScreen(
     }
 
     DisposableEffect(Unit) {
-        onDispose {
-            cropView = null
-        }
+        onDispose { cropView = null }
     }
 }
