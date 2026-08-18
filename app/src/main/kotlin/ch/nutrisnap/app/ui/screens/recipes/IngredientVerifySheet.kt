@@ -1775,11 +1775,3 @@ private fun AiEstimateScreen(
         }
     }
 }
-
-@Composable
-private fun MacroChip(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
