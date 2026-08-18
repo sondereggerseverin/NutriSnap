@@ -11,13 +11,16 @@ import androidx.core.view.updatePadding
 import ch.nutrisnap.app.utils.CrashLogger
 
 /**
- * Fängt unbehandelte Exceptions global ab, protokolliert sie lokal (siehe
- * CrashLogger) und reicht sie danach an den Standard-Handler weiter – der
- * Absturz selbst passiert weiterhin wie vorher, nur ist er jetzt sichtbar.
+ * Fängt unbehandelte Exceptions global ab, startet den ANR-Watchdog und
+ * trackt die aktuelle Activity – alles landet im lokalen Absturzprotokoll
+ * (Einstellungen → Absturzprotokoll).
  */
 class NutriSnapApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+
+        CrashLogger.init(this)
+
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             runCatching { CrashLogger.record(this, thread, throwable) }
@@ -36,16 +39,14 @@ class NutriSnapApplication : Application() {
         // 2) Zusätzlich Content-Root um System-Bar-Insets polstern (Fallback für OEMs)
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
-                if (!isCropImageActivity(activity)) return
-                fixCropperWindow(activity)
+                if (isCropImageActivity(activity)) fixCropperWindow(activity)
             }
 
             override fun onActivityStarted(activity: Activity) {}
 
             override fun onActivityResumed(activity: Activity) {
-                // Nochmal absichern: manche Geräte setzen Flags erst nach Created um
-                if (!isCropImageActivity(activity)) return
-                fixCropperWindow(activity)
+                CrashLogger.setCurrentActivity(activity.javaClass.simpleName)
+                if (isCropImageActivity(activity)) fixCropperWindow(activity)
             }
 
             override fun onActivityPaused(activity: Activity) {}
@@ -61,17 +62,14 @@ class NutriSnapApplication : Application() {
     private fun fixCropperWindow(activity: Activity) {
         val window = activity.window ?: return
 
-        // Entscheidender Schritt: Activity soll NICHT unter Status-/Nav-Bar zeichnen
         WindowCompat.setDecorFitsSystemWindows(window, true)
 
-        // Fallback-Padding falls ein OEM die Toolbar trotzdem verschiebt
         val content = activity.findViewById<View>(android.R.id.content) ?: return
         ViewCompat.setOnApplyWindowInsetsListener(content) { v, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.updatePadding(top = bars.top, bottom = bars.bottom)
             insets
         }
-        // Insets ggf. sofort anfordern (Listener allein feuert nicht immer)
         ViewCompat.requestApplyInsets(content)
     }
 }

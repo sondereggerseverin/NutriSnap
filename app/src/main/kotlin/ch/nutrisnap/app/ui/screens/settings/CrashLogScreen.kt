@@ -66,13 +66,13 @@ fun CrashLogScreen(onBack: () -> Unit) {
         ) {
             if (content.isBlank()) {
                 Text(
-                    "Kein Absturz seit dem letzten Löschen aufgezeichnet.",
+                    "Kein Absturz/ANR seit dem letzten Löschen aufgezeichnet.",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
                 Text(
-                    "Neuester Eintrag zuerst – zum Melden kopieren und einfügen.",
+                    "Neuester Eintrag zuerst (CRASH / ANR / ERROR). Zum Melden kopieren und einfügen.",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
