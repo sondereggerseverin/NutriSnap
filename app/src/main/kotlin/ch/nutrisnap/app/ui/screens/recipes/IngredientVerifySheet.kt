@@ -1366,7 +1366,7 @@ private fun MacroChip(label: String, value: String) {
     }
 }
 
-// ── Identify Sheet: Barcode / Search / Manual ─────────────────────────────────
+// ── Identify Sheet: Barcode / Search / KI-Schätzung ───────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1389,7 +1389,7 @@ fun IngredientIdentifySheet(
                 ingredientName = ingredientName,
                 onBarcode = { mode = IdentifyMode.Barcode },
                 onSearch  = { mode = IdentifyMode.Search(ingredientName) },
-                onManual  = { mode = IdentifyMode.Manual }
+                onAi      = { mode = IdentifyMode.AiEstimate }
             )
             IdentifyMode.Barcode -> BarcodeLookupScreen(
                 onBarcodeScanned = { barcode ->
@@ -1407,7 +1407,7 @@ fun IngredientIdentifySheet(
                 onFoodSelected = onFoodSelected,
                 onBack = { mode = IdentifyMode.Choose }
             )
-            IdentifyMode.Manual -> ManualEntryScreen(
+            IdentifyMode.AiEstimate -> AiEstimateScreen(
                 name = ingredientName,
                 onConfirm = onFoodSelected,
                 onBack = { mode = IdentifyMode.Choose }
@@ -1420,7 +1420,7 @@ sealed class IdentifyMode {
     object Choose  : IdentifyMode()
     object Barcode : IdentifyMode()
     data class Search(val query: String) : IdentifyMode()
-    object Manual  : IdentifyMode()
+    object AiEstimate : IdentifyMode()
 }
 
 // ── Choose screen ─────────────────────────────────────────────────────────────
@@ -1430,7 +1430,7 @@ private fun IdentifyChooseScreen(
     ingredientName: String,
     onBarcode: () -> Unit,
     onSearch: () -> Unit,
-    onManual: () -> Unit
+    onAi: () -> Unit
 ) {
     Column(Modifier.padding(16.dp).padding(bottom = 24.dp)) {
         Text("Zutat identifizieren", fontWeight = FontWeight.Bold, fontSize = 18.sp)
@@ -1456,12 +1456,12 @@ private fun IdentifyChooseScreen(
         )
         Spacer(Modifier.height(8.dp))
         OptionRow(
-            icon = Icons.Default.Edit,
-            title = "Manuell eingeben",
-            subtitle = "kcal, Protein, Kohlenhydrate, Fett selbst tippen",
-            badge = null,
-            badgeColor = Color.Transparent,
-            onClick = onManual
+            icon = Icons.Default.AutoAwesome,
+            title = "Mit KI schätzen/suchen",
+            subtitle = "Referenzwerte zuerst, sonst KI-Schätzung pro 100g",
+            badge = "KI",
+            badgeColor = Color(0xFF6A1B9A),
+            onClick = onAi
         )
     }
 }
@@ -1644,70 +1644,142 @@ private fun FoodSearchScreen(
     }
 }
 
-// ── Manual Entry Screen ───────────────────────────────────────────────────────
+// ── KI-Schätzung Screen ───────────────────────────────────────────────────────
+// Strategie gegen Halluzinationen:
+// 1. Zuerst lokale Referenz-DB (USDA-nahe Werte, z.B. Mais ~86 kcal) — kein LLM.
+// 2. Sonst GroqFoodEstimatorApi mit strengem Prompt + Plausibilitätscheck
+//    (kcal ≈ 4P+4K+9F, sinnvolle Bereiche).
 
 @Composable
-private fun ManualEntryScreen(
+private fun AiEstimateScreen(
     name: String,
     onConfirm: (FoodItem) -> Unit,
     onBack: () -> Unit
 ) {
-    var foodName by remember { mutableStateOf(name) }
-    var kcal     by remember { mutableStateOf("") }
-    var protein  by remember { mutableStateOf("") }
-    var carbs    by remember { mutableStateOf("") }
-    var fat      by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(true) }
+    var result by remember { mutableStateOf<FoodItem?>(null) }
+    var sourceLabel by remember { mutableStateOf("") }
+    var errorMsg by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(name) {
+        isLoading = true
+        errorMsg = null
+        result = null
+        // 1) Lokale Referenz zuerst — echte Werte, keine Erfindung
+        val local = ch.nutrisnap.app.domain.IngredientNutritionDatabase.lookup(name)
+        if (local != null) {
+            result = FoodItem(
+                name = name.trim().ifBlank { "Unbekannt" },
+                brand = "Referenzdatenbank",
+                calories = local.calories,
+                protein = local.protein,
+                carbs = local.carbs,
+                fat = local.fat,
+                fiber = local.fiber,
+                servingSize = 100f,
+                servingUnit = "g",
+                source = FoodSource.MANUAL,
+                completenessScore = 80
+            )
+            sourceLabel = "Lokale Referenz (USDA-nah)"
+            isLoading = false
+            return@LaunchedEffect
+        }
+        // 2) KI-Schätzung nur wenn nichts in der Referenz-DB
+        val estimated = runCatching {
+            ch.nutrisnap.app.data.api.GroqFoodEstimatorApi.estimate(name)
+        }.getOrNull()
+        if (estimated != null) {
+            result = estimated
+            sourceLabel = "KI-Schätzung (nicht verifiziert)"
+        } else {
+            errorMsg = "Keine Schätzung möglich — bitte Datenbank-Suche oder Barcode nutzen."
+        }
+        isLoading = false
+    }
 
     Column(Modifier.padding(16.dp).padding(bottom = 24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") }
-            Text("Manuell eingeben", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text("Mit KI schätzen/suchen", fontWeight = FontWeight.Bold, fontSize = 18.sp)
         }
-        Text("Nährwerte pro 100g eingeben", fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp, bottom = 12.dp))
+        Text(
+            "Zuerst Referenzwerte, sonst KI pro 100g",
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp, bottom = 12.dp)
+        )
 
-        OutlinedTextField(value = foodName, onValueChange = { foodName = it },
-            label = { Text("Name") }, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-            shape = RoundedCornerShape(10.dp))
-
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MacroField("kcal", kcal, { kcal = it }, Modifier.weight(1f))
-            MacroField("Protein g", protein, { protein = it }, Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MacroField("Kohlenhy. g", carbs, { carbs = it }, Modifier.weight(1f))
-            MacroField("Fett g", fat, { fat = it }, Modifier.weight(1f))
-        }
-
-        Spacer(Modifier.height(16.dp))
-        Button(
-            onClick = {
-                onConfirm(FoodItem(
-                    name     = foodName.ifBlank { name },
-                    calories = kcal.toFloatOrNull() ?: 0f,
-                    protein  = protein.toFloatOrNull() ?: 0f,
-                    carbs    = carbs.toFloatOrNull() ?: 0f,
-                    fat      = fat.toFloatOrNull() ?: 0f,
-                    source   = FoodSource.MANUAL
-                ))
-            },
-            enabled = kcal.isNotBlank(),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(Icons.Default.Check, null, Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Übernehmen")
+        when {
+            isLoading -> {
+                Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator()
+                        Spacer(Modifier.height(12.dp))
+                        Text("Suche Nährwerte…", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            errorMsg != null -> {
+                Text(errorMsg!!, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+                Spacer(Modifier.height(12.dp))
+                TextButton(onClick = {
+                    scope.launch {
+                        isLoading = true
+                        errorMsg = null
+                        val estimated = runCatching {
+                            ch.nutrisnap.app.data.api.GroqFoodEstimatorApi.estimate(name)
+                        }.getOrNull()
+                        result = estimated
+                        sourceLabel = if (estimated != null) "KI-Schätzung (nicht verifiziert)" else ""
+                        if (estimated == null) errorMsg = "Keine Schätzung möglich."
+                        isLoading = false
+                    }
+                }) { Text("Erneut versuchen") }
+            }
+            result != null -> {
+                val food = result!!
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text(food.name, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                        Text(sourceLabel, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 2.dp, bottom = 10.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            MacroChip("kcal", "${food.calories?.toInt() ?: "–"}")
+                            MacroChip("Protein", "${food.protein?.let { "%.1f".format(it) } ?: "–"} g")
+                            MacroChip("KH", "${food.carbs?.let { "%.1f".format(it) } ?: "–"} g")
+                            MacroChip("Fett", "${food.fat?.let { "%.1f".format(it) } ?: "–"} g")
+                        }
+                        food.fiber?.takeIf { it > 0f }?.let {
+                            Text("Ballaststoffe: %.1f g / 100g".format(it),
+                                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 8.dp))
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+                Button(
+                    onClick = { onConfirm(food) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Check, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Übernehmen")
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun MacroField(label: String, value: String, onChange: (String) -> Unit, modifier: Modifier) {
-    OutlinedTextField(
-        value = value, onValueChange = onChange,
-        label = { Text(label, fontSize = 12.sp) },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-        singleLine = true, modifier = modifier, shape = RoundedCornerShape(10.dp)
-    )
+private fun MacroChip(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }

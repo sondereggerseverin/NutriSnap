@@ -43,13 +43,30 @@ object GroqFoodEstimatorApi {
      * wurde, hier aber noch nicht.
      */
     suspend fun estimate(query: String): FoodItem? = withContext(Dispatchers.IO) {
+        // Strenger Prompt: nur Standard-Referenzwerte (USDA/BFS), keine Marken,
+        // Atwater-Plausibilität, typische Bereiche — gegen Halluzinationen wie
+        // "Mais 400 kcal / 20g Ballaststoffe".
         val prompt = """
-            Gib die durchschnittlichen Nährwerte pro 100g für das deutsche Lebensmittel
-            "$query" zurück (rohe/übliche Zubereitungsform, keine bestimmte Marke).
-            Antworte AUSSCHLIESSLICH mit einem JSON-Objekt, keine Erklärung, kein Markdown:
-            {"name":"...", "calories":0.0, "protein":0.0, "carbs":0.0, "fat":0.0,
-             "fiber":0.0, "sugar":0.0, "salt":0.0}
-            Falls "$query" kein plausibles Lebensmittel ist, antworte mit {}
+            Du bist eine Nährwert-Referenz. Gib NUR Standardwerte pro 100g (roh/üblich,
+            ungesalzen, keine Marke) für "$query" zurück — wie USDA FoodData Central
+            oder Schweizer Nährwertdatenbank.
+
+            Regeln (strikt):
+            - Nur bekannte, realistische Durchschnittswerte. Nichts erfinden.
+            - calories muss ungefähr 4*protein + 4*carbs + 9*fat (±15%) entsprechen.
+            - Typische Bereiche: Gemüse 10–80 kcal, Obst 30–90, Getreide/Reis roh
+              300–370, gekocht 90–130, Mais/Maiskörner ~86, Kakaopulver ~228,
+              Fleisch 100–300, Öle ~884. Ballaststoffe bei Gemüse/Getreide meist 1–10g,
+              nicht 20g bei Mais.
+            - Unbekannt oder unsicher → antworte mit {}
+
+            Beispiele korrekter Werte:
+            Mais (Körner): {"name":"Mais","calories":86,"protein":3.3,"carbs":19,"fat":1.2,"fiber":2.7,"sugar":3.2,"salt":0.02}
+            Apfel: {"name":"Apfel","calories":52,"protein":0.3,"carbs":14,"fat":0.2,"fiber":2.4,"sugar":10,"salt":0}
+            Kakaopulver: {"name":"Kakaopulver","calories":228,"protein":20,"carbs":58,"fat":14,"fiber":33,"sugar":1.8,"salt":0.05}
+
+            Antworte AUSSCHLIESSLICH mit einem JSON-Objekt, kein Markdown, keine Erklärung:
+            {"name":"...","calories":0.0,"protein":0.0,"carbs":0.0,"fat":0.0,"fiber":0.0,"sugar":0.0,"salt":0.0}
         """.trimIndent()
 
         if (!GeminiService.isAvailable()) {
@@ -130,17 +147,35 @@ object GroqFoodEstimatorApi {
         return buildFoodItem(data, query)
     }
 
-    private fun buildFoodItem(data: JSONObject, query: String): FoodItem {
+    private fun buildFoodItem(data: JSONObject, query: String): FoodItem? {
         fun g(key: String): Float? =
-            if (data.has(key) && !data.isNull(key)) data.optDouble(key, Double.NaN).toFloat().takeIf { !it.isNaN() } else null
+            if (data.has(key) && !data.isNull(key)) data.optDouble(key, Double.NaN).toFloat().takeIf { !it.isNaN() && it >= 0f } else null
+        val calories = g("calories") ?: return null
+        val protein = g("protein") ?: 0f
+        val carbs = g("carbs") ?: 0f
+        val fat = g("fat") ?: 0f
+        // Atwater-Plausibilität: kcal ≈ 4P+4K+9F (±25%, etwas Spielraum für Alkohol/Rundung)
+        val atwater = 4f * protein + 4f * carbs + 9f * fat
+        if (atwater > 5f) {
+            val ratio = calories / atwater
+            if (ratio < 0.7f || ratio > 1.35f) {
+                Log.w(TAG, "Verwerfe unplausible Schätzung für \"$query\": $calories kcal vs Atwater $atwater")
+                return null
+            }
+        }
+        // Absurde Ausreißer (z.B. 400 kcal bei Mais-artigem Low-Fat-Food) abfangen
+        if (calories > 950f || calories < 0f) return null
+        val fiber = g("fiber")
+        if (fiber != null && fiber > 50f) return null // z.B. 20g bei Mais wäre falsch, 50+ absurd
+
         return FoodItem(
             name = data.optString("name", query).ifBlank { query },
             brand = "KI-geschätzt",
-            calories = g("calories"),
-            protein  = g("protein"),
-            carbs    = g("carbs"),
-            fat      = g("fat"),
-            fiber    = g("fiber"),
+            calories = calories,
+            protein  = protein,
+            carbs    = carbs,
+            fat      = fat,
+            fiber    = fiber,
             sugar    = g("sugar"),
             salt     = g("salt"),
             servingSize = 100f,
