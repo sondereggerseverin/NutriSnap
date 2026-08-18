@@ -31,12 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeCategory
-import ch.nutrisnap.app.ui.screens.settings.notifDataStore
+import ch.nutrisnap.app.ui.components.ComposeCropScreen
 import coil.compose.AsyncImage
-import com.canhub.cropper.CropImageContract
-import com.canhub.cropper.CropImageContractOptions
-import com.canhub.cropper.CropImageOptions
-import com.canhub.cropper.CropImageView
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,21 +60,9 @@ fun RecipeEditSheet(
     // Photo state — starts with existing imageUrl, can be replaced with local URI
     var imageUri     by remember { mutableStateOf<Uri?>(recipe.imageUrl?.let { Uri.parse(it) }) }
     var imageUrl     by remember { mutableStateOf(recipe.imageUrl) } // keeps remote URL if not replaced
+    var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
 
-    // Nach Auswahl: Zuschneiden, dann übernommen
-    val cropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
-        if (result.isSuccessful) {
-            val cropped = result.uriContent ?: return@rememberLauncherForActivityResult
-            imageUri = cropped
-            imageUrl = cropped.toString()
-        }
-    }
-
-    val cropPrefs by context.notifDataStore.data.collectAsState(initial = null)
-    val useThemeCropper = cropPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_CROPPER_THEME_COLOR) ?: true
-    val themePrimary = MaterialTheme.colorScheme.primary
-
-    // Gallery picker → öffnet Cropper
+    // Gallery picker → eigener Crop-Screen mit sichtbarem Speichern-Button
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -88,16 +72,22 @@ fun RecipeEditSheet(
                 uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
             )
         }
-        cropLauncher.launch(
-            CropImageContractOptions(
-                uri = uri,
-                cropImageOptions = ch.nutrisnap.app.ui.theme.CropperDefaults.options(
-                    title = "Foto zuschneiden",
-                    useTheme = useThemeCropper,
-                    themePrimary = themePrimary
-                )
-            )
+        pendingCropUri = uri
+    }
+
+    // Crop-Overlay über dem Sheet
+    pendingCropUri?.let { cropUri ->
+        ComposeCropScreen(
+            imageUri = cropUri,
+            title = "Foto zuschneiden",
+            onCropped = { cropped ->
+                imageUri = cropped
+                imageUrl = cropped.toString()
+                pendingCropUri = null
+            },
+            onCancel = { pendingCropUri = null }
         )
+        return
     }
 
     fun buildSaved(): Recipe {

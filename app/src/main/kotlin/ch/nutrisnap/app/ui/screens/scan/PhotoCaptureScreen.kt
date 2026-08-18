@@ -31,19 +31,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import ch.nutrisnap.app.ui.screens.settings.notifDataStore
-import ch.nutrisnap.app.ui.theme.CropperDefaults
-import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_CROPPER_THEME_COLOR
-import com.canhub.cropper.CropImageContract
-import com.canhub.cropper.CropImageContractOptions
+import ch.nutrisnap.app.ui.components.ComposeCropScreen
 import java.util.concurrent.Executors
 
 /**
  * Capture-Screen für ein Foto (Kamera oder Galerie).
  *
  * [enableCrop] nur für Rezept-Fotos true setzen. Nährwerttabellen und
- * Rezept-Extraktion (OCR) laufen ohne Zuschneiden – der Cropper versteckt
- * sonst oft den Weiter-Button und stört die Texterkennung.
+ * Rezept-Extraktion (OCR) laufen ohne Zuschneiden.
+ * Zuschneiden läuft über [ComposeCropScreen] (eigener Screen mit sichtbarem
+ * Speichern-Button) – nicht mehr über die deprecated CropImageActivity.
  */
 @Composable
 fun PhotoCaptureScreen(
@@ -61,12 +58,9 @@ fun PhotoCaptureScreen(
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     var cameraControl by remember { mutableStateOf<CameraControl?>(null) }
     var cameraInfo by remember { mutableStateOf<CameraInfo?>(null) }
+    var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
     val executor = remember { Executors.newSingleThreadExecutor() }
     val mainExecutor = remember { ContextCompat.getMainExecutor(context) }
-
-    val prefs by context.notifDataStore.data.collectAsState(initial = null)
-    val useThemeCropper = prefs?.get(KEY_TOGGLE_CROPPER_THEME_COLOR) ?: true
-    val themePrimary = MaterialTheme.colorScheme.primary
 
     fun decodeBitmap(uri: Uri): Bitmap? = try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -82,16 +76,22 @@ fun PhotoCaptureScreen(
         null
     }
 
-    val cropLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
-        if (!result.isSuccessful) {
-            isCapturing = false
-            return@rememberLauncherForActivityResult
-        }
-        val croppedUri = result.uriContent
-        isCapturing = false
-        if (croppedUri != null) {
-            decodeBitmap(croppedUri)?.let { onPhotoCaptured(it) }
-        }
+    // Eigener Crop-Screen mit sichtbarem Speichern-Button (kein Library-Activity)
+    pendingCropUri?.let { cropUri ->
+        ComposeCropScreen(
+            imageUri = cropUri,
+            title = "Foto zuschneiden",
+            onCropped = { cropped ->
+                pendingCropUri = null
+                isCapturing = false
+                decodeBitmap(cropped)?.let { onPhotoCaptured(it) }
+            },
+            onCancel = {
+                pendingCropUri = null
+                isCapturing = false
+            }
+        )
+        return
     }
 
     val galleryLauncher = rememberLauncherForActivityResult(
@@ -100,16 +100,7 @@ fun PhotoCaptureScreen(
         if (uri == null) return@rememberLauncherForActivityResult
         if (enableCrop) {
             isCapturing = true
-            cropLauncher.launch(
-                CropImageContractOptions(
-                    uri = uri,
-                    cropImageOptions = CropperDefaults.options(
-                        title = "Foto zuschneiden",
-                        useTheme = useThemeCropper,
-                        themePrimary = themePrimary
-                    )
-                )
-            )
+            pendingCropUri = uri
         } else {
             decodeBitmap(uri)?.let { onPhotoCaptured(it) }
         }
