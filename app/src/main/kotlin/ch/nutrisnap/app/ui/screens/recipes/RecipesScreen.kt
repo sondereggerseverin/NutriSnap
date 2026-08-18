@@ -841,7 +841,7 @@ fun RecipesScreen(
                 shoppingVm.addRecipeIngredients(live.displayTitle(), names.map { Triple(it, null, null) })
                 selectedRecipe = null
             },
-            onUpdateIngredients = { newText -> vm.updateRecipe(live.copy(ingredients = newText)) },
+            onUpdateIngredients = { newText -> vm.updateIngredientsAndSyncMatches(live, newText) },
             onUpdateCookedWeight = { w -> vm.updateRecipe(live.copy(cookedWeightG = w)) },
             onScaleToBudget = { vm.scaleToRemainingBudget(live) },
             onTranslateGermanMetric = { vm.translateToGermanMetric(live) },

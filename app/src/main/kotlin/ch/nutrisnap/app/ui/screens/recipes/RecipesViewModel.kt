@@ -772,6 +772,42 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
+     * Aktualisiert den Zutatentext und markiert Matches, deren Zeile nicht mehr
+     * vorkommt, als gelöscht — verhindert, dass nach dem Entfernen einer Zutat
+     * (z.B. Seasoning) die Komponenten-Gruppen aus verwaisten Matches
+     * durcheinandergeraten.
+     */
+    fun updateIngredientsAndSyncMatches(recipe: Recipe, newIngredients: String) {
+        viewModelScope.launch {
+            repo.updateRecipe(recipe.copy(ingredients = newIngredients))
+            val existing = matchDao.getMatchesForRecipeOnce(recipe.id)
+            if (existing.isEmpty()) return@launch
+            fun core(s: String): String =
+                s.lowercase()
+                    .trim()
+                    .trimStart('•', '-', '*', ' ')
+                    .replace(Regex("""^\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tbsp|tsp|cup|oz)?\s*"""), "")
+                    .trim()
+            val textCores = newIngredients.lines()
+                .map { core(it) }
+                .filter { it.length >= 2 }
+                .toSet()
+            for (m in existing) {
+                if (m.isDeleted) continue
+                val rawC = core(m.ingredientRaw)
+                val nameC = core(m.ingredientName)
+                val stillPresent = textCores.any { t ->
+                    (rawC.length >= 3 && (t.contains(rawC) || rawC.contains(t))) ||
+                        (nameC.length >= 3 && (t.contains(nameC) || nameC.contains(t)))
+                }
+                if (!stillPresent) {
+                    matchDao.updateMatch(m.copy(isDeleted = true))
+                }
+            }
+        }
+    }
+
+    /**
      * Einmalige Reparatur: Caption-Klumpen in saubere Zutatenzeilen zerlegen
      * und speichern. No-op wenn Text bereits strukturiert ist.
      */
