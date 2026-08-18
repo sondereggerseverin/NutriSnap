@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeCategory
+import ch.nutrisnap.app.ui.components.ComposeCropScreen
+import ch.nutrisnap.app.utils.ImageDecodeUtils
 import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -63,27 +65,29 @@ fun RecipeEditSheet(
     var imageUri     by remember { mutableStateOf<Uri?>(recipe.imageUrl?.let { Uri.parse(it) }) }
     var imageUrl     by remember { mutableStateOf(recipe.imageUrl) } // keeps remote URL if not replaced
     var isImportingPhoto by remember { mutableStateOf(false) }
+    /** Skaliertes Temp-Bild für den Crop-Screen (nie das volle Kamera-Original). */
+    var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
 
     val photoScope = rememberCoroutineScope()
-    // Gallery: Bild direkt übernehmen (kein Crop – der hing/crashte bei großen Fotos).
-    // Kopie in App-Cache, skaliert, stabile FileProvider-URI.
+
+    // 1) Galerie → skaliert in Cache  2) Crop-Screen mit Speichern-Button  3) Ergebnis setzen
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         isImportingPhoto = true
         photoScope.launch {
-            val ok = runCatching {
+            val scaledUri = runCatching {
                 val bitmap = withContext(Dispatchers.IO) {
-                    ch.nutrisnap.app.utils.ImageDecodeUtils.decodeUri(context, uri, maxEdgePx = 1600)
+                    ImageDecodeUtils.decodeUri(context, uri, maxEdgePx = 2048)
                 } ?: throw IllegalStateException("Bild konnte nicht geladen werden")
-                val localUri = withContext(Dispatchers.IO) {
+                withContext(Dispatchers.IO) {
                     val outFile = java.io.File(
                         context.cacheDir,
-                        "recipe_photo_${System.currentTimeMillis()}.jpg"
+                        "crop_src_${System.currentTimeMillis()}.jpg"
                     )
                     java.io.FileOutputStream(outFile).use { fos ->
-                        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, fos)
+                        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, fos)
                     }
                     runCatching { if (!bitmap.isRecycled) bitmap.recycle() }
                     androidx.core.content.FileProvider.getUriForFile(
@@ -92,15 +96,31 @@ fun RecipeEditSheet(
                         outFile
                     )
                 }
-                imageUri = localUri
-                imageUrl = localUri.toString()
-            }.isSuccess
-            if (!ok) {
+            }.getOrNull()
+            isImportingPhoto = false
+            if (scaledUri != null) {
+                pendingCropUri = scaledUri
+            } else {
+                // Notfalls Original ohne Crop
                 imageUri = uri
                 imageUrl = uri.toString()
             }
-            isImportingPhoto = false
         }
+    }
+
+    // Crop-Screen mit immer sichtbarem „Speichern“
+    pendingCropUri?.let { cropUri ->
+        ComposeCropScreen(
+            imageUri = cropUri,
+            title = "Foto zuschneiden",
+            onCropped = { cropped ->
+                imageUri = cropped
+                imageUrl = cropped.toString()
+                pendingCropUri = null
+            },
+            onCancel = { pendingCropUri = null }
+        )
+        return
     }
 
     fun buildSaved(): Recipe {
@@ -195,7 +215,14 @@ fun RecipeEditSheet(
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        if (currentUri != null) {
+                        if (isImportingPhoto) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(Modifier.size(28.dp))
+                                Spacer(Modifier.height(8.dp))
+                                Text("Bild wird geladen…", fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        } else if (currentUri != null) {
                             AsyncImage(
                                 model = currentUri,
                                 contentDescription = "Rezeptbild",
