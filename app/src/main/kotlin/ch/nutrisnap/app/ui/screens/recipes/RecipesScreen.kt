@@ -158,8 +158,27 @@ private val INGREDIENT_AMOUNT_REGEX = Regex(
     RegexOption.IGNORE_CASE
 )
 
-private fun normalizeUnit(raw: String): String {
-    if (raw.isBlank()) return "g"
+/** Zählbare Lebensmittel: "2 chicken breasts" → Stück, nicht g. */
+private val COUNTABLE_NAME_HINTS = listOf(
+    "breast", "brust", "filet", "fillet", "thigh", "schenkel",
+    "egg", "eggs", "ei", "eier",
+    "onion", "zwiebel", "shallot", "schalotte",
+    "clove", "cloves", "zehe", "zehen", "garlic", "knoblauch",
+    "tomato", "tomate", "potato", "kartoffel", "avocado",
+    "banana", "banane", "apple", "apfel", "lime", "lemon", "zitrone",
+    "piece", "pieces", "stück", "stueck", "stange", "scheibe", "slice"
+)
+
+private fun isCountableName(name: String): Boolean {
+    val n = name.lowercase()
+    return COUNTABLE_NAME_HINTS.any { it in n }
+}
+
+private fun normalizeUnit(raw: String, nameHint: String = ""): String {
+    if (raw.isBlank()) {
+        // "2 Hähnchenbrüste" / "1 Schalotte" → Stück, nicht fälschlich g
+        return if (isCountableName(nameHint)) "Stück" else "g"
+    }
     return UNIT_ALIASES[raw.trim().lowercase()] ?: raw.trim()
 }
 
@@ -199,10 +218,11 @@ private fun parseIngredientLine(line: String): ParsedIngredient {
     val trimmed = line.trimStart('•', '-', ' ', '*')
     val m = INGREDIENT_AMOUNT_REGEX.find(trimmed)
     if (m != null) {
+        val name = cleanIngredientName(m.groupValues[3])
         return ParsedIngredient(
             amount = parseAmountToken(m.groupValues[1]),
-            unit = normalizeUnit(m.groupValues[2]),
-            name = cleanIngredientName(m.groupValues[3])
+            unit = normalizeUnit(m.groupValues[2], name),
+            name = name
         )
     }
     val loose = Regex(
@@ -210,10 +230,24 @@ private fun parseIngredientLine(line: String): ParsedIngredient {
         RegexOption.IGNORE_CASE
     ).find(trimmed)
     if (loose != null) {
+        val name = cleanIngredientName(loose.groupValues[3])
         return ParsedIngredient(
             amount = loose.groupValues[1].replace(',', '.'),
-            unit = normalizeUnit(loose.groupValues[2]),
-            name = cleanIngredientName(loose.groupValues[3])
+            unit = normalizeUnit(loose.groupValues[2], name),
+            name = name
+        )
+    }
+    // "2 chicken breasts" ohne erkannte Einheit (Regex braucht oft Whitespace+Name)
+    val countOnly = Regex(
+        """^(\d+(?:[.,]\d+)?)\s+(.+)$"""
+    ).find(trimmed)
+    if (countOnly != null) {
+        val name = cleanIngredientName(countOnly.groupValues[2])
+        val unit = if (isCountableName(name)) "Stück" else "g"
+        return ParsedIngredient(
+            amount = countOnly.groupValues[1].replace(',', '.'),
+            unit = unit,
+            name = name
         )
     }
     return ParsedIngredient(amount = "", unit = "g", name = cleanIngredientName(trimmed))
@@ -221,8 +255,8 @@ private fun parseIngredientLine(line: String): ParsedIngredient {
 
 private fun joinIngredientLine(parsed: ParsedIngredient): String {
     val amt = parsed.amount.trim()
-    val unit = normalizeUnit(parsed.unit)
     val name = cleanIngredientName(parsed.name)
+    val unit = normalizeUnit(parsed.unit, name)
     return if (amt.isNotBlank()) "$amt $unit $name" else name
 }
 

@@ -175,13 +175,19 @@ object RecipeNutritionAnalyzer {
     private val COUNT_WEIGHTS = mapOf(
         "eggs" to 55f, "egg" to 55f, "ei" to 55f, "eier" to 55f,
         "onion" to 110f, "zwiebel" to 110f, "zwiebeln" to 110f,
-        "garlic" to 3f, "knoblauch" to 3f, "clove" to 3f,
+        "garlic" to 3f, "knoblauch" to 3f, "clove" to 3f, "cloves" to 3f,
         "lime" to 60f, "lemon" to 80f, "zitrone" to 80f,
         "tomato" to 120f, "tomate" to 120f,
         "potato" to 150f, "kartoffel" to 150f,
         "avocado" to 150f, "banana" to 120f, "banane" to 120f,
-        "scharlotte" to 80f, "schalotte" to 80f, "knoblauchzehe" to 3f,
-        "knoblauchzehen" to 3f,
+        "scharlotte" to 80f, "schalotte" to 80f, "shallot" to 40f, "shallots" to 40f,
+        "knoblauchzehe" to 3f, "knoblauchzehen" to 3f,
+        // Hähnchenbrust: typisch ~150–200 g roh pro Stück
+        "chicken breast" to 180f, "chicken breasts" to 180f,
+        "hähnchenbrust" to 180f, "haehnchenbrust" to 180f,
+        "hühnerbrust" to 180f, "brustfilet" to 180f,
+        "breast" to 180f, "breasts" to 180f,
+        "thigh" to 120f, "thighs" to 120f, "schenkel" to 120f,
         "stange" to 200f, "porree" to 200f, "lauch" to 200f,
         "packung" to 150f, "pack" to 150f, "dose" to 200f,
         "bund" to 50f, "scheibe" to 25f, "scheiben" to 25f
