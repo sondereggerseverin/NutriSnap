@@ -31,6 +31,7 @@ import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_RECIPE_MENU
 import ch.nutrisnap.app.ui.theme.MacroColors
 import ch.nutrisnap.app.ui.theme.NutriRadius
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 
 /** Portionen, die man aus der Liste tracken will (nicht recipe.servings!). */
 private val PORTION_STEPS = listOf(1f, 1.5f, 2f, 3f)
@@ -487,6 +488,7 @@ fun RecipeCardImage(recipe: Recipe, modifier: Modifier = Modifier) {
     var loadFailed by remember(recipe.imageUrl) { mutableStateOf(false) }
     val url = recipe.imageUrl
     val showImage = !url.isNullOrBlank() && !loadFailed
+    val context = LocalContext.current
 
     Box(
         modifier = modifier
@@ -494,11 +496,17 @@ fun RecipeCardImage(recipe: Recipe, modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center
     ) {
         if (showImage) {
+            // Thumbnails auf ~400px begrenzen – volle Rezeptfotos sonst zu teuer fürs Grid
+            val data: Any = if (url.startsWith("file://") || (url.startsWith("/") && !url.startsWith("http"))) {
+                val f = java.io.File(url.removePrefix("file://"))
+                if (f.exists()) f else url
+            } else url
             AsyncImage(
-                model = if (url.startsWith("file://") || (url.startsWith("/") && !url.startsWith("http"))) {
-                    val f = java.io.File(url.removePrefix("file://"))
-                    if (f.exists()) f else url
-                } else url,
+                model = ImageRequest.Builder(context)
+                    .data(data)
+                    .size(400)
+                    .crossfade(false)
+                    .build(),
                 contentDescription = recipe.title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),

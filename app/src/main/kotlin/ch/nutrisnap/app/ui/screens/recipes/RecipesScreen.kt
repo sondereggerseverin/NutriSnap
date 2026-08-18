@@ -358,7 +358,9 @@ fun RecipesScreen(
             }
         }
     ) { padding ->
-        Column(Modifier.padding(padding)) {
+        // fillMaxSize + weight(1f) am Grid/List: sonst misst Column die Lazy-Liste
+        // mit unbounded height → alle 251 Items werden gemessen → ANR in RectList/MeasureAndLayout.
+        Column(Modifier.fillMaxSize().padding(padding)) {
             // Kompakte Suche (ohne Label → weniger Höhe)
             Row(
                 Modifier
@@ -553,7 +555,7 @@ fun RecipesScreen(
                     ),
                     horizontalArrangement = Arrangement.spacedBy(if (window.isTablet) 12.dp else 8.dp),
                     verticalArrangement = Arrangement.spacedBy(if (window.isTablet) 12.dp else 8.dp),
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.weight(1f).fillMaxWidth()
                 ) {
                     gridItems(displayedRecipes, key = { it.id }) { recipe ->
                         RecipeGridCard(
@@ -574,7 +576,7 @@ fun RecipesScreen(
                     contentPadding = PaddingValues(start = listPadH, end = listPadH, top = 6.dp, bottom = 80.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.weight(1f).fillMaxWidth()
                 ) {
                     items(displayedRecipes, key = { it.id }) { recipe ->
                         if (recipe.isIncomplete()) {
