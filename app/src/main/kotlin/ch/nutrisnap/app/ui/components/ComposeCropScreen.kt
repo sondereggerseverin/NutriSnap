@@ -261,7 +261,11 @@ fun ComposeCropScreen(
                         val out = withContext(Dispatchers.IO) {
                             runCatching {
                                 val cropped = cropNormalized(src, l, t, r, b)
-                                val outFile = File(context.cacheDir, "crop_${System.currentTimeMillis()}.jpg")
+                                // Persistenter Ordner statt cacheDir – die OS kann den Cache jederzeit
+                                // leeren, wodurch das Rezeptfoto verschwindet (imageUrl zeigt dann ins Leere).
+                                // Gleicher Ort wie ZenMuxImageService, damit KI- und eigene Fotos konsistent liegen.
+                                val outDir = File(context.filesDir, "recipe_images").apply { mkdirs() }
+                                val outFile = File(outDir, "crop_${System.currentTimeMillis()}.jpg")
                                 FileOutputStream(outFile).use { fos ->
                                     cropped.compress(Bitmap.CompressFormat.JPEG, 88, fos)
                                 }
