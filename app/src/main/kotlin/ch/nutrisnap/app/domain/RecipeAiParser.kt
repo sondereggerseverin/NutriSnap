@@ -176,8 +176,11 @@ object RecipeAiParser {
         t = splitInlineIngredients(t)
         // Ab erstem echten Methodenschritt abschneiden (falls Zutaten+Schritte gemischt)
         t = cutOffInstructions(t)
-        return t.lines()
+        // Zeilen, die noch mehrere Mengen tragen, nochmal aufsplitten
+        val expanded = t.lines().flatMap { expandMultiIngredientLine(it) }
+        return expanded
             .map { it.trim().trimStart('•', '-', '*', ' ').trim() }
+            .flatMap { splitHeaderFromFirstItem(it) }
             .filter { it.isNotBlank() && !isJunkIngredientLine(it) }
             .map { cleanIngredientLineNoise(it) }
             .filter { it.isNotBlank() }
@@ -187,11 +190,73 @@ object RecipeAiParser {
             }
     }
 
+    /**
+     * "For the chicken: 2 chicken breasts" → Header + eigene Zutatenzeile.
+     * Verhindert, dass die erste Zutat im Abschnittsnamen landet.
+     */
+    private fun splitHeaderFromFirstItem(line: String): List<String> {
+        val d = line.trim()
+        // "For the chicken: 2 chicken breasts" / "Für die Sauce: 1 Schalotte …"
+        val m = Regex(
+            """^(For the\s+[^:]{2,40}|Für\s+(?:die|den|das)\s+[^:]{2,40}|Served with|Dazu|Beilage)\s*:\s+(.+)$""",
+            RegexOption.IGNORE_CASE
+        ).matchEntire(d) ?: return listOf(d)
+        val header = m.groupValues[1].trim()
+        val rest = m.groupValues[2].trim()
+        if (rest.isBlank()) return listOf(header)
+        // Rest kann noch mehrere Zutaten enthalten
+        return listOf(header) + expandMultiIngredientLine(rest)
+    }
+
+    /**
+     * Eine Zeile mit mehreren Mengen (z.B. "1 tsp oil 1 tsp paprika 1 tsp oregano")
+     * in Einzelzutaten zerlegen.
+     */
+    private fun expandMultiIngredientLine(line: String): List<String> {
+        val d = line.trim().trimStart('•', '-', '*', ' ').trim()
+        if (d.isBlank() || isSectionHeaderLine(d)) return listOf(d)
+        // Schon sauber: nur eine Mengenangabe
+        val unit = """g|kg|ml|l|EL|TL|Tsp|Tbsp|tsp|tbsp|cup|cups|oz|lb|Stück|Stk|pcs|Prise|Tasse|clove|cloves"""
+        val qtyPattern = Regex(
+            """(?i)(\d+[.,]?\d*|\d+/\d+|¼|½|¾|⅓|⅔)\s*($unit)\b"""
+        )
+        val hits = qtyPattern.findAll(d).toList()
+        if (hits.size <= 1) {
+            // Zählzutaten ohne Einheit: "2 chicken breasts" / "2 garlic cloves"
+            val countHits = Regex(
+                """(?i)(?<=^|\s)(\d+)\s+(chicken|hähnchen|haehnchen|breast|breasts|egg|eggs|ei|eier|onion|zwiebel|shallot|schalotte|clove|cloves|zehe|tomato|tomate|potato|kartoffel)\b"""
+            ).findAll(d).toList()
+            if (countHits.size <= 1) return listOf(d)
+        }
+        // An jeder Mengen-Position splitten (ab dem 2. Treffer)
+        val splitPoints = qtyPattern.findAll(d).map { it.range.first }.toList()
+        if (splitPoints.size <= 1) return listOf(d)
+        val parts = mutableListOf<String>()
+        for (i in splitPoints.indices) {
+            val start = splitPoints[i]
+            val end = splitPoints.getOrNull(i + 1) ?: d.length
+            val part = d.substring(start, end).trim().trimEnd(',', ';')
+            if (part.isNotBlank()) parts += part
+        }
+        // Text vor der ersten Menge (selten) an erste Zutat hängen oder verwerfen
+        if (splitPoints.first() > 0) {
+            val prefix = d.substring(0, splitPoints.first()).trim()
+            if (prefix.isNotBlank() && prefix.length < 40 && !isSectionHeaderLine(prefix)) {
+                // Präfix ist eher Rauschen (z.B. "and") — weglassen
+            }
+        }
+        return parts.ifEmpty { listOf(d) }
+    }
+
     /** Makros, Methodenschritte, Promo, leere Meta-Zeilen — keine Zutaten. */
     fun isJunkIngredientLine(line: String): Boolean {
         val d = line.trim().trimStart('•', '-', '*', ' ').trim()
         if (d.isBlank()) return true
         val lower = d.lowercase()
+        // Meta-Zeilen wie "Ingredients (serves 2):"
+        if (Regex("""^(ingredients?|zutaten)\s*(\(|$|for\s+\d|serves?)""", RegexOption.IGNORE_CASE)
+                .containsMatchIn(d) && !Regex("""\d+\s*(g|ml|tsp|tbsp)""", RegexOption.IGNORE_CASE).containsMatchIn(d)
+        ) return true
         // Makro-Zusammenfassungen: "265 kcals | P:", "39g | C:", "20g | F:", "5g per cup"
         if (Regex(
                 """^\d+[.,]?\d*\s*(kcals?|calories?|kcal)\b""",
@@ -201,15 +266,31 @@ object RecipeAiParser {
         if (Regex("""^\d+[.,]?\d*\s*g\s*[|/:]\s*[pcf]\b""", RegexOption.IGNORE_CASE).containsMatchIn(d)) return true
         if (Regex("""^\d+[.,]?\d*\s*g\s*per\s+(cup|serving|portion)""", RegexOption.IGNORE_CASE).containsMatchIn(d)) return true
         if (Regex("""^[pcf]\s*:\s*$""", RegexOption.IGNORE_CASE).containsMatchIn(d)) return true
+        // Prosa / Zubereitungsschritte
+        if (lower.startsWith("firstly") || lower.startsWith("first,") ||
+            lower.startsWith("next,") || lower.startsWith("next ") ||
+            lower.startsWith("then ") || lower.startsWith("then,") ||
+            lower.startsWith("in the meantime") || lower.startsWith("meanwhile") ||
+            lower.startsWith("serve up") || lower.startsWith("serve with") ||
+            lower.startsWith("enjoy") || lower.startsWith("once ") ||
+            lower.startsWith("after ") || lower.startsWith("while ")
+        ) return true
         // Nummerierte Zubereitungsschritte
         if (Regex("""^\d+[.)]\s+\p{L}""").containsMatchIn(d) &&
             Regex(
-                """\b(mix|add|stir|pour|bake|cook|heat|divide|refrigerate|spoon|blend|whisk|fold|spread|save|method)\b""",
+                """\b(mix|add|stir|pour|bake|cook|heat|divide|refrigerate|spoon|blend|whisk|fold|spread|save|method|season|fry|simmer)\b""",
                 RegexOption.IGNORE_CASE
             ).containsMatchIn(d)
         ) return true
         if (lower == "method" || lower.startsWith("method ") || lower == "zubereitung" ||
             lower.startsWith("instructions") || lower.startsWith("directions")
+        ) return true
+        // Lange Sätze mit mehreren Kochverben → Anleitung, keine Zutat
+        if (d.length > 90 &&
+            Regex(
+                """\b(mix|stir|cook|bake|fry|simmer|season|until|minutes|mins)\b""",
+                RegexOption.IGNORE_CASE
+            ).findAll(d).count() >= 2
         ) return true
         // Social / Promo
         if (lower.startsWith("save this") || lower.startsWith("comment ") ||
@@ -219,6 +300,8 @@ object RecipeAiParser {
         // Reine Hashtag-/Code-Zeilen
         if (d.startsWith("@") && d.length < 40) return true
         if (!d.any { it.isLetter() }) return true
+        // Orphan-Klammernreste wie "20g)" von "(about 20g)"
+        if (Regex("""^\d+[.,]?\d*\s*g\s*\)?\s*$""", RegexOption.IGNORE_CASE).matches(d)) return true
         return false
     }
 
@@ -227,7 +310,11 @@ object RecipeAiParser {
         var s = line
         s = s.replace(Regex("""@\w+"""), "").trim()
         // "40g Haferflocken Mehl (80 g )" → erste Menge behalten, Klammer-Menge weg
-        s = s.replace(Regex("""\s*\(\s*\d+[.,]?\d*\s*g\s*\)\s*""", RegexOption.IGNORE_CASE), " ").trim()
+        // Aber "(about 20g)" / "(optional)" behalten wir sinnvoll:
+        // Nur doppelte Gramm-Klammern am Ende entfernen wenn schon eine Menge am Anfang steht
+        if (Regex("""^\d+[.,]?\d*\s*g\b""", RegexOption.IGNORE_CASE).containsMatchIn(s)) {
+            s = s.replace(Regex("""\s*\(\s*\d+[.,]?\d*\s*g\s*\)\s*$""", RegexOption.IGNORE_CASE), " ").trim()
+        }
         s = s.replace(Regex("""\s{2,}"""), " ").trim()
         return s.trimEnd(':', ',', ';', ' ')
     }
@@ -240,11 +327,21 @@ object RecipeAiParser {
             val lower = d.lowercase()
             lower == "method" || lower == "zubereitung" || lower == "instructions" ||
                 lower == "directions" || lower == "preparation" ||
+                lower.startsWith("firstly") || lower.startsWith("first,") ||
+                lower.startsWith("next,") || lower.startsWith("in the meantime") ||
+                lower.startsWith("meanwhile") ||
+                (lower.startsWith("then ") && d.length > 40) ||
                 (Regex("""^\d+[.)]\s+""").containsMatchIn(d) &&
                     Regex(
-                        """\b(mix|add|stir|pour|bake|cook|heat|divide|refrigerate|spoon|blend)\b""",
+                        """\b(mix|add|stir|pour|bake|cook|heat|divide|refrigerate|spoon|blend|season|fry|simmer)\b""",
                         RegexOption.IGNORE_CASE
-                    ).containsMatchIn(d))
+                    ).containsMatchIn(d)) ||
+                // Langer Prosa-Absatz mit mehreren Kochverben
+                (d.length > 100 &&
+                    Regex(
+                        """\b(mix|stir|cook|fry|simmer|season|until|minutes)\b""",
+                        RegexOption.IGNORE_CASE
+                    ).findAll(d).count() >= 2)
         }.takeIf { it > 0 } ?: return text
         return lines.take(cut).joinToString("\n")
     }
@@ -285,11 +382,21 @@ object RecipeAiParser {
         val d = line.trim().trimStart('•', '-', '*', ' ').trim()
         if (d.length < 3) return false
         val lower = d.lowercase()
-        if (lower.startsWith("für ") || lower.startsWith("for ") ||
-            lower.startsWith("ingredients") || lower.startsWith("zutaten")
-        ) return true
+        // Explizite Abschnitts-Marker
+        if (lower.startsWith("für ") || lower.startsWith("for the ") || lower.startsWith("for ") ||
+            lower.startsWith("served with") || lower.startsWith("dazu") ||
+            lower.startsWith("beilage") || lower.startsWith("sauce") ||
+            lower.startsWith("marinade") || lower.startsWith("topping") ||
+            lower.startsWith("dressing") || lower.startsWith("garnish")
+        ) {
+            // "For the chicken: 2 breasts" ist KEIN reiner Header — splitHeaderFromFirstItem
+            // kümmert sich darum. Hier true, damit die Zeile als Header-Kandidat gilt.
+            return true
+        }
+        // "Ingredients (serves 2)" / "Zutaten für 4" = Meta, kein Abschnittsname für Split
+        if (lower.startsWith("ingredients") || lower.startsWith("zutaten")) return true
         // Kurzer Titel ohne Menge
-        if (Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tsp|tbsp)\b""", RegexOption.IGNORE_CASE)
+        if (Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tsp|tbsp|cup|oz)\b""", RegexOption.IGNORE_CASE)
                 .containsMatchIn(d)
         ) return false
         if (d.first().isDigit()) return false
@@ -307,25 +414,33 @@ object RecipeAiParser {
         // Abschnitts-Marker (Wortanfang, damit "for" in "Ingredients for" nicht splitet)
         c = c.replace(
             Regex(
-                """(?<=\S)\s*(?=(?:Für\s+\p{L}|For the\s+\p{L}|Charred\s+\p{L}|Hot Honig\s+\p{L}|Hot Honey\s+\p{L}|Ingredients for\s+\d|Zutaten(?:\s+für)?\s+\p{L}))""",
+                """(?<=\S)\s*(?=(?:Für\s+(?:die|den|das)\s+\p{L}|Für\s+\p{L}|For the\s+\p{L}|Served with|Dazu\b|Beilage\b|Charred\s+\p{L}|Hot Honig\s+\p{L}|Hot Honey\s+\p{L}|Ingredients for\s+\d|Zutaten(?:\s+für)?\s+\p{L}))""",
                 RegexOption.IGNORE_CASE
+            ),
+            "\n"
+        )
+        // "For the chicken:" / "Für die Sauce:" am Zeilenanfang oder nach Text — eigene Zeile
+        c = c.replace(
+            Regex(
+                """(?i)(?<=\S)\s*(?=(?:For the\s+[^:\n]{2,30}|Für\s+(?:die|den|das)\s+[^:\n]{2,30})\s*:)"""
             ),
             "\n"
         )
         // Vor Mengen: 600g / 15 ml / 1 Tsp / 2 Tbsp / 76.5 g / 1/2 Limette
-        val unit = """g|kg|ml|l|EL|TL|Tsp|Tbsp|tsp|tbsp|cup|cups|oz|lb|Stück|Stk|pcs|Prise|Tasse"""
-        // Nach Buchstabe/Klammer → neue Menge mit Einheit
+        // Nicht splitten bei "(about 20g)" / "(optional)" — negative Lookbehind auf "("
+        val unit = """g|kg|ml|l|EL|TL|Tsp|Tbsp|tsp|tbsp|cup|cups|oz|lb|Stück|Stk|pcs|Prise|Tasse|clove|cloves"""
+        // Nach Buchstabe → neue Menge mit Einheit (nicht nach "about"/"ca." in Klammern)
         c = c.replace(
             Regex(
-                """(?<=[a-zäöüßA-ZÄÖÜ)])\s+(?=(\d+[.,]?\d*|\d+/\d+)\s*($unit)\b)""",
+                """(?<=[a-zäöüßA-ZÄÖÜ)])\s+(?=(?!about\b|ca\.?\b|approx)(\d+[.,]?\d*|\d+/\d+|¼|½|¾)\s*($unit)\b)""",
                 RegexOption.IGNORE_CASE
             ),
             "\n"
         )
-        // Nach Nicht-Ziffer vor Menge mit Einheit (Emoji etc.)
+        // Nach Nicht-Ziffer vor Menge mit Einheit (Emoji etc.), nicht in Klammern
         c = c.replace(
             Regex(
-                """(?<=[^\d\s.,/])\s+(?=(\d+[.,]?\d*|\d+/\d+)\s*($unit)\b)""",
+                """(?<=[^\d\s.,/(])\s+(?=(\d+[.,]?\d*|\d+/\d+|¼|½|¾)\s*($unit)\b)""",
                 RegexOption.IGNORE_CASE
             ),
             "\n"
@@ -335,9 +450,22 @@ object RecipeAiParser {
             Regex("""(?<=[^\d\s.,/])\s+(?=\d+/\d+\s+\p{L})"""),
             "\n"
         )
-        // Newlines vor "Ingredients for N servings"
+        // Zählzutaten: "2 chicken breasts", "2 garlic cloves"
         c = c.replace(
-            Regex("""(?i)(?<=\S)\s*(?=Ingredients\s+for\s+\d+)"""),
+            Regex(
+                """(?<=[a-zäöüßA-ZÄÖÜ)])\s+(?=(\d+)\s+(?:chicken|hähnchen|haehnchen|breast|breasts|egg|eggs|ei|eier|onion|zwiebel|shallot|schalotte|garlic|knoblauch|clove|cloves|tomato|tomate)\b)""",
+                RegexOption.IGNORE_CASE
+            ),
+            "\n"
+        )
+        // Newlines vor "Ingredients for N servings" / "Ingredients (serves 2)"
+        c = c.replace(
+            Regex("""(?i)(?<=\S)\s*(?=Ingredients\s*(\(|for\s+\d|serves?))"""),
+            "\n"
+        )
+        // Prosa-Start: "Firstly," / "Next," → eigene Zeile (cutOffInstructions greift danach)
+        c = c.replace(
+            Regex("""(?i)(?<=\S)\s*(?=(?:Firstly|First,|Next,|In the meantime|Meanwhile|Then season|Then add|Then fry)\b)"""),
             "\n"
         )
         return c
@@ -351,13 +479,20 @@ object RecipeAiParser {
         val cleaned = cleanCaption(caption)
         val lines   = cleaned.lines().map { it.trim() }.filter { it.isNotBlank() }
         return lines.firstOrNull { line ->
+            val lower = line.lowercase()
             line.length > 3 &&
             line.any { it.isLetter() } &&
             !line.startsWith("#") &&
             !Regex("""^\d+[.,]?\d*\s*[KkMm]?\s*(likes?|comments?|followers|views)""", RegexOption.IGNORE_CASE).containsMatchIn(line) &&
             !Regex("""^\d{4}-\d{2}-\d{2}""").containsMatchIn(line) &&
-            !line.lowercase().startsWith("zutaten") &&
-            !line.lowercase().startsWith("zubereitung")
+            !lower.startsWith("zutaten") &&
+            !lower.startsWith("ingredients") &&
+            !lower.startsWith("zubereitung") &&
+            !lower.startsWith("for the ") &&
+            !lower.startsWith("für ") &&
+            !lower.startsWith("method") &&
+            !lower.startsWith("instructions") &&
+            !lower.startsWith("served with")
         }?.take(80) ?: fallback
     }
 
@@ -386,17 +521,19 @@ Respond ONLY with valid JSON matching this exact schema — no markdown, no expl
 }
 Rules:
 - title: Extract the DISH NAME ONLY. Rules in priority order:
-  1. If caption contains a line that IS clearly a food/dish name (e.g. "High Protein Pasta Salad", "Butter Chicken Burritos"), use that
+  1. If caption contains a line that IS clearly a food/dish name (e.g. "High Protein Pasta Salad", "Butter Chicken Burritos", "Marry Me Chicken"), use that
   2. If caption starts with descriptive text ("Wirklich ausgezeichnet...", "This is amazing..."), look for a dish name LATER in the caption near the ingredient list
-  3. NEVER use: likes/comments counts, usernames, dates, hashtags, promotional text, generic phrases like "Check this out"
+  3. NEVER use: likes/comments counts, usernames, dates, hashtags, promotional text, "Ingredients (serves N)", "For the chicken", generic phrases like "Check this out"
   4. If truly no dish name exists, construct one from the main ingredients (e.g. "Pasta Salat mit Thunfisch")
-- servings: extract the number of PORTIONS/SERVINGS this recipe makes. Look for "Makes X", "Ergibt X", "für X Personen", "X Portionen". If the caption says "Per Burrito" or "Per Serving" that means 1 serving in the macros. Default to 1 if unclear, NOT a random number.
-- ingredient_sections: group by section headers (e.g. "Marinade", "Sauce", "Topping", "Ganache"). Items separated by "-", "•", "*", or newlines. If no sections, use one section named "".
-- CRITICAL: Each ingredient item must be ONE ingredient only (e.g. "200g Hähnchenbrust"), NOT a full sentence or instruction.
-- NEVER put into ingredient items: macro summaries ("265 kcals", "39g | P", "20g | C", "5g per cup"), numbered method steps ("1. Mix…"), hashtags, @mentions, "Method", "Zubereitung", promo ("Save this", "link in bio").
-- Prefer lines that look like "40g oat flour", "250g Greek yoghurt" over any surrounding caption noise.
+- servings: extract the number of PORTIONS/SERVINGS this recipe makes. Look for "Makes X", "Ergibt X", "serves X", "für X Personen", "X Portionen". If the caption says "Per Burrito" or "Per Serving" that means 1 serving in the macros. Default to 1 if unclear, NOT a random number.
+- ingredient_sections: group by section headers exactly as written (e.g. "For the chicken", "For the sauce", "Served with", "Marinade", "Topping"). Items separated by "-", "•", "*", or newlines. If no sections, use one section named "".
+- CRITICAL: Each ingredient item must be ONE ingredient only (e.g. "2 chicken breasts", "1 tsp olive oil", "150ml chicken stock") — NEVER merge multiple ingredients into one string.
+- CRITICAL: Section headers must NOT include the first ingredient. Wrong: "For the chicken: 2 chicken breasts". Right: section_name="For the chicken", items=["2 chicken breasts", ...].
+- NEVER put into ingredient items: cooking instructions ("Firstly, season…", "Next, fry…", "In the meantime…"), macro summaries ("265 kcals", "39g | P"), numbered method steps ("1. Mix…"), hashtags, @mentions, "Method", "Zubereitung", promo ("Save this", "link in bio"), "Ingredients (serves 2)".
+- "Served with: Mashed potato / broccoli" → own section "Served with" with those items — they are sides, not instructions.
+- Prefer lines that look like "40g oat flour", "1 tsp oregano", "2 chicken breasts" over any surrounding caption noise.
 - calories_per_serving / protein_g / carbs_g / fat_g: extract PER SERVING values if mentioned, else null
-- instructions: numbered cooking steps only. No ingredient lists, no hashtags, no promo lines. null if not present.
+- instructions: cooking steps only (Firstly… / Next… / numbered). No ingredient lists, no hashtags, no promo lines. null if not present.
 - tags: comma-separated, max 5, lowercase
 - All numeric fields must be numbers (not strings), null if unknown
 - Ignore: "Comment X for...", "DM me for...", "Link in bio", hashtags, storage/heating tips unless they are actual steps
@@ -596,9 +733,11 @@ Rules:
             .find(cleaned)?.groupValues?.get(1)?.toFloatOrNull()
 
         val instrKw = listOf("zubereitung", "anleitung", "zubereiten", "preparation",
-            "method", "instructions", "directions", "steps", "how to make", "how to:")
+            "method", "instructions", "directions", "steps", "how to make", "how to:",
+            "firstly", "first,", "next,", "in the meantime", "meanwhile")
         val ingrKw  = listOf("zutaten", "ingredients", "du brauchst", "you need",
-            "what you need", "you will need", "ingredients:", "what you'll need")
+            "what you need", "you will need", "ingredients:", "what you'll need",
+            "ingredients (serves")
 
         val instrIdx = instrKw.firstNotNullOfOrNull { lower.indexOf(it).takeIf { i -> i > 0 } }
         val ingrIdx  = ingrKw.firstNotNullOfOrNull  { lower.indexOf(it).takeIf { i -> i >= 0 } }
