@@ -199,8 +199,10 @@ object RecipeNutritionAnalyzer {
             "note:", "hinweis", "tip:", "tipp:", "#", "http", "www.", "@",
             "comment", "kommentar", "dm me", "link in bio", "per serving", "pro portion",
             "gesamtnährwerte", "total nutrition", "kcal:", "kalorien:", "calories:",
-            "fett:", "protein:", "kohlenhydrate:", "for the", "für die", "für den",
-            "sauce:", "dressing:", "topping:", "marinade:", "das rezept")
+            "fett:", "protein:", "kohlenhydrate:", "for the", "für die", "für den", "für das",
+            "für hähnchen", "für haehnchen", "für sauce", "für soße", "für sosse",
+            "sauce:", "dressing:", "topping:", "marinade:", "das rezept",
+            "ingredients", "zutaten", "served with", "serviert mit")
         if (skipPrefixes.any { lc.startsWith(it) }) return false
 
         // Filter pure macro lines: "292 kcal", "6g Fett", "11g KH", "47g Protein", "Fett: 56g"
@@ -246,7 +248,18 @@ object RecipeNutritionAnalyzer {
     )
 
     fun parseIngredientLine(line: String): ParsedIngredient? {
-        val clean = line.trimStart('*', '-', '\u2022', '\u00b7', ' ').trim()
+        var clean = line.trimStart('*', '-', '\u2022', '\u00b7', ' ').trim()
+        if (clean.isBlank() || clean.length < 2) return null
+        // Abschnittspräfix abschneiden: "Für die Sauce: 1 Schalotte" → "1 Schalotte"
+        clean = clean.replace(
+            Regex(
+                """(?i)^(für\s+(die\s+|den\s+|das\s+)?|for\s+(the\s+)?)""" +
+                    """(hähnchen|haehnchen|chicken|sauce|soße|sosse|marinade|dressing|""" +
+                    """topping|teig|base|füllung|fuellung|beilage)""" +
+                    """\s*[:：\-]\s*"""
+            ),
+            ""
+        ).trim()
         if (clean.isBlank() || clean.length < 2) return null
 
         // "150-200 ml Wasser" / "150 – 200 ml" → Mittelwert + Einheit

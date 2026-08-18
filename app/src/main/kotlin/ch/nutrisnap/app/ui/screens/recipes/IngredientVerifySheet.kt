@@ -257,14 +257,38 @@ fun computeVerifiedTotals(states: List<IngredientVerifyState>): VerifiedTotals {
 }
 
 /** Anzeigetext: aktuelle Menge + Rezeptname (DE), nicht OFF/Scan-Produktname (oft FR/EN). */
-fun formatVerifyLineTitle(state: IngredientVerifyState): String {
+/**
+ * Menge + Name getrennt – für tabellarische Verify-Zeilen.
+ * Entfernt Abschnittsköpfe ("Für die Sauce:", "For the chicken:") und Roh-Mengenpräfixe.
+ */
+data class VerifyLineParts(val amountLabel: String, val name: String)
+
+fun formatVerifyLineParts(state: IngredientVerifyState): VerifyLineParts {
     val g = state.effectiveAmountG
-    val amountStr = if (g >= 10f) "${g.toInt()} g" else "${"%.1f".format(g)} g"
+    val amountStr = when {
+        !g.isFinite() || g <= 0f -> "–"
+        g >= 10f -> "${g.toInt()} g"
+        else -> "${"%.1f".format(g)} g"
+    }
     fun clean(raw: String): String = raw
-        .trimStart('•', '-', ' ', '➕')
+        .trimStart('•', '-', '*', '·', ' ', '➕')
         .replace(Regex("""^added_\d+_"""), "")
         .replace(Regex("""\s*\(\d{10,}\)"""), "")
-        .replace(Regex("""(?i)^\d+([.,]\d+)?\s*(g|ml|kg|el|tl|cup|tbsp|tsp)?\s+"""), "")
+        // Abschnittsköpfe, die fälschlich in den Zutatennamen gerutscht sind
+        .replace(
+            Regex(
+                """(?i)^(für\s+(die\s+)?|for\s+(the\s+)?)""" +
+                    """(hähnchen|haehnchen|chicken|sauce|soße|sosse|marinade|dressing|""" +
+                    """topping|teig|base|füllung|fuellung|beilage|gemüse|gemuese|reis|nudeln)""" +
+                    """\s*[:：\-]\s*"""
+            ),
+            ""
+        )
+        .replace(Regex("""(?i)^ingredients?\s*(\([^)]*\))?\s*:?\s*"""), "")
+        .replace(Regex("""(?i)^zutaten\s*(\([^)]*\))?\s*:?\s*"""), "")
+        .replace(Regex("""(?i)^\d+([.,]\d+)?\s*(g|ml|kg|el|tl|cup|tbsp|tsp|oz)\s+"""), "")
+        .trim()
+        .trimStart(':', '–', '-', ' ')
         .trim()
 
     val fromParsed = state.result.parsed?.name?.takeIf { it.isNotBlank() }?.let { clean(it) }
@@ -278,7 +302,12 @@ fun formatVerifyLineTitle(state: IngredientVerifyState): String {
         !fromFood.isNullOrBlank() -> fromFood
         else -> clean(state.result.line).ifBlank { state.result.line.trim() }
     }
-    return "$amountStr $name"
+    return VerifyLineParts(amountStr, name)
+}
+
+fun formatVerifyLineTitle(state: IngredientVerifyState): String {
+    val p = formatVerifyLineParts(state)
+    return "${p.amountLabel} ${p.name}".trim()
 }
 
 // ── Main Sheet ────────────────────────────────────────────────────────────────
@@ -644,6 +673,40 @@ fun IngredientVerifySheet(
             }
 
             // ── Zutaten (flach, ohne Beilage/Sauce) ─────────────────────────
+            item {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Spacer(Modifier.size(28.dp))
+                    Text(
+                        "Menge",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.width(56.dp)
+                    )
+                    Text(
+                        "Zutat",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        "kcal",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.width(52.dp)
+                    )
+                    Spacer(Modifier.width(if (readOnly) 18.dp else 46.dp))
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+            }
             // Key muss eindeutig sein: result.line kann doppelt vorkommen
             // (z.B. zweimal „Salz“) → sonst Crash beim Scrollen (LazyColumn).
             itemsIndexed(
@@ -928,25 +991,40 @@ private fun IngredientVerifyRow(
         editingFiber = false
     }
 
+    val parts = formatVerifyLineParts(state)
+    val matchName = state.effectiveFood?.name?.trim().orEmpty()
+    val showMatchSub = when {
+        !isMatched && !isOverride -> true
+        isOverride -> true
+        matchName.isNotBlank() && !matchName.equals(parts.name, ignoreCase = true) -> true
+        else -> false
+    }
+    val matchLabel = when {
+        isOverride -> state.override?.name?.takeIf { it.isNotBlank() }?.let { "✓ $it" } ?: "✓ manuell"
+        isMatched  -> "✓ $matchName"
+        else       -> "Nicht gefunden"
+    }
+
     Column(Modifier.fillMaxWidth()) {
+        // Tabellarische Hauptzeile: Status | Menge | Name | kcal | Aktionen
         Row(
             Modifier
                 .fillMaxWidth()
                 .clickable { onToggleExpand() }
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Status icon
+            // Status
             Box(
                 Modifier
-                    .size(32.dp)
+                    .size(28.dp)
                     .clip(CircleShape)
                     .background(
                         when {
                             isOverride -> Color(0xFF1565C0).copy(alpha = 0.15f)
                             isMatched  -> Color(0xFF2E7D32).copy(alpha = 0.12f)
-                            else       -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
+                            else       -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.45f)
                         }
                     ),
                 contentAlignment = Alignment.Center
@@ -958,7 +1036,7 @@ private fun IngredientVerifyRow(
                         else       -> Icons.Default.QuestionMark
                     },
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(15.dp),
                     tint = when {
                         isOverride -> Color(0xFF1565C0)
                         isMatched  -> Color(0xFF2E7D32)
@@ -967,55 +1045,72 @@ private fun IngredientVerifyRow(
                 )
             }
 
-            // Name + source — effektive Menge (350→450) sofort in der Zeile
+            // Menge (feste Spalte)
+            Text(
+                parts.amountLabel,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.width(56.dp),
+                maxLines = 1
+            )
+
+            // Name + optional Match-Unterzeile
             Column(Modifier.weight(1f)) {
                 Text(
-                    text = formatVerifyLineTitle(state),
+                    text = parts.name,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 2
                 )
-                Text(
-                    text = when {
-                        isOverride -> "✓ ${state.override?.name ?: ""} (gescannt/gesucht)"
-                        isMatched  -> "✓ ${state.effectiveFood?.name ?: "gematcht"}"
-                        else       -> "Nicht gefunden · Tippen für Optionen"
-                    },
-                    fontSize = 11.sp,
-                    color = when {
-                        isOverride -> Color(0xFF1565C0)
-                        isMatched  -> Color(0xFF2E7D32)
-                        else       -> MaterialTheme.colorScheme.error
-                    }
-                )
+                if (showMatchSub) {
+                    Text(
+                        text = matchLabel,
+                        fontSize = 11.sp,
+                        color = when {
+                            isOverride -> Color(0xFF1565C0)
+                            isMatched  -> Color(0xFF2E7D32)
+                            else       -> MaterialTheme.colorScheme.error
+                        },
+                        maxLines = 1
+                    )
+                }
             }
 
-            // Calories + direct scan + chevron
-            Column(horizontalAlignment = Alignment.End) {
-                if (state.effectiveCalories > 0f) {
-                    Text(
-                        "${safeInt(state.effectiveCalories)} kcal",
-                        fontSize = 12.sp, fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Direkter Scan-Zugriff — kein Aufklappen nötig für die genaueste Methode
-                    if (!readOnly) {
-                        IconButton(onClick = onScan, Modifier.size(26.dp)) {
-                            Icon(Icons.Default.QrCodeScanner, "Produkt ändern (Scan/Suche/Manuell)", Modifier.size(15.dp),
-                                tint = MaterialTheme.colorScheme.primary)
-                        }
-                    }
+            // kcal
+            Text(
+                if (state.effectiveCalories > 0f) "${safeInt(state.effectiveCalories)}" else "–",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.width(36.dp),
+                maxLines = 1
+            )
+            Text(
+                "kcal",
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            if (!readOnly) {
+                IconButton(onClick = onScan, Modifier.size(28.dp)) {
                     Icon(
-                        if (showActions) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        null, Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        Icons.Default.QrCodeScanner,
+                        "Produkt ändern",
+                        Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }
+            Icon(
+                if (showActions) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                null,
+                Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
+
 
         // Schnell umhängen: nächste Gruppe in availableGroups
         if (onMoveComponent != null && componentGroup != null && availableGroups.size >= 2) {

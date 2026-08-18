@@ -240,6 +240,9 @@ $userInput
 Extrahiere daraus alle Zutaten und Zubereitungsschritte. Falls Mengenangaben fehlen, schätze realistische Werte.
 Falls kein Rezepttitel erkennbar ist, erfinde einen passenden deutschen Namen.
 Übersetze alles ins Deutsche (auch wenn die Quelle Englisch ist) und verwende metrische Einheiten.
+Abschnittsüberschriften (z.B. "For the chicken", "For the sauce", "Served with") strukturieren nur –
+sie sind keine Zutaten und dürfen nicht in ingredients/structuredIngredients landen.
+Zutaten flach und eindeutig auflisten: eine Zutat pro Eintrag, ohne Abschnittspräfix im Namen.
 """.trimIndent()
         } else {
             "Erstelle ein realistisches Rezept für: $userInput"
@@ -281,6 +284,11 @@ VOLLSTÄNDIGE ZUTATENLISTE (Pflicht):
 - Keine Schritte mit Zutaten, die nicht in structuredIngredients stehen
   (z.B. wenn Schritt „Zwiebel anbraten“ sagt → Zwiebel muss in der Liste sein).
 - Typisches Curry/Pfannengericht: 8–15 Zutatenzeilen, nicht 2–3.
+- Abschnittsköpfe sind KEINE Zutaten: „For the chicken:“, „Für die Sauce:“, „Ingredients (serves 2):“,
+  „Marinade:“, „Dressing:“ usw. niemals als name/amount übernehmen.
+- Jede Zutat als eigene klare Zeile: Menge + deutscher Name (z.B. „2 Hähnchenbrüste“, „1 EL Olivenöl“).
+  Keine Präfixe wie „Für Hähnchen: …“ im Zutatennamen.
+- Keine Duplikate: dieselbe Zutat nur einmal, Mengen zusammenfassen wenn nötig.
 """.trimIndent()
 
     private val NUTRITION_RULES = """
