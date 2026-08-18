@@ -45,9 +45,29 @@ import androidx.core.content.FileProvider
 import com.canhub.cropper.CropImageView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import kotlin.coroutines.resume
+
+/**
+ * Croppt off-Main über die Async-API der Lib (croppedImageAsync +
+ * OnCropImageCompleteListener). Grosse Kamerafotos (12+ MP) brauchen für
+ * Decode/Transform/Skalierung teils mehrere Sekunden – ruft man stattdessen
+ * das synchrone getCroppedImage() auf (auch in einer Coroutine mit
+ * Dispatchers.Main.immediate), blockiert das den Main-Thread und löst einen
+ * ANR aus ("App reagiert nicht").
+ */
+private suspend fun CropImageView.cropAsync(reqWidth: Int, reqHeight: Int): Bitmap? =
+    suspendCancellableCoroutine { cont ->
+        setOnCropImageCompleteListener { _, result ->
+            if (cont.isActive) {
+                cont.resume(if (result.isSuccessful) result.bitmap else null)
+            }
+        }
+        croppedImageAsync(reqWidth = reqWidth, reqHeight = reqHeight)
+    }
 
 /**
  * Eigener Zuschneide-Screen mit **immer sichtbarem** Speichern-Button unten.
@@ -176,11 +196,11 @@ fun ComposeCropScreen(
                     errorText = null
                     scope.launch {
                         val resultUri = runCatching {
-                            // View-Zugriff auf Main; Encode im Hintergrund
-                            val bitmap = withContext(Dispatchers.Main.immediate) {
-                                // Begrenzte Ausgabegröße → weniger RAM, weniger OOM
-                                view.getCroppedImage(1600, 1600) ?: view.getCroppedImage()
-                            } ?: return@runCatching null
+                            // Crop läuft async in der Lib (kein Main-Block, kein ANR)
+                            // Begrenzte Ausgabegröße → weniger RAM, weniger OOM
+                            val bitmap = view.cropAsync(1600, 1600)
+                                ?: view.cropAsync(0, 0)
+                                ?: return@runCatching null
 
                             withContext(Dispatchers.IO) {
                                 val outFile = File(
