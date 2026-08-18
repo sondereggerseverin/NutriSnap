@@ -225,6 +225,13 @@ enum class RecipeCategory(val label: String, val emoji: String) {
     SAUCE("Sauce / Dip", "🫙"),
     OTHER("Sonstiges", "📋");
 
+    /**
+     * Ob dieses Gericht sinnvoll in Beilage / Sauce-Fleisch aufgeteilt werden kann.
+     * Frühstück, Dessert und Getränke sind ein Gericht – nie splitten.
+     */
+    val allowsComponentSplit: Boolean
+        get() = this == MAIN || this == SIDE_SNACK || this == SAUCE || this == OTHER
+
     companion object {
         fun fromStored(value: String?): RecipeCategory {
             if (value.isNullOrBlank()) return OTHER
@@ -248,12 +255,15 @@ enum class RecipeCategory(val label: String, val emoji: String) {
             val dessert = listOf(
                 "dessert", "nachtisch", "kuchen", "brownie", "cookie", "keks", "pudding",
                 "eiscreme", "ice cream", "mousse", "cheesecake", "tiramisu",
-                "schokolade", "chocolate", "muffin", "cupcake", "süßspeise", "suessspeise"
+                "schokolade", "chocolate", "muffin", "cupcake", "süßspeise", "suessspeise",
+                "oreo", "cremefüllung", "cremefuellung", "quarkdessert", "protein pudding",
+                "proteinpudding"
             )
             val breakfast = listOf(
                 "frühstück", "fruehstueck", "breakfast", "overnight", "chia", "porridge",
                 "oats", "haferflocken", "müsli", "muesli", "granola", "pancake", "pfannkuchen",
-                "french toast", "smoothie bowl", "joghurt bowl", "yogurt bowl"
+                "french toast", "smoothie bowl", "joghurt bowl", "yogurt bowl",
+                "magerquark", "skyr", "overnight oats", "haferbrei"
             )
             val drink = listOf("smoothie", "shake", "saft", "juice", "latte", "matcha drink", "protein shake")
             val sauce = listOf("sauce", "soße", "sosse", "dressing", "dip ", "mayo", "pesto")

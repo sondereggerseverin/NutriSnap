@@ -279,18 +279,23 @@ fun IngredientVerifySheet(
     /** Original-Zutaten-Text des Rezepts (für Abschnitts-Header → componentGroup). */
     recipeIngredients: String = "",
     /** Nur ansehen: keine Edits, kein Override-Schreiben, kein Übernehmen. */
-    readOnly: Boolean = false
+    readOnly: Boolean = false,
+    /**
+     * false bei Frühstück/Dessert/Getränk: keine Beilage/Sauce-Zuordnung,
+     * Zutaten bleiben flach (ein Gericht).
+     */
+    allowComponentSplit: Boolean = true
 ) {
     var overrides by remember { mutableStateOf(initialOverrides) }
     var verifyStates by remember {
         mutableStateOf(mergeIngredientOverrides(analysisResult.ingredients, initialOverrides))
     }
     // Abschnitte aus Rezept-Text – Namen 1:1 behalten (kein Collapse auf side/sauce).
-    // side/sauce nur als Fallback, wenn gar keine Abschnitte im Text stehen.
-    val sectionByLine = remember(recipeIngredients) {
+    // side/sauce nur als Fallback, wenn Split erlaubt und keine Abschnitte im Text stehen.
+    val sectionByLine = remember(recipeIngredients, allowComponentSplit) {
         val sections = parseIngredientSections(recipeIngredients)
         val map = mutableMapOf<String, String>()
-        if (sections.size >= 2) {
+        if (allowComponentSplit && sections.size >= 2) {
             for ((sectionName, lines) in sections) {
                 val key = sectionName.trim().ifBlank { "Sonstiges" }
                 for (line in lines) {
@@ -300,28 +305,36 @@ fun IngredientVerifySheet(
         }
         map
     }
-    // Zutat → Abschnittsname | "side" | "sauce"
+    // Zutat → Abschnittsname | "side" | "sauce" | null (kein Split)
     var groups by remember {
         mutableStateOf(
             mergeIngredientOverrides(analysisResult.ingredients, initialOverrides).associate { s ->
                 val line = s.result.line
-                val key = "${s.result.line} ${s.result.parsed?.name.orEmpty()} ${s.effectiveFood?.name.orEmpty()}"
-                val fromSection = sectionByLine.entries.firstOrNull { (k, _) ->
-                    line.lowercase().contains(k) || k.contains(line.lowercase().take(20))
-                }?.value
-                line to (initialOverrides[line]?.componentGroup
-                    ?: fromSection
-                    ?: defaultComponentGroup(key))
+                if (!allowComponentSplit) {
+                    line to null
+                } else {
+                    val key = "${s.result.line} ${s.result.parsed?.name.orEmpty()} ${s.effectiveFood?.name.orEmpty()}"
+                    val fromSection = sectionByLine.entries.firstOrNull { (k, _) ->
+                        line.lowercase().contains(k) || k.contains(line.lowercase().take(20))
+                    }?.value
+                    line to (initialOverrides[line]?.componentGroup
+                        ?: fromSection
+                        ?: defaultComponentGroup(key))
+                }
             }
         )
     }
-    // Verfügbare Gruppen für →-Button: Abschnitte aus Text, sonst side/sauce
-    val availableGroupKeys = remember(sectionByLine, groups) {
-        val fromSections = sectionByLine.values.distinct()
-        when {
-            fromSections.size >= 2 -> fromSections
-            groups.values.distinct().size >= 2 -> groups.values.filterNotNull().distinct()
-            else -> listOf("side", "sauce")
+    // Verfügbare Gruppen für →-Button: Abschnitte aus Text, sonst side/sauce (nur wenn Split erlaubt)
+    val availableGroupKeys = remember(sectionByLine, groups, allowComponentSplit) {
+        if (!allowComponentSplit) emptyList()
+        else {
+            val fromSections = sectionByLine.values.distinct()
+            when {
+                fromSections.size >= 2 -> fromSections
+                groups.values.filterNotNull().distinct().size >= 2 ->
+                    groups.values.filterNotNull().distinct()
+                else -> listOf("side", "sauce")
+            }
         }
     }
     var sideWeightText by remember {
@@ -343,13 +356,17 @@ fun IngredientVerifySheet(
     }
 
     // Neue Zutaten in groups aufnehmen (z. B. per Scan hinzugefügt)
-    LaunchedEffect(verifyStates.map { it.result.line }) {
+    LaunchedEffect(verifyStates.map { it.result.line }, allowComponentSplit) {
         val lines = verifyStates.map { it.result.line }.toSet()
         groups = groups.filterKeys { it in lines } + verifyStates
             .filter { it.result.line !in groups }
             .associate { s ->
-                val key = "${s.result.line} ${s.result.parsed?.name.orEmpty()} ${s.effectiveFood?.name.orEmpty()}"
-                s.result.line to (overrides[s.result.line]?.componentGroup ?: defaultComponentGroup(key))
+                if (!allowComponentSplit) {
+                    s.result.line to null
+                } else {
+                    val key = "${s.result.line} ${s.result.parsed?.name.orEmpty()} ${s.effectiveFood?.name.orEmpty()}"
+                    s.result.line to (overrides[s.result.line]?.componentGroup ?: defaultComponentGroup(key))
+                }
             }
     }
 
@@ -662,28 +679,34 @@ fun IngredientVerifySheet(
                         val servDiv = servings.coerceAtLeast(1)
                         val totalWeight = verifyStates.sumOf { it.effectiveAmountG.toDouble() }.toFloat()
                             .takeIf { it > 0f }
-                        // Abschnitts-Header aus groups beibehalten (nicht flach speichern!)
+                        // Abschnitts-Header nur wenn Split erlaubt und mehrere Gruppen
                         val ingredientsText = buildString {
-                            val orderedKeys = verifyStates
-                                .map { groups[it.result.line] ?: "sauce" }
-                                .distinct()
-                            val multi = orderedKeys.size >= 2
-                            for (key in orderedKeys) {
-                                if (multi) {
-                                    val header = when (key) {
-                                        "side" -> "Beilage"
-                                        "sauce" -> "Sauce / Fleisch"
-                                        else -> key
-                                    }
-                                    append(header).append('\n')
-                                }
-                                verifyStates.filter { groups[it.result.line] == key }.forEach { s ->
+                            if (!allowComponentSplit) {
+                                verifyStates.forEach { s ->
                                     append("• ").append(formatVerifyLineTitle(s)).append('\n')
                                 }
-                                if (multi) append('\n')
+                            } else {
+                                val orderedKeys = verifyStates
+                                    .map { groups[it.result.line] ?: "sauce" }
+                                    .distinct()
+                                val multi = orderedKeys.size >= 2
+                                for (key in orderedKeys) {
+                                    if (multi) {
+                                        val header = when (key) {
+                                            "side" -> "Beilage"
+                                            "sauce" -> "Sauce / Fleisch"
+                                            else -> key
+                                        }
+                                        append(header).append('\n')
+                                    }
+                                    verifyStates.filter { groups[it.result.line] == key }.forEach { s ->
+                                        append("• ").append(formatVerifyLineTitle(s)).append('\n')
+                                    }
+                                    if (multi) append('\n')
+                                }
                             }
                         }.trim()
-                        // Matches inkl. componentGroup aus Abschnitten/UI persistieren
+                        // Matches inkl. componentGroup (null bei Frühstück/Dessert)
                         onSaveMatches?.invoke(
                             verifyStates.map { s ->
                                 val food = s.effectiveFood
@@ -709,7 +732,7 @@ fun IngredientVerifySheet(
                                         s.isVerified -> MatchSource.DATABASE
                                         else -> MatchSource.UNMATCHED
                                     },
-                                    componentGroup = groups[s.result.line],
+                                    componentGroup = if (allowComponentSplit) groups[s.result.line] else null,
                                     manualAmountG = s.amountOverride,
                                     manualFiberG = s.manualFiber,
                                     isDeleted = false

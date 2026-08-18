@@ -721,7 +721,11 @@ fun RecipesScreen(
                 it.name.contains("sauce", ignoreCase = true) ||
                     it.name.contains("fleisch", ignoreCase = true)
             }?.cookedWeightG,
-            recipeIngredients = verifyRecipe.ingredients
+            recipeIngredients = verifyRecipe.ingredients,
+            allowComponentSplit = verifyRecipe.withGuessedCategoryIfEmpty().category().allowsComponentSplit &&
+                RecipeCategory.guess(
+                    verifyRecipe.title, verifyRecipe.ingredients, verifyRecipe.description
+                ).allowsComponentSplit
         )
     }
 
@@ -1832,15 +1836,21 @@ fun RecipeDetailSheet(
                     Spacer(Modifier.width(8.dp))
                     Text("Kochmodus starten", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 }
-                Spacer(Modifier.height(6.dp))
-                OutlinedButton(
-                    onClick = onEditComponents,
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(vertical = 8.dp)
-                ) {
-                    Icon(Icons.Default.Restaurant, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Komponenten trennen", fontSize = 13.sp)
+                // Frühstück / Dessert / Getränk: kein Komponenten-Split (ein Gericht)
+                val splitAllowed = recipe.withGuessedCategoryIfEmpty().category().allowsComponentSplit &&
+                    RecipeCategory.guess(recipe.title, recipe.ingredients, recipe.description)
+                        .allowsComponentSplit
+                if (splitAllowed) {
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedButton(
+                        onClick = onEditComponents,
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(vertical = 8.dp)
+                    ) {
+                        Icon(Icons.Default.Restaurant, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Komponenten trennen", fontSize = 13.sp)
+                    }
                 }
                 Spacer(Modifier.height(10.dp))
             }
@@ -2009,6 +2019,7 @@ fun RecipeDetailSheet(
                     // itemsIndexed + Index-Key: identische Zutatenzeilen (z.B. 2× „• 1 shot Espresso“)
                     // würden sonst denselben LazyColumn-Key erzeugen → Crash beim Scrollen.
                     // Wenn Text flach ist, aber Matches componentGroup haben → gruppiert anzeigen.
+                    // Ausnahme: Frühstück/Dessert/Getränk nie in Beilage/Sauce splitten.
                     val rawLines = recipe.ingredients.lines().filter { it.isNotBlank() }
                     val textHasHeaders = rawLines.any { line ->
                         val d = line.trim()
@@ -2016,12 +2027,20 @@ fun RecipeDetailSheet(
                             !d.first().isDigit() && !d.startsWith(" ") &&
                             !Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl)\b""", RegexOption.IGNORE_CASE).containsMatchIn(d)
                     }
-                    val groupedFromMatches = !textHasHeaders &&
+                    // Split nur wenn Kategorie UND Heuristik es erlauben
+                    // (falsch gespeichertes MAIN bei Dessert/Frühstück darf nicht splitten)
+                    val storedCat = recipe.withGuessedCategoryIfEmpty().category()
+                    val guessedCat = RecipeCategory.guess(
+                        recipe.title, recipe.ingredients, recipe.description
+                    )
+                    val allowSplit = storedCat.allowsComponentSplit && guessedCat.allowsComponentSplit
+                    val groupedFromMatches = allowSplit && !textHasHeaders &&
                         ingredientMatches.any { !it.componentGroup.isNullOrBlank() }
                     val displayBlocks: List<Pair<String?, String>> = if (groupedFromMatches) {
                         val order = linkedMapOf<String, MutableList<String>>()
                         for (m in ingredientMatches.filter { !it.isDeleted }) {
                             val g = m.componentGroup?.trim().orEmpty().ifBlank { "sauce" }
+                            // side/sauce-Labels nur bei Gerichten, die Split erlauben
                             val label = when (g) {
                                 "side" -> "Beilage"
                                 "sauce" -> "Sauce / Fleisch"
@@ -2409,8 +2428,13 @@ private fun NutritionAnalysisCard(
                                 Spacer(Modifier.width(2.dp))
                                 Text("Verify", fontSize = 11.sp)
                             }
-                            TextButton(onClick = onSplitComponents, contentPadding = PaddingValues(2.dp)) {
-                                Text("Trennen", fontSize = 11.sp)
+                            val canSplit = recipe.withGuessedCategoryIfEmpty().category().allowsComponentSplit &&
+                                RecipeCategory.guess(recipe.title, recipe.ingredients, recipe.description)
+                                    .allowsComponentSplit
+                            if (canSplit) {
+                                TextButton(onClick = onSplitComponents, contentPadding = PaddingValues(2.dp)) {
+                                    Text("Trennen", fontSize = 11.sp)
+                                }
                             }
                         }
                         TextButton(onClick = onAnalyze, contentPadding = PaddingValues(2.dp)) {
