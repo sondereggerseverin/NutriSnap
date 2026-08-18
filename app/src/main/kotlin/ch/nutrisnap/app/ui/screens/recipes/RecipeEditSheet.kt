@@ -1,8 +1,8 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
-import android.graphics.Bitmap
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,8 +31,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeCategory
-import ch.nutrisnap.app.ui.components.ComposeCropScreen
 import coil.compose.AsyncImage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,34 +62,45 @@ fun RecipeEditSheet(
     // Photo state — starts with existing imageUrl, can be replaced with local URI
     var imageUri     by remember { mutableStateOf<Uri?>(recipe.imageUrl?.let { Uri.parse(it) }) }
     var imageUrl     by remember { mutableStateOf(recipe.imageUrl) } // keeps remote URL if not replaced
-    var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
+    var isImportingPhoto by remember { mutableStateOf(false) }
 
-    // Gallery picker → eigener Crop-Screen mit sichtbarem Speichern-Button
+    val photoScope = rememberCoroutineScope()
+    // Gallery: Bild direkt übernehmen (kein Crop – der hing/crashte bei großen Fotos).
+    // Kopie in App-Cache, skaliert, stabile FileProvider-URI.
     val photoPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent()
+        ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
-        runCatching {
-            context.contentResolver.takePersistableUriPermission(
-                uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
+        isImportingPhoto = true
+        photoScope.launch {
+            val ok = runCatching {
+                val bitmap = withContext(Dispatchers.IO) {
+                    ch.nutrisnap.app.utils.ImageDecodeUtils.decodeUri(context, uri, maxEdgePx = 1600)
+                } ?: throw IllegalStateException("Bild konnte nicht geladen werden")
+                val localUri = withContext(Dispatchers.IO) {
+                    val outFile = java.io.File(
+                        context.cacheDir,
+                        "recipe_photo_${System.currentTimeMillis()}.jpg"
+                    )
+                    java.io.FileOutputStream(outFile).use { fos ->
+                        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, fos)
+                    }
+                    runCatching { if (!bitmap.isRecycled) bitmap.recycle() }
+                    androidx.core.content.FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        outFile
+                    )
+                }
+                imageUri = localUri
+                imageUrl = localUri.toString()
+            }.isSuccess
+            if (!ok) {
+                imageUri = uri
+                imageUrl = uri.toString()
+            }
+            isImportingPhoto = false
         }
-        pendingCropUri = uri
-    }
-
-    // Crop-Overlay über dem Sheet
-    pendingCropUri?.let { cropUri ->
-        ComposeCropScreen(
-            imageUri = cropUri,
-            title = "Foto zuschneiden",
-            onCropped = { cropped ->
-                imageUri = cropped
-                imageUrl = cropped.toString()
-                pendingCropUri = null
-            },
-            onCancel = { pendingCropUri = null }
-        )
-        return
     }
 
     fun buildSaved(): Recipe {
@@ -175,7 +188,11 @@ fun RecipeEditSheet(
                                 MaterialTheme.colorScheme.outlineVariant,
                                 RoundedCornerShape(12.dp)
                             )
-                            .clickable { photoPicker.launch("image/*") },
+                            .clickable(enabled = !isImportingPhoto) {
+                                photoPicker.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         if (currentUri != null) {
