@@ -18,7 +18,9 @@ object ImageDecodeUtils {
     fun decodeUri(
         context: Context,
         uri: Uri,
-        maxEdgePx: Int = DEFAULT_MAX_EDGE
+        maxEdgePx: Int = DEFAULT_MAX_EDGE,
+        /** RGB_565 halbiert Speicher/Bandbreite – gut für Crop-Preview. */
+        preferRgb565: Boolean = false
     ): Bitmap? = runCatching {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         context.contentResolver.openInputStream(uri)?.use {
@@ -36,13 +38,12 @@ object ImageDecodeUtils {
 
         val opts = BitmapFactory.Options().apply {
             inSampleSize = sample
-            inPreferredConfig = Bitmap.Config.ARGB_8888
+            inPreferredConfig = if (preferRgb565) Bitmap.Config.RGB_565 else Bitmap.Config.ARGB_8888
         }
         val bitmap = context.contentResolver.openInputStream(uri)?.use {
             BitmapFactory.decodeStream(it, null, opts)
         } ?: return null
 
-        // Zusätzlich soft-downscale falls nach Sample noch zu groß
         val edge = max(bitmap.width, bitmap.height)
         if (edge <= maxEdgePx) return bitmap
         val scale = maxEdgePx.toFloat() / edge

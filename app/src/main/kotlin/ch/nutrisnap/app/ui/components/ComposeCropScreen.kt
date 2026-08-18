@@ -54,18 +54,13 @@ import java.io.File
 import java.io.FileOutputStream
 
 /**
- * Zuschneide-Screen mit **immer sichtbarem Speichern-Button**.
+ * Zuschneide-Screen mit immer sichtbarem Speichern-Button.
  *
- * Wichtig gegen ANR/OOM:
- * - Bild wird zuerst auf max. 1600px skaliert (IO-Thread)
- * - In die CropImageView per [CropImageView.setImageBitmap] (kein erneutes Full-Decode)
- * - Speichern: [CropImageView.croppedImageAsync] – die eigentliche Bitmap-Berechnung
- *   läuft in einem Hintergrund-Worker der Cropper-Lib, NICHT mehr synchron auf dem
- *   Main-Thread. (Frühere Versionen riefen die deprecated synchrone getCroppedImage()
- *   über Dispatchers.Main.immediate auf – das ist trotz Coroutine-Hülle blockierend,
- *   weil Main.immediate keinen Thread-Wechsel macht. Das war die eigentliche ANR-Ursache,
- *   nicht die Bildgröße.)
- * - Datei-Encode weiterhin auf IO; Timeout + Fallback auf Original falls etwas hängt
+ * ANR-Schutz (Stand 18.08.2026, Stack: CropImageView.applyImageMatrix/onLayout):
+ * - Preview max. 1024 px Kante (IO) – kleinere Bitmap = billigeres applyImageMatrix
+ * - isAutoZoomEnabled = false – AutoZoom triggert Layout-Schleifen in der Lib
+ * - setImageBitmap nur einmal in factory (kein erneutes Full-Decode via URI)
+ * - Speichern weiterhin croppedImageAsync (Background-Worker der Lib)
  */
 @Composable
 fun ComposeCropScreen(
@@ -81,16 +76,14 @@ fun ComposeCropScreen(
     var isLoading by remember { mutableStateOf(true) }
     var isSaving by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
-    // Bridge zwischen dem Callback der Cropper-Lib (setOnCropImageCompleteListener,
-    // wird vom Bibliotheks-Hintergrundthread aus aufgerufen) und der wartenden Coroutine.
     var pendingCropDeferred by remember { mutableStateOf<CompletableDeferred<Bitmap?>?>(null) }
 
-    // Einmalig skaliert laden – nie das 12-MP-Original in die View
+    // Preview bewusst kleiner als früher (1600): applyImageMatrix skaliert linear mit Pixeln
     LaunchedEffect(imageUri) {
         isLoading = true
         errorText = null
         val bmp = withContext(Dispatchers.IO) {
-            ImageDecodeUtils.decodeUri(context, imageUri, maxEdgePx = 1600)
+            ImageDecodeUtils.decodeUri(context, imageUri, maxEdgePx = 1024, preferRgb565 = true)
         }
         if (bmp == null) {
             errorText = "Bild konnte nicht geladen werden"
@@ -117,32 +110,36 @@ fun ComposeCropScreen(
             .navigationBarsPadding()
     ) {
         Row(
-            modifier = Modifier
+            Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF1A1A1A))
                 .padding(horizontal = 4.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onCancel, enabled = !isSaving) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Abbrechen",
-                    tint = Color.White
-                )
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Abbrechen", tint = Color.White)
             }
             Text(
-                text = title,
+                title,
                 color = Color.White,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 18.sp,
+                fontSize = 16.sp,
                 modifier = Modifier.weight(1f)
             )
             IconButton(
-                onClick = { runCatching { cropView?.rotateImage(90) } },
+                onClick = { cropView?.rotateImage(90) },
                 enabled = !isSaving && sourceBitmap != null
             ) {
                 Icon(Icons.Default.RotateRight, contentDescription = "Drehen", tint = Color.White)
             }
+        }
+
+        errorText?.let { msg ->
+            Text(
+                msg,
+                color = Color(0xFFFFAB91),
+                fontSize = 12.sp,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
         }
 
         Box(
@@ -152,15 +149,14 @@ fun ComposeCropScreen(
         ) {
             val bmp = sourceBitmap
             if (bmp != null && !isLoading) {
+                // key über Bitmap-Identity: factory läuft nur wenn neues Bitmap gesetzt wird
                 AndroidView(
                     factory = { ctx ->
                         CropImageView(ctx).apply {
                             guidelines = CropImageView.Guidelines.ON
-                            isAutoZoomEnabled = true
-                            // Bitmap bereits skaliert – kein setImageUriAsync (lädt sonst nochmal)
+                            // AutoZoom aus: verhindert Layout-Thrashing in applyImageMatrix
+                            isAutoZoomEnabled = false
                             setImageBitmap(bmp)
-                            // Läuft im Hintergrund-Worker der Lib, liefert hierüber das Ergebnis
-                            // zurück – siehe croppedImageAsync() im Speichern-Button unten.
                             setOnCropImageCompleteListener { _, result ->
                                 pendingCropDeferred?.complete(result.bitmap)
                             }
@@ -169,6 +165,7 @@ fun ComposeCropScreen(
                     },
                     modifier = Modifier.fillMaxSize(),
                     update = { view ->
+                        // Nur Referenz halten – Bitmap nicht erneut setzen (teuer + Layout-Loop)
                         cropView = view
                     }
                 )
@@ -198,22 +195,10 @@ fun ComposeCropScreen(
             }
         }
 
-        errorText?.let { msg ->
-            Text(
-                text = msg,
-                color = Color(0xFFFF8A80),
-                fontSize = 13.sp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
-            )
-        }
-
         Row(
-            modifier = Modifier
+            Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF1A1A1A))
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -226,16 +211,15 @@ fun ComposeCropScreen(
             }
             Button(
                 onClick = {
-                    val view = cropView
-                    if (view == null || isSaving) return@Button
+                    val view = cropView ?: return@Button
+                    if (isSaving) return@Button
                     isSaving = true
                     errorText = null
                     val deferred = CompletableDeferred<Bitmap?>()
                     pendingCropDeferred = deferred
-                    // Startet den Crop im Hintergrund-Worker der Lib (nicht blockierend).
-                    // Ergebnis kommt über den in AndroidView.factory registrierten Listener.
                     runCatching {
-                        view.croppedImageAsync(reqWidth = 1280, reqHeight = 1280)
+                        // Ausgabe bewusst begrenzt – Preview ist max 1024, Output ähnlich
+                        view.croppedImageAsync(reqWidth = 1024, reqHeight = 1024)
                     }.onFailure { deferred.complete(null) }
                     scope.launch {
                         val cropped = withTimeoutOrNull(12_000L) { deferred.await() }
@@ -262,7 +246,6 @@ fun ComposeCropScreen(
                         if (out != null) {
                             onCropped(out)
                         } else {
-                            // Timeout/Fehler: Original (bereits skaliert, falls Cache) übernehmen
                             errorText = "Zuschneiden fehlgeschlagen – Original wird verwendet"
                             onCropped(imageUri)
                         }
