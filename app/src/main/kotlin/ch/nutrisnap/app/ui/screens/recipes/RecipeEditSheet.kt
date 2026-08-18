@@ -29,6 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeCategory
 import ch.nutrisnap.app.ui.components.ComposeCropScreen
@@ -62,28 +64,55 @@ fun RecipeEditSheet(
     var imageUrl     by remember { mutableStateOf(recipe.imageUrl) } // keeps remote URL if not replaced
     /** Galerie-URI → ComposeCropScreen (skaliert intern, Speichern-Button sichtbar). */
     var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
+    /**
+     * Während Galerie-Picker / Crop darf das ModalBottomSheet NICHT dismissen.
+     * Sonst: Activity-Result → Sheet-onDismiss → editRecipe=null → User landet auf Startseite,
+     * pendingCropUri geht verloren (Crop startet nie) oder App wirkt „abgestürzt“.
+     */
+    var suppressDismiss by remember { mutableStateOf(false) }
 
-    // Galerie → Crop-Screen (Skalierung passiert dort auf IO-Thread)
+    // Galerie → Crop-Dialog (Skalierung passiert dort auf IO-Thread)
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
+        if (uri == null) {
+            // Abbruch in der Galerie: Sheet wieder normal schließbar
+            suppressDismiss = false
+            return@rememberLauncherForActivityResult
+        }
         pendingCropUri = uri
+        // suppressDismiss bleibt true bis Crop fertig/abgebrochen
     }
 
-    // Crop-Screen mit immer sichtbarem „Speichern“
+    // Crop als eigenes Fullscreen-Dialog-Fenster – unabhängig vom BottomSheet-Lifecycle
     pendingCropUri?.let { cropUri ->
-        ComposeCropScreen(
-            imageUri = cropUri,
-            title = "Foto zuschneiden",
-            onCropped = { cropped ->
-                imageUri = cropped
-                imageUrl = cropped.toString()
+        Dialog(
+            onDismissRequest = {
                 pendingCropUri = null
+                suppressDismiss = false
             },
-            onCancel = { pendingCropUri = null }
-        )
-        return
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+                dismissOnBackPress = true,
+                dismissOnClickOutside = false
+            )
+        ) {
+            ComposeCropScreen(
+                imageUri = cropUri,
+                title = "Foto zuschneiden",
+                onCropped = { cropped ->
+                    imageUri = cropped
+                    imageUrl = cropped.toString()
+                    pendingCropUri = null
+                    suppressDismiss = false
+                },
+                onCancel = {
+                    pendingCropUri = null
+                    suppressDismiss = false
+                }
+            )
+        }
     }
 
     fun buildSaved(): Recipe {
@@ -106,7 +135,10 @@ fun RecipeEditSheet(
         )
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, modifier = Modifier.fillMaxHeight(0.96f)) {
+    ModalBottomSheet(
+        onDismissRequest = { if (!suppressDismiss) onDismiss() },
+        modifier = Modifier.fillMaxHeight(0.96f)
+    ) {
         Column(Modifier.fillMaxSize()) {
             // ── Header ──────────────────────────────────────────────────────
             Row(
@@ -172,6 +204,7 @@ fun RecipeEditSheet(
                                 RoundedCornerShape(12.dp)
                             )
                             .clickable {
+                                suppressDismiss = true
                                 photoPicker.launch(
                                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                 )
