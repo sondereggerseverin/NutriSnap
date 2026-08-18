@@ -256,20 +256,28 @@ fun computeVerifiedTotals(states: List<IngredientVerifyState>): VerifiedTotals {
     )
 }
 
-/** Anzeigetext: aktuelle Menge + Produktname (ohne interne Keys/Timestamps). */
+/** Anzeigetext: aktuelle Menge + Rezeptname (DE), nicht OFF/Scan-Produktname (oft FR/EN). */
 fun formatVerifyLineTitle(state: IngredientVerifyState): String {
     val g = state.effectiveAmountG
     val amountStr = if (g >= 10f) "${g.toInt()} g" else "${"%.1f".format(g)} g"
-    val rawName = state.effectiveFood?.name?.takeIf { it.isNotBlank() }
-        ?: state.result.parsed?.name?.takeIf { it.isNotBlank() }
-        ?: state.result.line
-    val name = rawName
+    fun clean(raw: String): String = raw
         .trimStart('•', '-', ' ', '➕')
         .replace(Regex("""^added_\d+_"""), "")
         .replace(Regex("""\s*\(\d{10,}\)"""), "")
         .replace(Regex("""(?i)^\d+([.,]\d+)?\s*(g|ml|kg|el|tl|cup|tbsp|tsp)?\s+"""), "")
         .trim()
-        .ifBlank { rawName.trim() }
+
+    val fromParsed = state.result.parsed?.name?.takeIf { it.isNotBlank() }?.let { clean(it) }
+    val fromLine = clean(state.result.line).takeIf { it.isNotBlank() }
+    val fromFood = state.effectiveFood?.name?.takeIf { it.isNotBlank() }?.let { clean(it) }
+
+    // Original-Rezepttext hat Vorrang vor kommerziellem OFF-Namen ("Cacao en poudre" etc.)
+    val name = when {
+        !fromParsed.isNullOrBlank() && fromParsed.length >= 2 -> fromParsed
+        !fromLine.isNullOrBlank() && fromLine.length >= 2 -> fromLine
+        !fromFood.isNullOrBlank() -> fromFood
+        else -> clean(state.result.line).ifBlank { state.result.line.trim() }
+    }
     return "$amountStr $name"
 }
 
@@ -472,11 +480,12 @@ fun IngredientVerifySheet(
             onFoodSelected = { food ->
                 if (isAddNew) {
                     val amountG = 100f
-                    // Interner Key stabil & eindeutig; Anzeige ohne Timestamp
-                    val line = "added_${System.currentTimeMillis()}_${food.name}"
+                    // Lesbarer Key statt "added_TIMESTAMP_…" (landet sonst im Rezepttext)
+                    val baseName = food.name.trim().ifBlank { "Zutat" }
+                    val line = "${amountG.toInt()} g $baseName"
                     val result = RecipeNutritionAnalyzer.IngredientResult(
                         line = line,
-                        parsed = RecipeNutritionAnalyzer.ParsedIngredient(amountG, food.name),
+                        parsed = RecipeNutritionAnalyzer.ParsedIngredient(amountG, baseName),
                         foodItem = food,
                         calories = amountG / 100f * (food.calories ?: 0f),
                         protein = amountG / 100f * (food.protein ?: 0f),

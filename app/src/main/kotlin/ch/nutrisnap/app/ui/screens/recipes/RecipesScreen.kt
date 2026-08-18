@@ -2126,12 +2126,18 @@ fun RecipeDetailSheet(
                             val hasAmount = parsed.amount.isNotBlank() &&
                                 (parsed.amount.toFloatOrNull() != null || parsed.amount.any { it.isDigit() })
                             val match = findMatchForLine(rawLine)
+                            // Grün = verifiziert, Orange = Menge da aber noch kein Produkt-Match
+                            // (kein Fehler – nur Hinweis, über Verify nachziehen)
                             val (statusIcon, statusColor, statusLabel) = when {
                                 match?.matchedFoodItemId != null ||
                                     (match != null && match.matchSource != MatchSource.UNMATCHED) ->
                                     Triple(Icons.Default.CheckCircle, MacroColors.calories, "Verifiziert")
                                 hasAmount ->
-                                    Triple(Icons.Default.ErrorOutline, MacroColors.carbs, "Menge erkannt, noch nicht gematcht")
+                                    Triple(
+                                        Icons.Default.RadioButtonUnchecked,
+                                        MacroColors.carbs,
+                                        "Menge erkannt – noch nicht verifiziert"
+                                    )
                                 else ->
                                     Triple(
                                         Icons.Default.RadioButtonUnchecked,
