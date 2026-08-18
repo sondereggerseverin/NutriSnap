@@ -45,6 +45,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.FileProvider
 import ch.nutrisnap.app.utils.ImageDecodeUtils
 import com.canhub.cropper.CropImageView
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -58,8 +59,13 @@ import java.io.FileOutputStream
  * Wichtig gegen ANR/OOM:
  * - Bild wird zuerst auf max. 1600px skaliert (IO-Thread)
  * - In die CropImageView per [CropImageView.setImageBitmap] (kein erneutes Full-Decode)
- * - Speichern: synchrone Crop-API nur auf begrenztem Bitmap, Encode auf IO
- * - Timeout + Fallback auf Original, falls etwas hängen bleibt
+ * - Speichern: [CropImageView.croppedImageAsync] – die eigentliche Bitmap-Berechnung
+ *   läuft in einem Hintergrund-Worker der Cropper-Lib, NICHT mehr synchron auf dem
+ *   Main-Thread. (Frühere Versionen riefen die deprecated synchrone getCroppedImage()
+ *   über Dispatchers.Main.immediate auf – das ist trotz Coroutine-Hülle blockierend,
+ *   weil Main.immediate keinen Thread-Wechsel macht. Das war die eigentliche ANR-Ursache,
+ *   nicht die Bildgröße.)
+ * - Datei-Encode weiterhin auf IO; Timeout + Fallback auf Original falls etwas hängt
  */
 @Composable
 fun ComposeCropScreen(
@@ -75,6 +81,9 @@ fun ComposeCropScreen(
     var isLoading by remember { mutableStateOf(true) }
     var isSaving by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
+    // Bridge zwischen dem Callback der Cropper-Lib (setOnCropImageCompleteListener,
+    // wird vom Bibliotheks-Hintergrundthread aus aufgerufen) und der wartenden Coroutine.
+    var pendingCropDeferred by remember { mutableStateOf<CompletableDeferred<Bitmap?>?>(null) }
 
     // Einmalig skaliert laden – nie das 12-MP-Original in die View
     LaunchedEffect(imageUri) {
@@ -150,6 +159,11 @@ fun ComposeCropScreen(
                             isAutoZoomEnabled = true
                             // Bitmap bereits skaliert – kein setImageUriAsync (lädt sonst nochmal)
                             setImageBitmap(bmp)
+                            // Läuft im Hintergrund-Worker der Lib, liefert hierüber das Ergebnis
+                            // zurück – siehe croppedImageAsync() im Speichern-Button unten.
+                            setOnCropImageCompleteListener { _, result ->
+                                pendingCropDeferred?.complete(result.bitmap)
+                            }
                             cropView = this
                         }
                     },
@@ -216,14 +230,19 @@ fun ComposeCropScreen(
                     if (view == null || isSaving) return@Button
                     isSaving = true
                     errorText = null
+                    val deferred = CompletableDeferred<Bitmap?>()
+                    pendingCropDeferred = deferred
+                    // Startet den Crop im Hintergrund-Worker der Lib (nicht blockierend).
+                    // Ergebnis kommt über den in AndroidView.factory registrierten Listener.
+                    runCatching {
+                        view.croppedImageAsync(reqWidth = 1280, reqHeight = 1280)
+                    }.onFailure { deferred.complete(null) }
                     scope.launch {
-                        val out = withTimeoutOrNull(12_000L) {
-                            runCatching {
-                                // Begrenztes Bitmap – getCroppedImage auf schon kleinem Source
-                                val cropped = withContext(Dispatchers.Main.immediate) {
-                                    view.getCroppedImage(1280, 1280) ?: view.getCroppedImage()
-                                } ?: return@runCatching null
-                                withContext(Dispatchers.IO) {
+                        val cropped = withTimeoutOrNull(12_000L) { deferred.await() }
+                        pendingCropDeferred = null
+                        val out = if (cropped != null) {
+                            withContext(Dispatchers.IO) {
+                                runCatching {
                                     val outFile = File(
                                         context.cacheDir,
                                         "crop_${System.currentTimeMillis()}.jpg"
@@ -237,14 +256,14 @@ fun ComposeCropScreen(
                                         "${context.packageName}.fileprovider",
                                         outFile
                                     )
-                                }
-                            }.getOrNull()
-                        }
+                                }.getOrNull()
+                            }
+                        } else null
                         if (out != null) {
                             onCropped(out)
                         } else {
                             // Timeout/Fehler: Original (bereits skaliert, falls Cache) übernehmen
-                            errorText = "Zuschneiden dauerte zu lange – Original wird verwendet"
+                            errorText = "Zuschneiden fehlgeschlagen – Original wird verwendet"
                             onCropped(imageUri)
                         }
                         isSaving = false
