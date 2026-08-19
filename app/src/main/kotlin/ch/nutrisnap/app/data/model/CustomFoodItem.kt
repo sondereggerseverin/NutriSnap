@@ -2,9 +2,16 @@ package ch.nutrisnap.app.data.model
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "custom_foods")
+@Entity(
+    tableName = "custom_foods",
+    indices = [
+        Index(value = ["barcode"]),
+        Index(value = ["name"])
+    ]
+)
 data class CustomFoodItem(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val name: String,

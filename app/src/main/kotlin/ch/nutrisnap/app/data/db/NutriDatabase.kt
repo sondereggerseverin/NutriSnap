@@ -80,7 +80,7 @@ interface UserProfileDao {
         RecipeComponent::class,
         FrozenMeal::class
     ],
-    version = 32,
+    version = 33,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -665,6 +665,19 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // Performance-Indizes für Tagebuch-, Food- und Custom-Food-Queries
+        private val MIGRATION_32_33 = object : Migration(32, 33) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_diary_entries_dateStr ON diary_entries(dateStr)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_diary_entries_foodItemId ON diary_entries(foodItemId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_diary_entries_dateStr_mealType ON diary_entries(dateStr, mealType)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_food_items_barcode ON food_items(barcode)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_food_items_name ON food_items(name)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_custom_foods_barcode ON custom_foods(barcode)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_custom_foods_name ON custom_foods(name)")
+            }
+        }
+
 
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
@@ -681,7 +694,8 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20,
                         MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
                         MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28,
-                        MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32
+                        MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32,
+                        MIGRATION_32_33
                     )
                     .build()
                     .also { INSTANCE = it }

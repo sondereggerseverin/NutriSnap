@@ -10,7 +10,14 @@ import kotlinx.serialization.Serializable
 import java.time.LocalDate
 
 // ─── Diary ───────────────────────────────────────────────────────────────────
-@Entity(tableName = "diary_entries")
+@Entity(
+    tableName = "diary_entries",
+    indices = [
+        Index(value = ["dateStr"]),
+        Index(value = ["foodItemId"]),
+        Index(value = ["dateStr", "mealType"])
+    ]
+)
 data class DiaryEntry(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val foodItemId: Int,           // Int to match FoodItem.id
