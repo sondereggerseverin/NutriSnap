@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
