@@ -35,7 +35,7 @@ private data class SplitPart(
 )
 
 /** Mappt beliebige componentGroup/Abschnittsnamen auf side/sauce oder behält den Key. */
-private fun normalizeGroupKey(raw: String?): String? {
+internal fun normalizeGroupKey(raw: String?): String? {
     val g = raw?.trim().orEmpty()
     if (g.isEmpty()) return null
     if (g == "side" || g == "sauce") return g
@@ -53,7 +53,7 @@ private fun normalizeGroupKey(raw: String?): String? {
     }
 }
 
-private fun defaultPartKey(
+internal fun defaultPartKey(
     m: IngredientMatch,
     sections: List<Pair<String, List<String>>> = emptyList()
 ): String {
@@ -104,7 +104,7 @@ private fun defaultPartKey(
     return if (sideKeys.any { it in n }) "side" else "sauce"
 }
 
-private fun displayNameForKey(key: String): String = when (key) {
+internal fun displayNameForKey(key: String): String = when (key) {
     "side" -> "Beilage"
     "sauce" -> "Sauce / Fleisch"
     else -> key
