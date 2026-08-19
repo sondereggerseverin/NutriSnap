@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -130,7 +131,7 @@ class MainActivity : ComponentActivity() {
                 if (!AUTH_ENABLED) {
                     // Skip auth entirely — go straight to main content
                     val networkMonitor2 = remember { NetworkMonitor(this) }
-                    val isOnline2 by networkMonitor2.isOnline.collectAsState(initial = true)
+                    val isOnline2 by networkMonitor2.isOnline.collectAsStateWithLifecycle(initialValue = true)
                     val hcVm2: HealthConnectViewModel = viewModel()
                     LaunchedEffect(Unit) { healthConnectViewModel = hcVm2 }
                     Column(modifier = Modifier.fillMaxSize()) {
@@ -149,7 +150,7 @@ class MainActivity : ComponentActivity() {
                     return@NutriSnapTheme
                 }
 
-                val isLoggedIn by authVm.isLoggedIn.collectAsState()
+                val isLoggedIn by authVm.isLoggedIn.collectAsStateWithLifecycle()
 
                 when (isLoggedIn) {
                     null  -> Box(modifier = Modifier.fillMaxSize())
@@ -173,9 +174,9 @@ class MainActivity : ComponentActivity() {
                             onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
                         }
                         val networkMonitor = remember { NetworkMonitor(this) }
-                        val isOnline by networkMonitor.isOnline.collectAsState(initial = true)
+                        val isOnline by networkMonitor.isOnline.collectAsStateWithLifecycle(initialValue = true)
                         val biometricEnabled by notifDataStore.data
-                            .map { it[KEY_BIOMETRIC_LOCK] ?: false }.collectAsState(initial = false)
+                            .map { it[KEY_BIOMETRIC_LOCK] ?: false }.collectAsStateWithLifecycle(initialValue = false)
                         var isUnlocked by remember { mutableStateOf(true) }
 
                         val hcVm: HealthConnectViewModel = viewModel()
@@ -301,7 +302,7 @@ fun MainScaffold(
     }
 
     val context = androidx.compose.ui.platform.LocalContext.current
-    val navPrefs by context.notifDataStore.data.collectAsState(initial = null)
+    val navPrefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
     val renameNavLabel = navPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_NAV_LABEL_RENAME) ?: false
 
     Scaffold(bottomBar = {

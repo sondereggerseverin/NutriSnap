@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,7 +58,7 @@ fun RecipeCardV2(
     var menuOpen by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
     val largerMenu = prefs?.get(KEY_TOGGLE_TOUCH_RECIPE_MENU) ?: true
     val menuBtnSize = if (largerMenu) 40.dp else 28.dp
     val menuIconSize = if (largerMenu) 22.dp else 18.dp

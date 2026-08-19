@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -142,7 +143,7 @@ fun SettingsScreen(
     onNavigateToSupplements: () -> Unit = {},
     onNavigateToCrashLog: () -> Unit = {}
 ) {
-    val state   by vm.uiState.collectAsState()
+    val state   by vm.uiState.collectAsStateWithLifecycle()
     val profile  = state.profile
 
     var weightText  by remember(profile.weightKg)         { mutableStateOf(if (profile.weightKg > 0f) profile.weightKg.toInt().toString() else "") }
@@ -163,7 +164,7 @@ fun SettingsScreen(
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
-    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
     val currentThemeName = prefs?.get(ch.nutrisnap.app.ui.theme.KEY_APP_THEME) ?: AppTheme.FOREST_GREEN.name
     val currentTheme = runCatching { AppTheme.valueOf(currentThemeName) }.getOrDefault(AppTheme.FOREST_GREEN)
 
@@ -1256,7 +1257,7 @@ fun HealthConnectCard() {
 fun AggressiveSportDayCard() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
-    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
     val enabled = prefs?.get(KEY_AGGRESSIVE_SPORT_DAY) ?: false
 
     SettingsCard(title = "Sporttag-Modus", icon = Icons.Default.FitnessCenter) {
@@ -1293,7 +1294,7 @@ fun AggressiveSportDayCard() {
 fun ManualActivitySettingsCard() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
-    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
     val enabled = prefs?.get(KEY_MANUAL_ACTIVITY_ENABLED) ?: false
 
     SettingsCard(title = "Manuelle Aktivität", icon = Icons.Default.DirectionsRun) {
@@ -1495,7 +1496,7 @@ private fun ThemeCard(
 private fun GoalPrognosisPreview(
     vm: ch.nutrisnap.app.domain.GoalPrognosisViewModel = viewModel()
 ) {
-    val prognosis by vm.prognosis.collectAsState()
+    val prognosis by vm.prognosis.collectAsStateWithLifecycle()
     val p = prognosis ?: return
 
     Spacer(Modifier.height(NutriSpacing.sm))

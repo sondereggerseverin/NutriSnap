@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -33,10 +34,10 @@ fun CustomFoodListScreen(
     onEdit: (Int) -> Unit,
     vm: CustomFoodViewModel = viewModel()
 ) {
-    val foods by vm.foods.collectAsState()
-    val query by vm.query.collectAsState()
-    val verifiedFilter by vm.verifiedFilter.collectAsState()
-    val sourceFilter by vm.sourceFilter.collectAsState()
+    val foods by vm.foods.collectAsStateWithLifecycle()
+    val query by vm.query.collectAsStateWithLifecycle()
+    val verifiedFilter by vm.verifiedFilter.collectAsStateWithLifecycle()
+    val sourceFilter by vm.sourceFilter.collectAsStateWithLifecycle()
     var pendingDelete by remember { mutableStateOf<CustomFoodItem?>(null) }
 
     Scaffold(

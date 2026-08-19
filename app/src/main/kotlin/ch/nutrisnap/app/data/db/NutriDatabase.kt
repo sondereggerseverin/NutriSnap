@@ -81,7 +81,7 @@ interface UserProfileDao {
         FrozenMeal::class
     ],
     version = 32,
-    exportSchema = false
+    exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class NutriDatabase : RoomDatabase() {

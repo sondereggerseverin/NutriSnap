@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -209,7 +210,7 @@ fun DiaryScreen(
     autoOpenScanner: Boolean = false,
     onNavigateToPhotoScan: (MealType?) -> Unit = {}
 ) {
-    val state by vm.uiState.collectAsState()
+    val state by vm.uiState.collectAsStateWithLifecycle()
     var showAddSheet by remember { mutableStateOf(autoOpenAdd || autoOpenScanner) }
     // BUG-FIX: showAddSheet wurde bisher nur beim Erstellen der Compose-Instanz aus
     // autoOpenAdd/autoOpenScanner initialisiert. Da NavHost Tab-Instanzen bei
@@ -231,15 +232,15 @@ fun DiaryScreen(
     var macroEditField by remember { mutableStateOf<MacroField?>(null) }
     var expandedNutrition by remember { mutableStateOf<MealType?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
-    val mealPrefs by context.notifDataStore.data.collectAsState(initial = null)
+    val mealPrefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
     val mealOrder = remember(mealPrefs) { parseMealOrder(mealPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_MEAL_ORDER)) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val quickAddFavorites by vm.favorites.collectAsState()
-    val autopilotTemplates by vm.autopilotTemplates.collectAsState()
+    val quickAddFavorites by vm.favorites.collectAsStateWithLifecycle()
+    val autopilotTemplates by vm.autopilotTemplates.collectAsStateWithLifecycle()
     val recipesVm: ch.nutrisnap.app.ui.screens.recipes.RecipesViewModel = viewModel()
-    val recipesState by recipesVm.uiState.collectAsState()
+    val recipesState by recipesVm.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -529,8 +530,8 @@ fun DiaryScreen(
         // Immer den aktuellen Eintrag aus dem State nehmen (nicht die evtl. veraltete
         // Closure-Referenz), damit ein Makro-Override sofort sichtbar wird.
         val liveEntry = state.entries.firstOrNull { it.id == entry.id } ?: entry
-        val foodItem by vm.entryDetailFood.collectAsState()
-        val detailRecipe by vm.entryDetailRecipe.collectAsState()
+        val foodItem by vm.entryDetailFood.collectAsStateWithLifecycle()
+        val detailRecipe by vm.entryDetailRecipe.collectAsStateWithLifecycle()
         EntryDetailSheet(
             entry     = liveEntry,
             foodItem  = foodItem,
@@ -1210,7 +1211,7 @@ private fun DiaryEntryRow(
     var showConfirm by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
-    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
     val largerDiaryIcons = prefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_DIARY_ICONS) ?: true
     val diaryIconBtnSize = if (largerDiaryIcons) 40.dp else 32.dp
 
@@ -1545,7 +1546,7 @@ fun AddFoodSheet(
                 modifier = Modifier.padding(bottom = NutriSpacing.sm)
             )
             // Nachträglich tracken: Tag wählen (nutzt dieselbe Datums-Navigation wie das Tagebuch)
-            val diaryDate by vm.uiState.collectAsState()
+            val diaryDate by vm.uiState.collectAsStateWithLifecycle()
             val activeDate = diaryDate.selectedDate
             Text("Tag", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(4.dp))
@@ -1709,10 +1710,10 @@ private fun SearchTab(
     var selectedMeal by remember { mutableStateOf(initialMeal ?: MealType.LUNCH) }
     var portionWarning by remember { mutableStateOf<String?>(null) }
 
-    val results   by vm.searchResults.collectAsState()
-    val searching by vm.isSearching.collectAsState()
-    val favorites by vm.favorites.collectAsState()
-    val barcodeResult by vm.barcodeResult.collectAsState()
+    val results   by vm.searchResults.collectAsStateWithLifecycle()
+    val searching by vm.isSearching.collectAsStateWithLifecycle()
+    val favorites by vm.favorites.collectAsStateWithLifecycle()
+    val barcodeResult by vm.barcodeResult.collectAsStateWithLifecycle()
     val favoriteKeys = remember(favorites) { favorites.map { it.favoriteKey() }.toSet() }
 
     LaunchedEffect(barcodeResult) {

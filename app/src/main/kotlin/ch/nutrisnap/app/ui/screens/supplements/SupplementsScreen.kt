@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -34,9 +35,9 @@ fun SupplementsScreen(
     vm: SupplementsViewModel = viewModel(),
     onNavigateBack: () -> Unit = {}
 ) {
-    val list by vm.supplements.collectAsState()
-    val plan by vm.dailyPlan.collectAsState()
-    val takenToday by vm.takenTodayIds.collectAsState()
+    val list by vm.supplements.collectAsStateWithLifecycle()
+    val plan by vm.dailyPlan.collectAsStateWithLifecycle()
+    val takenToday by vm.takenTodayIds.collectAsStateWithLifecycle()
     var selected by remember { mutableStateOf<Supplement?>(null) }
     var showAdd by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<Supplement?>(null) }

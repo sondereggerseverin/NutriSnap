@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,7 +42,7 @@ fun AnalysisScreen(
     onNavigateToInsights: () -> Unit = {},
     onNavigateToChat: () -> Unit = {}
 ) {
-    val state by vm.uiState.collectAsState()
+    val state by vm.uiState.collectAsStateWithLifecycle()
     var showDatePicker by remember { mutableStateOf(false) }
     var showWeekOverview by remember { mutableStateOf(false) }
 

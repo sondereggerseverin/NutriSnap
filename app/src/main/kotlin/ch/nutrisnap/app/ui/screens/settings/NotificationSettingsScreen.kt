@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.nutrisnap.app.service.NotificationScheduler
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -29,9 +30,9 @@ fun NotificationSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope   = rememberCoroutineScope()
 
-    val mealReminders  by context.notifDataStore.data.map { it[KEY_MEAL_REMINDERS]  ?: true  }.collectAsState(true)
-    val dailyRecap     by context.notifDataStore.data.map { it[KEY_DAILY_RECAP]     ?: true  }.collectAsState(true)
-    val biometricLock  by context.notifDataStore.data.map { it[KEY_BIOMETRIC_LOCK]  ?: false }.collectAsState(false)
+    val mealReminders  by context.notifDataStore.data.map { it[KEY_MEAL_REMINDERS]  ?: true  }.collectAsStateWithLifecycle(initialValue = true)
+    val dailyRecap     by context.notifDataStore.data.map { it[KEY_DAILY_RECAP]     ?: true  }.collectAsStateWithLifecycle(initialValue = true)
+    val biometricLock  by context.notifDataStore.data.map { it[KEY_BIOMETRIC_LOCK]  ?: false }.collectAsStateWithLifecycle(initialValue = false)
 
     Scaffold(topBar = {
         TopAppBar(

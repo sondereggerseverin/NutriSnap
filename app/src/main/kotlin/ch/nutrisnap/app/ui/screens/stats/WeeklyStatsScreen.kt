@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -81,8 +82,8 @@ class WeeklyStatsViewModel(app: Application) : AndroidViewModel(app) {
 
 @Composable
 fun WeeklyStatsScreen(viewModel: WeeklyStatsViewModel) {
-    val weeklyData by viewModel.weeklyData.collectAsState()
-    val calorieGoal by viewModel.calorieGoal.collectAsState()
+    val weeklyData by viewModel.weeklyData.collectAsStateWithLifecycle()
+    val calorieGoal by viewModel.calorieGoal.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier

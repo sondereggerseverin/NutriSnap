@@ -9,6 +9,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -33,10 +34,10 @@ fun HealthConnectScreen(
     onBack: () -> Unit = {},
     viewModel: HealthConnectViewModel = viewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val adjustedGoal by viewModel.adjustedCalorieGoal.collectAsState()
-    val weeklyStats by viewModel.weeklyStats.collectAsState()
-    val adaptiveTarget by viewModel.adaptiveDailyTarget.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val adjustedGoal by viewModel.adjustedCalorieGoal.collectAsStateWithLifecycle()
+    val weeklyStats by viewModel.weeklyStats.collectAsStateWithLifecycle()
+    val adaptiveTarget by viewModel.adaptiveDailyTarget.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {

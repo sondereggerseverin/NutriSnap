@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -84,10 +85,10 @@ fun ImprovedFoodSearchScreen(
     onOpenBarcode: () -> Unit,
     onCreateCustom: () -> Unit = {}
 ) {
-    val query by viewModel.query.collectAsState()
-    val searchState by viewModel.searchState.collectAsState()
-    val recentFoods by viewModel.recentFoods.collectAsState()
-    val frequentFoods by viewModel.frequentFoods.collectAsState()
+    val query by viewModel.query.collectAsStateWithLifecycle()
+    val searchState by viewModel.searchState.collectAsStateWithLifecycle()
+    val recentFoods by viewModel.recentFoods.collectAsStateWithLifecycle()
+    val frequentFoods by viewModel.frequentFoods.collectAsStateWithLifecycle()
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {

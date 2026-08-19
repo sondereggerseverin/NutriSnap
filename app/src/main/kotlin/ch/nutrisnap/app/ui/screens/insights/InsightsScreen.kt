@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -27,7 +28,7 @@ fun InsightsScreen(
     onBack: () -> Unit = {},
     vm: InsightsViewModel = viewModel()
 ) {
-    val insights by vm.insights.collectAsState()
+    val insights by vm.insights.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {

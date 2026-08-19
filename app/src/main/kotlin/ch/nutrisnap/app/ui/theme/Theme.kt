@@ -4,7 +4,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
@@ -329,7 +329,7 @@ val NutriSnapTypography = Typography(
 @Composable
 fun NutriSnapTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
-    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
     val themeName = prefs?.get(KEY_APP_THEME) ?: AppTheme.FOREST_GREEN.name
     val theme = runCatching { AppTheme.valueOf(themeName) }.getOrDefault(AppTheme.FOREST_GREEN)
     val useDarkColors = isSystemInDarkTheme()

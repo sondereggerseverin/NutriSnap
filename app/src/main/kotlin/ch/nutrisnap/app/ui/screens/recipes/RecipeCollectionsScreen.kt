@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -79,9 +80,9 @@ fun RecipeCollectionsScreen(
     onOpenRecipe: (Recipe) -> Unit = {},
     onBack: () -> Unit
 ) {
-    val collections by viewModel.collections.collectAsState()
-    val favorites by viewModel.favoriteRecipes.collectAsState()
-    val counts by viewModel.collectionCounts.collectAsState()
+    val collections by viewModel.collections.collectAsStateWithLifecycle()
+    val favorites by viewModel.favoriteRecipes.collectAsStateWithLifecycle()
+    val counts by viewModel.collectionCounts.collectAsStateWithLifecycle()
     var showNewCollectionDialog by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
     var newEmoji by remember { mutableStateOf("📁") }
@@ -338,7 +339,7 @@ private fun CollectionRecipesScreen(
     onToggleFavorite: (Recipe) -> Unit,
     emptyHint: String
 ) {
-    val recipes by recipesFlow.collectAsState(initial = emptyList())
+    val recipes by recipesFlow.collectAsStateWithLifecycle(initialValue = emptyList())
 
     Scaffold(
         topBar = {
@@ -425,7 +426,7 @@ fun AssignToCollectionDialog(
     onDismiss: () -> Unit,
     viewModel: RecipeCollectionsViewModel = viewModel()
 ) {
-    val collections by viewModel.collections.collectAsState()
+    val collections by viewModel.collections.collectAsStateWithLifecycle()
 
     AlertDialog(
         onDismissRequest = onDismiss,

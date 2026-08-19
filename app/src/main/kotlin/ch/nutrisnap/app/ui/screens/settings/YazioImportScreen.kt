@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material.icons.filled.Fastfood
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -22,9 +23,9 @@ fun YazioImportScreen(
     onBack: () -> Unit,
     viewModel: YazioImportViewModel = viewModel()
 ) {
-    val state by viewModel.state.collectAsState()
-    val recipeState by viewModel.recipeState.collectAsState()
-    val foodState by viewModel.foodState.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val recipeState by viewModel.recipeState.collectAsStateWithLifecycle()
+    val foodState by viewModel.foodState.collectAsStateWithLifecycle()
 
     val filePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()

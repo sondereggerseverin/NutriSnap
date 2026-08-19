@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,8 +41,8 @@ fun HomeScreen(
     onNavigateToDiary: (meal: MealType?, autoOpenAdd: Boolean) -> Unit = { _, _ -> },
     onNavigateToHealth: () -> Unit = {}
 ) {
-    val state by vm.uiState.collectAsState()
-    val hcState by hcVm.uiState.collectAsState()
+    val state by vm.uiState.collectAsStateWithLifecycle()
+    val hcState by hcVm.uiState.collectAsStateWithLifecycle()
     var showWeightDialog by remember { mutableStateOf(false) }
     var showActivityDialog by remember { mutableStateOf(false) }
     val window = ch.nutrisnap.app.ui.rememberWindowInfo()
@@ -523,7 +524,7 @@ private fun MealOverviewGrid(
     onQuickAdd: (MealOverview) -> Unit
 ) {
     val context = LocalContext.current
-    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
     val freshHome = (prefs?.get(KEY_FRESH_HOME) == true) || (prefs?.get(KEY_FRESH_UI) == true)
 
     if (freshHome) {
@@ -591,7 +592,7 @@ private fun MealOverviewGrid(
 @Composable
 private fun MealRowItem(meal: MealOverview, onClick: () -> Unit, onQuickAdd: () -> Unit) {
     val context = LocalContext.current
-    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
     val largerQuickAdd = prefs?.get(KEY_TOGGLE_TOUCH_MEAL_QUICKADD) ?: true
     val largerIcon = prefs?.get(KEY_TOGGLE_TOUCH_MEAL_ICON) ?: true
     val iconSize = if (largerIcon) 46.dp else 38.dp
@@ -680,7 +681,7 @@ private fun MealTile(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
     val largerQuickAdd = prefs?.get(KEY_TOGGLE_TOUCH_MEAL_QUICKADD) ?: true
     val largerIcon = prefs?.get(KEY_TOGGLE_TOUCH_MEAL_ICON) ?: true
     val iconSize = if (largerIcon) 44.dp else 32.dp

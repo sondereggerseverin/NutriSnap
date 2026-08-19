@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -30,8 +31,8 @@ fun DataChatScreen(
     onBack: () -> Unit = {},
     vm: DataChatViewModel = viewModel()
 ) {
-    val messages by vm.messages.collectAsState()
-    val isLoading by vm.isLoading.collectAsState()
+    val messages by vm.messages.collectAsStateWithLifecycle()
+    val isLoading by vm.isLoading.collectAsStateWithLifecycle()
     var question by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()

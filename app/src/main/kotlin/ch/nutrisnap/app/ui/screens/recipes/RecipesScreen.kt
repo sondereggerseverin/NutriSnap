@@ -31,6 +31,7 @@ import androidx.compose.material3.*
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -283,8 +284,8 @@ fun RecipesScreen(
     sharedBatchUrls: List<String> = emptyList(),
     sharedRecipeJson: String? = null
 ) {
-    val state by vm.uiState.collectAsState()
-    val collections by collectionsVm.collections.collectAsState()
+    val state by vm.uiState.collectAsStateWithLifecycle()
+    val collections by collectionsVm.collections.collectAsStateWithLifecycle()
     var showImportSheet   by remember { mutableStateOf(false) }
     var showCreateSheet   by remember { mutableStateOf(false) }
     var selectedRecipe    by remember { mutableStateOf<Recipe?>(null) }
@@ -306,11 +307,11 @@ fun RecipesScreen(
     var cookingRecipe     by remember { mutableStateOf<Recipe?>(null) }
     var showCollections   by remember { mutableStateOf(false) }
     var assignCollectionRecipe by remember { mutableStateOf<Recipe?>(null) }
-    val batchState by vm.batchState.collectAsState()
-    val budgetScaleState by vm.budgetScaleState.collectAsState()
-    val pendingTargetKcal by vm.pendingTargetKcal.collectAsState()
+    val batchState by vm.batchState.collectAsStateWithLifecycle()
+    val budgetScaleState by vm.budgetScaleState.collectAsStateWithLifecycle()
+    val pendingTargetKcal by vm.pendingTargetKcal.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
     val classicList = prefs?.get(KEY_CLASSIC_RECIPE_LIST) == true
     val freshCards = (prefs?.get(KEY_FRESH_RECIPE_CARDS) == true) || (prefs?.get(KEY_FRESH_UI) == true)
     val useGrid = !classicList
@@ -720,8 +721,8 @@ fun RecipesScreen(
 
     val showVerifyNow = showVerifySheet && verifyRecipe != null && verifyResult != null
     if (showVerifyNow) {
-        val existingComps by vm.getComponents(verifyRecipe!!.id).collectAsState(initial = emptyList())
-        val storedMatches by vm.getMatches(verifyRecipe.id).collectAsState(initial = emptyList())
+        val existingComps by vm.getComponents(verifyRecipe!!.id).collectAsStateWithLifecycle(initialValue = emptyList())
+        val storedMatches by vm.getMatches(verifyRecipe.id).collectAsStateWithLifecycle(initialValue = emptyList())
         val sessionOv = vm.getOverridesFor(verifyRecipe.id)
         val initialOv = if (sessionOv.isNotEmpty()) sessionOv else matchesToOverrides(storedMatches)
         IngredientVerifySheet(
@@ -776,8 +777,8 @@ fun RecipesScreen(
         }
     }
     if (showSplitSheet && splitRecipe != null) {
-        val splitMatches by vm.getMatches(splitRecipe.id).collectAsState(initial = emptyList())
-        val splitComps by vm.getComponents(splitRecipe.id).collectAsState(initial = emptyList())
+        val splitMatches by vm.getMatches(splitRecipe.id).collectAsStateWithLifecycle(initialValue = emptyList())
+        val splitComps by vm.getComponents(splitRecipe.id).collectAsStateWithLifecycle(initialValue = emptyList())
         ComponentSplitSheet(
             recipe = splitRecipe,
             matches = splitMatches,
@@ -797,8 +798,8 @@ fun RecipesScreen(
     if (!showVerifyNow && !showSplitSheet) selectedRecipe?.let { recipe ->
         // Always show latest version from state
         val live = state.recipes.find { it.id == recipe.id } ?: recipe
-        val liveMatches by vm.getMatches(live.id).collectAsState(initial = emptyList())
-        val imageRefresh by vm.imageRefreshState.collectAsState()
+        val liveMatches by vm.getMatches(live.id).collectAsStateWithLifecycle(initialValue = emptyList())
+        val imageRefresh by vm.imageRefreshState.collectAsStateWithLifecycle()
         // Caption-Klumpen einmalig in saubere Zeilen zerlegen und speichern
         LaunchedEffect(live.id, live.ingredients) {
             vm.repairMashedIngredientsIfNeeded(live)
@@ -945,8 +946,8 @@ fun RecipesScreen(
     }
 
     addToDiaryRecipe?.let { recipe ->
-        val components by vm.getComponents(recipe.id).collectAsState(initial = emptyList())
-        val diaryMatches by vm.getMatches(recipe.id).collectAsState(initial = emptyList())
+        val components by vm.getComponents(recipe.id).collectAsStateWithLifecycle(initialValue = emptyList())
+        val diaryMatches by vm.getMatches(recipe.id).collectAsStateWithLifecycle(initialValue = emptyList())
         // Persistente Korrektur: Nährwerte aus Matches ableiten (einmal pro Öffnen)
         LaunchedEffect(recipe.id, components, diaryMatches) {
             if (components.size > 1) {
@@ -1017,7 +1018,7 @@ fun RecipesScreen(
     }
 
     editComponentsRecipe?.let { recipe ->
-        val existing by vm.getComponents(recipe.id).collectAsState(initial = emptyList())
+        val existing by vm.getComponents(recipe.id).collectAsStateWithLifecycle(initialValue = emptyList())
         var suggested by remember(recipe.id) { mutableStateOf<List<RecipeComponent>>(emptyList()) }
         var suggestKey by remember { mutableStateOf(0) }
         LaunchedEffect(recipe.id, suggestKey) {
@@ -1044,7 +1045,7 @@ private fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit
     var showConfirm by remember { mutableStateOf(false) }
     val incomplete = recipe.isIncomplete()
     val context = LocalContext.current
-    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
     val stars = recipeStarsFromPrefs(prefs?.get(KEY_RECIPE_RATINGS), recipe.id)
     // Fresh-Layout läuft über RecipeCardV2; hier nur Warnzeile + klassische Karte
     Card(
@@ -1671,7 +1672,7 @@ fun RecipeDetailSheet(
     ingredientMatches: List<ch.nutrisnap.app.data.model.IngredientMatch> = emptyList()
 ) {
     val context = LocalContext.current
-    val prefs by context.notifDataStore.data.collectAsState(initial = null)
+    val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
     val freshRecipeDetail = (prefs?.get(KEY_FRESH_RECIPE_DETAIL) ?: false) ||
         (prefs?.get(KEY_FRESH_UI) ?: false)
     var servings   by remember(recipe.id) { mutableStateOf(recipe.servings) }

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -27,7 +28,7 @@ import java.time.format.DateTimeFormatter
 
 @Composable
 fun FreezerScreen(vm: FreezerViewModel = viewModel()) {
-    val meals by vm.meals.collectAsState()
+    val meals by vm.meals.collectAsStateWithLifecycle()
     var thawTarget by remember { mutableStateOf<FrozenMeal?>(null) }
 
     Column(Modifier.fillMaxSize()) {

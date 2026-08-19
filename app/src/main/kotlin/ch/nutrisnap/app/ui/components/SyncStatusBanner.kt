@@ -17,7 +17,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,7 +36,7 @@ import kotlinx.coroutines.delay
  */
 @Composable
 fun SyncStatusBanner() {
-    val status by SyncStatusHolder.status.collectAsState()
+    val status by SyncStatusHolder.status.collectAsStateWithLifecycle()
 
     // Stuck-Guard: alle 10s prüfen
     LaunchedEffect(status.state, status.activeOps) {
