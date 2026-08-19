@@ -42,12 +42,10 @@ class SearchUtilsTest {
             listOf("Ananas", "Grüner Apfel", "Apfelmus", "Banane")
         )
         assertTrue(ranked.isNotEmpty())
-        // Apfelmus / Grüner Apfel should rank above unrelated
         val names = ranked.map { it.first }
         assertTrue(names.any { it.contains("Apfel", ignoreCase = true) })
         assertFalse(names.contains("Banane"))
     }
-}
 
     @Test
     fun `toFtsMatchQuery builds prefix tokens`() {
@@ -56,3 +54,4 @@ class SearchUtilsTest {
         assertEquals("", SearchUtils.toFtsMatchQuery("a"))
         assertEquals("", SearchUtils.toFtsMatchQuery("  "))
     }
+}
