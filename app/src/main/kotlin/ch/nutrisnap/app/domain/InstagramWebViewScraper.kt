@@ -116,10 +116,7 @@ object InstagramWebViewScraper {
     private fun decodeJsString(rawResult: String?): String? =
         rawResult
             ?.removeSurrounding("\"")
-            ?.replace("\\n", "\n")
-            ?.replace("\\\"", "\"")
-            ?.replace("\\u003c", "<")
-            ?.replace("\\u003e", ">")
+            ?.let { RecipeAiParser.unescapeSocialText(it) }
             ?.trim()
             ?.takeIf { it.isNotBlank() && it != "null" }
 
@@ -147,7 +144,7 @@ object InstagramWebViewScraper {
                         if (txt.includes('edge_media_to_caption') || txt.includes('"caption"')) {
                             var m = txt.match(/"edge_media_to_caption".*?"text":"((?:[^"\\]|\\.)*)"/);
                             if (!m) m = txt.match(/"caption"\s*:\s*\{[^}]*"text"\s*:\s*"((?:[^"\\]|\\.){20,})"/);
-                            if (m && m[1] && m[1].length > 10) return m[1].replace(/\\n/g, '\n');
+                            if (m && m[1] && m[1].length > 10) return m[1].replace(/\\n/g, '\n').replace(/\\t/g, ' ');
                         }
                     }
                 } catch(e) {}
@@ -165,7 +162,7 @@ object InstagramWebViewScraper {
                         ];
                         for (var p of patterns) {
                             var m = str.match(p);
-                            if (m && m[1]) return m[1].replace(/\\n/g, '\n');
+                            if (m && m[1]) return m[1].replace(/\\n/g, '\n').replace(/\\t/g, ' ');
                         }
                     } catch(e) {}
                 }

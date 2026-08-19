@@ -486,7 +486,7 @@ class RecipeScraper(private val context: Context) {
             if (body.isBlank() || !body.trimStart().startsWith("{")) continue
             val caption = Regex(""""text"\s*:\s*"((?:[^"\\]|\\.){40,})"""")
                 .findAll(body)
-                .map { it.groupValues[1].replace("\\n", "\n").replace("\\\"", "\"") }
+                .map { RecipeAiParser.unescapeSocialText(it.groupValues[1]) }
                 .maxByOrNull { it.length }
             if (!caption.isNullOrBlank()) return caption
         }
@@ -510,7 +510,7 @@ class RecipeScraper(private val context: Context) {
         if (body.isBlank() || "login" in body.lowercase().take(300)) return null
         return Regex(""""text"\s*:\s*"((?:[^"\\]|\\.){40,})"""")
             .findAll(body)
-            .map { it.groupValues[1].replace("\\n", "\n").replace("\\\"", "\"") }
+            .map { RecipeAiParser.unescapeSocialText(it.groupValues[1]) }
             .maxByOrNull { it.length }
     }
 
@@ -522,7 +522,7 @@ class RecipeScraper(private val context: Context) {
             doc.select("meta[property=og:description]").attr("content"),
             doc.select("meta[name=description]").attr("content"),
             Regex(""""text"\s*:\s*"((?:[^"\\]|\\.){40,})"""").findAll(html)
-                .map { it.groupValues[1].replace("\\n", "\n").replace("\\\"", "\"") }
+                .map { RecipeAiParser.unescapeSocialText(it.groupValues[1]) }
                 .maxByOrNull { it.length }
                 .orEmpty()
         )
@@ -551,7 +551,7 @@ class RecipeScraper(private val context: Context) {
                 doc.select("meta[name=description]").attr("content"),
                 // JSON im Embed-Script
                 Regex(""""text"\s*:\s*"((?:[^"\\]|\\.){40,})"""").findAll(html)
-                    .map { it.groupValues[1].replace("\\n", "\n").replace("\\\"", "\"") }
+                    .map { RecipeAiParser.unescapeSocialText(it.groupValues[1]) }
                     .maxByOrNull { it.length }
                     .orEmpty()
             )
@@ -674,7 +674,7 @@ class RecipeScraper(private val context: Context) {
                         val apiUrl = "https://www.tikwm.com/api/?url=${encode(expandedUrl)}&hd=1"
                         val raw = fetchString(apiUrl)
                         val title = Regex(""""title"\s*:\s*"((?:[^"\\]|\\.)*)"""").find(raw)?.groupValues?.get(1)
-                            ?.replace("\\n", "\n")?.replace("\\\"", "\"")
+                            ?.let { RecipeAiParser.unescapeSocialText(it) }
                         val cover = Regex(""""origin_cover"\s*:\s*"((?:[^"\\]|\\.)*)"""").find(raw)?.groupValues?.get(1)
                             ?: Regex(""""cover"\s*:\s*"((?:[^"\\]|\\.)*)"""").find(raw)?.groupValues?.get(1)
                         val auth = Regex(""""unique_id"\s*:\s*"((?:[^"\\]|\\.)*)"""").find(raw)?.groupValues?.get(1)

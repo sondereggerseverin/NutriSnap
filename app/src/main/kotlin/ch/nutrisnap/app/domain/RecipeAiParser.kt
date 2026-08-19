@@ -139,6 +139,51 @@ object RecipeAiParser {
     }
 
     /**
+     * JSON-/Social-Escapes auflösen (Instagram/TikTok-Captions).
+     * Ohne das landen wörtliche "\t" / "\n" / "\u00e4" in den Zutatenzeilen.
+     * Idempotent auf bereits unescaped Text.
+     */
+    fun unescapeSocialText(raw: String): String {
+        if (raw.isEmpty()) return raw
+        if ('\\' !in raw) {
+            return raw.replace("\r\n", "\n").replace('\r', '\n')
+        }
+        val sb = StringBuilder(raw.length)
+        var i = 0
+        while (i < raw.length) {
+            val c = raw[i]
+            if (c == '\\' && i + 1 < raw.length) {
+                when (val n = raw[i + 1]) {
+                    'n' -> { sb.append('\n'); i += 2 }
+                    'r' -> { sb.append('\n'); i += 2 }
+                    't' -> { sb.append(' '); i += 2 }
+                    '"' -> { sb.append('"'); i += 2 }
+                    '\'' -> { sb.append('\''); i += 2 }
+                    '\\' -> { sb.append('\\'); i += 2 }
+                    '/' -> { sb.append('/'); i += 2 }
+                    'u', 'U' -> {
+                        val end = (i + 6).coerceAtMost(raw.length)
+                        val hex = raw.substring(i + 2, end)
+                        if (hex.length == 4 && hex.all { it in "0123456789abcdefABCDEF" }) {
+                            sb.append(hex.toInt(16).toChar())
+                            i += 6
+                        } else {
+                            sb.append(c); i++
+                        }
+                    }
+                    else -> { sb.append(c); sb.append(n); i += 2 }
+                }
+            } else {
+                sb.append(c); i++
+            }
+        }
+        return sb.toString()
+            .replace("\r\n", "\n")
+            .replace('\r', '\n')
+            .replace(Regex("[ \\t]{2,}"), " ")
+    }
+
+    /**
      * Strips the "X likes, Y comments - username on Date:" prefix that
      * Instagram/mirror sites prepend to og:description captions, and removes
      * surrounding quote marks. Safe to call on already-clean text (no-op).
@@ -148,7 +193,8 @@ object RecipeAiParser {
             """^[\d.,]+\s*(?:likes?|Likes?)\s*,?\s*[\d.,]*\s*(?:comments?|Comments?)?\s*-\s*\S+\s+on\s+[^:]+:\s*""",
             RegexOption.IGNORE_CASE
         )
-        var c = prefixRegex.replace(raw.trim(), "").trim()
+        var c = unescapeSocialText(raw.trim())
+        c = prefixRegex.replace(c, "").trim()
         // Strip surrounding straight or curly quotes left over from the caption
         c = c.removeSurrounding("\"").removeSurrounding("\u201c", "\u201d").trim()
         // Normalize TikTok/Instagram "*" ingredient separator → newlines
@@ -158,7 +204,7 @@ object RecipeAiParser {
         // Immer Mengen/Abschnitte trennen – auch wenn schon einzelne Newlines da sind
         // (sonst bleibt "600g Hähnchen 15 ml Öl 1 Tsp Paprika" in einer Zeile)
         c = splitInlineIngredients(c)
-        return c.ifBlank { raw.trim() }
+        return c.ifBlank { unescapeSocialText(raw.trim()) }
     }
 
     /**
@@ -169,7 +215,7 @@ object RecipeAiParser {
      */
     fun formatIngredientText(raw: String): String {
         if (raw.isBlank()) return raw
-        var t = raw.trim()
+        var t = unescapeSocialText(raw.trim())
         // Hashtags entfernen
         t = t.replace(Regex("""(?:\s*#\w+)+[\s:]*$""", RegexOption.IGNORE_CASE), "").trim()
         t = t.replace(Regex("""#\w+"""), " ").trim()
@@ -257,6 +303,19 @@ object RecipeAiParser {
         if (Regex("""^(ingredients?|zutaten)\s*(\(|$|for\s+\d|serves?)""", RegexOption.IGNORE_CASE)
                 .containsMatchIn(d) && !Regex("""\d+\s*(g|ml|tsp|tbsp)""", RegexOption.IGNORE_CASE).containsMatchIn(d)
         ) return true
+        // Marketing-/Subtitle ohne Mengenangabe (Caption-Intro, nicht Zutat)
+        // z.B. "Gesund, proteinreich & super easy für 4 Portionen"
+        val hasQuantity = Regex(
+            """(?i)(\d+[.,]?\d*|½|¼|¾|⅓|⅔)\s*(g|kg|ml|l|tl|el|tsp|tbsp|cup|cups|oz|lb|stück|stk|prise|bund|dose|pack|scheibe|scheiben)?\b"""
+        ).containsMatchIn(d)
+        if (!hasQuantity && !isSectionHeaderLine(d)) {
+            val marketingHits = listOf(
+                "proteinreich", "gesund", "super easy", "meal prep", "perfekt zum",
+                "für die woche", "zum mitnehmen", "high protein", "low calorie",
+                "easy für", "mac & cheese meal", "das perfekte"
+            ).count { lower.contains(it) }
+            if (marketingHits >= 1 && d.length > 20) return true
+        }
         // Makro-Zusammenfassungen: "265 kcals | P:", "39g | C:", "20g | F:", "5g per cup"
         if (Regex(
                 """^\d+[.,]?\d*\s*(kcals?|calories?|kcal)\b""",
