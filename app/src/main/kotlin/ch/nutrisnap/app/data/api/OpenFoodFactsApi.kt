@@ -40,21 +40,36 @@ object OpenFoodFactsApi {
                     val p = root.optJSONObject("product") ?: return@runCatching emptyList()
                     productToFoodItem(p, barcode = code)?.let { listOf(it) } ?: emptyList()
                 } else {
-                    // Name search
-                    val encoded = java.net.URLEncoder.encode(query.take(60), "UTF-8")
-                    val url = "https://world.openfoodfacts.org/cgi/search.pl" +
-                            "?search_terms=$encoded&search_simple=1&action=process&json=1" +
-                            "&page_size=$limit&fields=product_name,brands,nutriments,code,serving_size"
-                    val req = Request.Builder().url(url)
-                        .header("User-Agent", "NutriSnap/1.0 (Android)").build()
-                    val body = client.newCall(req).execute().use { it.body?.string() ?: return@runCatching emptyList() }
-                    val products = JSONObject(body).optJSONArray("products")
-                        ?: return@runCatching emptyList()
-                    (0 until products.length())
-                        .mapNotNull { productToFoodItem(products.getJSONObject(it)) }
+                    // Name search: zuerst CH-Subdomain (implizites Land=Schweiz-Filter),
+                    // damit Eigenmarken (Migros, Coop, Aldi, Lidl) vor internationalem
+                    // Rauschen ranken. Bei zu wenig CH-Treffern zusaetzlich global
+                    // nachladen (z.B. fuer Marken/Produkte ohne CH-Tagging).
+                    val chResults = searchOn("https://ch.openfoodfacts.org", query, limit)
+                    if (chResults.size >= 3) {
+                        chResults
+                    } else {
+                        val worldResults = searchOn("https://world.openfoodfacts.org", query, limit)
+                        (chResults + worldResults)
+                            .distinctBy { it.barcode ?: (it.name.lowercase().trim() + "|" + (it.brand?.lowercase()?.trim() ?: "")) }
+                            .take(limit)
+                    }
                 }
             }.getOrDefault(emptyList())
         }
+
+    /** Fuehrt eine Namenssuche gegen die angegebene OFF-Subdomain aus (z.B. ch./world.). */
+    private fun searchOn(baseHost: String, query: String, limit: Int): List<FoodItem> {
+        val encoded = java.net.URLEncoder.encode(query.take(60), "UTF-8")
+        val url = "$baseHost/cgi/search.pl" +
+                "?search_terms=$encoded&search_simple=1&action=process&json=1" +
+                "&page_size=$limit&fields=product_name,brands,nutriments,code,serving_size"
+        val req = Request.Builder().url(url)
+            .header("User-Agent", "NutriSnap/1.0 (Android)").build()
+        val body = client.newCall(req).execute().use { it.body?.string() } ?: return emptyList()
+        val products = JSONObject(body).optJSONArray("products") ?: return emptyList()
+        return (0 until products.length())
+            .mapNotNull { productToFoodItem(products.getJSONObject(it)) }
+    }
 
     private fun productToFoodItem(p: org.json.JSONObject, barcode: String? = null): FoodItem? {
         val n = p.optJSONObject("nutriments") ?: return null
