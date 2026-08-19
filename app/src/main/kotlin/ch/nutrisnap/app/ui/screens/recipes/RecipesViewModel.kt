@@ -963,6 +963,10 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Merged verifizierte Zutaten als IngredientMatch-Zeilen (kein delete-all).
+     * Primär per id, Fallback über normalisierten ingredientName.
+     * Bestehende componentGroup / matchedFoodItemId bleiben erhalten, wenn die
+     * neue Zeile keinen expliziten neuen Wert mitbringt.
+     */
     fun mergeMatchesForRecipe(recipeId: Long, matches: List<ch.nutrisnap.app.data.model.IngredientMatch>) {
         viewModelScope.launch {
             val existing = matchDao.getMatchesForRecipeOnce(recipeId)
