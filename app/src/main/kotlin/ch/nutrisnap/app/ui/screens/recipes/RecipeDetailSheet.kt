@@ -332,8 +332,7 @@ fun RecipeDetailSheet(
                             TextButton(
                                 onClick = {
                                     if (ingredientsEditMode) {
-                                        val newText = ingredientLines.filter { it.isNotBlank() }.joinToString("
-")
+                                        val newText = ingredientLines.filter { it.isNotBlank() }.joinToString("\n")
                                         if (newText != recipe.ingredients) onUpdateIngredients(newText)
                                     }
                                     ingredientsEditMode = !ingredientsEditMode
