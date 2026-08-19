@@ -14,9 +14,19 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface FoodItemDao {
 
-    // ── Basic search (used by FoodItemRepository.searchAll) ──────────────────
+    // ── Basic search (LIKE, Fallback / kurze Queries) ─────────────────────────
     @Query("SELECT * FROM food_items WHERE ${SearchSql.NORM_NAME} LIKE '%' || ${SearchSql.NORM_QUERY} || '%' OR ${SearchSql.NORM_BRAND} LIKE '%' || ${SearchSql.NORM_QUERY} || '%' ORDER BY timesUsed DESC LIMIT 50")
     suspend fun search(query: String): List<FoodItem>
+
+    // ── FTS5-Suche (schnell bei grosser food_items-Tabelle) ───────────────────
+    @Query("""
+        SELECT fi.* FROM food_items_fts
+        JOIN food_items fi ON fi.id = food_items_fts.rowid
+        WHERE food_items_fts MATCH :ftsQuery
+        ORDER BY fi.timesUsed DESC
+        LIMIT 50
+    """)
+    suspend fun searchFts(ftsQuery: String): List<FoodItem>
 
     // ── Extended search (used by FoodSearchRepository) ────────────────────────
     @Query("SELECT * FROM food_items WHERE ${SearchSql.NORM_NAME} LIKE '%' || ${SearchSql.NORM_QUERY} || '%' ORDER BY timesUsed DESC LIMIT 50")

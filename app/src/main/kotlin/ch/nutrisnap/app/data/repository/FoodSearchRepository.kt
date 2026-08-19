@@ -35,7 +35,12 @@ class FoodSearchRepository(
         // Synonym-Expansion für lokale DB (z.B. "poulet" → auch "hähnchen"/"chicken")
         val synonymQueries = synonymExpansionQueries(query) + listOfNotNull(swissVariant)
         val cached = (listOf(query) + synonymQueries).flatMap { q ->
-            runCatching { foodItemDao.searchFoods(q) }.getOrDefault(emptyList())
+            val fts = SearchUtils.toFtsMatchQuery(q)
+            val ftsHits = if (fts.isNotBlank())
+                runCatching { foodItemDao.searchFts(fts) }.getOrDefault(emptyList())
+            else emptyList()
+            if (ftsHits.isNotEmpty()) ftsHits
+            else runCatching { foodItemDao.searchFoods(q) }.getOrDefault(emptyList())
         }
         val cachedDistinct = cached
             .distinctBy { normalizeKey(it) }

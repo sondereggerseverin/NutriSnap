@@ -48,3 +48,11 @@ class SearchUtilsTest {
         assertFalse(names.contains("Banane"))
     }
 }
+
+    @Test
+    fun `toFtsMatchQuery builds prefix tokens`() {
+        assertEquals("haehn*", SearchUtils.toFtsMatchQuery("haehn"))
+        assertEquals("suss* kartoffel*", SearchUtils.toFtsMatchQuery("suss kartoffel"))
+        assertEquals("", SearchUtils.toFtsMatchQuery("a"))
+        assertEquals("", SearchUtils.toFtsMatchQuery("  "))
+    }

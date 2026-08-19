@@ -678,6 +678,17 @@ class FoodItemRepository(db: NutriDatabase) {
 
     fun getCustom(): Flow<List<FoodItem>> = dao.getAllCustom()
 
+
+    /** FTS5 zuerst, LIKE als Fallback (kurze Queries / leerer FTS-Treffer). */
+    private suspend fun localFoodSearch(dao: ch.nutrisnap.app.data.db.FoodItemDao, q: String): List<FoodItem> {
+        val fts = SearchUtils.toFtsMatchQuery(q)
+        if (fts.isNotBlank()) {
+            val hits = runCatching { dao.searchFts(fts) }.getOrDefault(emptyList())
+            if (hits.isNotEmpty()) return hits
+        }
+        return runCatching { dao.search(q) }.getOrDefault(emptyList())
+    }
+
     suspend fun searchAll(query: String): List<FoodItem> {
         // Barcode shortcut: pure digit string 8–14 chars
         if (query.all { it.isDigit() } && query.length in 8..14) {
@@ -688,7 +699,7 @@ class FoodItemRepository(db: NutriDatabase) {
         // damit z.B. "kalbsplätzli" auch "Kalbs Plätzli" in custom_foods findet.
         val variants = SearchUtils.localQueryVariants(query)
         val local = variants.flatMap { q ->
-            runCatching { dao.search(q) }.getOrDefault(emptyList())
+            localFoodSearch(dao, q)
         }.distinctBy { it.barcode ?: it.name.lowercase().trim() }
         val custom = variants.flatMap { q ->
             runCatching { customFoodDao.searchOnce(q) }.getOrDefault(emptyList())

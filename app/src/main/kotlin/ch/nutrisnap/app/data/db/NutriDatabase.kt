@@ -80,7 +80,7 @@ interface UserProfileDao {
         RecipeComponent::class,
         FrozenMeal::class
     ],
-    version = 33,
+    version = 34,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -666,6 +666,45 @@ abstract class NutriDatabase : RoomDatabase() {
         }
 
         // Performance-Indizes für Tagebuch-, Food- und Custom-Food-Queries
+
+        /** FTS5-Volltextindex über food_items (name, brand) – spürbar schnellere lokale Suche. */
+        private val MIGRATION_33_34 = object : Migration(33, 34) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE VIRTUAL TABLE IF NOT EXISTS food_items_fts USING fts5(
+                        name,
+                        brand,
+                        content='food_items',
+                        content_rowid='id',
+                        tokenize='unicode61'
+                    )
+                """.trimIndent())
+                // Sync-Trigger (External-Content-Tabelle)
+                db.execSQL("""
+                    CREATE TRIGGER IF NOT EXISTS food_items_fts_ai AFTER INSERT ON food_items BEGIN
+                        INSERT INTO food_items_fts(rowid, name, brand)
+                        VALUES (new.id, new.name, coalesce(new.brand, ''));
+                    END
+                """.trimIndent())
+                db.execSQL("""
+                    CREATE TRIGGER IF NOT EXISTS food_items_fts_ad AFTER DELETE ON food_items BEGIN
+                        INSERT INTO food_items_fts(food_items_fts, rowid, name, brand)
+                        VALUES ('delete', old.id, old.name, coalesce(old.brand, ''));
+                    END
+                """.trimIndent())
+                db.execSQL("""
+                    CREATE TRIGGER IF NOT EXISTS food_items_fts_au AFTER UPDATE OF name, brand ON food_items BEGIN
+                        INSERT INTO food_items_fts(food_items_fts, rowid, name, brand)
+                        VALUES ('delete', old.id, old.name, coalesce(old.brand, ''));
+                        INSERT INTO food_items_fts(rowid, name, brand)
+                        VALUES (new.id, new.name, coalesce(new.brand, ''));
+                    END
+                """.trimIndent())
+                // Bestehende Zeilen indexieren
+                db.execSQL("INSERT INTO food_items_fts(food_items_fts) VALUES('rebuild')")
+            }
+        }
+
         private val MIGRATION_32_33 = object : Migration(32, 33) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_diary_entries_dateStr ON diary_entries(dateStr)")
@@ -695,7 +734,7 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
                         MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28,
                         MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32,
-                        MIGRATION_32_33
+                        MIGRATION_32_33, MIGRATION_33_34
                     )
                     .build()
                     .also { INSTANCE = it }

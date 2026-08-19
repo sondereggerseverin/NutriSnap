@@ -214,4 +214,25 @@ object SearchUtils {
         }
         return out.filter { it.isNotBlank() && it != q }.distinct()
     }
+
+
+    /**
+     * Baut eine FTS5-MATCH-Query mit Prefix-Suche pro Token.
+     * Leere/zu kurze Eingaben → leerer String (Caller soll LIKE-Fallback nutzen).
+     */
+    fun toFtsMatchQuery(raw: String): String {
+        val tokens = raw.trim()
+            .split(Regex("\\s+"))
+            .map { it.trim() }
+            .filter { it.length >= 2 }
+            .map { token ->
+                // FTS5 Sonderzeichen escapen / entfernen
+                token.replace(Regex("""["*():^]"""), "")
+                    .replace("'", "''")
+            }
+            .filter { it.isNotBlank() }
+        if (tokens.isEmpty()) return ""
+        // Prefix-Match: "haehn" findet "Haehnchen"
+        return tokens.joinToString(" ") { "$it*" }
+    }
 }
