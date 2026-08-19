@@ -1,6 +1,7 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -26,5 +27,27 @@ class RecipeCaptionParserTest {
         val (ing, instr) = RecipeCaptionParser.parseCaption("Einfach lecker mit Tomaten")
         assertEquals("Einfach lecker mit Tomaten", ing)
         assertEquals("", instr)
+    }
+
+    @Test
+    fun `promo ingredients with star does not steal the ingredients block`() {
+        val caption = """
+            These Oreo oats are SO scrummy
+            ✨recipe✨
+            50g of oat flour*
+            30g protein powder*
+            The ingredients with a * are from @prozis (code FITFOODIEJULES will give you a big discount + gifts!)
+            Preheat oven to 180 mix all
+        """.trimIndent()
+        val (ing, instr) = RecipeCaptionParser.parseCaption(caption)
+        assertTrue("real ingredients kept", ing.contains("50g") || ing.contains("oat flour"))
+        assertFalse(
+            "promo must not start the block alone",
+            ing.trim().lowercase().startsWith("the ingredients with")
+        )
+        assertTrue(
+            "preheat should land in instructions or after ingredients",
+            instr.lowercase().contains("preheat") || ing.lowercase().contains("preheat")
+        )
     }
 }

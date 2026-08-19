@@ -57,4 +57,67 @@ class RecipeAiParserFormatTest {
         val clean = "• 100 g Haferflocken\n• 1 TL Salz"
         assertEquals(clean, RecipeAiParser.unescapeSocialText(clean))
     }
+
+    @Test
+    fun `isPromoIngredientNoise flags affiliate code lines`() {
+        assertTrue(
+            RecipeAiParser.isPromoIngredientNoise(
+                "The ingredients with a * are from @prozis (code FITFOODIEJULES will give you a big discount + gifts!)"
+            )
+        )
+        assertTrue(
+            RecipeAiParser.isPromoIngredientNoise(
+                "INGREDIENTS WITH A * ARE FROM (CODE FITFOODIEJULES WILL GIVE YOU A BIG DISCOUNT + GIFTS!)"
+            )
+        )
+        assertFalse(
+            RecipeAiParser.isPromoIngredientNoise("50g of oat flour*")
+        )
+    }
+
+    @Test
+    fun `fallbackParse keeps real ingredients despite promo ingredients sentence`() {
+        val caption = """
+            The rumours are true, you can eat Oreos every day and still reach your health goals
+            I might be tooting my own horn, but I have made oats in just about every way possible
+            These Oreo oats are SO scrummy, and definitely one to try
+
+            ✨recipe✨
+            50g of oat flour* (or oats blended to flour)
+            30g of vegan vanilla or cookies and cream protein powder*
+            5g of cocoa powder*
+            1 Oreo (I used a sugar free one)
+            1 small square of dark chocolate*
+            170ml of milk or water
+            1/2 tsp baking powder
+
+            The ingredients with a * are from @prozis (code FITFOODIEJULES will give you a big discount + gifts!)
+
+            Preheat oven to 180° (350F) mix all ingredients (except cocoa powder) to form a batter. Then crush half the Oreo and mix into the batter
+            Split half the batter into a separate bowl, and mix in the cocoa powder so you have two separate batters.
+            In an oven safe bowl/ramekin, pour the Oreo batter and chocolate batter into separate sides of the bowl so you get a chocolate side and an Oreo side.
+            Place the dark chocolate in the centre, and the other half of the Oreo on top. Bake for 20-25 minutes and enjoy!
+        """.trimIndent()
+
+        val recipe = RecipeAiParser.fallbackParse(
+            caption = caption,
+            sourceUrl = "https://www.instagram.com/p/example/",
+            platform = "instagram",
+            imageUrl = null
+        )
+
+        val ingLower = recipe.ingredients.lowercase()
+        assertTrue("oat flour must be kept", ingLower.contains("oat flour") || ingLower.contains("hafer"))
+        assertTrue("cocoa must be kept", ingLower.contains("cocoa") || ingLower.contains("kakao"))
+        assertTrue("milk must be kept", ingLower.contains("milk") || ingLower.contains("milch") || ingLower.contains("170"))
+        assertFalse("promo code must not appear in ingredients", ingLower.contains("fitfoodiejules"))
+        assertFalse("discount promo must not appear", ingLower.contains("discount"))
+        assertFalse("preheat must not be in ingredients", ingLower.contains("preheat"))
+
+        val instrLower = recipe.instructions.lowercase()
+        assertTrue(
+            "instructions should mention preheat or bake",
+            instrLower.contains("preheat") || instrLower.contains("bake") || instrLower.contains("vorheizen")
+        )
+    }
 }

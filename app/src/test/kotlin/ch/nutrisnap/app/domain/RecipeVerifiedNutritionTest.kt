@@ -12,7 +12,7 @@ class RecipeVerifiedNutritionTest {
         val recipe = Recipe(
             title = "Test",
             description = "Lecker\n\n📊 Pro Portion: 100 kcal · 10g Protein · 10g Kohlenhydrate · 5g Fett (verifiziert)",
-            servings = 2f
+            servings = 2
         )
         val updated = RecipeVerifiedNutrition.applyToRecipe(
             recipe = recipe,

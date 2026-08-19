@@ -353,16 +353,35 @@ object RecipeAiParser {
                 RegexOption.IGNORE_CASE
             ).findAll(d).count() >= 2
         ) return true
-        // Social / Promo
-        if (lower.startsWith("save this") || lower.startsWith("comment ") ||
-            lower.startsWith("link in bio") || lower.startsWith("dm me") ||
-            lower.contains("all prozis") || lower.contains("products linked")
-        ) return true
+        // Social / Promo (Affiliate-Codes, Rabatt-Hinweise)
+        if (isPromoIngredientNoise(d)) return true
         // Reine Hashtag-/Code-Zeilen
         if (d.startsWith("@") && d.length < 40) return true
         if (!d.any { it.isLetter() }) return true
         // Orphan-Klammernreste wie "20g)" von "(about 20g)"
         if (Regex("""^\d+[.,]?\d*\s*g\s*\)?\s*$""", RegexOption.IGNORE_CASE).matches(d)) return true
+        return false
+    }
+
+    /**
+     * Affiliate-/Promo-Zeilen, die oft „ingredients“ enthalten und den
+     * Keyword-Split kaputt machen (z. B. fitfoodiejules / Prozis-Code).
+     */
+    fun isPromoIngredientNoise(line: String): Boolean {
+        val lower = line.trim().lowercase()
+        if (lower.isBlank()) return false
+        if (lower.startsWith("save this") || lower.startsWith("comment ") ||
+            lower.startsWith("link in bio") || lower.startsWith("dm me")
+        ) return true
+        if (lower.contains("all prozis") || lower.contains("products linked")) return true
+        if (lower.contains("will give you") && (lower.contains("discount") || lower.contains("code"))) return true
+        if (lower.contains("ingredients with a *") || lower.contains("ingredients with a*")) return true
+        if (lower.contains("are from @") && lower.contains("code")) return true
+        if (lower.contains("big discount") || lower.contains("discount + gifts")) return true
+        // "code XYZ will give you…" ohne echte Menge
+        if (Regex("""\bcode\s+[a-z0-9_]+\b""", RegexOption.IGNORE_CASE).containsMatchIn(lower) &&
+            !Regex("""\d+\s*(g|ml|tsp|tbsp)\b""", RegexOption.IGNORE_CASE).containsMatchIn(lower)
+        ) return true
         return false
     }
 
@@ -795,13 +814,56 @@ Rules:
 
         val instrKw = listOf("zubereitung", "anleitung", "zubereiten", "preparation",
             "method", "instructions", "directions", "steps", "how to make", "how to:",
-            "firstly", "first,", "next,", "in the meantime", "meanwhile")
-        val ingrKw  = listOf("zutaten", "ingredients", "du brauchst", "you need",
-            "what you need", "you will need", "ingredients:", "what you'll need",
-            "ingredients (serves")
+            "firstly", "first,", "next,", "in the meantime", "meanwhile",
+            "preheat oven", "preheat the oven", "vorheizen")
+        // Nur echte Abschnitts-Header, nicht Promo-Sätze wie
+        // "The ingredients with a * are from @prozis (code …)"
+        val ingrHeaderRegexes = listOf(
+            Regex("""(?m)^(?:✨\s*)?recipe(?:\s*✨)?\s*$""", RegexOption.IGNORE_CASE),
+            Regex("""(?m)^(?:zutaten|ingredients)\s*:?\s*$""", RegexOption.IGNORE_CASE),
+            Regex("""(?m)^(?:zutaten|ingredients)\s*\([^)]*serves?""", RegexOption.IGNORE_CASE),
+            Regex("""(?m)^(?:zutaten|ingredients)\s*\([^)]*portion""", RegexOption.IGNORE_CASE),
+            Regex("""(?m)^(?:du brauchst|you need|what you need|you will need|what you'll need)\s*:?\s*$""", RegexOption.IGNORE_CASE),
+            Regex("""(?m)^(?:zutaten|ingredients)\s*:""", RegexOption.IGNORE_CASE)
+        )
 
-        val instrIdx = instrKw.firstNotNullOfOrNull { lower.indexOf(it).takeIf { i -> i > 0 } }
-        val ingrIdx  = ingrKw.firstNotNullOfOrNull  { lower.indexOf(it).takeIf { i -> i >= 0 } }
+        fun findSectionIndex(keywords: List<String>): Int? =
+            keywords.firstNotNullOfOrNull { kw ->
+                lower.indexOf(kw).takeIf { i -> i > 0 }
+            }
+
+        fun findIngredientHeaderIndex(): Int? {
+            for (re in ingrHeaderRegexes) {
+                val m = re.find(cleaned) ?: continue
+                return m.range.first
+            }
+            // Fallback: "ingredients"/"zutaten" nur wenn am Zeilenanfang und
+            // die Zeile kurz ist (Header), nicht mitten in einem Promo-Satz.
+            for ((idx, line) in lines.withIndex()) {
+                val t = line.trim().lowercase()
+                if (t.length > 60) continue
+                if (t.startsWith("ingredients") || t.startsWith("zutaten") ||
+                    t == "recipe" || t.startsWith("✨recipe") || t.endsWith("recipe✨")
+                ) {
+                    // Promo-Sätze rausfiltern
+                    if (t.contains("with a *") || t.contains("from @") ||
+                        t.contains("discount") || t.contains("code ") ||
+                        t.contains("prozis") || t.contains("will give you")
+                    ) continue
+                    // Index im cleaned-String: Position der Zeile
+                    var pos = 0
+                    for (j in 0 until idx) {
+                        pos = cleaned.indexOf(lines[j], pos).let { if (it < 0) pos else it + lines[j].length }
+                    }
+                    val found = cleaned.indexOf(line, pos).takeIf { it >= 0 } ?: continue
+                    return found
+                }
+            }
+            return null
+        }
+
+        val instrIdx = findSectionIndex(instrKw)
+        val ingrIdx  = findIngredientHeaderIndex()
 
         val ingredientLineRegex = Regex(
             """^(?:[-•*]|\d+\s*(?:g|ml|l|kg|cup|cups|tbsp?|tsp?|oz|lb|St[üu]ck|stk\.?|EL|TL|Prise|Tasse|Zehe))|""" +
@@ -809,7 +871,15 @@ Rules:
             RegexOption.IGNORE_CASE
         )
 
+        // Mengen-Zeilen immer bevorzugen, wenn genug vorhanden (robuster als Keyword-Split)
+        val qtyIngrLines = lines.filter { line ->
+            ingredientLineRegex.containsMatchIn(line) ||
+                line.startsWith("-") || line.startsWith("•") ||
+                (line.startsWith("*") && Regex("""\d""").containsMatchIn(line))
+        }.filter { !isJunkIngredientLine(it) && !isPromoIngredientNoise(it) }
+
         val ingredients = when {
+            qtyIngrLines.size >= 2 -> qtyIngrLines.joinToString("\n")
             ingrIdx != null -> {
                 // Instruktionen können VOR den Zutaten stehen (begin > end) —
                 // dann bis Textende nehmen, nicht bis zum früheren Instr-Index.
@@ -820,23 +890,25 @@ Rules:
                 cleaned.substring(ingrIdx, end).trim()
             }
             else -> {
-                val ingrLines = lines.filter { line ->
-                    ingredientLineRegex.containsMatchIn(line) ||
-                    line.startsWith("-") || line.startsWith("•") || line.startsWith("*")
-                }
-                if (ingrLines.size >= 2) {
-                    ingrLines.joinToString("\n")
-                } else {
-                    val hashtagStart = lines.indexOfFirst { it.startsWith("#") }.takeIf { it > 0 }
-                    val bodyLines = lines.drop(1).take(hashtagStart?.minus(1) ?: 30)
-                    bodyLines.joinToString("\n").ifBlank { cleaned.take(1200) }
-                }
+                val hashtagStart = lines.indexOfFirst { it.startsWith("#") }.takeIf { it > 0 }
+                val bodyLines = lines.drop(1).take(hashtagStart?.minus(1) ?: 30)
+                bodyLines.joinToString("\n").ifBlank { cleaned.take(1200) }
             }
         }
 
         // Wenn Zubereitung vor Zutaten steht: nur bis zum Zutaten-Block
         val instructions = when {
-            instrIdx == null -> ""
+            instrIdx == null -> {
+                // Ohne Keyword: ab erster klarer Koch-Anweisung (Preheat / Bake / …)
+                val stepStart = lines.indexOfFirst { line ->
+                    val l = line.lowercase().trim()
+                    l.startsWith("preheat") || l.startsWith("vorheizen") ||
+                        l.startsWith("bake ") || l.startsWith("mix all") ||
+                        (l.startsWith("place ") && l.length > 40) ||
+                        (l.startsWith("split ") && l.length > 40)
+                }.takeIf { it >= 0 }
+                if (stepStart != null) lines.drop(stepStart).joinToString("\n") else ""
+            }
             ingrIdx != null && instrIdx < ingrIdx ->
                 cleaned.substring(instrIdx, ingrIdx).trim()
             else ->
