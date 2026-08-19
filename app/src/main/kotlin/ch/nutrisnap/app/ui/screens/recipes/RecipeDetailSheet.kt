@@ -32,6 +32,11 @@ import ch.nutrisnap.app.data.model.RecipeCategory
 import ch.nutrisnap.app.data.model.RecipeComponent
 import ch.nutrisnap.app.domain.RecipeGermanMetricConverter
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
+import ch.nutrisnap.app.domain.ParsedIngredient
+import ch.nutrisnap.app.domain.INGREDIENT_UNITS
+import ch.nutrisnap.app.domain.parseIngredientLine
+import ch.nutrisnap.app.domain.joinIngredientLine
+import ch.nutrisnap.app.domain.normalizeForCoverageMatch
 import ch.nutrisnap.app.ui.components.MicronutrientTable
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_DETAIL
