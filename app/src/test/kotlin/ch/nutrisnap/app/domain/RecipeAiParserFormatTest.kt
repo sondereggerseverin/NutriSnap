@@ -182,4 +182,60 @@ In the bowl of a stand mixer combine the lukewarm milk
         // Title line may appear as header — acceptable; ingredients must not be mashed
         assertTrue("at least 4 section-like non-bullet lines", lines.count { !it.startsWith("•") } >= 4)
     }
+
+
+    @Test
+    fun `fallbackParse keeps ALL-CAPS section headers from Instagram caption`() {
+        val caption = """
+TIRAMISU ROLLS 🧡
+
+DOUGH
+240 g lukewarm milk
+100 g sugar
+10 g dry yeast
+470 g all-purpose flour
+1 large egg
+65 g softened butter
+2.5 g salt
+
+CINNAMON COFFEE FILLING
+100 g softened butter
+150 g brown sugar
+15 g ground cinnamon
+5 g instant coffee powder (or more)
+
+COFFEE SYRUP
+100 g water
+100 g sugar
+10 g instant coffee powder
+
+COFFEE CREAM CHEESE FROSTING
+150 g heavy whipping cream
+125 g cream cheese (or 5% white cheese)
+15 g powdered sugar
+15 g vanilla pudding mix
+15 g instant coffee powder (more or less)
+
+INSTRUCTIONS
+In the bowl of a stand mixer combine the lukewarm milk, sugar, and dry yeast.
+Preheat the oven to 150°C and bake for 15-20 minutes.
+#tiramisu #cinnamonrolls
+""".trimIndent()
+
+        val recipe = RecipeAiParser.fallbackParse(
+            caption = caption,
+            sourceUrl = "https://www.instagram.com/p/example/",
+            platform = "instagram",
+            imageUrl = null
+        )
+        val lines = recipe.ingredients.lines().map { it.trim() }.filter { it.isNotBlank() }
+        val upper = recipe.ingredients.uppercase()
+        assertTrue("DOUGH header must survive import", upper.contains("DOUGH") || upper.contains("TEIG"))
+        assertTrue("FILLING header must survive", upper.contains("FILLING") || upper.contains("FÜLLUNG") || upper.contains("CINNAMON"))
+        assertTrue("SYRUP header must survive", upper.contains("SYRUP") || upper.contains("SIRUP"))
+        assertTrue("FROSTING header must survive", upper.contains("FROSTING") || upper.contains("GLASUR") || upper.contains("CREAM CHEESE"))
+        assertTrue("flour quantity kept", recipe.ingredients.contains("470"))
+        assertFalse("instructions must not be in ingredients", recipe.ingredients.lowercase().contains("stand mixer"))
+        assertTrue("at least 4 non-bullet header lines", lines.count { !it.startsWith("•") } >= 4)
+    }
 }

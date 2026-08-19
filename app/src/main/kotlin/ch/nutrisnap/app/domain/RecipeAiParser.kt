@@ -891,15 +891,46 @@ Rules:
             RegexOption.IGNORE_CASE
         )
 
-        // Mengen-Zeilen immer bevorzugen, wenn genug vorhanden (robuster als Keyword-Split)
-        val qtyIngrLines = lines.filter { line ->
+        // Mengen-Zeilen + Abschnitts-Header (DOUGH / Füllung / …) in Original-Reihenfolge.
+        // Früher nur qty-Zeilen → Header ohne Zahl (DOUGH, FROSTING) gingen verloren.
+        fun isQtyIngredientLine(line: String): Boolean =
             ingredientLineRegex.containsMatchIn(line) ||
                 line.startsWith("-") || line.startsWith("•") ||
                 (line.startsWith("*") && Regex("""\d""").containsMatchIn(line))
-        }.filter { !isJunkIngredientLine(it) && !isPromoIngredientNoise(it) }
+
+        val qtyIngrLines = lines.filter { line ->
+            isQtyIngredientLine(line) && !isJunkIngredientLine(line) && !isPromoIngredientNoise(line)
+        }
+
+        /** Mengen + Section-Header zwischen erster und letzter Zutat (inkl. Header davor). */
+        fun linesWithSectionHeaders(qtyLines: List<String>): String {
+            if (qtyLines.isEmpty()) return ""
+            val qtyTrim = qtyLines.map { it.trim() }.toSet()
+            val indices = lines.mapIndexedNotNull { i, line ->
+                if (line.trim() in qtyTrim) i else null
+            }
+            if (indices.isEmpty()) return qtyLines.joinToString("\n")
+            var start = indices.first()
+            // Header direkt vor dem Block mitnehmen (DOUGH vor 240 g …)
+            while (start > 0 && isSectionHeaderLine(lines[start - 1]) &&
+                !isJunkIngredientLine(lines[start - 1]) &&
+                !isPromoIngredientNoise(lines[start - 1])
+            ) {
+                start--
+            }
+            val end = indices.last()
+            return lines.subList(start, end + 1)
+                .filter { line ->
+                    val t = line.trim()
+                    if (t.isEmpty()) return@filter false
+                    if (isJunkIngredientLine(t) || isPromoIngredientNoise(t)) return@filter false
+                    isQtyIngredientLine(t) || isSectionHeaderLine(t)
+                }
+                .joinToString("\n")
+        }
 
         val ingredients = when {
-            qtyIngrLines.size >= 2 -> qtyIngrLines.joinToString("\n")
+            qtyIngrLines.size >= 2 -> linesWithSectionHeaders(qtyIngrLines)
             ingrIdx != null -> {
                 // Instruktionen können VOR den Zutaten stehen (begin > end) —
                 // dann bis Textende nehmen, nicht bis zum früheren Instr-Index.
