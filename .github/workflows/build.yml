@@ -74,54 +74,95 @@ jobs:
           RUN_NUM: ${{ github.run_number }}
         run: |
           python3 - <<'PYEOF'
-          import urllib.request, json, base64, os
+          import urllib.request, urllib.error, json, base64, os
 
           token = os.environ['GH_TOKEN']
           repo = os.environ['REPO']
           run_num = os.environ['RUN_NUM']
 
-          with open('build_output.log', 'r', errors='replace') as f:
-              lines = f.readlines()
-
-          error_lines = [l for l in lines if any(k in l for k in [
+          KEYWORDS = [
               'e: ', 'error:', 'Unresolved reference', 'Cannot find',
               'cannot find', 'FAILED', 'unresolved', 'not found',
               'None of the following', 'Overload resolution', 'Type mismatch',
               'Val cannot be reassigned', 'Expecting', 'Compilation error',
               'is not defined', 'is not a member'
-          ])]
+          ]
 
-          content = (
-              f"# Build errors - run {run_num}\n\n"
-              "## Error lines\n```\n" +
-              "".join(error_lines[-80:]) +
-              "```\n\n## Last 150 lines\n```\n" +
-              "".join(lines[-150:]) +
-              "```\n"
-          )
+          def read_log(path):
+              try:
+                  with open(path, 'r', errors='replace') as f:
+                      return f.readlines()
+              except FileNotFoundError:
+                  return None
 
+          # WICHTIG: nicht nur build_output.log lesen. Wenn "Unit Tests" fehlschlaegt,
+          # wird "Build Debug APK" uebersprungen und build_output.log existiert nie -
+          # dann wuerde dieses Skript sonst mit FileNotFoundError abstuerzen, bevor
+          # es committen kann, und build_errors.txt bliebe auf einem alten Stand haengen.
+          sources = [
+              ('Unit Tests (test_output.log)', 'test_output.log'),
+              ('Build Debug APK (build_output.log)', 'build_output.log'),
+          ]
+
+          parts = [f"# Build errors - run {run_num}\n\n"]
+          any_log_found = False
+          for name, path in sources:
+              lines = read_log(path)
+              if lines is None:
+                  parts.append(f"## {name}\n_Log nicht vorhanden (Schritt uebersprungen oder nicht ausgefuehrt)._\n\n")
+                  continue
+              any_log_found = True
+              error_lines = [l for l in lines if any(k in l for k in KEYWORDS)]
+              parts.append(
+                  f"## {name} - Error lines\n```\n" +
+                  "".join(error_lines[-80:]) +
+                  "```\n\n" +
+                  f"## {name} - Last 150 lines\n```\n" +
+                  "".join(lines[-150:]) +
+                  "```\n\n"
+              )
+
+          if not any_log_found:
+              parts.append("Keine Log-Datei gefunden - Fehler ist vermutlich vor der Test-/Build-Ausfuehrung aufgetreten (z.B. Gradle-Konfigurationsfehler).\n")
+
+          content = "".join(parts)
           encoded = base64.b64encode(content.encode()).decode()
 
           api_url = f"https://api.github.com/repos/{repo}/contents/build_errors.txt"
-          req = urllib.request.Request(api_url, headers={"Authorization": f"token {token}"})
-          try:
-              existing = json.load(urllib.request.urlopen(req))
-              file_sha = existing['sha']
-          except:
-              file_sha = None
 
-          payload = {"message": f"ci: errors run {run_num}", "content": encoded}
-          if file_sha:
-              payload["sha"] = file_sha
+          def get_sha():
+              req = urllib.request.Request(api_url, headers={"Authorization": f"token {token}"})
+              try:
+                  existing = json.load(urllib.request.urlopen(req))
+                  return existing['sha']
+              except Exception:
+                  return None
 
-          put_req = urllib.request.Request(
-              api_url,
-              data=json.dumps(payload).encode(),
-              headers={"Authorization": f"token {token}", "Content-Type": "application/json"},
-              method="PUT"
-          )
-          resp = json.load(urllib.request.urlopen(put_req))
-          print("Committed:", resp.get('commit', {}).get('sha', 'unknown')[:12])
+          # Bei parallelen Sessions/Runs kann die SHA veraltet sein (409). Direkt vor
+          # jedem PUT frisch abrufen und bei Konflikt erneut versuchen.
+          for attempt in range(5):
+              file_sha = get_sha()
+              payload = {"message": f"ci: errors run {run_num}", "content": encoded}
+              if file_sha:
+                  payload["sha"] = file_sha
+
+              put_req = urllib.request.Request(
+                  api_url,
+                  data=json.dumps(payload).encode(),
+                  headers={"Authorization": f"token {token}", "Content-Type": "application/json"},
+                  method="PUT"
+              )
+              try:
+                  resp = json.load(urllib.request.urlopen(put_req))
+                  print("Committed:", resp.get('commit', {}).get('sha', 'unknown')[:12])
+                  break
+              except urllib.error.HTTPError as e:
+                  body = e.read().decode(errors='replace')
+                  if e.code == 409 and attempt < 4:
+                      print(f"SHA-Konflikt (Versuch {attempt + 1}/5), retry...")
+                      continue
+                  print(f"Upload fehlgeschlagen ({e.code}):", body)
+                  break
           PYEOF
       - name: Publish APK + log via GitHub Release
         if: success()
