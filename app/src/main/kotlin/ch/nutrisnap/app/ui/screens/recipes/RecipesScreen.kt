@@ -120,14 +120,14 @@ private fun RecipeStarsRow(stars: Int, modifier: Modifier = Modifier) {
 /** Normalisiert einen Zutatentext für robusten Abgleich: nur Kleinbuchstaben + Ziffern,
  *  keine Leerzeichen/Satzzeichen/Einheiten-Formatierung. So matchen "200g Haferflocken"
  *  und "200 g Haferflocken" trotz unterschiedlicher Formatierung. */
-private fun normalizeForCoverageMatch(s: String): String =
+internal fun normalizeForCoverageMatch(s: String): String =
     s.lowercase()
         .replace(Regex("""^added_\d+_"""), "")
         .replace(Regex("""[^a-zäöüß0-9]"""), "")
 
-private data class ParsedIngredient(val amount: String, val unit: String, val name: String)
+internal data class ParsedIngredient(val amount: String, val unit: String, val name: String)
 /** Anzeige-Einheiten im Dropdown (kurz, lesbar). */
-private val INGREDIENT_UNITS = listOf("g", "ml", "kg", "l", "EL", "TL", "Stück", "Prise", "Bund", "Dose", "Packung", "Scheibe", "Zehe")
+internal val INGREDIENT_UNITS = listOf("g", "ml", "kg", "l", "EL", "TL", "Stück", "Prise", "Bund", "Dose", "Packung", "Scheibe", "Zehe")
 private const val FRACTION_CHARS = "¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞"
 private val UNICODE_FRACTION_VALUES = mapOf(
     '¼' to 0.25f, '½' to 0.5f, '¾' to 0.75f,
@@ -215,7 +215,7 @@ private fun parseAmountToken(raw: String): String {
 private fun formatAmount(value: Float): String =
     if (value == value.toLong().toFloat()) value.toLong().toString() else "%.2f".format(value)
 
-private fun parseIngredientLine(line: String): ParsedIngredient {
+internal fun parseIngredientLine(line: String): ParsedIngredient {
     val trimmed = line.trimStart('•', '-', ' ', '*')
     val m = INGREDIENT_AMOUNT_REGEX.find(trimmed)
     if (m != null) {
@@ -254,7 +254,7 @@ private fun parseIngredientLine(line: String): ParsedIngredient {
     return ParsedIngredient(amount = "", unit = "g", name = cleanIngredientName(trimmed))
 }
 
-private fun joinIngredientLine(parsed: ParsedIngredient): String {
+internal fun joinIngredientLine(parsed: ParsedIngredient): String {
     val amt = parsed.amount.trim()
     val name = cleanIngredientName(parsed.name)
     val unit = normalizeUnit(parsed.unit, name)
