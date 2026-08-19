@@ -15,6 +15,8 @@ import ch.nutrisnap.app.domain.RecipeAiParser
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import ch.nutrisnap.app.domain.GroqVisionService
 import ch.nutrisnap.app.domain.RecipeGermanMetricConverter
+import ch.nutrisnap.app.domain.RecipeComponentSuggester
+import ch.nutrisnap.app.domain.RecipeListFilter
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.KEY_AUTO_GERMAN_METRIC
 import kotlinx.coroutines.flow.first
@@ -160,31 +162,13 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         _ingredientNeedles,
         _sort
     ) { recipes, platformFilter, categoryFilter, needles, sort ->
-        var filtered = recipes
-        if (platformFilter != null) {
-            filtered = filtered.filter { (it.platform ?: "web").lowercase() == platformFilter }
-        }
-        if (categoryFilter != null) {
-            filtered = filtered.filter { it.category() == categoryFilter }
-        }
-        if (needles.isNotEmpty()) {
-            filtered = filtered
-                .filter { r ->
-                    val hay = "${r.title}\n${r.ingredients}\n${r.description}\n${r.tags}".lowercase()
-                    needles.all { n -> n.lowercase() in hay }
-                }
-                .sortedByDescending { r ->
-                    val hay = "${r.title}\n${r.ingredients}".lowercase()
-                    needles.count { it.lowercase() in hay }
-                }
-        } else {
-            filtered = when (sort) {
-                RecipeSort.NEWEST -> filtered.sortedByDescending { it.savedAt }
-                RecipeSort.NAME -> filtered.sortedBy { it.title.lowercase() }
-                RecipeSort.CALORIES -> filtered.sortedByDescending { it.totalCalories ?: -1f }
-            }
-        }
-        filtered
+        RecipeListFilter.filterAndSort(
+            recipes = recipes,
+            platformFilter = platformFilter,
+            categoryFilter = categoryFilter,
+            needles = needles,
+            sort = sort
+        )
     }
 
     private data class FilterMeta(
@@ -900,58 +884,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
      */
     suspend fun suggestComponentsFromMatches(recipe: Recipe): List<RecipeComponent> {
         val matches = matchDao.getMatchesForRecipeOnce(recipe.id)
-            .filter { (it.matchedCalories ?: 0f) > 0f || it.amountGrams > 0f }
-        if (matches.isEmpty()) return emptyList()
-
-        fun isSide(text: String): Boolean {
-            val n = text.lowercase()
-            return listOf(
-                "reis", "basmati", "erbse", "erbsen", "peas", "kartoffel", "nudel", "pasta",
-                "quinoa", "couscous", "bulgur", "beilage", "reisnudeln", "sweet potato",
-                "süsskartoffel", "suesskartoffel"
-            ).any { it in n }
-        }
-        fun isSauce(text: String): Boolean {
-            val n = text.lowercase()
-            return listOf(
-                "poulet", "huhn", "chicken", "fleisch", "tomate", "rahm", "sahne", "cream",
-                "joghurt", "yogurt", "püree", "puree", "gewürz", "garam", "sauce", "butter",
-                "masala", "chili", "ingwer", "knoblauch", "zwiebel", "öl", "oil", "speiseöl",
-                "fromage", "rôti", "roti", "kebab"
-            ).any { it in n }
-        }
-        fun resolveKey(m: ch.nutrisnap.app.data.model.IngredientMatch): String {
-            val g = m.componentGroup?.trim().orEmpty()
-            if (g.isNotEmpty()) return g
-            val key = "${m.ingredientRaw} ${m.ingredientName} ${m.matchedFoodName.orEmpty()}"
-            return when {
-                isSide(key) && !isSauce(key) -> "side"
-                isSauce(key) -> "sauce"
-                isSide(key) -> "side"
-                else -> "sauce"
-            }
-        }
-        fun displayName(key: String): String = when (key) {
-            "side" -> "Beilage"
-            "sauce" -> "Sauce / Fleisch"
-            else -> key
-        }
-
-        val grouped = matches.groupBy { resolveKey(it) }
-        return grouped.entries.mapIndexed { i, (key, list) ->
-            RecipeComponent(
-                recipeId = recipe.id,
-                name = displayName(key),
-                cookedWeightG = 0f,
-                totalCalories = list.sumOf { (it.matchedCalories ?: 0f).toDouble() }.toFloat(),
-                proteinG = list.sumOf { (it.matchedProtein ?: 0f).toDouble() }.toFloat(),
-                carbsG = list.sumOf { (it.matchedCarbs ?: 0f).toDouble() }.toFloat(),
-                fatG = list.sumOf { (it.matchedFat ?: 0f).toDouble() }.toFloat(),
-                sortOrder = i
-            )
-        }
+        return RecipeComponentSuggester.suggestFromMatches(recipe.id, matches)
     }
-
 
     fun analyzeNutrition(recipe: Recipe, persist: Boolean = false) {
         viewModelScope.launch {
