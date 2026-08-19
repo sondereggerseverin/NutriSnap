@@ -446,5 +446,3 @@ fun enrichComponentsFromMatches(
         )
     }
 }
-
-@OptIn(ExperimentalMaterial3Api::class)

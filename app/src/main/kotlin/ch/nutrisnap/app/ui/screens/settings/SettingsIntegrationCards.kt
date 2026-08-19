@@ -389,7 +389,7 @@ private fun ThemeCard(
 // Feature 3: Ziel-Prognose live unter den Zielgewicht-Feldern anzeigen (bezieht sich
 // immer auf den zuletzt GESPEICHERTEN Stand, nicht auf ungespeicherte Texteingaben).
 @Composable
-private fun GoalPrognosisPreview(
+internal fun GoalPrognosisPreview(
     vm: ch.nutrisnap.app.domain.GoalPrognosisViewModel = viewModel()
 ) {
     val prognosis by vm.prognosis.collectAsStateWithLifecycle()
