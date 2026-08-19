@@ -305,14 +305,16 @@ object RecipeAiParser {
         ) return true
         // Marketing-/Subtitle ohne Mengenangabe (Caption-Intro, nicht Zutat)
         // z.B. "Gesund, proteinreich & super easy für 4 Portionen"
+        // Echte Mengenangabe: Zahl+Einheit oder Bruch. Nicht „4 Portionen“ / „für 2 Personen“.
         val hasQuantity = Regex(
-            """(?i)(\d+[.,]?\d*|½|¼|¾|⅓|⅔)\s*(g|kg|ml|l|tl|el|tsp|tbsp|cup|cups|oz|lb|stück|stk|prise|bund|dose|pack|scheibe|scheiben)?\b"""
+            """(?i)((\d+[.,]?\d*|½|¼|¾|⅓|⅔)\s*(g|kg|ml|l|tl|el|tsp|tbsp|cup|cups|oz|lb|stück|stk|prise|bund|dose|pack|scheibe|scheiben)\b|(½|¼|¾|⅓|⅔)\s+\p{L})"""
         ).containsMatchIn(d)
         if (!hasQuantity && !isSectionHeaderLine(d)) {
             val marketingHits = listOf(
                 "proteinreich", "gesund", "super easy", "meal prep", "perfekt zum",
                 "für die woche", "zum mitnehmen", "high protein", "low calorie",
-                "easy für", "mac & cheese meal", "das perfekte"
+                "easy für", "easy fuer", "mac & cheese meal", "das perfekte",
+                "fuer 4 portionen", "für 4 portionen"
             ).count { lower.contains(it) }
             if (marketingHits >= 1 && d.length > 20) return true
         }
