@@ -9,14 +9,12 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import ch.nutrisnap.app.utils.CrashLogger
-import dagger.hilt.android.HiltAndroidApp
 
 /**
  * Fängt unbehandelte Exceptions global ab, startet den ANR-Watchdog und
  * trackt die aktuelle Activity – alles landet im lokalen Absturzprotokoll
  * (Einstellungen → Absturzprotokoll).
  */
-@HiltAndroidApp
 class NutriSnapApplication : Application() {
     override fun onCreate() {
         super.onCreate()

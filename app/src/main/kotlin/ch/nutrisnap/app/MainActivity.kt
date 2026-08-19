@@ -1,6 +1,5 @@
 package ch.nutrisnap.app
 
-import dagger.hilt.android.AndroidEntryPoint
 
 import android.Manifest
 import android.content.Intent
@@ -88,7 +87,6 @@ val bottomNavItems = listOf(
     Screen.Home, Screen.Diary, Screen.Recipes, Screen.Analysis, Screen.Settings
 )
 
-@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private var sharedUrl: String? = null
     private var sharedBatchUrls: List<String> = emptyList()
