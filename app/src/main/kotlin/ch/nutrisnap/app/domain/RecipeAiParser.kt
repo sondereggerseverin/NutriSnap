@@ -461,13 +461,26 @@ object RecipeAiParser {
     private fun isSectionHeaderLine(line: String): Boolean {
         val d = line.trim().trimStart('•', '-', '*', ' ').trim()
         if (d.length < 3) return false
-        val lower = d.lowercase()
-        // Explizite Abschnitts-Marker
+        val lower = d.lowercase().trimEnd(':').trim()
+        // Explizite Abschnitts-Marker (EN + DE + typische Back-/Koch-Abschnitte)
         if (lower.startsWith("für ") || lower.startsWith("for the ") || lower.startsWith("for ") ||
             lower.startsWith("served with") || lower.startsWith("dazu") ||
             lower.startsWith("beilage") || lower.startsWith("sauce") ||
             lower.startsWith("marinade") || lower.startsWith("topping") ||
-            lower.startsWith("dressing") || lower.startsWith("garnish")
+            lower.startsWith("dressing") || lower.startsWith("garnish") ||
+            lower == "dough" || lower == "teig" ||
+            lower == "filling" || lower == "füllung" || lower == "fuellung" ||
+            lower == "frosting" || lower == "glasur" || lower == "icing" ||
+            lower == "syrup" || lower == "sirup" ||
+            lower == "batter" || lower == "teigmasse" ||
+            lower == "crust" || lower == "boden" ||
+            lower == "streusel" || lower == "glaze" ||
+            lower.endsWith(" filling") || lower.endsWith(" füllung") || lower.endsWith(" fuellung") ||
+            lower.endsWith(" frosting") || lower.endsWith(" glasur") ||
+            lower.endsWith(" syrup") || lower.endsWith(" sirup") ||
+            lower.endsWith(" dough") || lower.endsWith(" teig") ||
+            lower.endsWith(" sauce") || lower.endsWith(" marinade") ||
+            lower.endsWith(" topping") || lower.endsWith(" belag")
         ) {
             // "For the chicken: 2 breasts" ist KEIN reiner Header — splitHeaderFromFirstItem
             // kümmert sich darum. Hier true, damit die Zeile als Header-Kandidat gilt.
@@ -480,6 +493,13 @@ object RecipeAiParser {
                 .containsMatchIn(d)
         ) return false
         if (d.first().isDigit()) return false
+        // Reine GROSSBUCHSTABEN-Zeile ohne Menge = klassischer Social-Caption-Header
+        // (DOUGH, CINNAMON COFFEE FILLING, COFFEE SYRUP, …)
+        val lettersOnly = d.filter { it.isLetter() || it.isWhitespace() || it == '-' || it == '&' }
+        if (lettersOnly.isNotBlank() && lettersOnly == lettersOnly.uppercase() &&
+            lettersOnly.replace(" ", "").length in 3..40 &&
+            !Regex("""\d""").containsMatchIn(d)
+        ) return true
         // Emoji + kurzer Name (z.B. "Charred Zuckermais & beans 🫘")
         val withoutEmoji = d.replace(Regex("""[\p{So}\p{Cn}]"""), "").trim()
         return withoutEmoji.length in 3..48 &&
@@ -606,7 +626,7 @@ Rules:
   3. NEVER use: likes/comments counts, usernames, dates, hashtags, promotional text, "Ingredients (serves N)", "For the chicken", generic phrases like "Check this out"
   4. If truly no dish name exists, construct one from the main ingredients (e.g. "Pasta Salat mit Thunfisch")
 - servings: extract the number of PORTIONS/SERVINGS this recipe makes. Look for "Makes X", "Ergibt X", "serves X", "für X Personen", "X Portionen". If the caption says "Per Burrito" or "Per Serving" that means 1 serving in the macros. Default to 1 if unclear, NOT a random number.
-- ingredient_sections: group by section headers exactly as written (e.g. "For the chicken", "For the sauce", "Served with", "Marinade", "Topping"). Items separated by "-", "•", "*", or newlines. If no sections, use one section named "".
+- ingredient_sections: group by section headers exactly as written (e.g. "For the chicken", "For the sauce", "Served with", "Marinade", "Topping", "DOUGH", "CINNAMON COFFEE FILLING", "COFFEE SYRUP", "FROSTING"). ALL-CAPS lines without quantities are section headers — never put them inside items. Items separated by "-", "•", "*", or newlines. If no sections, use one section named "".
 - CRITICAL: Each ingredient item must be ONE ingredient only (e.g. "2 chicken breasts", "1 tsp olive oil", "150ml chicken stock") — NEVER merge multiple ingredients into one string.
 - CRITICAL: Section headers must NOT include the first ingredient. Wrong: "For the chicken: 2 chicken breasts". Right: section_name="For the chicken", items=["2 chicken breasts", ...].
 - NEVER put into ingredient items: cooking instructions ("Firstly, season…", "Next, fry…", "In the meantime…"), macro summaries ("265 kcals", "39g | P"), numbered method steps ("1. Mix…"), hashtags, @mentions, "Method", "Zubereitung", promo ("Save this", "link in bio"), "Ingredients (serves 2)".

@@ -169,9 +169,26 @@ fun CookingModeScreen(recipe: Recipe, onBack: () -> Unit) {
                     Spacer(Modifier.height(16.dp))
 
                     scaledIngredients.forEach { ingredient ->
-                        Row(modifier = Modifier.padding(vertical = 4.dp)) {
-                            Text("• ", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                            Text(ingredient, style = MaterialTheme.typography.bodyLarge)
+                        val trimmed = ingredient.trim().trimStart('•', '-', '*', ' ').trim()
+                        val isHeader = trimmed.length in 3..48 &&
+                            !trimmed.first().isDigit() &&
+                            !Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tsp|tbsp|cup|oz)\b""", RegexOption.IGNORE_CASE)
+                                .containsMatchIn(trimmed)
+                        if (isHeader) {
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                trimmed.trimEnd(':').uppercase(),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                letterSpacing = 0.6.sp
+                            )
+                            Spacer(Modifier.height(4.dp))
+                        } else {
+                            Row(modifier = Modifier.padding(vertical = 4.dp)) {
+                                Text("• ", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                Text(trimmed, style = MaterialTheme.typography.bodyLarge)
+                            }
                         }
                     }
                 }

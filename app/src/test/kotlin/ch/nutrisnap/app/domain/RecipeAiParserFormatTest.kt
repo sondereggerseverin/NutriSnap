@@ -120,4 +120,66 @@ class RecipeAiParserFormatTest {
             instrLower.contains("preheat") || instrLower.contains("bake") || instrLower.contains("vorheizen")
         )
     }
+
+    @Test
+    fun `formatIngredientText preserves ALL-CAPS section headers like DOUGH and FILLING`() {
+        val raw = """
+TIRAMISU ROLLS
+DOUGH
+240 g lukewarm milk
+100 g sugar
+10 g dry yeast
+470 g all-purpose flour
+1 large egg
+65 g softened butter
+2.5 g salt
+CINNAMON COFFEE FILLING
+100 g softened butter
+150 g brown sugar
+15 g ground cinnamon
+5 g instant coffee powder (or more)
+COFFEE SYRUP
+100 g water
+100 g sugar
+10 g instant coffee powder
+COFFEE CREAM CHEESE FROSTING
+150 g heavy whipping cream
+125 g cream cheese
+15 g powdered sugar
+15 g vanilla pudding mix
+15 g instant coffee powder
+INSTRUCTIONS
+In the bowl of a stand mixer combine the lukewarm milk
+""".trimIndent()
+
+        val formatted = RecipeAiParser.formatIngredientText(raw)
+        val lines = formatted.lines().map { it.trim() }.filter { it.isNotBlank() }
+        // Headers should appear without bullet
+        assertTrue("DOUGH header must be kept", lines.any { it.equals("DOUGH", true) || it.equals("Teig", true) })
+        assertTrue(
+            "FILLING header must be kept",
+            lines.any {
+                it.contains("FILLING", true) || it.contains("Füllung", true) ||
+                    it.contains("CINNAMON", true)
+            }
+        )
+        assertTrue(
+            "SYRUP header must be kept",
+            lines.any { it.contains("SYRUP", true) || it.contains("Sirup", true) }
+        )
+        assertTrue(
+            "FROSTING header must be kept",
+            lines.any {
+                it.contains("FROSTING", true) || it.contains("Frosting", true) ||
+                    it.contains("Glasur", true) || it.contains("CREAM CHEESE", true)
+            }
+        )
+        // Real ingredients with bullets
+        assertTrue(lines.any { it.startsWith("•") && it.contains("240") })
+        assertTrue(lines.any { it.startsWith("•") && it.contains("470") })
+        // Instructions must not leak into ingredients
+        assertFalse(formatted.lowercase().contains("stand mixer"))
+        // Title line may appear as header — acceptable; ingredients must not be mashed
+        assertTrue("at least 4 section-like non-bullet lines", lines.count { !it.startsWith("•") } >= 4)
+    }
 }

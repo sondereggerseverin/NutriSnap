@@ -219,6 +219,18 @@ object RecipeGermanMetricConverter {
         Regex("""(?i)^crust\s*:?\s*$""") to "Boden:",
         Regex("""(?i)^streusel\s*:?\s*$""") to "Streusel:",
         Regex("""(?i)^mash\s*:?\s*$""") to "Stampf:",
+        Regex("""(?i)^syrup\s*:?\s*$""") to "Sirup:",
+        Regex("""(?i)^icing\s*:?\s*$""") to "Glasur:",
+        Regex("""(?i)^cream\s+cheese\s+frosting\s*:?\s*$""") to "Frischkäse-Frosting:",
+        Regex("""(?i)^coffee\s+cream\s+cheese\s+frosting\s*:?\s*$""") to "Kaffee-Frischkäse-Frosting:",
+        Regex("""(?i)^cinnamon\s+coffee\s+filling\s*:?\s*$""") to "Zimt-Kaffee-Füllung:",
+        Regex("""(?i)^coffee\s+syrup\s*:?\s*$""") to "Kaffee-Sirup:",
+        Regex("""(?i)^coffee\s+filling\s*:?\s*$""") to "Kaffee-Füllung:",
+        Regex("""(?i)^(.+?)\s+filling\s*:?\s*$""") to "$1-Füllung:",
+        Regex("""(?i)^(.+?)\s+frosting\s*:?\s*$""") to "$1-Frosting:",
+        Regex("""(?i)^(.+?)\s+syrup\s*:?\s*$""") to "$1-Sirup:",
+        Regex("""(?i)^(.+?)\s+sauce\s*:?\s*$""") to "$1-Sauce:",
+        Regex("""(?i)^(.+?)\s+dough\s*:?\s*$""") to "$1-Teig:",
         // Mehrwort-Zutaten (längere zuerst — wichtig vor Einzelwort-Ersetzungen)
         Regex("""(?i)\bchicken\s+thigh\s+fillets?\b""") to "Hähnchen-Oberschenkel-Filets",
         Regex("""(?i)\bchicken\s+thighs?\b""") to "Hähnchen-Oberschenkel",
@@ -481,9 +493,14 @@ PFLICHT — 100 % Deutsch, null Englisch:
   black beans → schwarze Bohnen, small handful of coriander → eine kleine Handvoll Koriander,
   greek yoghurt → griechischer Joghurt, sweet potatoes → Süsskartoffeln,
   salted butter → gesalzene Butter.
-- Abschnittsüberschriften übersetzen: „For the Sauce“ → „Für die Sauce:“,
+- Abschnittsüberschriften übersetzen und ALS EIGENE ZEILE behalten (ohne Bullet, ohne Zutat darunter):
+  „For the Sauce“ → „Für die Sauce:“,
   „For the Sweet Potato Mash“ → „Für den Süsskartoffel-Stampf:“,
-  dough → Teig, filling → Füllung, topping → Belag.
+  „DOUGH“ → „Teig:“, „CINNAMON COFFEE FILLING“ → „Zimt-Kaffee-Füllung:“,
+  „COFFEE SYRUP“ → „Kaffee-Sirup:“, „COFFEE CREAM CHEESE FROSTING“ → „Kaffee-Frischkäse-Frosting:“,
+  dough → Teig, filling → Füllung, topping → Belag, frosting → Frosting/Glasur, syrup → Sirup.
+  WICHTIG: Abschnittszeilen NIEMALS weglassen oder mit der nächsten Zutat zusammenführen.
+  Format: eine Header-Zeile, darunter die Zutaten dieses Abschnitts (je Zeile eine Zutat).
 - ALLE Zubereitungsschritte auf Deutsch.
 - FESTE Zutaten in g, FLÜSSIGE in ml (nicht cups/tbsp/oz/°F).
 - Markennamen dürfen bleiben. Keine Zutaten erfinden. Mengen sinnvoll runden.

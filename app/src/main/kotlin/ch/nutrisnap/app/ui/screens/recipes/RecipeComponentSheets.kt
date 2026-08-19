@@ -324,13 +324,26 @@ internal fun parseIngredientSections(ingredients: String): List<Pair<String, Lis
         if (Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tbsp|tsp|cup|oz)\b""", RegexOption.IGNORE_CASE).containsMatchIn(d)) {
             return false
         }
-        val lc = d.lowercase()
-        // Explizite Abschnitts-Muster
+        val lc = d.lowercase().trimEnd(':').trim()
+        // Explizite Abschnitts-Muster (inkl. Back-Abschnitte)
         if (lc.startsWith("für die ") || lc.startsWith("für den ") || lc.startsWith("für das ") ||
-            lc.startsWith("for the ") || lc.startsWith("for ") || lc.endsWith(":")
+            lc.startsWith("for the ") || lc.startsWith("for ") || d.trim().endsWith(":") ||
+            lc == "dough" || lc == "teig" || lc == "filling" || lc == "füllung" || lc == "fuellung" ||
+            lc == "frosting" || lc == "glasur" || lc == "syrup" || lc == "sirup" ||
+            lc.endsWith(" filling") || lc.endsWith(" füllung") || lc.endsWith(" fuellung") ||
+            lc.endsWith(" frosting") || lc.endsWith(" glasur") ||
+            lc.endsWith(" syrup") || lc.endsWith(" sirup") ||
+            lc.endsWith(" dough") || lc.endsWith(" teig") ||
+            lc.endsWith("-füllung") || lc.endsWith("-fuellung") ||
+            lc.endsWith("-frosting") || lc.endsWith("-sirup") || lc.endsWith("-teig") ||
+            lc.endsWith("-sauce") || lc.endsWith("-glasur")
+        ) return true
+        // Reine GROSSBUCHSTABEN ohne Menge = Social-Caption-Header
+        val lettersOnly = d.filter { it.isLetter() || it.isWhitespace() || it == '-' || it == '&' }
+        if (lettersOnly.isNotBlank() && lettersOnly == lettersOnly.uppercase() &&
+            lettersOnly.replace(" ", "").length in 3..40
         ) return true
         // Kurze Titel ohne Bullet/Ziffer (wie Rezept-Ansicht): "Fleisch", "Sauce", "Mais & Bohnen"
-        // Keine typische Zutaten-Formulierung mit Menge/Einheit oben schon ausgeschlossen
         return true
     }
 
