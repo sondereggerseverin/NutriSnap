@@ -62,6 +62,7 @@ fun RecipeDetailSheet(
     hasStoredOverrides: Boolean = false,
     onAddToShoppingList: (Recipe) -> Unit = {},
     onUpdateIngredients: (String) -> Unit = {},
+    onRestructureIngredients: () -> Unit = {},
     onUpdateCookedWeight: (Float?) -> Unit = {},
     onScaleToBudget: () -> Unit = {},
     onTranslateGermanMetric: () -> Unit = {},
@@ -279,9 +280,7 @@ fun RecipeDetailSheet(
                     Text("Kochmodus starten", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 }
                 // Frühstück / Dessert / Getränk: kein Komponenten-Split (ein Gericht)
-                val splitAllowed = recipe.withGuessedCategoryIfEmpty().category().allowsComponentSplit &&
-                    RecipeCategory.guess(recipe.title, recipe.ingredients, recipe.description)
-                        .allowsComponentSplit
+                val splitAllowed = recipeAllowsComponentSplit(recipe)
                 if (splitAllowed) {
                     Spacer(Modifier.height(6.dp))
                     OutlinedButton(
@@ -319,19 +318,32 @@ fun RecipeDetailSheet(
             run {
                 item {
                     SectionHeader("Zutaten", trailing = {
-                        TextButton(
-                            onClick = {
-                                if (ingredientsEditMode) {
-                                    val newText = ingredientLines.filter { it.isNotBlank() }.joinToString("\n")
-                                    if (newText != recipe.ingredients) onUpdateIngredients(newText)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (!ingredientsEditMode && recipe.ingredients.isNotBlank()) {
+                                TextButton(
+                                    onClick = onRestructureIngredients,
+                                    contentPadding = PaddingValues(4.dp)
+                                ) {
+                                    Icon(Icons.Default.AutoFixHigh, null, Modifier.size(15.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Abschnitte", fontSize = 12.sp)
                                 }
-                                ingredientsEditMode = !ingredientsEditMode
-                            },
-                            contentPadding = PaddingValues(4.dp)
-                        ) {
-                            Icon(if (ingredientsEditMode) Icons.Default.Check else Icons.Default.Edit, null, Modifier.size(15.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text(if (ingredientsEditMode) "Fertig" else "Bearbeiten", fontSize = 12.sp)
+                            }
+                            TextButton(
+                                onClick = {
+                                    if (ingredientsEditMode) {
+                                        val newText = ingredientLines.filter { it.isNotBlank() }.joinToString("
+")
+                                        if (newText != recipe.ingredients) onUpdateIngredients(newText)
+                                    }
+                                    ingredientsEditMode = !ingredientsEditMode
+                                },
+                                contentPadding = PaddingValues(4.dp)
+                            ) {
+                                Icon(if (ingredientsEditMode) Icons.Default.Check else Icons.Default.Edit, null, Modifier.size(15.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(if (ingredientsEditMode) "Fertig" else "Bearbeiten", fontSize = 12.sp)
+                            }
                         }
                     })
                     Spacer(Modifier.height(8.dp))
@@ -340,6 +352,39 @@ fun RecipeDetailSheet(
                 if (ingredientsEditMode) {
                     // ── Strukturierte Zutaten-Bearbeitung: Zahl + Einheit + Name ──
                     itemsIndexed(ingredientLines) { idx, line ->
+                        val d = line.trim().trimStart('•', '-', '*', ' ').trim()
+                        val looksLikeHeader = d.isNotEmpty() && !d.first().isDigit() &&
+                            !Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tsp|tbsp|cup|oz)\b""", RegexOption.IGNORE_CASE).containsMatchIn(d) &&
+                            (d.endsWith(":") || d.length <= 48)
+                        if (looksLikeHeader && !Regex("""\d""").containsMatchIn(d.take(4))) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedTextField(
+                                    value = d.trimEnd(':'),
+                                    onValueChange = { v ->
+                                        val header = v.trim().trimEnd(':').ifBlank { "Abschnitt" } + ":"
+                                        ingredientLines = ingredientLines.toMutableList().also { it[idx] = header }
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    singleLine = true,
+                                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                                    placeholder = { Text("Abschnittsname", fontSize = 11.sp) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Title, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                )
+                                IconButton(
+                                    onClick = { ingredientLines = ingredientLines.toMutableList().also { it.removeAt(idx) } },
+                                    Modifier.size(32.dp)
+                                ) {
+                                    Icon(Icons.Default.DeleteOutline, "Löschen", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                            return@itemsIndexed
+                        }
                         val parsed = remember(line) { parseIngredientLine(line) }
                         var amount by remember(line) { mutableStateOf(parsed.amount) }
                         var selectedUnit by remember(line) { mutableStateOf(parsed.unit) }
@@ -448,6 +493,18 @@ fun RecipeDetailSheet(
                             Spacer(Modifier.width(6.dp))
                             Text("Zutat hinzufügen", fontSize = 13.sp)
                         }
+                        Spacer(Modifier.height(6.dp))
+                        OutlinedButton(
+                            onClick = {
+                                // Header-Zeile ohne Bullet/Menge → wird in der Ansicht als Abschnitt gerendert
+                                ingredientLines = ingredientLines + "Abschnitt:"
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Title, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Abschnittsüberschrift", fontSize = 13.sp)
+                        }
                         Spacer(Modifier.height(16.dp))
                     }
                 } else if (recipe.ingredients.isBlank()) {
@@ -469,13 +526,8 @@ fun RecipeDetailSheet(
                             !d.first().isDigit() && !d.startsWith(" ") &&
                             !Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl)\b""", RegexOption.IGNORE_CASE).containsMatchIn(d)
                     }
-                    // Split nur wenn Kategorie UND Heuristik es erlauben
-                    // (falsch gespeichertes MAIN bei Dessert/Frühstück darf nicht splitten)
-                    val storedCat = recipe.withGuessedCategoryIfEmpty().category()
-                    val guessedCat = RecipeCategory.guess(
-                        recipe.title, recipe.ingredients, recipe.description
-                    )
-                    val allowSplit = storedCat.allowsComponentSplit && guessedCat.allowsComponentSplit
+                    // Split: Kategorie ODER ≥2 Abschnitte im Zutaten-Text (auch Dessert)
+                    val allowSplit = recipeAllowsComponentSplit(recipe)
                     val groupedFromMatches = allowSplit && !textHasHeaders &&
                         ingredientMatches.any { !it.componentGroup.isNullOrBlank() }
                     val displayBlocks: List<Pair<String?, String>> = if (groupedFromMatches) {
@@ -876,9 +928,7 @@ internal fun NutritionAnalysisCard(
                                 Spacer(Modifier.width(2.dp))
                                 Text("Verify", fontSize = 11.sp)
                             }
-                            val canSplit = recipe.withGuessedCategoryIfEmpty().category().allowsComponentSplit &&
-                                RecipeCategory.guess(recipe.title, recipe.ingredients, recipe.description)
-                                    .allowsComponentSplit
+                            val canSplit = recipeAllowsComponentSplit(recipe)
                             if (canSplit) {
                                 TextButton(onClick = onSplitComponents, contentPadding = PaddingValues(2.dp)) {
                                     Text("Trennen", fontSize = 11.sp)

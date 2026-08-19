@@ -726,9 +726,21 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun repairMashedIngredientsIfNeeded(recipe: Recipe) {
         if (!RecipeAiParser.looksMashed(recipe.ingredients)) return
-        val fixed = RecipeAiParser.formatIngredientText(recipe.ingredients)
-        if (fixed.isBlank() || fixed == recipe.ingredients.trim()) return
+        restructureIngredientSections(recipe)
+    }
+
+    /**
+     * Zutaten neu strukturieren: Abschnitts-Header (Teig/Füllung/…) erkennen,
+     * Bullets setzen, offline deutsche Abschnittsnamen nachziehen.
+     * Manuell aus der Rezept-Detailansicht aufrufbar.
+     */
+    fun restructureIngredientSections(recipe: Recipe) {
         viewModelScope.launch {
+            var fixed = RecipeAiParser.formatIngredientText(recipe.ingredients)
+            if (fixed.isBlank()) return@launch
+            // Offline: dough→Teig, cinnamon coffee filling→…, Header-Zeilen behalten
+            fixed = RecipeGermanMetricConverter.convertOfflineFull(fixed)
+            if (fixed.trim() == recipe.ingredients.trim()) return@launch
             repo.updateRecipe(recipe.copy(ingredients = fixed))
         }
     }

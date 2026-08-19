@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import ch.nutrisnap.app.data.model.IngredientMatch
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.model.Recipe
+import ch.nutrisnap.app.data.model.RecipeCategory
 import ch.nutrisnap.app.data.model.RecipeComponent
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import ch.nutrisnap.app.ui.theme.MacroColors
@@ -372,6 +373,18 @@ internal fun parseIngredientSections(ingredients: String): List<Pair<String, Lis
     flush()
     // Mindestens 2 Abschnitte mit Zutaten, sonst nicht brauchbar
     return sections.filter { it.second.isNotEmpty() }
+}
+
+/**
+ * Ob ein Rezept in trackbare Komponenten geteilt werden darf.
+ * - Kategorie MAIN/SIDE/SAUCE/OTHER (mit Heuristik-Schutz gegen falsch gespeichertes MAIN)
+ * - ODER ≥2 Abschnitte im Zutaten-Text (auch Dessert/Frühstück: Teig/Füllung/Frosting)
+ */
+internal fun recipeAllowsComponentSplit(recipe: Recipe): Boolean {
+    if (parseIngredientSections(recipe.ingredients).size >= 2) return true
+    val stored = recipe.withGuessedCategoryIfEmpty().category()
+    val guessed = RecipeCategory.guess(recipe.title, recipe.ingredients, recipe.description)
+    return stored.allowsComponentSplit && guessed.allowsComponentSplit
 }
 
 /** Ordnet eine Match-Zeile einem Abschnitts-Key zu (Name-Ähnlichkeit). */

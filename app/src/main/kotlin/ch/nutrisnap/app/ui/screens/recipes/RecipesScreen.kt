@@ -621,10 +621,7 @@ fun RecipesScreen(
                     it.name.contains("fleisch", ignoreCase = true)
             }?.cookedWeightG,
             recipeIngredients = verifyRecipe.ingredients,
-            allowComponentSplit = verifyRecipe.withGuessedCategoryIfEmpty().category().allowsComponentSplit &&
-                RecipeCategory.guess(
-                    verifyRecipe.title, verifyRecipe.ingredients, verifyRecipe.description
-                ).allowsComponentSplit
+            allowComponentSplit = recipeAllowsComponentSplit(verifyRecipe)
         )
     }
 
@@ -739,6 +736,7 @@ fun RecipesScreen(
                 selectedRecipe = null
             },
             onUpdateIngredients = { newText -> vm.updateIngredientsAndSyncMatches(live, newText) },
+            onRestructureIngredients = { vm.restructureIngredientSections(live) },
             onUpdateCookedWeight = { w -> vm.updateRecipe(live.copy(cookedWeightG = w)) },
             onScaleToBudget = { vm.scaleToRemainingBudget(live) },
             onTranslateGermanMetric = { vm.translateToGermanMetric(live) },
