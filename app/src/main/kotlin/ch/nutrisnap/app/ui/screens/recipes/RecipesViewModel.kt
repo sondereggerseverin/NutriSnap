@@ -23,63 +23,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-private data class ImportState(
-    val isImporting:      Boolean = false,
-    val importPhase:      String? = null,
-    val importError:      String? = null,
-    val lastImport:       Recipe? = null,
-    val instagramBlocked: Boolean = false,
-    val blockedUrl:       String  = ""
-)
-
-data class NutritionState(
-    val isAnalyzing: Boolean = false,
-    val result: RecipeNutritionAnalyzer.AnalysisResult? = null,
-    val error: String? = null,
-    val recipeId: Long = -1L
-)
-
-enum class RecipeSort { NEWEST, NAME, CALORIES }
-
-enum class BatchStatus { PENDING, RUNNING, DONE, ERROR }
-
-data class BatchImportItem(
-    val url:         String,
-    val status:      BatchStatus = BatchStatus.PENDING,
-    val resultTitle: String?     = null,
-    val error:       String?     = null
-)
-
-data class BatchImportState(
-    val items:     List<BatchImportItem> = emptyList(),
-    val isRunning: Boolean = false
-) {
-    val doneCount: Int get() = items.count { it.status == BatchStatus.DONE }
-}
-
-data class RecipesUiState(
-    val recipes:          List<Recipe> = emptyList(),
-    val query:            String       = "",
-    val platformFilter:   String?      = null,   // null = alle
-    val categoryFilter:   RecipeCategory? = null, // null = alle Kategorien
-    val ingredientNeedles: List<String> = emptyList(), // alle müssen vorkommen
-    val sort:             RecipeSort   = RecipeSort.NEWEST,
-    val isImporting:      Boolean      = false,
-    val importPhase:      String?      = null,
-    val importError:      String?      = null,
-    val lastImport:       Recipe?      = null,
-    val instagramBlocked: Boolean      = false,
-    val blockedUrl:       String       = "",
-    val nutritionState:   NutritionState = NutritionState(),
-    val isTranslating:    Boolean      = false
-)
-
-data class BudgetScaleState(
-    val isLoading: Boolean = false,
-    val result: RecipeBudgetScaleResult? = null,
-    val error: String? = null
-)
-
 class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     private val db = NutriDatabase.getInstance(app)
     private val repo = RecipeRepository(db, app)
@@ -1212,18 +1155,6 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun parseCaption(caption: String): Pair<String, String> {
-        val lower = caption.lowercase()
-        val instrKw = listOf("zubereitung","anleitung","so geht","preparation","method","instructions","steps","how to","zubereiten:")
-        val ingrKw  = listOf("zutaten","zutaten:","ingredients","du brauchst","das brauchst","you need","für das rezept")
-        val instrIdx = instrKw.firstNotNullOfOrNull { kw -> lower.indexOf(kw).takeIf { it > 5 } }
-        val ingrIdx  = ingrKw.firstNotNullOfOrNull  { kw -> lower.indexOf(kw).takeIf { it >= 0 } }
-        return when {
-            ingrIdx != null && instrIdx != null && instrIdx > ingrIdx ->
-                caption.substring(ingrIdx, instrIdx).trim() to caption.substring(instrIdx).trim()
-            instrIdx != null -> caption.substring(0, instrIdx).trim() to caption.substring(instrIdx).trim()
-            ingrIdx != null  -> caption.substring(ingrIdx).trim() to ""
-            else             -> caption to ""
-        }
-    }
+    private fun parseCaption(caption: String): Pair<String, String> =
+        RecipeCaptionParser.parseCaption(caption)
 }
