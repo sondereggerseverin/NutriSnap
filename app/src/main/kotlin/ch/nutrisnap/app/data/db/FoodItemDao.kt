@@ -18,7 +18,7 @@ interface FoodItemDao {
     @Query("SELECT * FROM food_items WHERE ${SearchSql.NORM_NAME} LIKE '%' || ${SearchSql.NORM_QUERY} || '%' OR ${SearchSql.NORM_BRAND} LIKE '%' || ${SearchSql.NORM_QUERY} || '%' ORDER BY timesUsed DESC LIMIT 50")
     suspend fun search(query: String): List<FoodItem>
 
-    // ── FTS5-Suche (schnell bei grosser food_items-Tabelle) ───────────────────
+    // ── FTS-Suche (schnell bei grosser food_items-Tabelle) ───────────────────
     @Query("""
         SELECT fi.* FROM food_items_fts
         JOIN food_items fi ON fi.id = food_items_fts.rowid

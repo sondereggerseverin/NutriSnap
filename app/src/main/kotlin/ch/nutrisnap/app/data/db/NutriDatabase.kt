@@ -57,6 +57,7 @@ interface UserProfileDao {
 @Database(
     entities = [
         FoodItem::class,
+        FoodItemFts::class,
         DiaryEntry::class,
         Recipe::class,
         UserProfileEntity::class,
@@ -670,40 +671,40 @@ abstract class NutriDatabase : RoomDatabase() {
         /** FTS5-Volltextindex über food_items (name, brand) – spürbar schnellere lokale Suche. */
         private val MIGRATION_33_34 = object : Migration(33, 34) {
             override fun migrate(db: SupportSQLiteDatabase) {
+                // Room @Fts4(contentEntity=FoodItem) erwartet FTS4 mit content=food_items
+                db.execSQL(
+                    "CREATE VIRTUAL TABLE IF NOT EXISTS `food_items_fts` USING FTS4(" +
+                        "`name` TEXT, `brand` TEXT, content=`food_items`)"
+                )
+                // External-Content: Änderungen an food_items in den Index spiegeln
                 db.execSQL("""
-                    CREATE VIRTUAL TABLE IF NOT EXISTS food_items_fts USING fts5(
-                        name,
-                        brand,
-                        content='food_items',
-                        content_rowid='id',
-                        tokenize='unicode61'
-                    )
-                """.trimIndent())
-                // Sync-Trigger (External-Content-Tabelle)
-                db.execSQL("""
-                    CREATE TRIGGER IF NOT EXISTS food_items_fts_ai AFTER INSERT ON food_items BEGIN
-                        INSERT INTO food_items_fts(rowid, name, brand)
-                        VALUES (new.id, new.name, coalesce(new.brand, ''));
+                    CREATE TRIGGER IF NOT EXISTS room_food_items_fts_insert
+                    AFTER INSERT ON food_items BEGIN
+                        INSERT INTO food_items_fts(docid, name, brand)
+                        VALUES (new.id, new.name, new.brand);
                     END
                 """.trimIndent())
                 db.execSQL("""
-                    CREATE TRIGGER IF NOT EXISTS food_items_fts_ad AFTER DELETE ON food_items BEGIN
-                        INSERT INTO food_items_fts(food_items_fts, rowid, name, brand)
-                        VALUES ('delete', old.id, old.name, coalesce(old.brand, ''));
+                    CREATE TRIGGER IF NOT EXISTS room_food_items_fts_delete
+                    AFTER DELETE ON food_items BEGIN
+                        DELETE FROM food_items_fts WHERE docid = old.id;
                     END
                 """.trimIndent())
                 db.execSQL("""
-                    CREATE TRIGGER IF NOT EXISTS food_items_fts_au AFTER UPDATE OF name, brand ON food_items BEGIN
-                        INSERT INTO food_items_fts(food_items_fts, rowid, name, brand)
-                        VALUES ('delete', old.id, old.name, coalesce(old.brand, ''));
-                        INSERT INTO food_items_fts(rowid, name, brand)
-                        VALUES (new.id, new.name, coalesce(new.brand, ''));
+                    CREATE TRIGGER IF NOT EXISTS room_food_items_fts_update
+                    AFTER UPDATE OF name, brand ON food_items BEGIN
+                        UPDATE food_items_fts SET name = new.name, brand = new.brand
+                        WHERE docid = new.id;
                     END
                 """.trimIndent())
-                // Bestehende Zeilen indexieren
-                db.execSQL("INSERT INTO food_items_fts(food_items_fts) VALUES('rebuild')")
+                // Bestehende Daten indexieren
+                db.execSQL(
+                    "INSERT INTO food_items_fts(docid, name, brand) " +
+                        "SELECT id, name, brand FROM food_items"
+                )
             }
         }
+
 
         private val MIGRATION_32_33 = object : Migration(32, 33) {
             override fun migrate(db: SupportSQLiteDatabase) {
