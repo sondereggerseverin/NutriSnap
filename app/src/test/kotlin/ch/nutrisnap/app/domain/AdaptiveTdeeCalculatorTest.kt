@@ -55,7 +55,7 @@ class AdaptiveTdeeCalculatorTest {
             formulaBmr = 1500.0,
             formulaTdee = 2000.0,
             trend = null,
-            deficitKcal = 2000, // aggressive — would go below floor without clamp
+            deficitKcal = 2000.0, // aggressive — would go below floor without clamp
             todayActiveKcal = 0.0,
             avgActiveKcal = 0.0
         )
