@@ -1,6 +1,8 @@
 package ch.nutrisnap.app.ui.screens.diary
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import ch.nutrisnap.app.ui.theme.NutriRadius
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -17,6 +19,7 @@ import ch.nutrisnap.app.data.model.MealTemplate
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.ui.theme.NutriSpacing
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun EntryScheduleSheet(
     entry: DiaryEntry,

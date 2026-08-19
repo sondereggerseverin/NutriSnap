@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.IngredientMatch
 import ch.nutrisnap.app.data.model.MatchSource
 import ch.nutrisnap.app.data.model.RecipeComponent

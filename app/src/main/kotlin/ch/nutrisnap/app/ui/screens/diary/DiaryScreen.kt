@@ -990,6 +990,3 @@ private fun ReorderableMealEntries(
         }
     }
 }
-
-
-@OptIn(ExperimentalMaterial3Api::class)
