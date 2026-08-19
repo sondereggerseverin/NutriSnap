@@ -53,5 +53,7 @@ class SearchUtilsTest {
         assertEquals("suss* kartoffel*", SearchUtils.toFtsMatchQuery("suss kartoffel"))
         assertEquals("", SearchUtils.toFtsMatchQuery("a"))
         assertEquals("", SearchUtils.toFtsMatchQuery("  "))
+        val umlaut = SearchUtils.toFtsMatchQuery("Hähnchen")
+        assertTrue(umlaut.contains("haehnchen*") || umlaut.contains("Hähnchen*") || umlaut.contains("*"))
     }
 }

@@ -232,7 +232,12 @@ object SearchUtils {
             }
             .filter { it.isNotBlank() }
         if (tokens.isEmpty()) return ""
-        // Prefix-Match: "haehn" findet "Haehnchen"
-        return tokens.joinToString(" ") { "$it*" }
+        // Prefix-Match + Umlaut-Variante (ä→ae): AND zwischen Tokens, OR innerhalb
+        return tokens.map { t ->
+            val norm = normalize(t)
+            val alts = listOfNotNull(t, if (norm != t.lowercase()) norm else null).distinct()
+            if (alts.size == 1) "${alts[0]}*"
+            else "(" + alts.joinToString(" OR ") { "$it*" } + ")"
+        }.joinToString(" ")
     }
 }
