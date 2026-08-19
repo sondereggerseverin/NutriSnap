@@ -288,6 +288,8 @@ fun formatVerifyLineParts(state: IngredientVerifyState): VerifyLineParts {
         .replace(Regex("""(?i)^ingredients?\s*(\([^)]*\))?\s*:?\s*"""), "")
         .replace(Regex("""(?i)^zutaten\s*(\([^)]*\))?\s*:?\s*"""), "")
         .replace(Regex("""(?i)^\d+([.,]\d+)?\s*(g|ml|kg|el|tl|cup|tbsp|tsp|oz)\s+"""), "")
+        // Englische Füllwörter nach der Menge: "of cocoa powder", "of Milch or Wasser"
+        .replace(Regex("""(?i)^(of|a|an)\s+"""), "")
         .trim()
         .trimStart(':', '–', '-', ' ')
         .trim()
@@ -296,8 +298,10 @@ fun formatVerifyLineParts(state: IngredientVerifyState): VerifyLineParts {
     val fromLine = clean(state.result.line).takeIf { it.isNotBlank() }
     val fromFood = state.effectiveFood?.name?.takeIf { it.isNotBlank() }?.let { clean(it) }
 
-    // Original-Rezepttext hat Vorrang vor kommerziellem OFF-Namen ("Cacao en poudre" etc.)
+    // Manuelle Auswahl (Scan/Suche/DB) → gewählter Produktname ersetzt den Rohtext.
+    // Auto-Match: Original-Rezepttext behalten (besser als generischer OFF-Name).
     val name = when {
+        state.override != null && !fromFood.isNullOrBlank() -> fromFood
         !fromParsed.isNullOrBlank() && fromParsed.length >= 2 -> fromParsed
         !fromLine.isNullOrBlank() && fromLine.length >= 2 -> fromLine
         !fromFood.isNullOrBlank() -> fromFood

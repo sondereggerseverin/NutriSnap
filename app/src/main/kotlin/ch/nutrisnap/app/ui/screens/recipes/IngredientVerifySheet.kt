@@ -569,9 +569,15 @@ fun IngredientVerifySheet(
                                     // "bereits gematcht"-Prüfung in RecipesScreen die Zutat nicht wieder
                                     // und zeigt sie fälschlich nochmals unter "Weitere" an (Duplikate).
                                     ingredientRaw = formatVerifyLineTitle(s),
-                                    ingredientName = s.result.parsed?.name
-                                        ?: food?.name
-                                        ?: s.result.line,
+                                    // Manuelle DB-/Scan-Auswahl: Produktname ersetzt Rohtext
+                                    ingredientName = when {
+                                        s.override != null -> food?.name
+                                            ?: s.result.parsed?.name
+                                            ?: s.result.line
+                                        else -> s.result.parsed?.name
+                                            ?: food?.name
+                                            ?: s.result.line
+                                    },
                                     amountGrams = s.effectiveAmountG,
                                     matchedFoodItemId = food?.id?.toLong(),
                                     matchedFoodName = food?.name,

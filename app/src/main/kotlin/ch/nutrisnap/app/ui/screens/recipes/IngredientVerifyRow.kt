@@ -127,9 +127,11 @@ internal fun IngredientVerifyRow(
 
     val parts = formatVerifyLineParts(state)
     val matchName = state.effectiveFood?.name?.trim().orEmpty()
+    // Bei manuellem Override ist der Hauptname bereits der Produktname →
+    // Unterzeile nur zeigen, wenn sie sich vom Hauptnamen unterscheidet.
     val showMatchSub = when {
         !isMatched && !isOverride -> true
-        isOverride -> true
+        isOverride -> matchName.isNotBlank() && !matchName.equals(parts.name, ignoreCase = true)
         matchName.isNotBlank() && !matchName.equals(parts.name, ignoreCase = true) -> true
         else -> false
     }
