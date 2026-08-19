@@ -16,13 +16,18 @@ import java.time.LocalDate
  */
 private class FakeDiaryDao(private val datesWithEntries: Set<String>) : DiaryDao {
     override fun getEntriesForDate(dateStr: String): Flow<List<DiaryEntry>> = flowOf(emptyList())
+    override suspend fun getEntriesForDateOnce(dateStr: String): List<DiaryEntry> = emptyList()
+    override suspend fun updateSortOrder(id: Long, sortOrder: Int) {}
     override fun getWeeklySummary(fromDate: String): Flow<List<DailySummary>> = flowOf(emptyList())
+    override fun getSummaryBetween(fromDate: String, toDate: String): Flow<List<DailySummary>> = flowOf(emptyList())
     override suspend fun insert(entry: DiaryEntry): Long = 0L
     override suspend fun update(entry: DiaryEntry) {}
     override suspend fun delete(entry: DiaryEntry) {}
     override suspend fun totalCaloriesForDate(dateStr: String): Float? = null
     override suspend fun hasEntriesForDate(dateStr: String): Boolean = dateStr in datesWithEntries
     override suspend fun getAllOnce(): List<DiaryEntry> = emptyList()
+    override suspend fun getEntriesSince(fromDate: String): List<DiaryEntry> = emptyList()
+    override suspend fun getById(id: Long): DiaryEntry? = null
     override suspend fun deleteAll() {}
 }
 
