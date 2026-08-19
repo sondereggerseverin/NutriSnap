@@ -1,0 +1,98 @@
+name: Import Eigenmarken (OpenFoodFacts CH)
+on:
+  workflow_dispatch:
+    inputs:
+      brand_tag:
+        description: "OpenFoodFacts brands_tags Wert (z.B. migros, aldi-suisse, lidl, coop)"
+        required: true
+        default: "migros"
+      brand_label:
+        description: "Anzeigename der Marke (z.B. Migros)"
+        required: true
+        default: "Migros"
+      out_path:
+        description: "Zielpfad der JSON-Datei"
+        required: true
+        default: "app/src/main/assets/off_migros_ch.json"
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Fetch brand catalog from OpenFoodFacts
+        run: |
+          python3 scripts/fetch_off_ch_brand.py \
+            --brand "${{ inputs.brand_tag }}" \
+            --label "${{ inputs.brand_label }}" \
+            --out "${{ inputs.out_path }}" \
+            2>&1 | tee off_import.log
+
+      - name: Commit result
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.email "severin@nutrisnap.dev"
+          git config user.name "Severin Sonderegger"
+          git add "${{ inputs.out_path }}"
+          if git diff --cached --quiet; then
+            echo "Keine Änderungen (Datei bereits aktuell oder leer)."
+          else
+            git commit -m "Eigenmarken-Import: ${{ inputs.brand_label }} (OpenFoodFacts CH)"
+            git push
+          fi
+
+      - name: Upload log on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_NUM: ${{ github.run_number }}
+        run: |
+          python3 - <<'PYEOF'
+          import urllib.request, json, base64, os
+
+          token = os.environ['GH_TOKEN']
+          repo = os.environ['REPO']
+          run_num = os.environ['RUN_NUM']
+
+          try:
+              with open('off_import.log', 'r', errors='replace') as f:
+                  content = f.read()
+          except FileNotFoundError:
+              content = "(kein off_import.log erzeugt - Fehler vor Skriptstart)"
+
+          text = f"# Eigenmarken-Import Fehler - run {run_num}\n\n```\n{content[-4000:]}\n```\n"
+          encoded = base64.b64encode(text.encode()).decode()
+
+          api_url = f"https://api.github.com/repos/{repo}/contents/off_import_errors.txt"
+          req = urllib.request.Request(api_url, headers={"Authorization": f"token {token}"})
+          try:
+              existing = json.load(urllib.request.urlopen(req))
+              file_sha = existing['sha']
+          except Exception:
+              file_sha = None
+
+          payload = {"message": f"ci: off-import errors run {run_num}", "content": encoded}
+          if file_sha:
+              payload["sha"] = file_sha
+
+          put_req = urllib.request.Request(
+              api_url,
+              data=json.dumps(payload).encode(),
+              headers={"Authorization": f"token {token}", "Content-Type": "application/json"},
+              method="PUT"
+          )
+          resp = json.load(urllib.request.urlopen(put_req))
+          print("Committed:", resp.get('commit', {}).get('sha', 'unknown')[:12])
+          PYEOF
