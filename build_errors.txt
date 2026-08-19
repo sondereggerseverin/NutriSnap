@@ -1,40 +1,40 @@
-# Build errors - run 837
+# Build errors - run 887
 
-## Error lines
+## Unit Tests (test_output.log) - Error lines
 ```
-Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libbarhopper_v3.so, libdatastore_shared_counter.so, libimage_processing_util_jni.so. Run with --info option to learn more.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:610:33 Overload resolution ambiguity between candidates:
-fun MacroChip(label: String, value: String): Unit
-fun MacroChip(label: String, value: String): Unit
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:611:33 Overload resolution ambiguity between candidates:
-fun MacroChip(label: String, value: String): Unit
-fun MacroChip(label: String, value: String): Unit
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:612:33 Overload resolution ambiguity between candidates:
-fun MacroChip(label: String, value: String): Unit
-fun MacroChip(label: String, value: String): Unit
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:1361:9 Conflicting overloads:
-fun MacroChip(label: String, value: String): Unit
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:1753:29 Overload resolution ambiguity between candidates:
-fun MacroChip(label: String, value: String): Unit
-fun MacroChip(label: String, value: String): Unit
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:1754:29 Overload resolution ambiguity between candidates:
-fun MacroChip(label: String, value: String): Unit
-fun MacroChip(label: String, value: String): Unit
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:1755:29 Overload resolution ambiguity between candidates:
-fun MacroChip(label: String, value: String): Unit
-fun MacroChip(label: String, value: String): Unit
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:1756:29 Overload resolution ambiguity between candidates:
-fun MacroChip(label: String, value: String): Unit
-fun MacroChip(label: String, value: String): Unit
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/IngredientVerifySheet.kt:1780:9 Conflicting overloads:
-fun MacroChip(label: String, value: String): Unit
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipeImportSheets.kt:298:68 Unresolved reference 'saveManualRecipe'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:213:82 Unresolved reference 'importFromSharedJson'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:587:27 Property delegate must have a 'getValue(Nothing?, KProperty0<??? (Unknown type for type parameter T)>)' method. None of the following functions is applicable:
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:587:30 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:587:33 Unresolved reference 'getMatches'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:587:61 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:587:104 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:614:20 Unresolved reference 'replaceMatchesForRecipe'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:642:26 Property delegate must have a 'getValue(Nothing?, KProperty0<??? (Unknown type for type parameter T)>)' method. None of the following functions is applicable:
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:642:29 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:642:32 Unresolved reference 'getMatches'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:642:59 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:642:102 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:649:20 Unresolved reference 'replaceMatchesForRecipe'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:663:25 Property delegate must have a 'getValue(Nothing?, KProperty0<??? (Unknown type for type parameter T)>)' method. None of the following functions is applicable:
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:663:28 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:663:31 Unresolved reference 'getMatches'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:663:51 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:663:94 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:812:26 Property delegate must have a 'getValue(Nothing?, KProperty0<??? (Unknown type for type parameter T)>)' method. None of the following functions is applicable:
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:812:29 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:812:32 Unresolved reference 'getMatches'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:812:54 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:812:97 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesViewModel.kt:962:6 Syntax error: Missing '}.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesViewModel.kt:1062:1 Syntax error: Unclosed comment.
 > Task :app:compileDebugKotlin FAILED
    > Compilation error. See log for more details
 Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilation error. See log for more details
-BUILD FAILED in 2m 35s
+BUILD FAILED in 1m 16s
 ```
 
-## Last 150 lines
+## Unit Tests (test_output.log) - Last 150 lines
 ```
 	at org.gradle.internal.work.DefaultAsyncWorkTracker.waitForItemsAndGatherFailures(DefaultAsyncWorkTracker.java:92)
 	at org.gradle.internal.work.DefaultAsyncWorkTracker.waitForAll(DefaultAsyncWorkTracker.java:78)
@@ -184,6 +184,10 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilat
 	... 2 more
 
 
-BUILD FAILED in 2m 35s
-31 actionable tasks: 31 executed
+BUILD FAILED in 1m 16s
+18 actionable tasks: 18 executed
 ```
+
+## Build Debug APK (build_output.log)
+_Log nicht vorhanden (Schritt uebersprungen oder nicht ausgefuehrt)._
+
