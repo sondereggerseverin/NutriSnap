@@ -17,6 +17,8 @@ import ch.nutrisnap.app.domain.GroqVisionService
 import ch.nutrisnap.app.domain.RecipeGermanMetricConverter
 import ch.nutrisnap.app.domain.RecipeComponentSuggester
 import ch.nutrisnap.app.domain.RecipeListFilter
+import ch.nutrisnap.app.domain.IngredientMatchSync
+import ch.nutrisnap.app.domain.RecipeVerifiedNutrition
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.KEY_AUTO_GERMAN_METRIC
 import kotlinx.coroutines.flow.first
@@ -709,25 +711,9 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             repo.updateRecipe(recipe.copy(ingredients = newIngredients))
             val existing = matchDao.getMatchesForRecipeOnce(recipe.id)
             if (existing.isEmpty()) return@launch
-            fun core(s: String): String =
-                s.lowercase()
-                    .trim()
-                    .trimStart('•', '-', '*', ' ')
-                    .replace(Regex("""^\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tbsp|tsp|cup|oz)?\s*"""), "")
-                    .trim()
-            val textCores = newIngredients.lines()
-                .map { core(it) }
-                .filter { it.length >= 2 }
-                .toSet()
+            val toDelete = IngredientMatchSync.matchIdsToSoftDelete(existing, newIngredients).toSet()
             for (m in existing) {
-                if (m.isDeleted) continue
-                val rawC = core(m.ingredientRaw)
-                val nameC = core(m.ingredientName)
-                val stillPresent = textCores.any { t ->
-                    (rawC.length >= 3 && (t.contains(rawC) || rawC.contains(t))) ||
-                        (nameC.length >= 3 && (t.contains(nameC) || nameC.contains(t)))
-                }
-                if (!stillPresent) {
+                if (m.id in toDelete) {
                     matchDao.updateMatch(m.copy(isDeleted = true))
                 }
             }
@@ -954,34 +940,19 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         ingredientsText: String? = null
     ) {
         viewModelScope.launch {
-            val macroLine = "📊 Pro Portion: ${kcalPerServ.toInt()} kcal" +
-                " · ${protPerServ.toInt()}g Protein" +
-                " · ${carbsPerServ.toInt()}g Kohlenhydrate" +
-                " · ${fatPerServ.toInt()}g Fett (verifiziert)"
-            val baseDesc = recipe.description.lines()
-                .filterNot { line ->
-                    val t = line.trim()
-                    t.startsWith("📊") ||
-                        t.startsWith("Pro Stück:", ignoreCase = true) ||
-                        t.startsWith("Pro Portion:", ignoreCase = true) ||
-                        (t.contains("kcal", ignoreCase = true) && t.contains("Protein", ignoreCase = true))
-                }
-                .joinToString("\n").trim()
-            val newDesc = if (baseDesc.isNotBlank()) "$baseDesc\n\n$macroLine" else macroLine
-            val updated = recipe.copy(
-                totalCalories     = kcalPerServ * recipe.servings,
-                proteinPerServing = protPerServ,
-                carbsPerServing   = carbsPerServ,
-                fatPerServing     = fatPerServ,
-                fiberPerServing        = fiberPerServ  ?: recipe.fiberPerServing,
-                sugarPerServing        = sugarPerServ  ?: recipe.sugarPerServing,
-                saturatedFatPerServing = satFatPerServ ?: recipe.saturatedFatPerServing,
-                saltPerServing         = saltPerServ   ?: recipe.saltPerServing,
-                sodiumPerServing       = sodiumPerServ ?: recipe.sodiumPerServing,
-                totalIngredientWeightG = totalIngredientWeightG
-                    ?: recipe.totalIngredientWeightG,
-                description       = newDesc,
-                ingredients       = ingredientsText?.takeIf { it.isNotBlank() } ?: recipe.ingredients
+            val updated = RecipeVerifiedNutrition.applyToRecipe(
+                recipe = recipe,
+                kcalPerServ = kcalPerServ,
+                protPerServ = protPerServ,
+                carbsPerServ = carbsPerServ,
+                fatPerServ = fatPerServ,
+                fiberPerServ = fiberPerServ,
+                sugarPerServ = sugarPerServ,
+                satFatPerServ = satFatPerServ,
+                saltPerServ = saltPerServ,
+                sodiumPerServ = sodiumPerServ,
+                totalIngredientWeightG = totalIngredientWeightG,
+                ingredientsText = ingredientsText
             )
             repo.updateRecipe(updated)
             // Session-Overrides räumen – Persistenz liegt in IngredientMatch
@@ -992,10 +963,6 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Merged verifizierte Zutaten als IngredientMatch-Zeilen (kein delete-all).
-     * Primär per id, Fallback über normalisierten ingredientName.
-     * Bestehende componentGroup / matchedFoodItemId bleiben erhalten, wenn die
-     * neue Zeile keinen expliziten neuen Wert mitbringt.
-     */
     fun mergeMatchesForRecipe(recipeId: Long, matches: List<ch.nutrisnap.app.data.model.IngredientMatch>) {
         viewModelScope.launch {
             val existing = matchDao.getMatchesForRecipeOnce(recipeId)
