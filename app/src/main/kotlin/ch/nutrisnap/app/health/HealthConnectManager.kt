@@ -10,6 +10,8 @@ import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.MealType as HcMealType
+import androidx.health.connect.client.records.NutritionRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
@@ -18,6 +20,9 @@ import androidx.health.connect.client.records.metadata.DataOrigin
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
+import androidx.health.connect.client.units.Energy
+import androidx.health.connect.client.units.Mass
+import ch.nutrisnap.app.data.model.MealType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import java.time.Instant
@@ -62,6 +67,9 @@ class HealthConnectManager(context: Context) {
         // damit der normale "Health Connect verbinden"-Flow nicht davon abhängt.
         val HISTORY_PERMISSION = HealthPermission.PERMISSION_READ_HEALTH_DATA_HISTORY
 
+        /** Optional: Tagebuch → NutritionRecord. Nicht im Pflicht-Connect-Flow. */
+        val WRITE_NUTRITION_PERMISSION = HealthPermission.getWritePermission(NutritionRecord::class)
+
         fun getStatus(context: Context): HealthConnectStatus = when (
             HealthConnectClient.getSdkStatus(context)
         ) {
@@ -90,6 +98,69 @@ class HealthConnectManager(context: Context) {
     /** True, wenn Health Connect auch Daten älter als 30 Tage zurückgeben darf. */
     suspend fun hasHistoryPermission(): Boolean =
         checkPermissions().contains(HISTORY_PERMISSION)
+
+    /** True, wenn NutriSnap NutritionRecords schreiben darf. */
+    suspend fun hasWriteNutritionPermission(): Boolean =
+        checkPermissions().contains(WRITE_NUTRITION_PERMISSION)
+
+    /**
+     * Schreibt einen Mahlzeiten-Eintrag als [NutritionRecord] nach Health Connect.
+     * Best-effort: fehlende Permission oder API-Fehler → Result.failure, ohne Exception
+     * an den Aufrufer durchzureichen (Tagebuch-Speichern darf nicht scheitern).
+     *
+     * Werte in g bzw. kcal; 0/negativ → Feld weglassen (HC akzeptiert null).
+     * Zeitraum: 15 Minuten um [at] (HC verlangt start < end).
+     */
+    suspend fun writeNutritionEntry(
+        name: String,
+        mealType: MealType,
+        energyKcal: Double,
+        proteinG: Double,
+        carbsG: Double,
+        fatG: Double,
+        fiberG: Double = 0.0,
+        sugarG: Double = 0.0,
+        saturatedFatG: Double = 0.0,
+        sodiumG: Double = 0.0,
+        at: Instant = Instant.now()
+    ): Result<Unit> = runCatching {
+        if (!hasWriteNutritionPermission()) {
+            error("Keine WRITE_NUTRITION-Berechtigung")
+        }
+        val zone = ZoneId.systemDefault()
+        val offset = zone.rules.getOffset(at)
+        val end = at.plusSeconds(15 * 60)
+        val endOffset = zone.rules.getOffset(end)
+
+        fun massOrNull(g: Double): Mass? =
+            if (g.isFinite() && g > 0.0) Mass.grams(g) else null
+
+        val record = NutritionRecord(
+            startTime = at,
+            startZoneOffset = offset,
+            endTime = end,
+            endZoneOffset = endOffset,
+            name = name.take(100).ifBlank { null },
+            energy = if (energyKcal.isFinite() && energyKcal > 0.0) Energy.kilocalories(energyKcal) else null,
+            protein = massOrNull(proteinG),
+            totalCarbohydrate = massOrNull(carbsG),
+            totalFat = massOrNull(fatG),
+            dietaryFiber = massOrNull(fiberG),
+            sugar = massOrNull(sugarG),
+            saturatedFat = massOrNull(saturatedFatG),
+            sodium = massOrNull(sodiumG),
+            mealType = when (mealType) {
+                MealType.BREAKFAST -> HcMealType.MEAL_TYPE_BREAKFAST
+                MealType.LUNCH -> HcMealType.MEAL_TYPE_LUNCH
+                MealType.DINNER -> HcMealType.MEAL_TYPE_DINNER
+                MealType.SNACK -> HcMealType.MEAL_TYPE_SNACK
+            }
+        )
+        client.insertRecords(listOf(record))
+        Unit
+    }.onFailure {
+        Log.w(TAG, "writeNutritionEntry failed for \"$name\": ${it.message}")
+    }
 
     /** Steps for a specific day */
     suspend fun getStepsForDay(date: LocalDate): Long {
