@@ -322,7 +322,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             }
             try {
                 val vision = GroqVisionService()
-                val base64 = vision.bitmapToBase64Jpeg(bitmap, quality = 80)
+                val base64 = vision.bitmapToBase64JpegForText(bitmap, quality = 85)
                 val extractedList = vision.extractRecipesFromImage(base64).getOrElse { e ->
                     _importState.update {
                         it.copy(
@@ -467,7 +467,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                     // Mit Screenshot: trotzdem aus dem Bild bauen und Link manuell setzen
                     _importState.update { it.copy(importPhase = "Rezept aus Screenshot lesen…") }
                     val vision = GroqVisionService()
-                    val base64 = vision.bitmapToBase64Jpeg(recipeScreenshot, quality = 80)
+                    val base64 = vision.bitmapToBase64JpegForText(recipeScreenshot, quality = 85)
                     val extracted = vision.extractRecipeFromImage(base64).getOrElse { e ->
                         _importState.update {
                             it.copy(
@@ -551,7 +551,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 if (recipeScreenshot != null) {
                     _importState.update { it.copy(importPhase = "Rezept aus Screenshot lesen…") }
                     val vision = GroqVisionService()
-                    val base64 = vision.bitmapToBase64Jpeg(recipeScreenshot, quality = 80)
+                    val base64 = vision.bitmapToBase64JpegForText(recipeScreenshot, quality = 85)
                     val extracted = vision.extractRecipeFromImage(base64).getOrNull()
                     if (extracted != null &&
                         (extracted.ingredients.isNotBlank() || extracted.instructions.isNotBlank())

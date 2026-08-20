@@ -221,14 +221,14 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val vision = GroqVisionService()
-                val b64 = vision.bitmapToBase64Jpeg(labelBitmap, quality = 85)
+                val b64 = vision.bitmapToBase64JpegForText(labelBitmap, quality = 85)
                 var label = vision.analyzeNutritionLabel(b64).getOrElse { e ->
                     onDone(null)
                     return@launch
                 }
                 // Zweites Foto (falls Etikett getrennt) – fehlende Felder ergänzen
                 if (secondBitmap != null) {
-                    val b642 = vision.bitmapToBase64Jpeg(secondBitmap, quality = 85)
+                    val b642 = vision.bitmapToBase64JpegForText(secondBitmap, quality = 85)
                     vision.analyzeNutritionLabel(b642).getOrNull()?.let { second ->
                         label = label.copy(
                             caloriesPer100g = label.caloriesPer100g.takeIf { it > 0f } ?: second.caloriesPer100g,

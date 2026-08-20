@@ -35,7 +35,7 @@ class NutritionLabelScanViewModel(app: Application) : AndroidViewModel(app) {
     fun analyzePhoto(bitmap: Bitmap) {
         _state.value = LabelScanState.Analyzing
         viewModelScope.launch {
-            val base64 = visionService.bitmapToBase64Jpeg(bitmap)
+            val base64 = visionService.bitmapToBase64JpegForText(bitmap)
             visionService.analyzeNutritionLabel(base64).fold(
                 onSuccess = { result -> _state.value = LabelScanState.Result(result) },
                 onFailure = { e -> _state.value = LabelScanState.Error(e.message ?: "Unbekannter Fehler") }

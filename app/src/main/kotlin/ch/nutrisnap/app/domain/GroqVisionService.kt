@@ -1,6 +1,10 @@
 package ch.nutrisnap.app.domain
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
 import android.util.Base64
 import ch.nutrisnap.app.BuildConfig
 import kotlinx.coroutines.Deferred
@@ -93,7 +97,13 @@ class GroqVisionService {
         // Aktuelles Groq Vision-Modell (Stand 2026, siehe console.groq.com/docs/vision).
         // Falls Groq dieses Modell dereinst deprecated: hier zentral austauschen.
         private const val VISION_MODEL = "qwen/qwen3.6-27b"
-        private const val MAX_DIMENSION = 1024 // Px – haelt Base64-Payload unter Groq's 4MB-Limit
+        /** Standard für Food-/Fridge-Fotos – hält Base64 unter typischen API-Limits. */
+        private const val MAX_DIMENSION = 1024
+        /**
+         * Höhere Kante für textlastige Bilder (Rezeptkarte, Kochbuch, Screenshot).
+         * Lesbarkeit von Zutatenlisten profitiert stärker von Auflösung als Food-Fotos.
+         */
+        private const val MAX_DIMENSION_TEXT = 1536
     }
 
     /** Komprimiert ein Foto auf eine fuer die API geeignete Groesse und kodiert es als Base64-JPEG. */
@@ -104,12 +114,59 @@ class GroqVisionService {
         return Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
     }
 
+    /**
+     * Vorbereitung für textlastige Vision-Calls (Rezept aus Bild/Screenshot/Kochbuch):
+     * etwas höhere Auflösung, leichter Kontrast + Entsättigung (Screenshot-Noise),
+     * höhere JPEG-Qualität. Payload bleibt typischerweise unter 4 MB.
+     */
+    fun bitmapToBase64JpegForText(bitmap: Bitmap, quality: Int = 85): String {
+        val scaled = scaleDown(bitmap, MAX_DIMENSION_TEXT)
+        val enhanced = runCatching { enhanceForTextReadability(scaled) }.getOrDefault(scaled)
+        val stream = ByteArrayOutputStream()
+        enhanced.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(60, 95), stream)
+        if (enhanced !== scaled && enhanced !== bitmap) {
+            runCatching { enhanced.recycle() }
+        }
+        return Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+    }
+
     private fun scaleDown(bitmap: Bitmap, maxDim: Int): Bitmap {
         val w = bitmap.width
         val h = bitmap.height
         if (w <= maxDim && h <= maxDim) return bitmap
         val ratio = minOf(maxDim.toFloat() / w, maxDim.toFloat() / h)
         return Bitmap.createScaledBitmap(bitmap, (w * ratio).toInt().coerceAtLeast(1), (h * ratio).toInt().coerceAtLeast(1), true)
+    }
+
+    /**
+     * Leichte Kontrast-Anhebung und leichte Entsättigung – hilft bei verwaschenen
+     * Screenshots und schwach belichteten Kochbuchseiten, ohne Farben komplett zu zerstören
+     * (Food-Fotos nutzen diesen Pfad nicht).
+     */
+    internal fun enhanceForTextReadability(src: Bitmap): Bitmap {
+        val contrast = 1.22f
+        val translate = (-0.5f * contrast + 0.5f) * 255f
+        // Kontrast-Matrix
+        val contrastMatrix = ColorMatrix(
+            floatArrayOf(
+                contrast, 0f, 0f, 0f, translate,
+                0f, contrast, 0f, 0f, translate,
+                0f, 0f, contrast, 0f, translate,
+                0f, 0f, 0f, 1f, 0f
+            )
+        )
+        // Leicht entsättigen (UI-Screenshots: farbiges Chrome stört Text weniger)
+        val satMatrix = ColorMatrix().apply { setSaturation(0.82f) }
+        contrastMatrix.postConcat(satMatrix)
+
+        val config = src.config ?: Bitmap.Config.ARGB_8888
+        val out = Bitmap.createBitmap(src.width, src.height, config)
+        val canvas = Canvas(out)
+        val paint = Paint(Paint.FILTER_BITMAP_FLAG).apply {
+            colorFilter = ColorMatrixColorFilter(contrastMatrix)
+        }
+        canvas.drawBitmap(src, 0f, 0f, paint)
+        return out
     }
 
     /**
