@@ -989,53 +989,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun mergeMatchesForRecipe(recipeId: Long, matches: List<ch.nutrisnap.app.data.model.IngredientMatch>) {
         viewModelScope.launch {
-            val existing = matchDao.getMatchesForRecipeOnce(recipeId)
-            if (matches.isEmpty()) {
-                if (existing.isNotEmpty()) matchDao.deleteMatchesForRecipe(recipeId)
-                return@launch
-            }
-            fun norm(s: String) = s.trim().lowercase()
-            val byId = existing.associateBy { it.id }
-            val byName = existing
-                .filter { it.ingredientName.isNotBlank() }
-                .associateBy { norm(it.ingredientName) }
-            val usedIds = mutableSetOf<Long>()
-
-            for (m in matches) {
-                val old = when {
-                    m.id > 0L && m.id in byId -> byId[m.id]
-                    norm(m.ingredientName).isNotBlank() && norm(m.ingredientName) in byName ->
-                        byName[norm(m.ingredientName)]
-                    else -> null
-                }
-                if (old != null) {
-                    usedIds += old.id
-                    val merged = m.copy(
-                        id = old.id,
-                        recipeId = recipeId,
-                        // Behalte bestehende Zuordnung, wenn neu null
-                        componentGroup = m.componentGroup ?: old.componentGroup,
-                        matchedFoodItemId = m.matchedFoodItemId ?: old.matchedFoodItemId,
-                        matchedFoodName = m.matchedFoodName ?: old.matchedFoodName,
-                        matchedCalories = m.matchedCalories ?: old.matchedCalories,
-                        matchedProtein = m.matchedProtein ?: old.matchedProtein,
-                        matchedCarbs = m.matchedCarbs ?: old.matchedCarbs,
-                        matchedFat = m.matchedFat ?: old.matchedFat,
-                        matchSource = if (m.matchSource != ch.nutrisnap.app.data.model.MatchSource.UNMATCHED)
-                            m.matchSource else old.matchSource,
-                        manualAmountG = m.manualAmountG ?: old.manualAmountG,
-                        manualFiberG = m.manualFiberG ?: old.manualFiberG,
-                        isDeleted = m.isDeleted
-                    )
-                    matchDao.updateMatch(merged)
-                } else {
-                    matchDao.insertMatch(m.copy(id = 0, recipeId = recipeId))
-                }
-            }
-            // Entfernte Zeilen löschen
-            for (old in existing) {
-                if (old.id !in usedIds) matchDao.deleteMatch(old)
-            }
+            repo.mergeMatchesForRecipe(recipeId, matches)
         }
     }
 
