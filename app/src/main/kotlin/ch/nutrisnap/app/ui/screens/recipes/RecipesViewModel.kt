@@ -584,6 +584,26 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         }.getOrDefault(false)
     }
 
+    /**
+     * Gemeinsamer Nachlauf nach Import:
+     * optional DE/metrisch, dann Nährwerte persistieren (wenn Zutaten vorhanden).
+     */
+    private suspend fun postProcessImported(
+        recipe: Recipe,
+        forceGerman: Boolean = false,
+        withNutrition: Boolean = true
+    ): Recipe {
+        var r = repo.applyGermanMetricIfNeeded(
+            recipe,
+            enabled = shouldAutoGermanMetric(),
+            force = forceGerman
+        )
+        if (withNutrition && r.ingredients.isNotBlank()) {
+            r = repo.analyzeAndPersistNutrition(r)?.first ?: r
+        }
+        return r
+    }
+
     /** Fügt neue URLs zur Batch-Queue hinzu (Duplikate werden ignoriert). */
     fun addBatchUrls(urls: List<String>) {
         val existing = _batchState.value.items.map { it.url }.toSet()
@@ -606,7 +626,6 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         if (_batchState.value.isRunning) return
         viewModelScope.launch {
             _batchState.update { it.copy(isRunning = true) }
-            val autoGerman = shouldAutoGermanMetric()
             val queue = _batchState.value.items.filter { it.status != BatchStatus.DONE }
             for ((index, item) in queue.withIndex()) {
                 val urlLower = item.url.lowercase()
@@ -627,12 +646,11 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 if (result.success && result.recipe != null) {
                     val forceGerman = isIg || isTikTok ||
                         (result.recipe.platform ?: "").lowercase() in setOf("instagram", "tiktok", "bild")
-                    var recipe = repo.applyGermanMetricIfNeeded(
+                    val recipe = postProcessImported(
                         result.recipe,
-                        enabled = autoGerman,
-                        force = forceGerman
+                        forceGerman = forceGerman,
+                        withNutrition = true
                     )
-                    recipe = repo.analyzeAndPersistNutrition(recipe)?.first ?: recipe
                     doneTitle = recipe.title
                 }
                 _batchState.update { st ->
@@ -792,7 +810,9 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 mealCategory = mealCategory,
                 sourceUrl = null
             ).withGuessedCategoryIfEmpty().withoutNullArtifacts()
-            val saved = recipe.copy(id = repo.saveRecipe(recipe))
+            var saved = recipe.copy(id = repo.saveRecipe(recipe))
+            // Manuell oft schon DE – nur Auto-Übersetzung, Nährwerte wenn Zutaten da
+            saved = postProcessImported(saved, forceGerman = false, withNutrition = true)
             _importState.update { it.copy(lastImport = saved) }
         }
     }
@@ -1038,7 +1058,9 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     fun importFromSharedJson(json: String) {
         val recipe = ch.nutrisnap.app.domain.RecipeJsonImport.tryParse(json) ?: return
         viewModelScope.launch {
-            val saved = recipe.copy(id = repo.saveRecipe(recipe))
+            var saved = recipe.copy(id = repo.saveRecipe(recipe))
+            // JSON aus Chat oft schon DE/metrisch – Auto-Einstellung, Nährwerte nachziehen
+            saved = postProcessImported(saved, forceGerman = false, withNutrition = true)
             _importState.update { it.copy(lastImport = saved) }
         }
     }
@@ -1047,20 +1069,23 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val cleaned = RecipeAiParser.cleanCaption(caption)
             val (ingredients, instructions) = parseCaption(cleaned)
+            val platform = when {
+                "instagram.com" in url || "instagr.am" in url -> "instagram"
+                "tiktok.com" in url -> "tiktok"
+                else -> "web"
+            }
             val recipe = Recipe(
                 title        = title?.ifBlank { null } ?: RecipeAiParser.extractTitle(caption, "Instagram Rezept"),
                 description  = cleaned.take(500),
                 sourceUrl    = url.ifBlank { null },
-                platform     = when {
-                    "instagram.com" in url || "instagr.am" in url -> "instagram"
-                    "tiktok.com" in url -> "tiktok"
-                    else -> "web"
-                },
+                platform     = platform,
                 ingredients  = ingredients.ifBlank { cleaned },
                 instructions = instructions,
                 tags         = "manuell"
             )
-            val saved = recipe.copy(id = repo.saveRecipe(recipe))
+            var saved = recipe.copy(id = repo.saveRecipe(recipe))
+            val forceGerman = platform in setOf("instagram", "tiktok")
+            saved = postProcessImported(saved, forceGerman = forceGerman, withNutrition = true)
             _importState.update { it.copy(lastImport = saved) }
         }
     }
