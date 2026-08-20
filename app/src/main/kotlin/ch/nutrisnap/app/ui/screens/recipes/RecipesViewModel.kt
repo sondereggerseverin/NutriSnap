@@ -269,36 +269,19 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             if (result.success && result.recipe != null) {
                 val r = result.recipe
                 val platform = (r.platform ?: "").lowercase()
-                val shouldTranslate = shouldAutoGermanMetric() ||
-                    platform in setOf("instagram", "tiktok", "bild")
-                if (shouldTranslate) {
-                    val converted = RecipeGermanMetricConverter.convertWithAi(r).getOrNull()
-                    if (converted != null) {
-                        val updated = r.copy(
-                            title = converted.title.ifBlank { r.title },
-                            description = converted.description.ifBlank { r.description },
-                            ingredients = converted.ingredients.ifBlank { r.ingredients },
-                            instructions = converted.instructions.ifBlank { r.instructions },
-                            mealCategory = r.mealCategory.ifBlank {
-                                ch.nutrisnap.app.data.model.RecipeCategory.guess(
-                                    converted.title.ifBlank { r.title },
-                                    converted.ingredients.ifBlank { r.ingredients },
-                                    converted.description.ifBlank { r.description }
-                                ).name
-                            }
-                        )
-                        repo.updateRecipe(updated)
-                        _importState.update { it.copy(isImporting = false, importPhase = null, lastImport = updated) }
-                        return@launch
-                    }
+                val forceGerman = platform in setOf("instagram", "tiktok", "bild")
+                val updated = repo.applyGermanMetricIfNeeded(
+                    r, enabled = shouldAutoGermanMetric(), force = forceGerman
+                )
+                _importState.update {
+                    it.copy(isImporting = false, importPhase = null, lastImport = updated)
                 }
+                return@launch
             }
             _importState.update { state ->
                 when {
                     result.instagramBlocked ->
                         state.copy(isImporting = false, importPhase = null, instagramBlocked = true, blockedUrl = url)
-                    result.success ->
-                        state.copy(isImporting = false, importPhase = null, lastImport = result.recipe)
                     else ->
                         state.copy(
                             isImporting = false,
@@ -367,20 +350,12 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                         tags = if (extractedList.size > 1) "bild,mehrfach" else "bild"
                     )
                     var saved = recipe.copy(id = repo.saveRecipe(recipe))
-                    if (shouldAutoGermanMetric()) {
-                        val converted = RecipeGermanMetricConverter.convertWithAi(saved).getOrNull()
-                        if (converted != null) {
-                            saved = saved.copy(
-                                title = converted.title.ifBlank { saved.title },
-                                ingredients = converted.ingredients.ifBlank { saved.ingredients },
-                                instructions = converted.instructions.ifBlank { saved.instructions }
-                            )
-                            repo.updateRecipe(saved)
-                        }
-                    }
-                    if (firstSaved == null) firstSaved = saved
+                    saved = repo.applyGermanMetricIfNeeded(
+                        saved, enabled = shouldAutoGermanMetric(), force = true
+                    )
                     // Auto-Nährwerte aus Zutaten berechnen und persistieren
-                    analyzeNutrition(saved, persist = true)
+                    saved = repo.analyzeAndPersistNutrition(saved)?.first ?: saved
+                    if (firstSaved == null) firstSaved = saved
                 }
 
                 _importState.update {
@@ -508,20 +483,11 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                         tags = "instagram,hybrid"
                     )
                     var saved = recipe.copy(id = repo.saveRecipe(recipe))
-                    if (shouldAutoGermanMetric()) {
-                        val converted = RecipeGermanMetricConverter.convertWithAi(saved).getOrNull()
-                        if (converted != null) {
-                            saved = saved.copy(
-                                title = converted.title.ifBlank { saved.title },
-                                description = converted.description.ifBlank { saved.description },
-                                ingredients = converted.ingredients.ifBlank { saved.ingredients },
-                                instructions = converted.instructions.ifBlank { saved.instructions }
-                            )
-                            repo.updateRecipe(saved)
-                        }
-                    }
+                    saved = repo.applyGermanMetricIfNeeded(
+                        saved, enabled = shouldAutoGermanMetric(), force = true
+                    )
+                    saved = repo.analyzeAndPersistNutrition(saved)?.first ?: saved
                     _importState.update { it.copy(isImporting = false, importPhase = null, lastImport = saved) }
-                    analyzeNutrition(saved, persist = true)
                     return@launch
                 }
 
@@ -590,29 +556,15 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 // 3) Auto-Übersetzung / Metrik falls gewünscht
                 if (shouldAutoGermanMetric()) {
                     _importState.update { it.copy(importPhase = "Übersetze…") }
-                    val converted = RecipeGermanMetricConverter.convertWithAi(base).getOrNull()
-                    if (converted != null) {
-                        base = base.copy(
-                            title = converted.title.ifBlank { base.title },
-                            description = converted.description.ifBlank { base.description },
-                            ingredients = converted.ingredients.ifBlank { base.ingredients },
-                            instructions = converted.instructions.ifBlank { base.instructions },
-                            mealCategory = base.mealCategory.ifBlank {
-                                RecipeCategory.guess(
-                                    converted.title.ifBlank { base.title },
-                                    converted.ingredients.ifBlank { base.ingredients },
-                                    converted.description.ifBlank { base.description }
-                                ).name
-                            }
-                        )
-                        repo.updateRecipe(base)
-                    }
                 }
+                base = repo.applyGermanMetricIfNeeded(
+                    base, enabled = shouldAutoGermanMetric(), force = false
+                )
+                base = repo.analyzeAndPersistNutrition(base)?.first ?: base
 
                 _importState.update {
                     it.copy(isImporting = false, importPhase = null, lastImport = base)
                 }
-                analyzeNutrition(base, persist = true)
             } catch (e: Exception) {
                 _importState.update {
                     it.copy(
@@ -922,37 +874,25 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     fun analyzeNutrition(recipe: Recipe, persist: Boolean = false) {
         viewModelScope.launch {
             _nutritionState.value = NutritionState(isAnalyzing = true, recipeId = recipe.id)
+            if (persist) {
+                // Persist-Logik zentral im Repository (auch Import-Pipeline nutzt sie)
+                runCatching { repo.analyzeAndPersistNutrition(recipe) }
+                    .onSuccess { pair ->
+                        if (pair != null) {
+                            _nutritionState.value =
+                                NutritionState(result = pair.second, recipeId = pair.first.id)
+                        } else {
+                            _nutritionState.value =
+                                NutritionState(error = "Analyse nicht möglich", recipeId = recipe.id)
+                        }
+                    }
+                    .onFailure { e ->
+                        _nutritionState.value = NutritionState(error = e.message, recipeId = recipe.id)
+                    }
+                return@launch
+            }
             val result = runCatching { RecipeNutritionAnalyzer.analyze(recipe) }
             result.onSuccess { analysis ->
-                if (persist) {
-                    // Update recipe in DB with calculated macros
-                    val macroLine = "📊 Pro Portion: ${analysis.caloriesPerServing.toInt()} kcal" +
-                        " · ${analysis.proteinPerServing.toInt()}g Protein" +
-                        " · ${analysis.carbsPerServing.toInt()}g Kohlenhydrate" +
-                        " · ${analysis.fatPerServing.toInt()}g Fett"
-                    val baseDesc = recipe.description.lines()
-                        .filterNot { it.startsWith("📊") }.joinToString("\n").trim()
-                    val newDesc = if (baseDesc.isNotBlank()) "$baseDesc\n\n$macroLine" else macroLine
-                    val servDiv = recipe.servings.coerceAtLeast(1)
-                    val updated = recipe.copy(
-                        totalCalories     = analysis.totalCalories,
-                        proteinPerServing = analysis.proteinPerServing,
-                        carbsPerServing   = analysis.carbsPerServing,
-                        fatPerServing     = analysis.fatPerServing,
-                        // Ballaststoffe & Co. wurden bisher berechnet aber nie persistiert,
-                        // daher liefen Tagebuch-Summe/Home-Übersicht immer auf 0 zurück.
-                        // Bei unvollständigen Zutaten-Daten wird die (ggf. unvollständige)
-                        // Summe trotzdem gespeichert statt verworfen — die Karte zeigt in
-                        // dem Fall zusätzlich einen Hinweis (siehe fiberComplete).
-                        fiberPerServing        = analysis.totalMicros["fiber"]?.div(servDiv) ?: recipe.fiberPerServing,
-                        sugarPerServing        = analysis.totalMicros["sugar"]?.div(servDiv) ?: recipe.sugarPerServing,
-                        saturatedFatPerServing = analysis.totalMicros["saturatedFat"]?.div(servDiv) ?: recipe.saturatedFatPerServing,
-                        saltPerServing         = analysis.totalMicros["salt"]?.div(servDiv) ?: recipe.saltPerServing,
-                        sodiumPerServing       = analysis.totalMicros["sodium"]?.div(servDiv) ?: recipe.sodiumPerServing,
-                        description       = newDesc
-                    )
-                    repo.updateRecipe(updated)
-                }
                 _nutritionState.value = NutritionState(result = analysis, recipeId = recipe.id)
             }.onFailure { e ->
                 _nutritionState.value = NutritionState(error = e.message, recipeId = recipe.id)

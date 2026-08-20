@@ -480,6 +480,69 @@ class RecipeRepository(db: NutriDatabase, private val context: Context) {
     }
 
     /**
+     * Optional Deutsch/metrisch nach Import. [force] = true erzwingt Übersetzung
+     * (z.B. Instagram/TikTok/Bild), unabhängig von der User-Einstellung.
+     * Speichert nur wenn [recipe.id] > 0 und sich etwas geändert hat.
+     */
+    suspend fun applyGermanMetricIfNeeded(recipe: Recipe, enabled: Boolean, force: Boolean = false): Recipe {
+        if (!enabled && !force) return recipe
+        val converted = ch.nutrisnap.app.domain.RecipeGermanMetricConverter
+            .convertWithAi(recipe).getOrNull() ?: return recipe
+        val updated = recipe.copy(
+            title = converted.title.ifBlank { recipe.title },
+            description = converted.description.ifBlank { recipe.description },
+            ingredients = converted.ingredients.ifBlank { recipe.ingredients },
+            instructions = converted.instructions.ifBlank { recipe.instructions },
+            mealCategory = recipe.mealCategory.ifBlank {
+                ch.nutrisnap.app.data.model.RecipeCategory.guess(
+                    converted.title.ifBlank { recipe.title },
+                    converted.ingredients.ifBlank { recipe.ingredients },
+                    converted.description.ifBlank { recipe.description }
+                ).name
+            }
+        )
+        if (recipe.id > 0L && updated != recipe) updateRecipe(updated)
+        return updated
+    }
+
+    /**
+     * Nährwerte aus Zutaten berechnen und am Rezept persistieren.
+     * Ohne UI-State — von Import-Pipeline und Detail-Screen gemeinsam nutzbar.
+     * @return aktualisiertes Rezept + Analyse, oder null bei Fehler / fehlender ID.
+     */
+    suspend fun analyzeAndPersistNutrition(
+        recipe: Recipe
+    ): Pair<Recipe, ch.nutrisnap.app.domain.RecipeNutritionAnalyzer.AnalysisResult>? {
+        if (recipe.id <= 0L) return null
+        val analysis = runCatching {
+            ch.nutrisnap.app.domain.RecipeNutritionAnalyzer.analyze(recipe)
+        }.getOrNull() ?: return null
+        val macroLine = "📊 Pro Portion: ${analysis.caloriesPerServing.toInt()} kcal" +
+            " · ${analysis.proteinPerServing.toInt()}g Protein" +
+            " · ${analysis.carbsPerServing.toInt()}g Kohlenhydrate" +
+            " · ${analysis.fatPerServing.toInt()}g Fett"
+        val baseDesc = recipe.description.lines()
+            .filterNot { it.startsWith("📊") }.joinToString("\n").trim()
+        val newDesc = if (baseDesc.isNotBlank()) "$baseDesc\n\n$macroLine" else macroLine
+        val servDiv = recipe.servings.coerceAtLeast(1)
+        val updated = recipe.copy(
+            totalCalories = analysis.totalCalories,
+            proteinPerServing = analysis.proteinPerServing,
+            carbsPerServing = analysis.carbsPerServing,
+            fatPerServing = analysis.fatPerServing,
+            fiberPerServing = analysis.totalMicros["fiber"]?.div(servDiv) ?: recipe.fiberPerServing,
+            sugarPerServing = analysis.totalMicros["sugar"]?.div(servDiv) ?: recipe.sugarPerServing,
+            saturatedFatPerServing = analysis.totalMicros["saturatedFat"]?.div(servDiv)
+                ?: recipe.saturatedFatPerServing,
+            saltPerServing = analysis.totalMicros["salt"]?.div(servDiv) ?: recipe.saltPerServing,
+            sodiumPerServing = analysis.totalMicros["sodium"]?.div(servDiv) ?: recipe.sodiumPerServing,
+            description = newDesc
+        )
+        updateRecipe(updated)
+        return updated to analysis
+    }
+
+    /**
      * Nachladen des Rezept-Bildes via oEmbed/og:image, ohne neu zu scrapen.
      * @return aktualisiertes Rezept oder null wenn kein Bild gefunden.
      */
