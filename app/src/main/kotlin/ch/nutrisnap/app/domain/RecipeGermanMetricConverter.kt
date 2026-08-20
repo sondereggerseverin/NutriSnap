@@ -46,11 +46,82 @@ object RecipeGermanMetricConverter {
     fun convertUnitsToMetric(text: String): String {
         return try {
             text.lines().joinToString("\n") { line ->
-                runCatching { convertLineToMetric(line) }.getOrDefault(line)
+                runCatching {
+                    cleanupMetricLine(convertLineToMetric(line))
+                }.getOrDefault(line)
             }
         } catch (_: Exception) {
             text
         }
+    }
+
+    /**
+     * Entfernt kaputte Doppel-Mengen und Klammer-Reste nach der Umrechnung.
+     *
+     * Typische KI-/Offline-Artefakte:
+     * - "1361 g (48 oz) chicken" → oz in Klammer wird nochmals umgerechnet → "1361 g (1360 g)"
+     * - "15 g (1 Tbsp) oil" → "15 g (15 ml)"
+     * - "240 g (240 g )" / "15 g ( 15 ml )"
+     * - Zeilensplit mitten in Klammern: "1361 g (" + "1360 g) Hähnchen"
+     */
+    fun cleanupMetricLine(line: String): String {
+        var r = line.trim()
+        if (r.isBlank()) return r
+
+        // 1) Klammer mit Original-Einheit oder doppelter metrischer Menge entfernen
+        //    (48 oz), (1 Tbsp), (2 packets), (1 can), (1/2 cup), (240 g), (15 ml)
+        r = Regex(
+            """\s*\(\s*""" +
+                """(?:""" +
+                """\d+[.,]?\d*\s*(?:oz|ounces?|lbs?|pounds?|fl\.?\s*oz|cups?|tbsp|tbs|tablespoons?|tsp|teaspoons?|""" +
+                """packets?|cans?|g|kg|ml|l)\b""" +
+                """(?:\s*/\s*\d+[.,]?\d*)?""" +  // optional "1/2 cup" schon umgeschrieben
+                """|\d+\s+\d+/\d+\s*(?:cup|tbsp|tsp|oz)s?\b""" +
+                """|\d+/\d+\s*(?:cup|tbsp|tsp|oz)s?\b""" +
+                """)""" +
+                """\s*\)""",
+            RegexOption.IGNORE_CASE
+        ).replace(r, "")
+
+        // 2) Nachgestellte Doppel-Menge ohne Klammer: "1361 g 1360 g Hähnchen" → erste behalten
+        r = Regex(
+            """^(\d+[.,]?\d*\s*(?:g|kg|ml|l))\s+\d+[.,]?\d*\s*(?:g|kg|ml|l)\b""",
+            RegexOption.IGNORE_CASE
+        ).replace(r) { it.groupValues[1] }
+
+        // 3) Orphan-Klammern und leere ()
+        r = r.replace(Regex("""\s*\(\s*\)"""), "")
+        r = r.replace(Regex("""\s+[()]"""), " ")
+        r = r.replace(Regex("""[()]\s+"""), " ")
+        r = r.replace(Regex("""\s{2,}"""), " ").trim()
+
+        // 4) "g )" / "ml )" Reste
+        r = r.replace(Regex("""\s*[)]\s*"""), " ").replace(Regex("""\s*[(]\s*"""), " ")
+        r = r.replace(Regex("""\s{2,}"""), " ").trim()
+
+        // 5) Führendes Bullet wiederherstellen wenn Original eins hatte
+        return r
+    }
+
+    /** Mehrzeilig: cleanup + kaputte Split-Zeilen zusammenführen. */
+    fun cleanupMetricText(text: String): String {
+        val lines = text.lines().map { it.trim() }.filter { it.isNotBlank() }
+        if (lines.isEmpty()) return text
+        val merged = mutableListOf<String>()
+        var i = 0
+        while (i < lines.size) {
+            var cur = cleanupMetricLine(lines[i])
+            // "1361 g (" + nächste Zeile "1360 g) Name" → eine Zeile
+            if ((cur.endsWith("(") || cur.endsWith("( ")) && i + 1 < lines.size) {
+                val next = cleanupMetricLine(lines[i + 1])
+                cur = cleanupMetricLine("$cur $next")
+                i += 2
+            } else {
+                i += 1
+            }
+            if (cur.isNotBlank()) merged += cur
+        }
+        return merged.joinToString("\n")
     }
 
     /**
@@ -442,9 +513,9 @@ object RecipeGermanMetricConverter {
         }
     }
 
-    /** Offline: Einheiten metrisch + Namen deutsch (ohne KI). */
+    /** Offline: Einheiten metrisch + Namen deutsch (ohne KI) + Klammer-Cleanup. */
     fun convertOfflineFull(text: String): String =
-        translateNamesToGerman(convertUnitsToMetric(text))
+        cleanupMetricText(translateNamesToGerman(convertUnitsToMetric(text)))
 
     /**
      * KI: Zutaten + Zubereitung ins Deutsche übersetzen und metrisch umrechnen.
@@ -474,8 +545,11 @@ object RecipeGermanMetricConverter {
             ConvertedRecipe(
                 title = obj.optString("title").ifBlank { recipe.title },
                 description = translateNamesToGerman(desc),
+                // convertOfflineFull: Einheiten + DE-Namen + Klammer-/Doppelmengen-Cleanup
                 ingredients = convertOfflineFull(ing),
-                instructions = translateNamesToGerman(convertUnitsToMetric(ins))
+                instructions = cleanupMetricText(
+                    translateNamesToGerman(convertUnitsToMetric(ins))
+                )
             )
         }.recover {
             offlineFallback(recipe)
@@ -503,6 +577,10 @@ PFLICHT — 100 % Deutsch, null Englisch:
   Format: eine Header-Zeile, darunter die Zutaten dieses Abschnitts (je Zeile eine Zutat).
 - ALLE Zubereitungsschritte auf Deutsch.
 - FESTE Zutaten in g, FLÜSSIGE in ml (nicht cups/tbsp/oz/°F).
+- NUR EINE Menge pro Zeile. NIEMALS Original und metrisch parallel:
+  FALSCH: „1361 g (48 oz) Hähnchen“ oder „15 g (1 Tbsp) Öl“
+  RICHTIG: „1360 g Hähnchen“ / „15 ml Öl“
+- Keine Klammern mit alten Einheiten. Packungen als „2 Päckchen Taco-Gewürz“ (nicht nur Gramm raten).
 - Markennamen dürfen bleiben. Keine Zutaten erfinden. Mengen sinnvoll runden.
 - Wenn ein Wort unsicher ist: beste deutsche Küchenbezeichnung wählen, nicht Englisch stehen lassen.
 

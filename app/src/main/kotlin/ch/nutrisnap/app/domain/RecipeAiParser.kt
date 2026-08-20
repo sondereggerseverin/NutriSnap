@@ -229,6 +229,7 @@ object RecipeAiParser {
             .flatMap { splitHeaderFromFirstItem(it) }
             .filter { it.isNotBlank() && !isJunkIngredientLine(it) }
             .map { cleanIngredientLineNoise(it) }
+            .map { RecipeGermanMetricConverter.cleanupMetricLine(it) }
             .filter { it.isNotBlank() }
             .joinToString("\n") { line ->
                 if (isSectionHeaderLine(line)) line.trimEnd(':').trim()
@@ -261,21 +262,24 @@ object RecipeAiParser {
     private fun expandMultiIngredientLine(line: String): List<String> {
         val d = line.trim().trimStart('•', '-', '*', ' ').trim()
         if (d.isBlank() || isSectionHeaderLine(d)) return listOf(d)
+        // Mengen in Klammern (z.B. "1361 g (48 oz)") NICHT als zweite Zutat zählen
+        val masked = d.replace(Regex("""\([^)]*\)"""), " ")
         // Schon sauber: nur eine Mengenangabe
         val unit = """g|kg|ml|l|EL|TL|Tsp|Tbsp|tsp|tbsp|cup|cups|oz|lb|Stück|Stk|pcs|Prise|Tasse|clove|cloves"""
         val qtyPattern = Regex(
             """(?i)(\d+[.,]?\d*|\d+/\d+|¼|½|¾|⅓|⅔)\s*($unit)\b"""
         )
-        val hits = qtyPattern.findAll(d).toList()
+        val hits = qtyPattern.findAll(masked).toList()
         if (hits.size <= 1) {
             // Zählzutaten ohne Einheit: "2 chicken breasts" / "2 garlic cloves"
             val countHits = Regex(
                 """(?i)(?<=^|\s)(\d+)\s+(chicken|hähnchen|haehnchen|breast|breasts|egg|eggs|ei|eier|onion|zwiebel|shallot|schalotte|clove|cloves|zehe|tomato|tomate|potato|kartoffel)\b"""
-            ).findAll(d).toList()
+            ).findAll(masked).toList()
             if (countHits.size <= 1) return listOf(d)
         }
-        // An jeder Mengen-Position splitten (ab dem 2. Treffer)
-        val splitPoints = qtyPattern.findAll(d).map { it.range.first }.toList()
+        // An jeder Mengen-Position splitten (ab dem 2. Treffer) – Positionen aus masked,
+        // Substrings aus Original (Klammern bleiben in der jeweiligen Zutat)
+        val splitPoints = qtyPattern.findAll(masked).map { it.range.first }.toList()
         if (splitPoints.size <= 1) return listOf(d)
         val parts = mutableListOf<String>()
         for (i in splitPoints.indices) {
