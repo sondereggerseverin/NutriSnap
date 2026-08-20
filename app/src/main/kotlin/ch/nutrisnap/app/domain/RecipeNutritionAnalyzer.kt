@@ -556,8 +556,16 @@ object RecipeNutritionAnalyzer {
      * (z.B. von der mehrstufigen KI-Foto-Analyse produzierte "150g Reis"-Zeilen).
      * [servings] = 1, da eine fotografierte Mahlzeit bereits die gesamte Portion ist.
      */
-    suspend fun analyzeIngredientLines(lines: List<String>, servings: Int = 1): AnalysisResult {
-        // ── Pass 1: local DB + OpenFoodFacts (parallel, per-ingredient) ───────────
+    /**
+     * @param allowNetwork wenn false: nur lokale DB + Wörterbuch-Cache, kein OFF und keine KI
+     *        (für On-Device-/Offline-Food-Scan, Phase C).
+     */
+    suspend fun analyzeIngredientLines(
+        lines: List<String>,
+        servings: Int = 1,
+        allowNetwork: Boolean = true
+    ): AnalysisResult {
+        // ── Pass 1: local DB + optional OpenFoodFacts (parallel, per-ingredient) ─
         val firstPass = withContext(Dispatchers.IO) {
             coroutineScope {
                 lines.map { line ->
@@ -599,9 +607,9 @@ object RecipeNutritionAnalyzer {
 
                         // Feature 2: bereits einmal aufgelöste Zutat (egal ob damals lokale DB
                         // oder OFF) -> direkt aus dem Cache, ohne erneute OFF-Netzwerkanfrage.
-                        // Cache-Miss -> normale OFF-Suche, neuer Treffer wird für's nächste Mal
-                        // im globalen Wörterbuch abgelegt (genau einmal, nicht doppelt).
-                        val food = globalDictionary?.lookup(parsed.name)?.let { cached ->
+                        // Cache-Miss -> normale OFF-Suche (nur wenn allowNetwork), neuer Treffer
+                        // wird für's nächste Mal im globalen Wörterbuch abgelegt.
+                        val cachedFood = globalDictionary?.lookup(parsed.name)?.let { cached ->
                             FoodItem(
                                 name     = cached.offProductName,
                                 calories = cached.kcalPer100g.toFloat(),
@@ -610,17 +618,20 @@ object RecipeNutritionAnalyzer {
                                 fat      = cached.fatPer100g.toFloat(),
                                 source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
                             )
-                        } ?: searchOFF(parsed.name)?.also { off ->
-                            globalDictionary?.save(
-                                originalName    = parsed.name,
-                                offProductId    = "",
-                                offProductName  = off.name,
-                                kcalPer100g     = (off.calories ?: 0f).toDouble(),
-                                proteinPer100g  = (off.protein  ?: 0f).toDouble(),
-                                carbsPer100g    = (off.carbs    ?: 0f).toDouble(),
-                                fatPer100g      = (off.fat      ?: 0f).toDouble()
-                            )
                         }
+                        val food = cachedFood ?: if (allowNetwork) {
+                            searchOFF(parsed.name)?.also { off ->
+                                globalDictionary?.save(
+                                    originalName    = parsed.name,
+                                    offProductId    = "",
+                                    offProductName  = off.name,
+                                    kcalPer100g     = (off.calories ?: 0f).toDouble(),
+                                    proteinPer100g  = (off.protein  ?: 0f).toDouble(),
+                                    carbsPer100g    = (off.carbs    ?: 0f).toDouble(),
+                                    fatPer100g      = (off.fat      ?: 0f).toDouble()
+                                )
+                            }
+                        } else null
                         if (food != null) {
                             IngredientResult(
                                 line     = line,
@@ -644,9 +655,9 @@ object RecipeNutritionAnalyzer {
             }
         }
 
-        // ── Pass 2: AI estimate for whatever is still unmatched ────────────────────
+        // ── Pass 2: AI estimate for whatever is still unmatched (nur online) ───────
         val unmatched = firstPass.filter { !it.matched && it.parsed != null }
-        val results: List<IngredientResult> = if (unmatched.isEmpty()) {
+        val results: List<IngredientResult> = if (unmatched.isEmpty() || !allowNetwork) {
             firstPass
         } else {
             val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }

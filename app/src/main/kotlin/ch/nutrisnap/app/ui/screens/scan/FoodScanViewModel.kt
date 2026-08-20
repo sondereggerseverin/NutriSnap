@@ -144,11 +144,20 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                 PhotoAnalysisStage.BREAKING_DOWN_MACROS,
                 onDevice = usedOnDevice
             )
-            val analysisResult = RecipeNutritionAnalyzer.analyzeIngredientLines(lines)
+            // On-Device/Offline: nur lokale Nährwert-DB + Cache – kein OFF/KI-Timeout
+            val analysisResult = RecipeNutritionAnalyzer.analyzeIngredientLines(
+                lines = lines,
+                allowNetwork = !usedOnDevice
+            )
 
             val warnings = buildScanWarnings(cleanedIngredients, analysisResult).toMutableList()
             if (usedOnDevice) {
                 warnings.add(0, "On-Device-Erkennung (ohne Cloud) – Zutaten und Mengen bitte prüfen.")
+            }
+            if (usedOnDevice && analysisResult.matchedCount < analysisResult.totalCount) {
+                warnings.add(
+                    "Nur ${analysisResult.matchedCount}/${analysisResult.totalCount} Zutaten lokal gefunden – restliche Nährwerte fehlen offline."
+                )
             }
 
             showStage(PhotoAnalysisStage.FINALIZING_RESULTS, onDevice = usedOnDevice)
