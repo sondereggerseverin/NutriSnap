@@ -17,6 +17,7 @@ import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.records.metadata.DataOrigin
+import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
@@ -140,6 +141,7 @@ class HealthConnectManager(context: Context) {
             startZoneOffset = offset,
             endTime = end,
             endZoneOffset = endOffset,
+            metadata = Metadata.EMPTY,
             name = name.take(100).ifBlank { null },
             energy = if (energyKcal.isFinite() && energyKcal > 0.0) Energy.kilocalories(energyKcal) else null,
             protein = massOrNull(proteinG),
