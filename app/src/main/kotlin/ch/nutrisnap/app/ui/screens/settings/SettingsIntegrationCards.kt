@@ -43,11 +43,14 @@ fun HealthConnectCard() {
     var permissionsGranted by remember { mutableStateOf<Boolean?>(null) }
     var isLoading by remember { mutableStateOf(false) }
 
+    var writeNutritionGranted by remember { mutableStateOf(false) }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = PermissionController.createRequestPermissionResultContract()
     ) { granted ->
         isLoading = false
         permissionsGranted = granted.containsAll(HealthConnectManager.REQUIRED_PERMISSIONS)
+        writeNutritionGranted = granted.contains(HealthConnectManager.WRITE_NUTRITION_PERMISSION)
     }
 
     LaunchedEffect(status) {
@@ -55,7 +58,11 @@ fun HealthConnectCard() {
             runCatching {
                 val manager = HealthConnectManager(context)
                 permissionsGranted = manager.hasAllPermissions()
-            }.onFailure { permissionsGranted = false }
+                writeNutritionGranted = manager.hasWriteNutritionPermission()
+            }.onFailure {
+                permissionsGranted = false
+                writeNutritionGranted = false
+            }
         }
     }
 
@@ -106,7 +113,10 @@ fun HealthConnectCard() {
                             }
                         )
                         Text(
-                            "Schritte, Kalorien, Schlaf, Herzrate",
+                            if (writeNutritionGranted)
+                                "Lesen + Ernährung schreiben (Tagebuch → HC)"
+                            else
+                                "Schritte, Kalorien, Schlaf, Herzrate",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -116,7 +126,7 @@ fun HealthConnectCard() {
                         Button(
                             onClick = {
                                 isLoading = true
-                                permissionLauncher.launch(HealthConnectManager.REQUIRED_PERMISSIONS)
+                                permissionLauncher.launch(HealthConnectManager.REQUESTABLE_PERMISSIONS)
                             },
                             enabled = !isLoading
                         ) {
@@ -131,15 +141,28 @@ fun HealthConnectCard() {
                             }
                         }
                     } else {
-                        OutlinedButton(onClick = {
-                            scope.launch {
-                                runCatching {
-                                    val manager = HealthConnectManager(context)
-                                    permissionsGranted = manager.hasAllPermissions()
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (!writeNutritionGranted) {
+                                OutlinedButton(onClick = {
+                                    isLoading = true
+                                    permissionLauncher.launch(
+                                        setOf(HealthConnectManager.WRITE_NUTRITION_PERMISSION)
+                                    )
+                                }) {
+                                    Text("Ernährung teilen", fontSize = 11.sp)
                                 }
                             }
-                        }) {
-                            Text("Erneut prüfen", fontSize = 12.sp)
+                            OutlinedButton(onClick = {
+                                scope.launch {
+                                    runCatching {
+                                        val manager = HealthConnectManager(context)
+                                        permissionsGranted = manager.hasAllPermissions()
+                                        writeNutritionGranted = manager.hasWriteNutritionPermission()
+                                    }
+                                }
+                            }) {
+                                Text("Erneut prüfen", fontSize = 12.sp)
+                            }
                         }
                     }
                 }

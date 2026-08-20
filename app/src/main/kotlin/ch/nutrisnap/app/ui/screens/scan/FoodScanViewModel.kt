@@ -10,14 +10,11 @@ import ch.nutrisnap.app.data.repository.DiaryRepository
 import ch.nutrisnap.app.domain.EntryPlausibilityChecker
 import ch.nutrisnap.app.domain.GroqVisionService
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
-import ch.nutrisnap.app.health.HealthConnectManager
-import ch.nutrisnap.app.health.HealthConnectStatus
 import ch.nutrisnap.app.ui.screens.recipes.IngredientOverride
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import java.time.Instant
 import java.time.LocalDate
 
 /** Sichtbare Stufen der mehrstufigen KI-Foto-Analyse — jede Stufe wird im UI
@@ -186,39 +183,20 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                 fiber = fiber ?: 0f, sugar = sugar ?: 0f,
                 saturatedFat = saturatedFat ?: 0f, salt = salt ?: 0f, sodium = sodium ?: 0f
             )
-            // Best-effort Spiegelung nach Health Connect (scheitert still ohne Permission)
-            pushNutritionToHealthConnect(
+            ch.nutrisnap.app.health.HealthConnectNutritionSync.pushMeal(
+                context = getApplication(),
                 name = dishName,
                 mealType = mealType,
-                kcal = kcal, protein = protein, carbs = carbs, fat = fat,
-                fiber = fiber ?: 0f, sugar = sugar ?: 0f,
-                saturatedFat = saturatedFat ?: 0f, sodium = sodium ?: 0f
+                energyKcal = kcal,
+                proteinG = protein,
+                carbsG = carbs,
+                fatG = fat,
+                fiberG = fiber ?: 0f,
+                sugarG = sugar ?: 0f,
+                saturatedFatG = saturatedFat ?: 0f,
+                sodiumG = sodium ?: 0f
             )
             _state.value = FoodScanState.Saved
         }
-    }
-
-    private suspend fun pushNutritionToHealthConnect(
-        name: String,
-        mealType: MealType,
-        kcal: Float, protein: Float, carbs: Float, fat: Float,
-        fiber: Float, sugar: Float, saturatedFat: Float, sodium: Float
-    ) {
-        val appCtx = getApplication<Application>()
-        if (HealthConnectManager.getStatus(appCtx) != HealthConnectStatus.AVAILABLE) return
-        val hc = HealthConnectManager(appCtx)
-        hc.writeNutritionEntry(
-            name = name,
-            mealType = mealType,
-            energyKcal = kcal.toDouble(),
-            proteinG = protein.toDouble(),
-            carbsG = carbs.toDouble(),
-            fatG = fat.toDouble(),
-            fiberG = fiber.toDouble(),
-            sugarG = sugar.toDouble(),
-            saturatedFatG = saturatedFat.toDouble(),
-            sodiumG = sodium.toDouble(),
-            at = Instant.now()
-        )
     }
 }

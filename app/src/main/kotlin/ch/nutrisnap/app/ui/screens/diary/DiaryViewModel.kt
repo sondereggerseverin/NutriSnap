@@ -406,8 +406,11 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
 
     fun addEntry(food: FoodItem, grams: Float, meal: MealType, date: java.time.LocalDate? = null) {
         viewModelScope.launch {
-            repo.addEntry(food, grams, meal, date ?: _date.value)
+            val id = repo.addEntry(food, grams, meal, date ?: _date.value)
             contextRanking.recordFoodUsage(food.id.toString(), food.name)
+            repo.getById(id)?.let { entry ->
+                ch.nutrisnap.app.health.HealthConnectNutritionSync.pushEntry(getApplication(), entry)
+            }
         }
     }
 
@@ -421,7 +424,10 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val id = repo.addEntry(food, grams, meal, _date.value)
             contextRanking.recordFoodUsage(food.id.toString(), food.name)
-            repo.getById(id)?.let { onAdded(it) }
+            repo.getById(id)?.let { entry ->
+                onAdded(entry)
+                ch.nutrisnap.app.health.HealthConnectNutritionSync.pushEntry(getApplication(), entry)
+            }
         }
     }
 
@@ -438,7 +444,10 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         meal: MealType
     ) {
         viewModelScope.launch {
-            repo.addManualEntry(name, kcal, protein, carbs, fat, meal, _date.value)
+            val id = repo.addManualEntry(name, kcal, protein, carbs, fat, meal, _date.value)
+            repo.getById(id)?.let { entry ->
+                ch.nutrisnap.app.health.HealthConnectNutritionSync.pushEntry(getApplication(), entry)
+            }
         }
     }
 
@@ -612,7 +621,7 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
                 return@launch
             }
             for (item in items) {
-                repo.addManualEntry(
+                val id = repo.addManualEntry(
                     name = item.foodName,
                     kcal = item.calories,
                     protein = item.protein,
@@ -621,6 +630,9 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
                     mealType = template.mealType,
                     date = _date.value
                 )
+                repo.getById(id)?.let { entry ->
+                    ch.nutrisnap.app.health.HealthConnectNutritionSync.pushEntry(getApplication(), entry)
+                }
             }
             onDone(items.size)
         }

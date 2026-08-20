@@ -68,8 +68,15 @@ class HealthConnectManager(context: Context) {
         // damit der normale "Health Connect verbinden"-Flow nicht davon abhängt.
         val HISTORY_PERMISSION = HealthPermission.PERMISSION_READ_HEALTH_DATA_HISTORY
 
-        /** Optional: Tagebuch → NutritionRecord. Nicht im Pflicht-Connect-Flow. */
+        /** Optional: Tagebuch → NutritionRecord. */
         val WRITE_NUTRITION_PERMISSION = HealthPermission.getWritePermission(NutritionRecord::class)
+
+        /**
+         * Permissions, die der "Verbinden"-Dialog anfragt: Lesen (Pflicht-Set) + Nutrition-Schreiben.
+         * [hasAllPermissions] bleibt auf [REQUIRED_PERMISSIONS], damit bestehende Nutzer ohne
+         * Write-Grant nicht als "getrennt" gelten.
+         */
+        val REQUESTABLE_PERMISSIONS: Set<String> = REQUIRED_PERMISSIONS + WRITE_NUTRITION_PERMISSION
 
         fun getStatus(context: Context): HealthConnectStatus = when (
             HealthConnectClient.getSdkStatus(context)

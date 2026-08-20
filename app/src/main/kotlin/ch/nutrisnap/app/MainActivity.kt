@@ -101,6 +101,7 @@ class MainActivity : ComponentActivity() {
     private val healthConnectPermLauncher = registerForActivityResult(
         PermissionController.createRequestPermissionResultContract()
     ) { granted ->
+        // Verbunden = Lesen ok; WRITE_NUTRITION ist optional und darf den Callback nicht blockieren.
         if (granted.containsAll(HealthConnectManager.REQUIRED_PERMISSIONS)) {
             healthConnectViewModel?.onPermissionGranted()
         }
@@ -146,7 +147,7 @@ class MainActivity : ComponentActivity() {
                             sharedRecipeJson = sharedRecipeJson,
                             hcVm = hcVm2,
                             onRequestHealthPermission = {
-                                healthConnectPermLauncher.launch(HealthConnectManager.REQUIRED_PERMISSIONS)
+                                healthConnectPermLauncher.launch(HealthConnectManager.REQUESTABLE_PERMISSIONS)
                             }
                         )
                     }
@@ -199,7 +200,7 @@ class MainActivity : ComponentActivity() {
                                     hcVm = hcVm,
                                     onRequestHealthPermission = {
                                         healthConnectPermLauncher.launch(
-                                            HealthConnectManager.REQUIRED_PERMISSIONS
+                                            HealthConnectManager.REQUESTABLE_PERMISSIONS
                                         )
                                     }
                                 )
