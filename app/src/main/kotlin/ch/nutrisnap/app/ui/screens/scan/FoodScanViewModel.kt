@@ -10,7 +10,8 @@ import ch.nutrisnap.app.data.repository.DiaryRepository
 import ch.nutrisnap.app.domain.DishScanResult
 import ch.nutrisnap.app.domain.EntryPlausibilityChecker
 import ch.nutrisnap.app.domain.GroqVisionService
-import ch.nutrisnap.app.domain.OnDeviceFoodLabeler
+import ch.nutrisnap.app.domain.OnDeviceFoodBackendRegistry
+import ch.nutrisnap.app.domain.OnDeviceScanStats
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import ch.nutrisnap.app.ui.screens.recipes.IngredientOverride
 import ch.nutrisnap.app.utils.NetworkMonitor
@@ -88,17 +89,25 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
             val online = NetworkMonitor(getApplication()).isCurrentlyOnline()
             var usedOnDevice = false
 
+            val onDeviceBackend = OnDeviceFoodBackendRegistry.active()
             val dish: DishScanResult = if (!online) {
                 // Phase C: On-Device-Fallback ohne Cloud
                 usedOnDevice = true
                 showStage(PhotoAnalysisStage.ON_DEVICE_LABELING, onDevice = true)
-                OnDeviceFoodLabeler.analyze(bitmap).getOrElse { e ->
-                    _state.value = FoodScanState.Error(
-                        "Offline und On-Device-Erkennung ohne Treffer. " +
-                            (e.message ?: "Bitte online scannen oder manuell erfassen.")
-                    )
-                    return@launch
-                }
+                onDeviceBackend.analyze(bitmap).fold(
+                    onSuccess = { result ->
+                        OnDeviceScanStats.recordSuccess(getApplication())
+                        result
+                    },
+                    onFailure = { e ->
+                        OnDeviceScanStats.recordFailure(getApplication())
+                        _state.value = FoodScanState.Error(
+                            "Offline und On-Device-Erkennung (${onDeviceBackend.displayName}) ohne Treffer. " +
+                                (e.message ?: "Bitte online scannen oder manuell erfassen.")
+                        )
+                        return@launch
+                    }
+                )
             } else {
                 showStage(PhotoAnalysisStage.IDENTIFYING_INGREDIENTS)
                 _state.value = FoodScanState.Analyzing(PhotoAnalysisStage.SEPARATING_INGREDIENTS)
@@ -107,12 +116,19 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                     // Cloud fehlgeschlagen → On-Device versuchen
                     usedOnDevice = true
                     showStage(PhotoAnalysisStage.ON_DEVICE_LABELING, onDevice = true, minDelayMs = 300)
-                    OnDeviceFoodLabeler.analyze(bitmap).getOrElse {
-                        _state.value = FoodScanState.Error(
-                            cloudErr.message ?: "Bilderkennung fehlgeschlagen"
-                        )
-                        return@launch
-                    }
+                    onDeviceBackend.analyze(bitmap).fold(
+                        onSuccess = { result ->
+                            OnDeviceScanStats.recordSuccess(getApplication())
+                            result
+                        },
+                        onFailure = {
+                            OnDeviceScanStats.recordFailure(getApplication())
+                            _state.value = FoodScanState.Error(
+                                cloudErr.message ?: "Bilderkennung fehlgeschlagen"
+                            )
+                            return@launch
+                        }
+                    )
                 }
             }
 
