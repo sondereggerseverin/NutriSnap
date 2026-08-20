@@ -70,6 +70,12 @@ data class RecipeFromImageResult(
     val fatPerServing: Float? = null
 )
 
+/** Wrapper für ein oder mehrere Rezepte auf demselben Foto (Kochbuchseite, Collage, Screenshot). */
+@Serializable
+data class RecipesFromImageResult(
+    val recipes: List<RecipeFromImageResult> = emptyList()
+)
+
 /**
  * Nutzt Groq's multimodales Vision-Modell um Fotos zu analysieren.
  * Gleicher kostenloser Groq-Tier wie GroqRecipeGeneratorService, gleicher API-Key
@@ -194,16 +200,23 @@ Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
     }
 
     /**
-     * Liest ein Rezept von einem Foto oder Screenshot (z.B. Rezeptkarte, Blog-Screenshot,
-     * handgeschriebenes Rezept). Gibt strukturierte Felder zurück, die direkt als [Recipe]
-     * gespeichert werden können.
+     * Liest ein oder mehrere Rezepte von einem Foto/Screenshot (Rezeptkarte, Kochbuchseite,
+     * Blog-Screenshot, Collage). Gibt eine Liste strukturierter Rezepte zurück.
+     * Ein einzelnes Rezept kommt als Liste mit einem Element.
      */
-    suspend fun extractRecipeFromImage(base64Jpeg: String): Result<RecipeFromImageResult> = withContext(Dispatchers.IO) {
-        val prompt = """
-Du siehst ein Foto oder einen Screenshot eines Rezepts (Rezeptkarte, Blog, Social Media, Notiz).
-Extrahiere ALLE sichtbaren Informationen so vollständig und originalgetreu wie möglich.
+    suspend fun extractRecipesFromImage(base64Jpeg: String): Result<List<RecipeFromImageResult>> =
+        withContext(Dispatchers.IO) {
+            val prompt = """
+Du siehst ein Foto oder einen Screenshot von einem oder mehreren Rezepten
+(Rezeptkarte, Kochbuchseite, Blog, Social Media, Notiz, Collage).
 
-Regeln:
+Aufgabe:
+- Wenn MEHRERE klar getrennte Rezepte sichtbar sind (z.B. zwei Rezepte auf einer Kochbuchseite,
+  Collage, mehrere Karten), extrahiere JEDES als eigenen Eintrag in "recipes".
+- Wenn nur EIN Rezept sichtbar ist, liefere genau einen Eintrag in "recipes".
+- Teile nicht willkürlich Abschnitte desselben Rezepts (z.B. Teig/Füllung) in mehrere Rezepte.
+
+Regeln pro Rezept:
 - ingredients: jede Zutat in einer eigenen Zeile, idealerweise mit Menge (z.B. "1 cup cottage cheese").
   Gruppiere optional mit Überschriften wie "dough:" / "filling:" wenn das Bild das so zeigt.
 - instructions: nummerierte Schritte, einer pro Zeile (1. ... 2. ...).
@@ -215,22 +228,71 @@ Regeln:
 
 Antworte NUR mit folgendem JSON (kein Markdown):
 {
-  "title": "Rezepttitel",
-  "description": "Kurze Beschreibung falls vorhanden, sonst leer",
-  "ingredients": "1 cup cottage cheese\n1/4 cup milk\n...",
-  "instructions": "1. Preheat oven...\n2. Blend...",
-  "servings": 12,
-  "prepTimeMinutes": 15,
-  "cookTimeMinutes": 46,
-  "caloriesPerServing": 142,
-  "proteinPerServing": 13,
-  "carbsPerServing": 14,
-  "fatPerServing": 3
+  "recipes": [
+    {
+      "title": "Rezepttitel",
+      "description": "Kurze Beschreibung falls vorhanden, sonst leer",
+      "ingredients": "1 cup cottage cheese\n1/4 cup milk\n...",
+      "instructions": "1. Preheat oven...\n2. Blend...",
+      "servings": 12,
+      "prepTimeMinutes": 15,
+      "cookTimeMinutes": 46,
+      "caloriesPerServing": 142,
+      "proteinPerServing": 13,
+      "carbsPerServing": 14,
+      "fatPerServing": 3
+    }
+  ]
 }
 """.trimIndent()
-        callVisionRaw(prompt, base64Jpeg, maxTokens = 3000).mapCatching {
-            json.decodeFromString<RecipeFromImageResult>(it)
+            callVisionRaw(prompt, base64Jpeg, maxTokens = 4000).mapCatching { raw ->
+                parseRecipesFromImageJson(raw)
+            }
         }
+
+    /**
+     * Rückwärtskompatibel: liefert das erste erkannte Rezept (oder Fehler wenn keines).
+     * Für neue Flows bevorzugt [extractRecipesFromImage] verwenden.
+     */
+    suspend fun extractRecipeFromImage(base64Jpeg: String): Result<RecipeFromImageResult> =
+        extractRecipesFromImage(base64Jpeg).mapCatching { list ->
+            list.firstOrNull()
+                ?: throw IllegalStateException("Kein Rezept im Bild erkannt")
+        }
+
+    /**
+     * Parst Vision-JSON robust: neues Format {"recipes":[...]} und Legacy-Einzelobjekt.
+     */
+    private fun parseRecipesFromImageJson(raw: String): List<RecipeFromImageResult> {
+        // Primär: Array-Wrapper
+        runCatching {
+            val wrapped = json.decodeFromString<RecipesFromImageResult>(raw)
+            if (wrapped.recipes.isNotEmpty()) {
+                return wrapped.recipes.filter { it.title.isNotBlank() || it.ingredients.isNotBlank() }
+            }
+        }
+        // Fallback: Modell liefert noch ein einzelnes Rezept-Objekt ohne "recipes"
+        runCatching {
+            val single = json.decodeFromString<RecipeFromImageResult>(raw)
+            if (single.title.isNotBlank() || single.ingredients.isNotBlank()) {
+                return listOf(single)
+            }
+        }
+        // Fallback: manuell "recipes"-Array aus org.json lesen (falls Serialization streikt)
+        runCatching {
+            val root = JSONObject(raw)
+            if (root.has("recipes")) {
+                val arr = root.getJSONArray("recipes")
+                val out = mutableListOf<RecipeFromImageResult>()
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    val item = json.decodeFromString<RecipeFromImageResult>(obj.toString())
+                    if (item.title.isNotBlank() || item.ingredients.isNotBlank()) out.add(item)
+                }
+                if (out.isNotEmpty()) return out
+            }
+        }
+        return emptyList()
     }
 
     /**

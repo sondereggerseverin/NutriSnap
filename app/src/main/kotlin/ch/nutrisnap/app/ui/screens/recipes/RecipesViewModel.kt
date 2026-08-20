@@ -311,61 +311,95 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Importiert ein Rezept aus einem Foto/Screenshot (Rezeptkarte, Blog-Screenshot, etc.).
-     * Nutzt Vision-KI, speichert direkt als Rezept mit platform = "bild".
+     * Importiert ein oder mehrere Rezepte aus einem Foto/Screenshot (Rezeptkarte, Kochbuchseite,
+     * Collage, Blog-Screenshot). Nutzt Vision-KI; speichert jedes erkannte Rezept mit platform = "bild".
+     * [ImportState.lastImport] zeigt das erste gespeicherte Rezept (Navigation/Feedback).
      */
     fun importFromImage(bitmap: Bitmap) {
         viewModelScope.launch {
-            _importState.update { it.copy(isImporting = true, importError = null, instagramBlocked = false) }
+            _importState.update {
+                it.copy(isImporting = true, importPhase = "Rezept(e) aus Bild lesen…", importError = null, instagramBlocked = false)
+            }
             try {
                 val vision = GroqVisionService()
                 val base64 = vision.bitmapToBase64Jpeg(bitmap, quality = 80)
-                val extracted = vision.extractRecipeFromImage(base64).getOrElse { e ->
+                val extractedList = vision.extractRecipesFromImage(base64).getOrElse { e ->
                     _importState.update {
-                        it.copy(isImporting = false, importError = e.message ?: "Bild konnte nicht gelesen werden")
-                    }
-                    return@launch
-                }
-                if (extracted.title.isBlank() && extracted.ingredients.isBlank()) {
-                    _importState.update {
-                        it.copy(isImporting = false, importError = "Kein Rezept im Bild erkannt")
-                    }
-                    return@launch
-                }
-                val totalMin = listOfNotNull(extracted.prepTimeMinutes, extracted.cookTimeMinutes)
-                    .takeIf { it.isNotEmpty() }?.sum()
-                val recipe = Recipe(
-                    title = extracted.title.ifBlank { "Rezept aus Bild" },
-                    description = extracted.description,
-                    platform = "bild",
-                    ingredients = extracted.ingredients,
-                    instructions = extracted.instructions,
-                    servings = extracted.servings.coerceAtLeast(1),
-                    prepTimeMinutes = totalMin ?: extracted.prepTimeMinutes,
-                    totalCalories = extracted.caloriesPerServing?.let { it * extracted.servings.coerceAtLeast(1) },
-                    proteinPerServing = extracted.proteinPerServing,
-                    carbsPerServing = extracted.carbsPerServing,
-                    fatPerServing = extracted.fatPerServing,
-                    tags = "bild"
-                )
-                var saved = recipe.copy(id = repo.saveRecipe(recipe))
-                if (shouldAutoGermanMetric()) {
-                    val converted = RecipeGermanMetricConverter.convertWithAi(saved).getOrNull()
-                    if (converted != null) {
-                        saved = saved.copy(
-                            title = converted.title.ifBlank { saved.title },
-                            ingredients = converted.ingredients.ifBlank { saved.ingredients },
-                            instructions = converted.instructions.ifBlank { saved.instructions }
+                        it.copy(
+                            isImporting = false,
+                            importPhase = null,
+                            importError = e.message ?: "Bild konnte nicht gelesen werden"
                         )
-                        repo.updateRecipe(saved)
                     }
+                    return@launch
                 }
-                _importState.update { it.copy(isImporting = false, lastImport = saved) }
-                // Auto-Nährwerte aus Zutaten berechnen und persistieren
-                analyzeNutrition(saved, persist = true)
+                if (extractedList.isEmpty()) {
+                    _importState.update {
+                        it.copy(isImporting = false, importPhase = null, importError = "Kein Rezept im Bild erkannt")
+                    }
+                    return@launch
+                }
+
+                var firstSaved: Recipe? = null
+                extractedList.forEachIndexed { index, extracted ->
+                    _importState.update {
+                        it.copy(
+                            importPhase = if (extractedList.size > 1)
+                                "Speichere Rezept ${index + 1}/${extractedList.size}…"
+                            else
+                                "Speichere Rezept…"
+                        )
+                    }
+                    val totalMin = listOfNotNull(extracted.prepTimeMinutes, extracted.cookTimeMinutes)
+                        .takeIf { it.isNotEmpty() }?.sum()
+                    val recipe = Recipe(
+                        title = extracted.title.ifBlank { "Rezept aus Bild" },
+                        description = extracted.description,
+                        platform = "bild",
+                        ingredients = extracted.ingredients,
+                        instructions = extracted.instructions,
+                        servings = extracted.servings.coerceAtLeast(1),
+                        prepTimeMinutes = totalMin ?: extracted.prepTimeMinutes,
+                        totalCalories = extracted.caloriesPerServing?.let { it * extracted.servings.coerceAtLeast(1) },
+                        proteinPerServing = extracted.proteinPerServing,
+                        carbsPerServing = extracted.carbsPerServing,
+                        fatPerServing = extracted.fatPerServing,
+                        tags = if (extractedList.size > 1) "bild,mehrfach" else "bild"
+                    )
+                    var saved = recipe.copy(id = repo.saveRecipe(recipe))
+                    if (shouldAutoGermanMetric()) {
+                        val converted = RecipeGermanMetricConverter.convertWithAi(saved).getOrNull()
+                        if (converted != null) {
+                            saved = saved.copy(
+                                title = converted.title.ifBlank { saved.title },
+                                ingredients = converted.ingredients.ifBlank { saved.ingredients },
+                                instructions = converted.instructions.ifBlank { saved.instructions }
+                            )
+                            repo.updateRecipe(saved)
+                        }
+                    }
+                    if (firstSaved == null) firstSaved = saved
+                    // Auto-Nährwerte aus Zutaten berechnen und persistieren
+                    analyzeNutrition(saved, persist = true)
+                }
+
+                _importState.update {
+                    it.copy(
+                        isImporting = false,
+                        importPhase = null,
+                        lastImport = firstSaved,
+                        importError = if (extractedList.size > 1)
+                            null // Erfolg: mehrere gespeichert; UI öffnet firstSaved
+                        else null
+                    )
+                }
             } catch (e: Exception) {
                 _importState.update {
-                    it.copy(isImporting = false, importError = e.message ?: "Fehler beim Bild-Import")
+                    it.copy(
+                        isImporting = false,
+                        importPhase = null,
+                        importError = e.message ?: "Fehler beim Bild-Import"
+                    )
                 }
             }
         }
