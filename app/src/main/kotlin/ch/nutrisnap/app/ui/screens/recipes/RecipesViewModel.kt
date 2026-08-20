@@ -678,19 +678,14 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { repo.deleteRecipe(recipe) }
     }
 
-    /** Kopie zum Anpassen — neues Rezept mit Titel „… (Kopie)“. */
+    /**
+     * Kopie zum Anpassen — inkl. Matches & Komponenten (Repository).
+     * Als lastImport melden, damit die UI die Kopie öffnen kann.
+     */
     fun duplicateRecipe(recipe: Recipe) {
         viewModelScope.launch {
-            val copy = recipe.copy(
-                id = 0,
-                title = recipe.displayTitle().let { base ->
-                    if (base.endsWith("(Kopie)")) base else "$base (Kopie)"
-                },
-                sourceUrl = null,
-                savedAt = System.currentTimeMillis(),
-                isFavorite = false
-            ).withoutNullArtifacts()
-            repo.saveRecipe(copy)
+            val saved = repo.duplicateRecipe(recipe)
+            _importState.update { it.copy(lastImport = saved) }
         }
     }
 

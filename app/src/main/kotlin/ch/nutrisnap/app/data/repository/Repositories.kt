@@ -401,6 +401,7 @@ class DiaryRepository(db: NutriDatabase) {
 class RecipeRepository(db: NutriDatabase, private val context: Context) {
     private val dao           = db.recipeDao()
     private val componentDao  = db.recipeComponentDao()
+    private val matchDao      = db.ingredientMatchDao()
     private val scraper       = RecipeScraper(context)
 
     fun getAll():          Flow<List<Recipe>> = dao.getAll()
@@ -587,8 +588,46 @@ class RecipeRepository(db: NutriDatabase, private val context: Context) {
     }
 
     suspend fun deleteRecipe(r: Recipe) {
+        // Zugehörige Daten mitlöschen (sonst verwaiste Matches/Komponenten)
+        runCatching { componentDao.deleteForRecipe(r.id) }
+        runCatching { matchDao.deleteMatchesForRecipe(r.id) }
         dao.delete(r)
         pushSafely { SupabaseSync.deleteRecipe(r.id) }
+    }
+
+    /**
+     * Rezept duplizieren inkl. verifizierter Matches und Komponenten.
+     * Neuer Titel „… (Kopie)“, ohne sourceUrl, nicht favorisiert.
+     * @return gespeicherte Kopie mit neuer id
+     */
+    suspend fun duplicateRecipe(recipe: Recipe): Recipe {
+        val copy = recipe.copy(
+            id = 0,
+            title = recipe.displayTitle().let { base ->
+                if (base.endsWith("(Kopie)")) base else "$base (Kopie)"
+            },
+            sourceUrl = null,
+            savedAt = System.currentTimeMillis(),
+            isFavorite = false
+        ).withoutNullArtifacts()
+        // Fingerprint-Dedup umgehen: Kopie bewusst als neues Rezept
+        val newId = dao.insert(copy.withoutNullArtifacts().withGuessedCategoryIfEmpty())
+        val saved = copy.copy(id = newId)
+        pushSafely { SupabaseSync.upsertRecipe(saved) }
+
+        val matches = matchDao.getMatchesForRecipeOnce(recipe.id)
+        if (matches.isNotEmpty()) {
+            matchDao.insertMatches(matches.map { m ->
+                m.copy(id = 0, recipeId = newId)
+            })
+        }
+        val components = componentDao.getForRecipeOnce(recipe.id)
+        if (components.isNotEmpty()) {
+            componentDao.insertAll(components.map { c ->
+                c.copy(id = 0, recipeId = newId)
+            })
+        }
+        return saved
     }
 
     suspend fun getById(id: Long) = dao.getById(id)
