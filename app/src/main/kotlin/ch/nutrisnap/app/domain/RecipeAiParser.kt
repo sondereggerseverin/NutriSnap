@@ -296,7 +296,11 @@ object RecipeAiParser {
 
     /** Makros, Methodenschritte, Promo, Meta, Hashtags — keine Zutaten. */
     fun isJunkIngredientLine(line: String): Boolean {
-        val d = line.trim().trimStart('•', '-', '*', ' ').trim()
+        // Emoji/Symbole am Anfang entfernen (z.B. "🥣 Ingredients – Makes 3")
+        val d = line.trim()
+            .trimStart('•', '-', '*', ' ')
+            .replace(Regex("""^[\p{So}\p{Cn}\p{Sk}]+"""), "")
+            .trim()
         if (d.isBlank()) return true
         val lower = d.lowercase()
             .replace('–', '-')
@@ -305,9 +309,15 @@ object RecipeAiParser {
         if (Regex(
                 """^(ingredients?|zutaten)\b""",
                 RegexOption.IGNORE_CASE
-            ).containsMatchIn(d) &&
-            !Regex("""\d+\s*(g|ml|kg|l|tsp|tbsp|oz|cup)\b""", RegexOption.IGNORE_CASE).containsMatchIn(d)
-        ) return true
+            ).containsMatchIn(d)
+        ) {
+            // Echte Zutat wie "Ingredients for salsa: 2 tomatoes" behalten nur mit klarer Menge+Food
+            val onlyMeta = !Regex(
+                """\d+[.,]?\d*\s*(g|ml|kg|l|tsp|tbsp|oz|cup)s?\s+\p{L}{3,}""",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(d)
+            if (onlyMeta) return true
+        }
         // "Makes 3" / "Serves 4" / "Portions: 10" allein
         if (Regex(
                 """^(makes?|serves?|servings?|portionen?|portions?)\s*:?\s*\d+\s*$""",
@@ -344,15 +354,16 @@ object RecipeAiParser {
             if (marketingHits >= 1 && d.length > 20) return true
         }
         // Makro-Zusammenfassungen: "265 kcals", "47g Protein", "83g Carbs", "6190 Calories"
+        // Immer Junk – auch wenn "47g" wie eine Mengenangabe aussieht
         if (Regex(
-                """^\d+[.,]?\d*\s*(kcals?|calories?|kcal)\b""",
+                """^[~≈]?\s*\d+[.,]?\d*\s*(kcals?|calories?|kcal)\b""",
                 RegexOption.IGNORE_CASE
             ).containsMatchIn(d)
         ) return true
         if (Regex(
-                """^\d+[.,]?\d*\s*g?\s*(protein|carbs?|fat|ballaststoffe)\b""",
+                """^[~≈]?\s*\d+[.,]?\d*\s*g?\s*(protein|carbs?|fat|ballaststoffe|calories?|kcals?)\b""",
                 RegexOption.IGNORE_CASE
-            ).containsMatchIn(d) && !hasQuantity
+            ).containsMatchIn(d)
         ) return true
         if (Regex("""^\d+[.,]?\d*\s*g\s*[|/:]\s*[pcf]\b""", RegexOption.IGNORE_CASE).containsMatchIn(d)) return true
         if (Regex("""^\d+[.,]?\d*\s*g\s*per\s+(cup|serving|portion)""", RegexOption.IGNORE_CASE).containsMatchIn(d)) return true

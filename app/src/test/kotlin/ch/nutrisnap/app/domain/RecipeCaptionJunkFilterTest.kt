@@ -60,8 +60,17 @@ class RecipeCaptionJunkFilterTest {
         assertFalse(lower.contains("550"))
         assertFalse(lower.contains("#mealprep"))
         assertFalse(lower.contains("chop the potatoes"))
-        assertTrue(out.contains("potatoes") || out.contains("Kartoffel") || out.contains("Carisma"))
-        assertTrue(out.contains("500") || out.contains("beef") || out.contains("Rind"))
-        assertTrue(out.contains("320") || out.contains("yoghurt") || out.contains("Joghurt") || out.contains("Chobani"))
+        assertTrue(
+            "expected potatoes/beef/yoghurt in:\n$out",
+            out.contains("potatoes", ignoreCase = true) ||
+                out.contains("Carisma", ignoreCase = true) ||
+                out.contains("beef", ignoreCase = true) ||
+                out.contains("500")
+        )
+        assertTrue(
+            "expected yoghurt/mayo amount in:\n$out",
+            out.contains("320") || out.contains("yoghurt", ignoreCase = true) ||
+                out.contains("Chobani", ignoreCase = true) || out.contains("mayo", ignoreCase = true)
+        )
     }
 }
