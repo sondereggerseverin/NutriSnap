@@ -1,20 +1,12 @@
-# Build errors - run 892
+# Build errors - run 900
 
 ## Unit Tests (test_output.log) - Error lines
 ```
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipeDetailSheet.kt:335:112 Syntax error: Expecting '"'.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipeDetailSheet.kt:335:112 Syntax error: Expecting ','.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipeDetailSheet.kt:336:3 Syntax error: Expecting '"'.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipeDetailSheet.kt:336:3 Syntax error: Expecting ','.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipeDetailSheet.kt:337:41 'if' must have both main and 'else' branches when used as an expression.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipeDetailSheet.kt:337:41 Argument type mismatch: actual type is 'Unit', but 'CharSequence' was expected.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipeDetailSheet.kt:337:45 Unresolved reference 'newText'.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipeDetailSheet.kt:337:96 Unresolved reference 'newText'.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipeDetailSheet.kt:337:104 Syntax error: Expecting ')'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:152:13 No value passed for parameter 'metadata'.
 > Task :app:compileDebugKotlin FAILED
    > Compilation error. See log for more details
 Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilation error. See log for more details
-BUILD FAILED in 1m 22s
+BUILD FAILED in 1m 20s
 ```
 
 ## Unit Tests (test_output.log) - Last 150 lines
@@ -167,7 +159,7 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilat
 	... 2 more
 
 
-BUILD FAILED in 1m 22s
+BUILD FAILED in 1m 20s
 18 actionable tasks: 18 executed
 ```
 
