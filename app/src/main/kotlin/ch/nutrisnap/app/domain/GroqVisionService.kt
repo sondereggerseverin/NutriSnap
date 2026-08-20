@@ -217,13 +217,16 @@ Aufgabe:
 - Teile nicht willkürlich Abschnitte desselben Rezepts (z.B. Teig/Füllung) in mehrere Rezepte.
 
 Regeln pro Rezept:
-- ingredients: jede Zutat in einer eigenen Zeile, idealerweise mit Menge (z.B. "1 cup cottage cheese").
+- ingredients: jede Zutat in einer eigenen Zeile, idealerweise mit Menge.
+  Wenn imperial/US-Mengen sichtbar sind (cup, tbsp, tsp, oz, lb), darfst du sie belassen —
+  die App rechnet sie offline nach; erfinde keine metrischen Werte, die nicht im Bild stehen.
   Gruppiere optional mit Überschriften wie "dough:" / "filling:" wenn das Bild das so zeigt.
 - instructions: nummerierte Schritte, einer pro Zeile (1. ... 2. ...).
 - Wenn Nährwerte pro Portion sichtbar sind (kcal, Protein, KH, Fett), übernimm sie.
-- Wenn Anzahl Portionen / servings sichtbar ist, übernimm sie.
-- Zeiten in Minuten umrechnen falls nötig.
-- Erfinde nichts, was nicht lesbar ist. Unleserliche Teile weglassen.
+- Wenn Anzahl Portionen / servings sichtbar ist, übernimm sie; sonst servings = 1.
+- Zeiten in Minuten umrechnen falls nötig (z.B. 1 h → 60).
+- Titel: wenn kein klarer Titel lesbar ist, kurze sinnvolle Bezeichnung aus dem Gericht ableiten.
+- Erfinde keine Zutaten/Schritte/Nährwerte, die nicht lesbar sind. Unleserliche Teile weglassen.
 - Sprache der Zutaten/Anleitung beibehalten (Englisch bleibt Englisch, Deutsch bleibt Deutsch).
 
 Antworte NUR mit folgendem JSON (kein Markdown):
@@ -246,7 +249,7 @@ Antworte NUR mit folgendem JSON (kein Markdown):
 }
 """.trimIndent()
             callVisionRaw(prompt, base64Jpeg, maxTokens = 4000).mapCatching { raw ->
-                parseRecipesFromImageJson(raw)
+                parseRecipesFromImageJson(raw).map { normalizeExtractedRecipe(it) }
             }
         }
 
@@ -293,6 +296,60 @@ Antworte NUR mit folgendem JSON (kein Markdown):
             }
         }
         return emptyList()
+    }
+
+    /**
+     * Post-Processing nach Vision-Extrakt (deterministisch, offline):
+     * - Imperial → metrisch (cups/tbsp/… → g/ml) via [RecipeGermanMetricConverter]
+     * - Whitespace/Leerzeilen bereinigen
+     * - servings mindestens 1
+     * - leerer Titel → kurzer Fallback aus erster Zutatenzeile
+     * - negative/unsinnige Nährwerte verwerfen
+     */
+    internal fun normalizeExtractedRecipe(raw: RecipeFromImageResult): RecipeFromImageResult {
+        fun cleanBlock(text: String): String =
+            text.lines()
+                .map { it.trimEnd() }
+                .dropWhile { it.isBlank() }
+                .dropLastWhile { it.isBlank() }
+                .joinToString("\n")
+                .replace(Regex("\n{3,}"), "\n\n")
+
+        val ingredientsMetric = runCatching {
+            RecipeGermanMetricConverter.convertUnitsToMetric(raw.ingredients)
+        }.getOrDefault(raw.ingredients)
+        val instructionsMetric = runCatching {
+            RecipeGermanMetricConverter.convertUnitsToMetric(raw.instructions)
+        }.getOrDefault(raw.instructions)
+
+        val ingredients = cleanBlock(ingredientsMetric)
+        val instructions = cleanBlock(instructionsMetric)
+        val description = cleanBlock(raw.description)
+        val title = raw.title.trim().ifBlank {
+            ingredients.lineSequence()
+                .map { it.trim() }
+                .firstOrNull { it.isNotBlank() && !it.endsWith(":") }
+                ?.take(48)
+                ?.let { "Rezept: $it" }
+                ?: "Rezept aus Bild"
+        }
+
+        fun saneNutrient(v: Float?): Float? =
+            v?.takeIf { it.isFinite() && it >= 0f && it < 10_000f }
+
+        return raw.copy(
+            title = title,
+            description = description,
+            ingredients = ingredients,
+            instructions = instructions,
+            servings = raw.servings.coerceAtLeast(1),
+            prepTimeMinutes = raw.prepTimeMinutes?.takeIf { it in 0..24 * 60 },
+            cookTimeMinutes = raw.cookTimeMinutes?.takeIf { it in 0..24 * 60 },
+            caloriesPerServing = saneNutrient(raw.caloriesPerServing),
+            proteinPerServing = saneNutrient(raw.proteinPerServing),
+            carbsPerServing = saneNutrient(raw.carbsPerServing),
+            fatPerServing = saneNutrient(raw.fatPerServing)
+        )
     }
 
     /**
