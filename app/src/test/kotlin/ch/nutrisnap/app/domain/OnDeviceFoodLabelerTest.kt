@@ -10,7 +10,7 @@ import org.junit.Test
 class OnDeviceFoodLabelerTest {
 
     @Test
-    fun `maps apple to Apfel`() {
+    fun mapsAppleToApfel() {
         val c = OnDeviceFoodLabeler.resolveLabel("Apple", 0.9f)
         assertNotNull(c)
         assertEquals("Apfel", c!!.name)
@@ -19,13 +19,14 @@ class OnDeviceFoodLabelerTest {
     }
 
     @Test
-    fun `unknown non-food label returns null`() {
+    fun unknownNonFoodLabelReturnsNull() {
         assertNull(OnDeviceFoodLabeler.resolveLabel("Person", 0.95f))
         assertNull(OnDeviceFoodLabeler.resolveLabel("Table", 0.8f))
+        assertNull(OnDeviceFoodLabeler.resolveLabel("Car", 0.9f))
     }
 
     @Test
-    fun `generic food kept when no specific labels`() {
+    fun genericFoodKeptWhenNoSpecificLabels() {
         val dish = OnDeviceFoodLabeler.buildDishFromLabels(
             listOf("Food" to 0.7f, "Table" to 0.9f)
         )
@@ -34,7 +35,7 @@ class OnDeviceFoodLabelerTest {
     }
 
     @Test
-    fun `specific labels drop generic food`() {
+    fun specificLabelsDropGenericFood() {
         val dish = OnDeviceFoodLabeler.buildDishFromLabels(
             listOf(
                 "Food" to 0.95f,
@@ -49,9 +50,19 @@ class OnDeviceFoodLabelerTest {
     }
 
     @Test
-    fun `substring match for french fries`() {
+    fun substringMatchForFrenchFries() {
         val c = OnDeviceFoodLabeler.resolveLabel("French fries", 0.6f)
         assertNotNull(c)
         assertEquals("Pommes", c!!.name)
+    }
+
+    @Test
+    fun shortKeysStillExactMatch() {
+        val egg = OnDeviceFoodLabeler.resolveLabel("egg", 0.8f)
+        assertNotNull(egg)
+        assertEquals("Ei", egg!!.name)
+        val tea = OnDeviceFoodLabeler.resolveLabel("tea", 0.8f)
+        assertNotNull(tea)
+        assertEquals("Tee", tea!!.name)
     }
 }

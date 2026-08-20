@@ -157,9 +157,13 @@ object OnDeviceFoodLabeler {
     internal fun resolveLabel(rawText: String, score: Float): DishIngredientCandidate? {
         val key = rawText.lowercase().trim()
         if (key.isBlank()) return null
+        // 1) Exakt  2) Label enthält Map-Key (mind. 4 Zeichen) – kein umgekehrtes
+        //    contains, sonst matchen kurze Keys falsch (z.B. "tea" in "table").
         val mapped = foodMap[key]
             ?: foodMap.entries
-                .filter { key.contains(it.key) || it.key.contains(key) }
+                .filter { (mapKey, _) ->
+                    mapKey.length >= 4 && (key == mapKey || key.contains(mapKey))
+                }
                 .maxByOrNull { it.key.length }
                 ?.value
             ?: return null
