@@ -304,7 +304,16 @@ object RecipeNutritionAnalyzer {
                 return ParsedIngredient((amt * mult).coerceAtLeast(1f), foodName.take(50))
             }
             val lc = clean.lowercase()
-            val amt = if (lc.contains("spray") || lc.contains("prise") || lc.contains("pinch")) 2f else 50f
+            // Gewürze/Pulver ohne Menge: Prise (~2 g), nicht 50 g (sonst explodieren Makros)
+            val amt = when {
+                lc.contains("spray") || lc.contains("prise") || lc.contains("pinch") -> 2f
+                Regex(
+                    """\b(powder|pulver|gewürz|seasoning|paprika|cumin|oregano|cinnamon|zimt|""" +
+                        """chili|curry|pfeffer|pepper|salt|salz|garlic powder|knoblauchpulver|""" +
+                        """onion powder|mustard powder|cayenne|turmeric|kurkuma)\b"""
+                ).containsMatchIn(lc) -> 3f
+                else -> 50f
+            }
             return ParsedIngredient(amt, clean.take(50))
         }
 
