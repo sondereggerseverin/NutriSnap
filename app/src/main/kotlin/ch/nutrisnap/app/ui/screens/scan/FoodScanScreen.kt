@@ -32,7 +32,7 @@ fun FoodScanScreen(
             onPhotoCaptured = { bitmap -> vm.analyzePhoto(bitmap) },
             onNavigateBack = onNavigateBack
         )
-        is FoodScanState.Analyzing -> AnalysisProgressView(stage = s.stage)
+        is FoodScanState.Analyzing -> AnalysisProgressView(stage = s.stage, onDevice = s.onDevice)
         is FoodScanState.Verify -> VerifyAndSaveFlow(
             dishName = s.dishName,
             analysisResult = s.analysisResult,
@@ -62,7 +62,7 @@ fun FoodScanScreen(
 
 private data class StageInfo(val stage: PhotoAnalysisStage, val label: String)
 
-private val ANALYSIS_STAGES = listOf(
+private val ANALYSIS_STAGES_CLOUD = listOf(
     StageInfo(PhotoAnalysisStage.IDENTIFYING_INGREDIENTS, "Zutaten werden erkannt…"),
     StageInfo(PhotoAnalysisStage.SEPARATING_INGREDIENTS, "Zutaten werden getrennt…"),
     StageInfo(PhotoAnalysisStage.SEARCHING_NUTRITION_DATABASE, "Nährwerte werden gesucht…"),
@@ -70,9 +70,18 @@ private val ANALYSIS_STAGES = listOf(
     StageInfo(PhotoAnalysisStage.FINALIZING_RESULTS, "Ergebnis wird finalisiert…")
 )
 
+private val ANALYSIS_STAGES_ON_DEVICE = listOf(
+    StageInfo(PhotoAnalysisStage.ON_DEVICE_LABELING, "On-Device-Erkennung (ohne Cloud)…"),
+    StageInfo(PhotoAnalysisStage.SEARCHING_NUTRITION_DATABASE, "Nährwerte werden gesucht…"),
+    StageInfo(PhotoAnalysisStage.BREAKING_DOWN_MACROS, "Makros werden aufgeschlüsselt…"),
+    StageInfo(PhotoAnalysisStage.FINALIZING_RESULTS, "Ergebnis wird finalisiert…")
+)
+
 @Composable
-private fun AnalysisProgressView(stage: PhotoAnalysisStage) {
-    val currentIndex = ANALYSIS_STAGES.indexOfFirst { it.stage == stage }.coerceAtLeast(0)
+private fun AnalysisProgressView(stage: PhotoAnalysisStage, onDevice: Boolean = false) {
+    val stages = if (onDevice || stage == PhotoAnalysisStage.ON_DEVICE_LABELING)
+        ANALYSIS_STAGES_ON_DEVICE else ANALYSIS_STAGES_CLOUD
+    val currentIndex = stages.indexOfFirst { it.stage == stage }.coerceAtLeast(0)
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
@@ -80,24 +89,27 @@ private fun AnalysisProgressView(stage: PhotoAnalysisStage) {
             modifier = Modifier.padding(32.dp).fillMaxWidth()
         ) {
             Text(
-                "KI-Analyse läuft…",
+                if (onDevice) "On-Device-Analyse…" else "KI-Analyse läuft…",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                "Dein Foto wird Schritt für Schritt in einzelne Zutaten zerlegt",
+                if (onDevice)
+                    "Offline-Erkennung – bitte Ergebnis anschliessend prüfen"
+                else
+                    "Dein Foto wird Schritt für Schritt in einzelne Zutaten zerlegt",
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(24.dp))
             LinearProgressIndicator(
-                progress = { (currentIndex + 1) / ANALYSIS_STAGES.size.toFloat() },
+                progress = { (currentIndex + 1) / stages.size.toFloat() },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(24.dp))
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                ANALYSIS_STAGES.forEachIndexed { index, info ->
+                stages.forEachIndexed { index, info ->
                     StageRow(
                         label = info.label,
                         status = when {

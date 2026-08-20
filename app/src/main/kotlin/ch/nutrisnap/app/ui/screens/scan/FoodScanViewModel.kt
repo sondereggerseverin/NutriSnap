@@ -24,6 +24,8 @@ import java.time.LocalDate
  *  mit eigenem Status-Text angezeigt, damit der Prozess transparent bleibt. */
 enum class PhotoAnalysisStage {
     IDENTIFYING_INGREDIENTS,
+    /** On-Device ML Kit Labeling (Offline- oder Cloud-Fallback). */
+    ON_DEVICE_LABELING,
     SEPARATING_INGREDIENTS,
     SEARCHING_NUTRITION_DATABASE,
     BREAKING_DOWN_MACROS,
@@ -32,7 +34,11 @@ enum class PhotoAnalysisStage {
 
 sealed class FoodScanState {
     object Capturing : FoodScanState()
-    data class Analyzing(val stage: PhotoAnalysisStage) : FoodScanState()
+    data class Analyzing(
+        val stage: PhotoAnalysisStage,
+        /** true = Nutzer sieht On-Device-Pfad in der Fortschrittsanzeige. */
+        val onDevice: Boolean = false
+    ) : FoodScanState()
     /** Zutaten aus dem Foto separiert + Nährwerte gesucht — bereit für den
      *  bekannten "Zutaten verifizieren"-Screen (IngredientVerifySheet). */
     data class Verify(
@@ -67,22 +73,25 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Mindestdauer pro Stufe, damit der Prozess für den User sichtbar/nachvollziehbar
      *  bleibt statt sofort durchzurauschen (Stufen ohne eigenen Netzwerk-Call). */
-    private suspend fun showStage(stage: PhotoAnalysisStage, minDelayMs: Long = 450) {
-        _state.value = FoodScanState.Analyzing(stage)
+    private suspend fun showStage(
+        stage: PhotoAnalysisStage,
+        onDevice: Boolean = false,
+        minDelayMs: Long = 450
+    ) {
+        _state.value = FoodScanState.Analyzing(stage, onDevice = onDevice)
         delay(minDelayMs)
     }
 
     fun analyzePhoto(bitmap: Bitmap) {
         overrides = emptyMap()
         viewModelScope.launch {
-            showStage(PhotoAnalysisStage.IDENTIFYING_INGREDIENTS)
             val online = NetworkMonitor(getApplication()).isCurrentlyOnline()
             var usedOnDevice = false
 
-            _state.value = FoodScanState.Analyzing(PhotoAnalysisStage.SEPARATING_INGREDIENTS)
             val dish: DishScanResult = if (!online) {
                 // Phase C: On-Device-Fallback ohne Cloud
                 usedOnDevice = true
+                showStage(PhotoAnalysisStage.ON_DEVICE_LABELING, onDevice = true)
                 OnDeviceFoodLabeler.analyze(bitmap).getOrElse { e ->
                     _state.value = FoodScanState.Error(
                         "Offline und On-Device-Erkennung ohne Treffer. " +
@@ -91,10 +100,13 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                     return@launch
                 }
             } else {
+                showStage(PhotoAnalysisStage.IDENTIFYING_INGREDIENTS)
+                _state.value = FoodScanState.Analyzing(PhotoAnalysisStage.SEPARATING_INGREDIENTS)
                 val base64 = visionService.bitmapToBase64Jpeg(bitmap)
                 visionService.analyzeDishIngredients(base64).getOrElse { cloudErr ->
                     // Cloud fehlgeschlagen → On-Device versuchen
                     usedOnDevice = true
+                    showStage(PhotoAnalysisStage.ON_DEVICE_LABELING, onDevice = true, minDelayMs = 300)
                     OnDeviceFoodLabeler.analyze(bitmap).getOrElse {
                         _state.value = FoodScanState.Error(
                             cloudErr.message ?: "Bilderkennung fehlgeschlagen"
@@ -113,7 +125,7 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                 return@launch
             }
 
-            showStage(PhotoAnalysisStage.SEARCHING_NUTRITION_DATABASE)
+            showStage(PhotoAnalysisStage.SEARCHING_NUTRITION_DATABASE, onDevice = usedOnDevice)
             // Wandelt die erkannten Zutaten in Zeilen um, die RecipeNutritionAnalyzer
             // (DB-Abgleich + AI-Fallback) genau wie manuell eingegebene Rezeptzeilen
             // verarbeiten kann. Unsichere Erkennungen bleiben im Namen sichtbar,
@@ -128,7 +140,10 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                 "${grams}g $label"
             }
 
-            _state.value = FoodScanState.Analyzing(PhotoAnalysisStage.BREAKING_DOWN_MACROS)
+            _state.value = FoodScanState.Analyzing(
+                PhotoAnalysisStage.BREAKING_DOWN_MACROS,
+                onDevice = usedOnDevice
+            )
             val analysisResult = RecipeNutritionAnalyzer.analyzeIngredientLines(lines)
 
             val warnings = buildScanWarnings(cleanedIngredients, analysisResult).toMutableList()
@@ -136,7 +151,7 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                 warnings.add(0, "On-Device-Erkennung (ohne Cloud) – Zutaten und Mengen bitte prüfen.")
             }
 
-            showStage(PhotoAnalysisStage.FINALIZING_RESULTS)
+            showStage(PhotoAnalysisStage.FINALIZING_RESULTS, onDevice = usedOnDevice)
             _state.value = FoodScanState.Verify(
                 dishName = dish.dishName.ifBlank { "Gescanntes Essen" },
                 analysisResult = analysisResult,
