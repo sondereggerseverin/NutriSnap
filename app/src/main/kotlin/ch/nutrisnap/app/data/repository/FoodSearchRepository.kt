@@ -134,7 +134,7 @@ class FoodSearchRepository(
                         }
                 )
 
-            foodItemDao.insertAll(result.filter { it.source != FoodSource.MANUAL }.take(20))
+            foodItemDao.insertAll(result.filter { it.source != FoodSource.MANUAL }.take(40))
             result
         }
     }
@@ -257,9 +257,15 @@ class FoodSearchRepository(
     }
 
     suspend fun searchByBarcode(barcode: String): FoodItem? {
-        return foodItemDao.searchByBarcode(barcode)
-            ?: runCatching { SwissFoodApi.search("barcode:$barcode").firstOrNull() }.getOrNull()
+        foodItemDao.searchByBarcode(barcode)?.let { return it }
+        val remote = runCatching { SwissFoodApi.search("barcode:$barcode").firstOrNull() }.getOrNull()
             ?: runCatching { openFoodFactsSearch("barcode:$barcode").firstOrNull() }.getOrNull()
+            ?: return null
+        // Remote-Treffer (OFF/Swiss) dauerhaft lokal cachen → DB wächst mit jedem Scan
+        return runCatching {
+            val id = foodItemDao.insert(remote.copy(id = 0)).toInt()
+            foodItemDao.getById(id) ?: remote.copy(id = id)
+        }.getOrDefault(remote)
     }
 
     fun getRecentFoods(): Flow<List<FoodItem>> = foodItemDao.getRecentFoods()

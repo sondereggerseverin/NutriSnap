@@ -25,7 +25,7 @@ object OpenFoodFactsApi {
      * For barcode lookups, pass "barcode:<code>" — the function detects this prefix
      * and hits the product lookup endpoint instead.
      */
-    suspend fun search(query: String, limit: Int = 10): List<FoodItem> =
+    suspend fun search(query: String, limit: Int = 15): List<FoodItem> =
         withContext(Dispatchers.IO) {
             runCatching {
                 // Barcode lookup
@@ -40,19 +40,13 @@ object OpenFoodFactsApi {
                     val p = root.optJSONObject("product") ?: return@runCatching emptyList()
                     productToFoodItem(p, barcode = code)?.let { listOf(it) } ?: emptyList()
                 } else {
-                    // Name search: zuerst CH-Subdomain (implizites Land=Schweiz-Filter),
-                    // damit Eigenmarken (Migros, Coop, Aldi, Lidl) vor internationalem
-                    // Rauschen ranken. Bei zu wenig CH-Treffern zusaetzlich global
-                    // nachladen (z.B. fuer Marken/Produkte ohne CH-Tagging).
+                    // Name search: CH-Subdomain zuerst (Migros/Coop/Aldi/Lidl ranken vorne),
+                    // danach immer world dazu mergen — maximiert die lokal gecachten Produkte.
                     val chResults = searchOn("https://ch.openfoodfacts.org", query, limit)
-                    if (chResults.size >= 3) {
-                        chResults
-                    } else {
-                        val worldResults = searchOn("https://world.openfoodfacts.org", query, limit)
-                        (chResults + worldResults)
-                            .distinctBy { it.barcode ?: (it.name.lowercase().trim() + "|" + (it.brand?.lowercase()?.trim() ?: "")) }
-                            .take(limit)
-                    }
+                    val worldResults = searchOn("https://world.openfoodfacts.org", query, limit)
+                    (chResults + worldResults)
+                        .distinctBy { it.barcode ?: (it.name.lowercase().trim() + "|" + (it.brand?.lowercase()?.trim() ?: "")) }
+                        .take(limit.coerceAtLeast(chResults.size).coerceAtMost(limit * 2))
                 }
             }.getOrDefault(emptyList())
         }
