@@ -141,7 +141,7 @@ class HealthConnectManager(context: Context) {
             startZoneOffset = offset,
             endTime = end,
             endZoneOffset = endOffset,
-            metadata = Metadata.EMPTY,
+            metadata = Metadata.manualEntry(),
             name = name.take(100).ifBlank { null },
             energy = if (energyKcal.isFinite() && energyKcal > 0.0) Energy.kilocalories(energyKcal) else null,
             protein = massOrNull(proteinG),
