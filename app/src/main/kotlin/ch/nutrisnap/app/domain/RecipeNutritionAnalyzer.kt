@@ -254,18 +254,9 @@ object RecipeNutritionAnalyzer {
     )
 
     fun parseIngredientLine(line: String): ParsedIngredient? {
-        var clean = line.trimStart('*', '-', '\u2022', '\u00b7', ' ').trim()
-        if (clean.isBlank() || clean.length < 2) return null
-        // Abschnittspräfix abschneiden: "Für die Sauce: 1 Schalotte" → "1 Schalotte"
-        clean = clean.replace(
-            Regex(
-                """(?i)^(für\s+(die\s+|den\s+|das\s+)?|for\s+(the\s+)?)""" +
-                    """(hähnchen|haehnchen|chicken|sauce|soße|sosse|marinade|dressing|""" +
-                    """topping|teig|base|füllung|fuellung|beilage)""" +
-                    """\s*[:：\-]\s*"""
-            ),
-            ""
-        ).trim()
+        // Abschnittspräfix abschneiden ("Für die Sauce: 1 Schalotte" → "1 Schalotte") —
+        // gemeinsame Implementierung mit IngredientLineParser.parseIngredientLine.
+        val clean = stripSectionPrefix(line.trimStart('*', '-', '\u2022', '\u00b7', ' ').trim())
         if (clean.isBlank() || clean.length < 2) return null
 
         // "150-200 ml Wasser" / "150 – 200 ml" → Mittelwert + Einheit

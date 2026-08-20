@@ -46,6 +46,23 @@ private val INGREDIENT_AMOUNT_REGEX = Regex(
         "\\s*($UNIT_PATTERN)?\\s+(.+)",
     RegexOption.IGNORE_CASE
 )
+private val INGREDIENT_RANGE_REGEX = Regex(
+    "^(\\d+(?:[.,]\\d+)?)\\s*[-–—]\\s*(\\d+(?:[.,]\\d+)?)\\s*($UNIT_PATTERN)?\\b\\s*(.*)$",
+    RegexOption.IGNORE_CASE
+)
+
+/** Schneidet Abschnitts-Präfixe wie "Für die Sauce:" vor der eigentlichen Menge ab.
+ *  Gemeinsam genutzt von [parseIngredientLine] und [RecipeNutritionAnalyzer.parseIngredientLine]. */
+fun stripSectionPrefix(line: String): String =
+    line.replace(
+        Regex(
+            """(?i)^(für\s+(die\s+|den\s+|das\s+)?|for\s+(the\s+)?)""" +
+                """(hähnchen|haehnchen|chicken|sauce|soße|sosse|marinade|dressing|""" +
+                """topping|teig|base|füllung|fuellung|beilage)""" +
+                """\s*[:：\-]\s*"""
+        ),
+        ""
+    ).trim()
 
 /** Zählbare Lebensmittel: "2 chicken breasts" → Stück, nicht g. */
 private val COUNTABLE_NAME_HINTS = listOf(
@@ -104,7 +121,22 @@ private fun formatAmount(value: Float): String =
     if (value == value.toLong().toFloat()) value.toLong().toString() else "%.2f".format(value)
 
 fun parseIngredientLine(line: String): ParsedIngredient {
-    val trimmed = line.trimStart('•', '-', ' ', '*')
+    val trimmed = stripSectionPrefix(line.trimStart('•', '-', ' ', '*'))
+    if (trimmed.isBlank()) return ParsedIngredient(amount = "", unit = "g", name = "")
+
+    val rangeMatch = INGREDIENT_RANGE_REGEX.find(trimmed)
+    if (rangeMatch != null) {
+        val a = rangeMatch.groupValues[1].replace(',', '.').toFloatOrNull() ?: 0f
+        val b = rangeMatch.groupValues[2].replace(',', '.').toFloatOrNull() ?: 0f
+        val avg = if (a > 0f && b > 0f) (a + b) / 2f else maxOf(a, b)
+        val name = cleanIngredientName(rangeMatch.groupValues[4].ifBlank { trimmed })
+        return ParsedIngredient(
+            amount = formatAmount(avg),
+            unit = normalizeUnit(rangeMatch.groupValues[3], name),
+            name = name
+        )
+    }
+
     val m = INGREDIENT_AMOUNT_REGEX.find(trimmed)
     if (m != null) {
         val name = cleanIngredientName(m.groupValues[3])
