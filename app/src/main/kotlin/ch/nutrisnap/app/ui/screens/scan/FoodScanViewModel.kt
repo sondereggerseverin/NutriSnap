@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.repository.DiaryRepository
+import ch.nutrisnap.app.domain.EntryPlausibilityChecker
 import ch.nutrisnap.app.domain.GroqVisionService
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import ch.nutrisnap.app.ui.screens.recipes.IngredientOverride
@@ -33,7 +34,9 @@ sealed class FoodScanState {
      *  bekannten "Zutaten verifizieren"-Screen (IngredientVerifySheet). */
     data class Verify(
         val dishName: String,
-        val analysisResult: RecipeNutritionAnalyzer.AnalysisResult
+        val analysisResult: RecipeNutritionAnalyzer.AnalysisResult,
+        /** Sanfte Hinweise (grosse Portionen, unsichere Erkennungen) – nicht blockierend. */
+        val warnings: List<String> = emptyList()
     ) : FoodScanState()
     data class Error(val message: String) : FoodScanState()
     object Saved : FoodScanState()
@@ -77,7 +80,11 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                 _state.value = FoodScanState.Error(e.message ?: "Unbekannter Fehler bei der Bilderkennung")
                 return@launch
             }
-            if (dish.ingredients.isEmpty()) {
+            // Leere Namen und offensichtliche Vision-Ausreisser (z.B. 5000 g) bereinigen
+            val cleanedIngredients = dish.ingredients
+                .map { it.copy(name = it.name.trim(), estimatedGrams = it.estimatedGrams.coerceIn(1f, MAX_INGREDIENT_GRAMS)) }
+                .filter { it.name.isNotBlank() }
+            if (cleanedIngredients.isEmpty()) {
                 _state.value = FoodScanState.Error("Keine Zutaten erkannt – bitte anderes Foto versuchen")
                 return@launch
             }
@@ -87,8 +94,8 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
             // (DB-Abgleich + AI-Fallback) genau wie manuell eingegebene Rezeptzeilen
             // verarbeiten kann. Unsichere Erkennungen bleiben im Namen sichtbar,
             // damit sie im Verify-Screen transparent markiert sind.
-            val lines = dish.ingredients.map { ing ->
-                val grams = ing.estimatedGrams.coerceAtLeast(1f).toInt()
+            val lines = cleanedIngredients.map { ing ->
+                val grams = ing.estimatedGrams.toInt().coerceAtLeast(1)
                 // Komma vor dem Hinweis: parseIngredientLine() kappt Zutatennamen ab dem
                 // ersten Komma fuer die DB-Suche (bestehendes Verhalten) — so bleibt der
                 // Hinweis in der Anzeige sichtbar, verfaelscht aber nie den Suchbegriff.
@@ -100,12 +107,59 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
             _state.value = FoodScanState.Analyzing(PhotoAnalysisStage.BREAKING_DOWN_MACROS)
             val analysisResult = RecipeNutritionAnalyzer.analyzeIngredientLines(lines)
 
+            val warnings = buildScanWarnings(cleanedIngredients, analysisResult)
+
             showStage(PhotoAnalysisStage.FINALIZING_RESULTS)
             _state.value = FoodScanState.Verify(
                 dishName = dish.dishName.ifBlank { "Gescanntes Essen" },
-                analysisResult = analysisResult
+                analysisResult = analysisResult,
+                warnings = warnings
             )
         }
+    }
+
+    /**
+     * Sanfte Hinweise vor dem Speichern – blockieren nicht, steuern Aufmerksamkeit
+     * auf unsichere oder ungewöhnlich grosse Schätzungen.
+     */
+    private fun buildScanWarnings(
+        ingredients: List<ch.nutrisnap.app.domain.DishIngredientCandidate>,
+        analysis: RecipeNutritionAnalyzer.AnalysisResult
+    ): List<String> {
+        val out = mutableListOf<String>()
+        val lowConf = ingredients.count { it.confidence.equals("niedrig", ignoreCase = true) }
+        if (lowConf > 0) {
+            out += if (lowConf == 1)
+                "1 Zutat unsicher erkannt – bitte im Verifizieren prüfen."
+            else
+                "$lowConf Zutaten unsicher erkannt – bitte im Verifizieren prüfen."
+        }
+        val totalG = ingredients.sumOf { it.estimatedGrams.toDouble() }.toFloat()
+        EntryPlausibilityChecker.checkPortion(totalG)?.let { out += it }
+        ingredients.forEach { ing ->
+            if (ing.estimatedGrams >= 800f) {
+                out += "„${ing.name}“ mit ${ing.estimatedGrams.toInt()} g wirkt sehr gross – Menge prüfen."
+            }
+        }
+        // Makro-Plausibilität der Analyzer-Summe (falls vorhanden)
+        runCatching {
+            val kcal = analysis.totalCalories
+            val p = analysis.totalProtein
+            val c = analysis.totalCarbs
+            val f = analysis.totalFat
+            EntryPlausibilityChecker.checkManualEntry(kcal, p, c, f)?.let { out += it }
+        }
+        if (analysis.estimatedCount > 0 && analysis.matchedCount > 0 &&
+            analysis.estimatedCount >= (analysis.matchedCount + 1) / 2
+        ) {
+            out += "Viele Nährwerte sind KI-Schätzungen – bei Bedarf Zutaten ersetzen."
+        }
+        return out.distinct().take(4)
+    }
+
+    companion object {
+        /** Harte Kappe pro Zutat – Vision schätzt manchmal unrealistische Massen. */
+        private const val MAX_INGREDIENT_GRAMS = 1500f
     }
 
     fun retake() {

@@ -36,6 +36,7 @@ fun FoodScanScreen(
         is FoodScanState.Verify -> VerifyAndSaveFlow(
             dishName = s.dishName,
             analysisResult = s.analysisResult,
+            warnings = s.warnings,
             initialOverrides = vm.getOverrides(),
             onOverridesChanged = vm::setOverrides,
             initialMeal = initialMeal,
@@ -150,6 +151,7 @@ private fun StageRow(label: String, status: StageStatus) {
 private fun VerifyAndSaveFlow(
     dishName: String,
     analysisResult: ch.nutrisnap.app.domain.RecipeNutritionAnalyzer.AnalysisResult,
+    warnings: List<String> = emptyList(),
     initialOverrides: Map<String, ch.nutrisnap.app.ui.screens.recipes.IngredientOverride>,
     onOverridesChanged: (Map<String, ch.nutrisnap.app.ui.screens.recipes.IngredientOverride>) -> Unit,
     initialMeal: MealType? = null,
@@ -163,6 +165,24 @@ private fun VerifyAndSaveFlow(
     // Zwischenspeicher für die vom Verify-Sheet gelieferten, finalen Summen —
     // Mahlzeit-Auswahl erfolgt danach in einem leichten Dialog.
     var pendingTotals by remember { mutableStateOf<PendingTotals?>(null) }
+    var showWarnings by remember(warnings) { mutableStateOf(warnings.isNotEmpty()) }
+
+    if (showWarnings && warnings.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { showWarnings = false },
+            title = { Text("Bitte prüfen") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    warnings.forEach { w ->
+                        Text("• $w", fontSize = 14.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showWarnings = false }) { Text("Verifizieren") }
+            }
+        )
+    }
 
     IngredientVerifySheet(
         analysisResult = analysisResult,
