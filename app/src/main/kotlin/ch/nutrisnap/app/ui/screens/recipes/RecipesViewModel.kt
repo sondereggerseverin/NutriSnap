@@ -600,14 +600,18 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     /**
      * Importiert offene Items sequenziell. Instagram: längere Pause + ein automatischer
      * Retry bei Block (Rate-Limit / Login-Wall oft nach kurzer Wartezeit weg).
+     * Nach Erfolg: derselbe Postprocess wie Einzel-Import (DE/metrisch + Nährwerte).
      */
     fun runBatchImport() {
         if (_batchState.value.isRunning) return
         viewModelScope.launch {
             _batchState.update { it.copy(isRunning = true) }
+            val autoGerman = shouldAutoGermanMetric()
             val queue = _batchState.value.items.filter { it.status != BatchStatus.DONE }
             for ((index, item) in queue.withIndex()) {
-                val isIg = "instagram.com" in item.url.lowercase() || "instagr.am" in item.url.lowercase()
+                val urlLower = item.url.lowercase()
+                val isIg = "instagram.com" in urlLower || "instagr.am" in urlLower
+                val isTikTok = "tiktok.com" in urlLower
                 if (index > 0 && isIg) {
                     kotlinx.coroutines.delay(2_800L)
                 }
@@ -619,11 +623,26 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                     kotlinx.coroutines.delay(3_500L)
                     result = repo.importFromUrl(item.url)
                 }
+                var doneTitle: String? = null
+                if (result.success && result.recipe != null) {
+                    val forceGerman = isIg || isTikTok ||
+                        (result.recipe.platform ?: "").lowercase() in setOf("instagram", "tiktok", "bild")
+                    var recipe = repo.applyGermanMetricIfNeeded(
+                        result.recipe,
+                        enabled = autoGerman,
+                        force = forceGerman
+                    )
+                    recipe = repo.analyzeAndPersistNutrition(recipe)?.first ?: recipe
+                    doneTitle = recipe.title
+                }
                 _batchState.update { st ->
                     st.copy(items = st.items.map {
                         if (it.url != item.url) it
                         else when {
-                            result.success -> it.copy(status = BatchStatus.DONE, resultTitle = result.recipe?.title)
+                            result.success -> it.copy(
+                                status = BatchStatus.DONE,
+                                resultTitle = doneTitle ?: result.recipe?.title
+                            )
                             result.instagramBlocked -> it.copy(
                                 status = BatchStatus.ERROR,
                                 error = "Instagram blockiert – manuell einfügen nötig"
