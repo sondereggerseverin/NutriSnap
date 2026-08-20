@@ -7,10 +7,13 @@ import androidx.lifecycle.viewModelScope
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.repository.DiaryRepository
+import ch.nutrisnap.app.domain.DishScanResult
 import ch.nutrisnap.app.domain.EntryPlausibilityChecker
 import ch.nutrisnap.app.domain.GroqVisionService
+import ch.nutrisnap.app.domain.OnDeviceFoodLabeler
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import ch.nutrisnap.app.ui.screens.recipes.IngredientOverride
+import ch.nutrisnap.app.utils.NetworkMonitor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -73,13 +76,34 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
         overrides = emptyMap()
         viewModelScope.launch {
             showStage(PhotoAnalysisStage.IDENTIFYING_INGREDIENTS)
-            val base64 = visionService.bitmapToBase64Jpeg(bitmap)
+            val online = NetworkMonitor(getApplication()).isCurrentlyOnline()
+            var usedOnDevice = false
 
             _state.value = FoodScanState.Analyzing(PhotoAnalysisStage.SEPARATING_INGREDIENTS)
-            val dish = visionService.analyzeDishIngredients(base64).getOrElse { e ->
-                _state.value = FoodScanState.Error(e.message ?: "Unbekannter Fehler bei der Bilderkennung")
-                return@launch
+            val dish: DishScanResult = if (!online) {
+                // Phase C: On-Device-Fallback ohne Cloud
+                usedOnDevice = true
+                OnDeviceFoodLabeler.analyze(bitmap).getOrElse { e ->
+                    _state.value = FoodScanState.Error(
+                        "Offline und On-Device-Erkennung ohne Treffer. " +
+                            (e.message ?: "Bitte online scannen oder manuell erfassen.")
+                    )
+                    return@launch
+                }
+            } else {
+                val base64 = visionService.bitmapToBase64Jpeg(bitmap)
+                visionService.analyzeDishIngredients(base64).getOrElse { cloudErr ->
+                    // Cloud fehlgeschlagen → On-Device versuchen
+                    usedOnDevice = true
+                    OnDeviceFoodLabeler.analyze(bitmap).getOrElse {
+                        _state.value = FoodScanState.Error(
+                            cloudErr.message ?: "Bilderkennung fehlgeschlagen"
+                        )
+                        return@launch
+                    }
+                }
             }
+
             // Leere Namen und offensichtliche Vision-Ausreisser (z.B. 5000 g) bereinigen
             val cleanedIngredients = dish.ingredients
                 .map { it.copy(name = it.name.trim(), estimatedGrams = it.estimatedGrams.coerceIn(1f, MAX_INGREDIENT_GRAMS)) }
@@ -99,7 +123,7 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                 // Komma vor dem Hinweis: parseIngredientLine() kappt Zutatennamen ab dem
                 // ersten Komma fuer die DB-Suche (bestehendes Verhalten) — so bleibt der
                 // Hinweis in der Anzeige sichtbar, verfaelscht aber nie den Suchbegriff.
-                val label = if (ing.confidence.equals("niedrig", ignoreCase = true))
+                val label = if (ing.confidence.equals("niedrig", ignoreCase = true) || usedOnDevice)
                     "${ing.name}, Unsichere Erkennung – bitte prüfen" else ing.name
                 "${grams}g $label"
             }
@@ -107,13 +131,16 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
             _state.value = FoodScanState.Analyzing(PhotoAnalysisStage.BREAKING_DOWN_MACROS)
             val analysisResult = RecipeNutritionAnalyzer.analyzeIngredientLines(lines)
 
-            val warnings = buildScanWarnings(cleanedIngredients, analysisResult)
+            val warnings = buildScanWarnings(cleanedIngredients, analysisResult).toMutableList()
+            if (usedOnDevice) {
+                warnings.add(0, "On-Device-Erkennung (ohne Cloud) – Zutaten und Mengen bitte prüfen.")
+            }
 
             showStage(PhotoAnalysisStage.FINALIZING_RESULTS)
             _state.value = FoodScanState.Verify(
                 dishName = dish.dishName.ifBlank { "Gescanntes Essen" },
                 analysisResult = analysisResult,
-                warnings = warnings
+                warnings = warnings.distinct().take(5)
             )
         }
     }
