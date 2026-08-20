@@ -3,7 +3,7 @@ package ch.nutrisnap.app.domain
 import android.graphics.Bitmap
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.label.ImageLabeling
-import com.google.mlkit.vision.label.defaults.DefaultImageLabelerOptions
+import com.google.mlkit.vision.label.defaults.ImageLabelerOptions
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -19,7 +19,7 @@ object OnDeviceFoodLabeler {
 
     private val labeler by lazy {
         ImageLabeling.getClient(
-            DefaultImageLabelerOptions.Builder()
+            ImageLabelerOptions.Builder()
                 .setConfidenceThreshold(0.45f)
                 .build()
         )
