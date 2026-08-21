@@ -4,6 +4,8 @@ import android.graphics.Bitmap
 import ch.nutrisnap.app.BuildConfig
 import ch.nutrisnap.app.data.model.Recipe
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 
 /**
@@ -13,7 +15,7 @@ import kotlinx.coroutines.withContext
  * 1. [OnDeviceTextRecognizer] liest Text aus dem Bild (offline, schnell).
  * 2. Heuristik prüft, ob der Text rezept-artig ist (Mengen + Zutaten-Keywords).
  * 3. Bei Erfolg: [RecipeAiParser] strukturiert den Text (wie Social-Caption).
- * 4. Bei zu wenig Text / unklarer Struktur: null → Aufrufer fällt auf Vision-LLM zurück.
+ * 4. Qualitäts-Score auf Zutaten; bei Bedarf Vision parallel und Merge.
  *
  * Vorteil gegenüber reinem Vision: bessere Zutatentreue bei Screenshots/Rezeptkarten,
  * niedrigere Latenz, weniger API-Kosten. Vision bleibt für Collagen, Layout und
@@ -26,6 +28,12 @@ object RecipeImageTextExtractor {
 
     /** Mindestens so viele „Mengen-Zeilen“, damit es nach Zutatenliste aussieht. */
     private const val MIN_QTY_LINES = 2
+
+    /**
+     * Ab diesem Zutaten-Score gilt OCR als „stark genug“, Vision kann übersprungen werden
+     * (außer Aufrufer will explizit Multi-Rezept-Vision).
+     */
+    internal const val STRONG_INGREDIENT_SCORE = 8
 
     private val QTY_LINE = Regex(
         """(?i)^\s*(?:[-•*·]\s*)?(?:\d+[.,]?\d*|\d+\s*/\s*\d+|[¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])\s*""" +
@@ -58,11 +66,130 @@ object RecipeImageTextExtractor {
                 )
             }.getOrNull() ?: return@withContext null
 
-            // Schwache AI-Ergebnisse (kaum Zutaten) → Vision behalten
             if (!isUsableRecipe(parsed)) return@withContext null
 
             listOf(parsed.toImageResult())
         }
+
+    /**
+     * OCR und optional Vision: bei starkem OCR-Ergebnis nur OCR,
+     * sonst Vision; wenn beide da sind → Feld-Merge (beste Zutaten / Anleitung / Titel).
+     *
+     * @param visionProvider liefert Vision-Ergebnis (kann mehrere Rezepte sein)
+     */
+    suspend fun extractWithVisionFallback(
+        bitmap: Bitmap,
+        visionProvider: suspend () -> List<RecipeFromImageResult>
+    ): List<RecipeFromImageResult> = coroutineScope {
+        val ocrDeferred = async { tryExtract(bitmap) }
+        val ocrList = ocrDeferred.await()
+        val ocrScore = ocrList?.firstOrNull()?.let { ingredientQualityScore(it.ingredients) } ?: -1
+
+        // Starke Einzel-OCR → Vision sparen (schnell + texttreu)
+        if (ocrList != null && ocrList.size == 1 && ocrScore >= STRONG_INGREDIENT_SCORE) {
+            return@coroutineScope ocrList
+        }
+
+        val visionResult = runCatching { visionProvider() }
+        val visionList = visionResult.getOrDefault(emptyList())
+        when {
+            ocrList.isNullOrEmpty() && visionList.isEmpty() -> {
+                // Kein OCR und Vision fehlgeschlagen → Fehler durchreichen (statt stillem Leer)
+                visionResult.exceptionOrNull()?.let { throw it }
+                emptyList()
+            }
+            ocrList.isNullOrEmpty() -> visionList
+            visionList.isEmpty() -> ocrList
+            // Vision hat mehrere Rezepte (Collage) → Vision priorisieren
+            visionList.size > 1 -> visionList
+            // Beide Einzelrezepte → Merge der stärksten Felder
+            else -> listOf(mergeBest(ocrList.first(), visionList.first()))
+        }
+    }
+
+    /**
+     * Zutaten-Qualität: Mengenzeilen, Zeilenanzahl, Abzug für Junk.
+     * Höher = bessere Extraktion für Tracking/Nährwerte.
+     */
+    internal fun ingredientQualityScore(ingredients: String): Int {
+        val lines = ingredients.lines().map { it.trim() }.filter { it.isNotBlank() }
+        if (lines.isEmpty()) return 0
+        var score = 0
+        var qty = 0
+        var junk = 0
+        for (line in lines) {
+            if (RecipeAiParser.isJunkIngredientLine(line) || RecipeAiParser.isPromoIngredientNoise(line)) {
+                junk++
+                continue
+            }
+            score += 1
+            if (QTY_LINE.containsMatchIn(line)) {
+                qty++
+                score += 2
+            }
+        }
+        score += (qty * 1).coerceAtMost(6)
+        score -= junk * 2
+        return score.coerceAtLeast(0)
+    }
+
+    /**
+     * Nimmt pro Feld die stärkere Variante:
+     * - ingredients: höherer Quality-Score
+     * - instructions: längere sinnvolle Anleitung
+     * - title / description / macros: nicht-leer bevorzugt, sonst Gegenstück
+     */
+    internal fun mergeBest(a: RecipeFromImageResult, b: RecipeFromImageResult): RecipeFromImageResult {
+        val aIng = ingredientQualityScore(a.ingredients)
+        val bIng = ingredientQualityScore(b.ingredients)
+        val ingredients = if (aIng >= bIng) a.ingredients else b.ingredients
+
+        val instructions = pickLongerUseful(a.instructions, b.instructions)
+        val title = a.title.trim().takeIf { it.isNotBlank() && !isPlaceholderTitle(it) }
+            ?: b.title.trim().takeIf { it.isNotBlank() && !isPlaceholderTitle(it) }
+            ?: a.title.ifBlank { b.title }
+        val description = a.description.trim().takeIf { it.isNotBlank() }
+            ?: b.description.trim()
+
+        val servings = when {
+            a.servings > 1 -> a.servings
+            b.servings > 1 -> b.servings
+            else -> maxOf(a.servings, b.servings).coerceAtLeast(1)
+        }
+
+        return RecipeFromImageResult(
+            title = title,
+            description = description,
+            ingredients = ingredients,
+            instructions = instructions,
+            servings = servings,
+            prepTimeMinutes = a.prepTimeMinutes ?: b.prepTimeMinutes,
+            cookTimeMinutes = a.cookTimeMinutes ?: b.cookTimeMinutes,
+            caloriesPerServing = a.caloriesPerServing ?: b.caloriesPerServing,
+            proteinPerServing = a.proteinPerServing ?: b.proteinPerServing,
+            carbsPerServing = a.carbsPerServing ?: b.carbsPerServing,
+            fatPerServing = a.fatPerServing ?: b.fatPerServing
+        )
+    }
+
+    private fun pickLongerUseful(x: String, y: String): String {
+        val xt = x.trim()
+        val yt = y.trim()
+        if (xt.isBlank()) return yt
+        if (yt.isBlank()) return xt
+        // Mehr Schritte / längerer Text meist besser
+        val xSteps = xt.lines().count { it.isNotBlank() }
+        val ySteps = yt.lines().count { it.isNotBlank() }
+        return when {
+            xSteps != ySteps -> if (xSteps > ySteps) xt else yt
+            else -> if (xt.length >= yt.length) xt else yt
+        }
+    }
+
+    private fun isPlaceholderTitle(t: String): Boolean {
+        val lower = t.lowercase().trim()
+        return lower in setOf("rezept", "recipe", "rezept aus bild", "instagram rezept", "untitled")
+    }
 
     /** Heuristik: genug Text + Mengenzeilen oder klare Rezept-Keywords. */
     internal fun looksLikeRecipeText(text: String): Boolean {
@@ -81,7 +208,6 @@ object RecipeImageTextExtractor {
             return false
         }
         val ingredientLines = ingredients.lines().map { it.trim() }.filter { it.isNotBlank() }
-        // Mindestens 2 Zutatenzeilen, davon ≥1 mit Menge
         if (ingredientLines.size < 2) return false
         val qtyHits = ingredientLines.count { QTY_LINE.containsMatchIn(it) }
         return qtyHits >= 1 || ingredientLines.size >= 3

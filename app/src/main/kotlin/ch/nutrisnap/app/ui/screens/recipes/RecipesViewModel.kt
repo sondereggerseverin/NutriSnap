@@ -297,8 +297,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Importiert ein oder mehrere Rezepte aus einem Foto/Screenshot (Rezeptkarte, Kochbuchseite,
-     * Collage, Blog-Screenshot). Zuerst on-device OCR + Caption-Parser (schnell, texttreu);
-     * bei zu wenig Text oder Collage Fallback auf Vision-KI. Speichert mit platform = "bild".
+     * Collage, Blog-Screenshot). OCR + optional Vision mit Qualitäts-Merge der Zutaten;
+     * bei starkem OCR-Text Vision übersprungen. Speichert mit platform = "bild".
      * [ImportState.lastImport] zeigt das erste gespeicherte Rezept (Navigation/Feedback).
      */
     fun importFromImage(bitmap: Bitmap) {
@@ -307,26 +307,12 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 it.copy(isImporting = true, importPhase = "Rezept(e) aus Bild lesen…", importError = null, instagramBlocked = false)
             }
             try {
-                // 1) Schneller OCR-Pfad (All-My-Meals-Style) – nur bei textlastigen Screenshots
-                _importState.update { it.copy(importPhase = "Text aus Bild lesen…") }
-                val ocrList = RecipeImageTextExtractor.tryExtract(bitmap)
-
-                val extractedList: List<RecipeFromImageResult> = if (!ocrList.isNullOrEmpty()) {
-                    ocrList
-                } else {
-                    // 2) Vision-Fallback (Collagen, Layout, wenig lesbarer Text)
-                    _importState.update { it.copy(importPhase = "Rezept(e) mit KI analysieren…") }
+                _importState.update { it.copy(importPhase = "Text & Bild analysieren…") }
+                val extractedList = RecipeImageTextExtractor.extractWithVisionFallback(bitmap) {
                     val vision = GroqVisionService()
                     val base64 = vision.bitmapToBase64JpegForText(bitmap, quality = 85)
                     vision.extractRecipesFromImage(base64).getOrElse { e ->
-                        _importState.update {
-                            it.copy(
-                                isImporting = false,
-                                importPhase = null,
-                                importError = e.message ?: "Bild konnte nicht gelesen werden"
-                            )
-                        }
-                        return@launch
+                        throw e
                     }
                 }
                 if (extractedList.isEmpty()) {
@@ -578,15 +564,18 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Einzelnes Rezept aus Screenshot: zuerst OCR + Caption-Parser, sonst Vision.
+     * Einzelnes Rezept aus Screenshot: OCR + Vision mit Qualitäts-Merge.
      * @return null wenn weder OCR noch Vision etwas Brauchbares liefern.
      */
     private suspend fun extractRecipeFromScreenshot(bitmap: Bitmap): RecipeFromImageResult? {
-        val ocr = RecipeImageTextExtractor.tryExtract(bitmap)?.firstOrNull()
-        if (ocr != null && (ocr.ingredients.isNotBlank() || ocr.title.isNotBlank())) return ocr
-        val vision = GroqVisionService()
-        val base64 = vision.bitmapToBase64JpegForText(bitmap, quality = 85)
-        return vision.extractRecipeFromImage(base64).getOrNull()
+        val list = RecipeImageTextExtractor.extractWithVisionFallback(bitmap) {
+            val vision = GroqVisionService()
+            val base64 = vision.bitmapToBase64JpegForText(bitmap, quality = 85)
+            vision.extractRecipeFromImage(base64).getOrNull()?.let { listOf(it) }.orEmpty()
+        }
+        return list.firstOrNull()?.takeIf {
+            it.ingredients.isNotBlank() || it.title.isNotBlank() || it.instructions.isNotBlank()
+        }
     }
 
     private suspend fun shouldAutoGermanMetric(): Boolean {
