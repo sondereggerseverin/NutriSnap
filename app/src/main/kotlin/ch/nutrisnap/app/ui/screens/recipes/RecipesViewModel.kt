@@ -308,10 +308,10 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             }
             try {
                 _importState.update { it.copy(importPhase = "Text & Bild analysieren…") }
-                val extractedList = RecipeImageTextExtractor.extractWithVisionFallback(bitmap) {
+                val extractedList = RecipeImageTextExtractor.extractWithVisionFallback(bitmap) { ocrHint ->
                     val vision = GroqVisionService()
                     val base64 = vision.bitmapToBase64JpegForText(bitmap, quality = 85)
-                    vision.extractRecipesFromImage(base64).getOrElse { e ->
+                    vision.extractRecipesFromImage(base64, ocrHint = ocrHint).getOrElse { e ->
                         throw e
                     }
                 }
@@ -568,10 +568,10 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
      * @return null wenn weder OCR noch Vision etwas Brauchbares liefern.
      */
     private suspend fun extractRecipeFromScreenshot(bitmap: Bitmap): RecipeFromImageResult? {
-        val list = RecipeImageTextExtractor.extractWithVisionFallback(bitmap) {
+        val list = RecipeImageTextExtractor.extractWithVisionFallback(bitmap) { ocrHint ->
             val vision = GroqVisionService()
             val base64 = vision.bitmapToBase64JpegForText(bitmap, quality = 85)
-            vision.extractRecipeFromImage(base64).getOrNull()?.let { listOf(it) }.orEmpty()
+            vision.extractRecipeFromImage(base64, ocrHint = ocrHint).getOrNull()?.let { listOf(it) }.orEmpty()
         }
         return list.firstOrNull()?.takeIf {
             it.ingredients.isNotBlank() || it.title.isNotBlank() || it.instructions.isNotBlank()

@@ -46,43 +46,65 @@ object RecipeImageTextExtractor {
     )
 
     /**
+     * Roh-OCR + optionales strukturiertes Rezept.
+     * OCR-Text wird auch an Vision weitergereicht, wenn der Parse schwach ist.
+     */
+    data class OcrAttempt(
+        val rawText: String?,
+        val recipes: List<RecipeFromImageResult>?
+    )
+
+    /**
      * Versucht, ein Rezept rein über OCR + Caption-Parser zu extrahieren.
      * @return ein-elementige Liste bei Erfolg, sonst null (Vision-Fallback).
      */
     suspend fun tryExtract(bitmap: Bitmap, apiKey: String = BuildConfig.GROQ_API_KEY): List<RecipeFromImageResult>? =
-        withContext(Dispatchers.Default) {
-            val ocrText = OnDeviceTextRecognizer.recognizeOrNull(bitmap) ?: return@withContext null
-            if (!looksLikeRecipeText(ocrText)) return@withContext null
-            if (apiKey.isBlank()) return@withContext null
+        tryExtractDetailed(bitmap, apiKey).recipes
 
-            val parsed = runCatching {
-                RecipeAiParser.parse(
-                    caption = ocrText,
-                    sourceUrl = null,
-                    platform = "bild",
-                    imageUrl = null,
-                    apiKey = apiKey,
-                    fastModel = false
-                )
-            }.getOrNull() ?: return@withContext null
-
-            if (!isUsableRecipe(parsed)) return@withContext null
-
-            listOf(parsed.toImageResult())
+    /**
+     * OCR einmal ausführen: Rohtext + ggf. geparstes Rezept.
+     */
+    suspend fun tryExtractDetailed(
+        bitmap: Bitmap,
+        apiKey: String = BuildConfig.GROQ_API_KEY
+    ): OcrAttempt = withContext(Dispatchers.Default) {
+        val ocrText = OnDeviceTextRecognizer.recognizeOrNull(bitmap)
+        if (ocrText.isNullOrBlank()) return@withContext OcrAttempt(null, null)
+        if (!looksLikeRecipeText(ocrText) || apiKey.isBlank()) {
+            return@withContext OcrAttempt(ocrText, null)
         }
+
+        val parsed = runCatching {
+            RecipeAiParser.parse(
+                caption = ocrText,
+                sourceUrl = null,
+                platform = "bild",
+                imageUrl = null,
+                apiKey = apiKey,
+                fastModel = false
+            )
+        }.getOrNull()
+
+        val recipes = if (parsed != null && isUsableRecipe(parsed)) {
+            listOf(parsed.toImageResult())
+        } else null
+
+        OcrAttempt(ocrText, recipes)
+    }
 
     /**
      * OCR und optional Vision: bei starkem OCR-Ergebnis nur OCR,
-     * sonst Vision; wenn beide da sind → Feld-Merge (beste Zutaten / Anleitung / Titel).
+     * sonst Vision (mit OCR-Rohtext als Hint); wenn beide da sind → Feld-Merge.
      *
-     * @param visionProvider liefert Vision-Ergebnis (kann mehrere Rezepte sein)
+     * @param visionProvider erhält optionalen OCR-Rohtext für präzisere Zutaten
      */
     suspend fun extractWithVisionFallback(
         bitmap: Bitmap,
-        visionProvider: suspend () -> List<RecipeFromImageResult>
+        visionProvider: suspend (ocrHint: String?) -> List<RecipeFromImageResult>
     ): List<RecipeFromImageResult> = coroutineScope {
-        val ocrDeferred = async { tryExtract(bitmap) }
-        val ocrList = ocrDeferred.await()
+        val ocrAttempt = tryExtractDetailed(bitmap)
+        val ocrList = ocrAttempt.recipes
+        val ocrHint = ocrAttempt.rawText
         val ocrScore = ocrList?.firstOrNull()?.let { ingredientQualityScore(it.ingredients) } ?: -1
 
         // Starke Einzel-OCR → Vision sparen (schnell + texttreu)
@@ -90,11 +112,10 @@ object RecipeImageTextExtractor {
             return@coroutineScope ocrList
         }
 
-        val visionResult = runCatching { visionProvider() }
+        val visionResult = runCatching { visionProvider(ocrHint) }
         val visionList = visionResult.getOrDefault(emptyList())
         when {
             ocrList.isNullOrEmpty() && visionList.isEmpty() -> {
-                // Kein OCR und Vision fehlgeschlagen → Fehler durchreichen (statt stillem Leer)
                 visionResult.exceptionOrNull()?.let { throw it }
                 emptyList()
             }

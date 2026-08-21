@@ -260,9 +260,29 @@ Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
      * Liest ein oder mehrere Rezepte von einem Foto/Screenshot (Rezeptkarte, Kochbuchseite,
      * Blog-Screenshot, Collage). Gibt eine Liste strukturierter Rezepte zurück.
      * Ein einzelnes Rezept kommt als Liste mit einem Element.
+     *
+     * @param ocrHint optionaler Rohtext aus on-device OCR – hilft bei Mengen/Zutatennamen,
+     *                wenn das Bild unscharf oder textlastig ist (All-My-Meals-Style).
      */
-    suspend fun extractRecipesFromImage(base64Jpeg: String): Result<List<RecipeFromImageResult>> =
+    suspend fun extractRecipesFromImage(
+        base64Jpeg: String,
+        ocrHint: String? = null
+    ): Result<List<RecipeFromImageResult>> =
         withContext(Dispatchers.IO) {
+            val ocrBlock = ocrHint?.trim()?.takeIf { it.length >= 20 }?.let { text ->
+                val clipped = text.take(3500)
+                """
+
+Zusätzlicher OCR-Rohtext vom Gerät (kann Fehler enthalten, Mengen/Namen aber oft treuer als reine Bildanalyse).
+Nutze ihn zur Korrektur von Zutaten und Mengenangaben, wenn er zum Bild passt.
+Erfinde nichts, was weder im Bild noch im OCR-Text steht.
+
+--- OCR START ---
+$clipped
+--- OCR ENDE ---
+"""
+            }.orEmpty()
+
             val prompt = """
 Du siehst ein Foto oder einen Screenshot von einem oder mehreren Rezepten
 (Rezeptkarte, Kochbuchseite, Blog, Social Media, Notiz, Collage).
@@ -285,7 +305,7 @@ Regeln pro Rezept:
 - Titel: wenn kein klarer Titel lesbar ist, kurze sinnvolle Bezeichnung aus dem Gericht ableiten.
 - Erfinde keine Zutaten/Schritte/Nährwerte, die nicht lesbar sind. Unleserliche Teile weglassen.
 - Sprache der Zutaten/Anleitung beibehalten (Englisch bleibt Englisch, Deutsch bleibt Deutsch).
-
+$ocrBlock
 Antworte NUR mit folgendem JSON (kein Markdown):
 {
   "recipes": [
@@ -314,8 +334,11 @@ Antworte NUR mit folgendem JSON (kein Markdown):
      * Rückwärtskompatibel: liefert das erste erkannte Rezept (oder Fehler wenn keines).
      * Für neue Flows bevorzugt [extractRecipesFromImage] verwenden.
      */
-    suspend fun extractRecipeFromImage(base64Jpeg: String): Result<RecipeFromImageResult> =
-        extractRecipesFromImage(base64Jpeg).mapCatching { list ->
+    suspend fun extractRecipeFromImage(
+        base64Jpeg: String,
+        ocrHint: String? = null
+    ): Result<RecipeFromImageResult> =
+        extractRecipesFromImage(base64Jpeg, ocrHint).mapCatching { list ->
             list.firstOrNull()
                 ?: throw IllegalStateException("Kein Rezept im Bild erkannt")
         }
