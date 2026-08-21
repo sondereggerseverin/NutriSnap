@@ -145,9 +145,7 @@ object RecipeImageTextExtractor {
         val ingredients = if (aIng >= bIng) a.ingredients else b.ingredients
 
         val instructions = pickLongerUseful(a.instructions, b.instructions)
-        val title = a.title.trim().takeIf { it.isNotBlank() && !isPlaceholderTitle(it) }
-            ?: b.title.trim().takeIf { it.isNotBlank() && !isPlaceholderTitle(it) }
-            ?: a.title.ifBlank { b.title }
+        val title = pickBetterTitle(a.title, b.title)
         val description = a.description.trim().takeIf { it.isNotBlank() }
             ?: b.description.trim()
 
@@ -189,6 +187,20 @@ object RecipeImageTextExtractor {
     private fun isPlaceholderTitle(t: String): Boolean {
         val lower = t.lowercase().trim()
         return lower in setOf("rezept", "recipe", "rezept aus bild", "instagram rezept", "untitled")
+    }
+
+    /** Längerer, nicht-generischer Titel gewinnt. */
+    private fun pickBetterTitle(a: String, b: String): String {
+        val at = a.trim()
+        val bt = b.trim()
+        val aOk = at.isNotBlank() && !isPlaceholderTitle(at)
+        val bOk = bt.isNotBlank() && !isPlaceholderTitle(bt)
+        return when {
+            aOk && bOk -> if (bt.length > at.length) bt else at
+            aOk -> at
+            bOk -> bt
+            else -> at.ifBlank { bt }
+        }
     }
 
     /** Heuristik: genug Text + Mengenzeilen oder klare Rezept-Keywords. */
