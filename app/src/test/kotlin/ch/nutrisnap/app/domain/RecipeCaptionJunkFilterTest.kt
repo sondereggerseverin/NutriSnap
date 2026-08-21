@@ -73,7 +73,6 @@ class RecipeCaptionJunkFilterTest {
                 out.contains("Chobani", ignoreCase = true) || out.contains("mayo", ignoreCase = true)
         )
     }
-}
 
     @Test
     fun rejectsGermanMacroLines() {
