@@ -117,6 +117,7 @@ dependencies {
     implementation("com.google.guava:guava:33.2.1-android")
     implementation(libs.mlkit.barcode)
     implementation(libs.mlkit.image.labeling)
+    implementation(libs.mlkit.text.recognition)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.health.connect)
     implementation(libs.supabase.auth)
