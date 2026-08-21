@@ -380,6 +380,7 @@ Antworte NUR mit folgendem JSON (kein Markdown):
 
     /**
      * Post-Processing nach Vision-Extrakt (deterministisch, offline):
+     * - Junk-Filter / Zeilen-Split wie Caption-Import ([RecipeAiParser.formatIngredientText])
      * - Imperial → metrisch (cups/tbsp/… → g/ml) via [RecipeGermanMetricConverter]
      * - Whitespace/Leerzeilen bereinigen
      * - servings mindestens 1
@@ -395,12 +396,20 @@ Antworte NUR mit folgendem JSON (kein Markdown):
                 .joinToString("\n")
                 .replace(Regex("\n{3,}"), "\n\n")
 
-        val ingredientsMetric = runCatching {
-            RecipeGermanMetricConverter.convertUnitsToMetric(raw.ingredients)
+        // Gleicher Cleanup wie Social-Caption-Import (Header, Makros, Promo, Multi-Zutaten-Zeilen)
+        val ingredientsFormatted = runCatching {
+            RecipeAiParser.formatIngredientText(raw.ingredients)
         }.getOrDefault(raw.ingredients)
-        val instructionsMetric = runCatching {
-            RecipeGermanMetricConverter.convertUnitsToMetric(raw.instructions)
+        val instructionsFormatted = runCatching {
+            RecipeAiParser.formatInstructionsText(raw.instructions)
         }.getOrDefault(raw.instructions)
+
+        val ingredientsMetric = runCatching {
+            RecipeGermanMetricConverter.convertUnitsToMetric(ingredientsFormatted)
+        }.getOrDefault(ingredientsFormatted)
+        val instructionsMetric = runCatching {
+            RecipeGermanMetricConverter.convertUnitsToMetric(instructionsFormatted)
+        }.getOrDefault(instructionsFormatted)
 
         val ingredients = cleanBlock(ingredientsMetric)
         val instructions = cleanBlock(instructionsMetric)

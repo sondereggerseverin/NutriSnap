@@ -349,11 +349,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                         tags = if (extractedList.size > 1) "bild,mehrfach" else "bild"
                     )
                     var saved = recipe.copy(id = repo.saveRecipe(recipe))
-                    saved = repo.applyGermanMetricIfNeeded(
-                        saved, enabled = shouldAutoGermanMetric(), force = true
-                    )
-                    // Auto-Nährwerte aus Zutaten berechnen und persistieren
-                    saved = repo.analyzeAndPersistNutrition(saved)?.first ?: saved
+                    // Gleicher Nachlauf wie URL-/Caption-Import (DE/metrisch + Nährwerte)
+                    saved = postProcessImported(saved, forceGerman = true, withNutrition = true)
                     if (firstSaved == null) firstSaved = saved
                 }
 

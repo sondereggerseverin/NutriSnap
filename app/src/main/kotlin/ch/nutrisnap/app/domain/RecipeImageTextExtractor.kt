@@ -163,9 +163,16 @@ object RecipeImageTextExtractor {
     internal fun mergeBest(a: RecipeFromImageResult, b: RecipeFromImageResult): RecipeFromImageResult {
         val aIng = ingredientQualityScore(a.ingredients)
         val bIng = ingredientQualityScore(b.ingredients)
-        val ingredients = if (aIng >= bIng) a.ingredients else b.ingredients
+        val rawIngredients = if (aIng >= bIng) a.ingredients else b.ingredients
+        // Nochmal Caption-Cleanup (Junk/Promo), falls eine Seite ungefiltert war
+        val ingredients = runCatching {
+            RecipeAiParser.formatIngredientText(rawIngredients)
+        }.getOrDefault(rawIngredients)
 
-        val instructions = pickLongerUseful(a.instructions, b.instructions)
+        val rawInstructions = pickLongerUseful(a.instructions, b.instructions)
+        val instructions = runCatching {
+            RecipeAiParser.formatInstructionsText(rawInstructions)
+        }.getOrDefault(rawInstructions)
         val title = pickBetterTitle(a.title, b.title)
         val description = a.description.trim().takeIf { it.isNotBlank() }
             ?: b.description.trim()

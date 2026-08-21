@@ -66,4 +66,27 @@ class RecipeFromImageNormalizeTest {
         assertFalse(out.ingredients.contains("\n\n\n"))
         assertFalse(out.instructions.contains("\n\n\n"))
     }
+
+    @Test
+    fun `junk and promo lines are stripped from ingredients`() {
+        val raw = RecipeFromImageResult(
+            title = "Bowl",
+            ingredients = """
+                Ingredients – Makes 2
+                200g Reis
+                150g Hähnchen
+                #mealprep #highprotein
+                Link in bio
+                Approx Macros Per Serve
+                500 Calories
+            """.trimIndent()
+        )
+        val out = vision.normalizeExtractedRecipe(raw)
+        val lower = out.ingredients.lowercase()
+        assertTrue(lower.contains("reis") || lower.contains("hähnchen") || lower.contains("haehnchen"))
+        assertFalse(lower.contains("makes 2"))
+        assertFalse(lower.contains("link in bio"))
+        assertFalse(lower.contains("#mealprep"))
+        assertFalse(lower.contains("500 calories"))
+    }
 }
