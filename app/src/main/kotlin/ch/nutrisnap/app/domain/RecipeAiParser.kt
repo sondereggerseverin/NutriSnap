@@ -219,6 +219,16 @@ object RecipeAiParser {
         // Hashtags entfernen
         t = t.replace(Regex("""(?:\s*#\w+)+[\s:]*$""", RegexOption.IGNORE_CASE), "").trim()
         t = t.replace(Regex("""#\w+"""), " ").trim()
+        // Inline-Abschnitte hart trennen (TikTok-Klumpen ohne Newlines)
+        t = t.replace(
+            Regex("""(?i)(?<=\S)\s*(?=Zubereitung\b|Method\b|Instructions\b|Nährwerte\b|Naehrwerte\b)"""),
+            "\n"
+        )
+        // Promo-Zeilen mit Pfeil vor dem Split isolieren
+        t = t.replace(
+            Regex("""(?i)\s*[→➤]\s*(?=Aktuell|Höchster|Hoechster|mit Code)"""),
+            "\n"
+        )
         t = splitInlineIngredients(t)
         // Ab erstem echten Methodenschritt abschneiden (falls Zutaten+Schritte gemischt)
         t = cutOffInstructions(t)
@@ -262,10 +272,17 @@ object RecipeAiParser {
     private fun expandMultiIngredientLine(line: String): List<String> {
         val d = line.trim().trimStart('•', '-', '*', ' ').trim()
         if (d.isBlank() || isSectionHeaderLine(d)) return listOf(d)
+        // "20 g X • 90 ml Y • 1 Portion Z" → Einzelzeilen (TikTok/Caption-Klumpen)
+        if (d.count { it == '•' } >= 1 &&
+            Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|EL|TL)\b""", RegexOption.IGNORE_CASE).findAll(d).count() >= 2
+        ) {
+            val parts = d.split('•').map { it.trim() }.filter { it.isNotBlank() }
+            if (parts.size >= 2) return parts.flatMap { expandMultiIngredientLine(it) }
+        }
         // Mengen in Klammern (z.B. "1361 g (48 oz)") NICHT als zweite Zutat zählen
         val masked = d.replace(Regex("""\([^)]*\)"""), " ")
         // Schon sauber: nur eine Mengenangabe
-        val unit = """g|kg|ml|l|EL|TL|Tsp|Tbsp|tsp|tbsp|cup|cups|oz|lb|Stück|Stk|pcs|Prise|Tasse|clove|cloves"""
+        val unit = """g|kg|ml|l|EL|TL|Tsp|Tbsp|tsp|tbsp|cup|cups|oz|lb|Stück|Stk|pcs|Prise|Tasse|clove|cloves|Portion|portion|Port\."""
         val qtyPattern = Regex(
             """(?i)(\d+[.,]?\d*|\d+/\d+|¼|½|¾|⅓|⅔)\s*($unit)\b"""
         )
@@ -365,7 +382,7 @@ object RecipeAiParser {
             ).containsMatchIn(d)
         ) return true
         if (Regex(
-                """^[~≈]?\s*\d+[.,]?\d*\s*g?\s*(protein|carbs?|fat|ballaststoffe|calories?|kcals?)\b""",
+                """^[~≈]?\s*\d+[.,]?\d*\s*g?\s*(protein|eiwei[sß]|carbs?|kohlenhydrate?|fat|fett|ballaststoffe?|calories?|kcals?)\b""",
                 RegexOption.IGNORE_CASE
             ).containsMatchIn(d)
         ) return true
@@ -378,6 +395,17 @@ object RecipeAiParser {
                 RegexOption.IGNORE_CASE
             ).containsMatchIn(d)
         ) return true
+        // DE Makro-Zeilen mit Pipe/Suffix: "41 g Eiweiß |", "6 g Fett Anzeige"
+        if (Regex(
+                """(?i)^\d+[.,]?\d*\s*g\s+(eiwei[sß]|protein|kohlenhydrate?|carbs?|fett|fat)\b"""
+            ).containsMatchIn(d)
+        ) return true
+        if (lower.startsWith("nährwerte") || lower.startsWith("naehrwerte") ||
+            lower.startsWith("nährwert") || lower.startsWith("naehrwert") ||
+            lower.contains("nährwerte gesamt") || lower.contains("naehrwerte gesamt")
+        ) return true
+        if (Regex("""(?i)\d+\s*kcal\s*[|·]\s*\d+\s*g\s*(eiwei|protein)""").containsMatchIn(d)) return true
+        if (lower == "anzeige" || lower.endsWith(" anzeige") || lower.contains("fett anzeige")) return true
         // Prosa / Zubereitungsschritte
         if (lower.startsWith("firstly") || lower.startsWith("first,") ||
             lower.startsWith("next,") || lower.startsWith("next ") ||
@@ -388,22 +416,31 @@ object RecipeAiParser {
             lower.startsWith("after ") || lower.startsWith("while ") ||
             lower.startsWith("chop the") || lower.startsWith("slice the") ||
             lower.startsWith("coat ") || lower.startsWith("preheat") ||
-            lower.startsWith("remove from") || lower.startsWith("to the liquid")
+            lower.startsWith("remove from") || lower.startsWith("to the liquid") ||
+            lower.startsWith("anschließend") || lower.startsWith("anschliessend") ||
+            lower.startsWith("danach ") || lower.startsWith("nun ") ||
+            lower.startsWith("verführe") || lower.startsWith("verrühr") ||
+            lower.startsWith("die masse") || lower.startsWith("den cheesecake") ||
+            lower.startsWith("für ca.") || lower.startsWith("fuer ca.") ||
+            lower.startsWith("für jeweils") || lower.startsWith("fuer jeweils") ||
+            lower.startsWith("für mindestens") || lower.startsWith("fuer mindestens")
         ) return true
         // Nummerierte Zubereitungsschritte
-        if (Regex("""^\d+[.)]\s+\p{L}""").containsMatchIn(d) &&
+        if (Regex("""^\d+[.)]?\s+\p{L}""").containsMatchIn(d) &&
             Regex(
-                """\b(mix|add|stir|pour|bake|cook|heat|divide|refrigerate|spoon|blend|whisk|fold|spread|save|method|season|fry|simmer|coat|chop|slice|preheat|remove|cover|place)\b""",
+                """\b(mix|add|stir|pour|bake|cook|heat|divide|refrigerate|spoon|blend|whisk|fold|spread|save|method|season|fry|simmer|coat|chop|slice|preheat|remove|cover|place|""" +
+                    """verrühr|verruehr|geben|garen|auskühl|auskuehl|stellen|erwärm|erwaerm|verteilen|schneiden|zerbrechen|mikrowelle)\b""",
                 RegexOption.IGNORE_CASE
             ).containsMatchIn(d)
         ) return true
         if (lower == "method" || lower.startsWith("method ") || lower == "zubereitung" ||
+            lower.startsWith("zubereitung") ||
             lower.startsWith("instructions") || lower.startsWith("directions")
         ) return true
         // Lange Sätze mit mehreren Kochverben → Anleitung, keine Zutat
         if (d.length > 90 &&
             Regex(
-                """\b(mix|stir|cook|bake|fry|simmer|season|until|minutes|mins)\b""",
+                """\b(mix|stir|cook|bake|fry|simmer|season|until|minutes|mins|verrühr|garen|mikrowelle|auskühl|verteilen|erwärm)\b""",
                 RegexOption.IGNORE_CASE
             ).findAll(d).count() >= 2
         ) return true
@@ -432,9 +469,16 @@ object RecipeAiParser {
         if (lower.contains("ingredients with a *") || lower.contains("ingredients with a*")) return true
         if (lower.contains("are from @") && lower.contains("code")) return true
         if (lower.contains("big discount") || lower.contains("discount + gifts")) return true
+        // DE TikTok-Promo: "Aktuell -25 % mit Code: VICCES", "Höchster Rabatt mit Code:"
+        if ("mit code" in lower) return true
+        if ("höchster rabatt" in lower || "hoechster rabatt" in lower) return true
+        if (Regex("""(?i)aktuell\s*-?\s*\d+\s*%""").containsMatchIn(lower)) return true
+        if (Regex("""(?i)\bcode\s*:\s*[a-z0-9_]+""").containsMatchIn(lower) &&
+            !Regex("""(?i)^\d+[.,]?\d*\s*(g|ml)\b""").containsMatchIn(lower)
+        ) return true
         // "code XYZ will give you…" ohne echte Menge
         if (Regex("""\bcode\s+[a-z0-9_]+\b""", RegexOption.IGNORE_CASE).containsMatchIn(lower) &&
-            !Regex("""\d+\s*(g|ml|tsp|tbsp)\b""", RegexOption.IGNORE_CASE).containsMatchIn(lower)
+            !Regex("""^\d+\s*(g|ml|tsp|tbsp)\b""", RegexOption.IGNORE_CASE).containsMatchIn(lower)
         ) return true
         return false
     }
@@ -443,14 +487,24 @@ object RecipeAiParser {
     private fun cleanIngredientLineNoise(line: String): String {
         var s = line
         s = s.replace(Regex("""@\w+"""), "").trim()
+        // Promo-Anhängsel abschneiden: "15 g ESN Whey → Aktuell -25 % mit Code: VICCES"
+        s = s.replace(
+            Regex(
+                """(?i)\s*[→➤‣]?\s*(aktuell\s*-?\s*\d+\s*%.*|höchster\s+rabatt.*|hoechster\s+rabatt.*|mit\s+code\s*:.*)$"""
+            ),
+            ""
+        ).trim()
+        s = s.replace(
+            Regex("""(?i)\s*[→➤]?\s*.{0,12}code\s*:\s*[a-z0-9_]+\s*.*$"""),
+            ""
+        ).trim()
+        s = s.replace(Regex("""(?i)\s+anzeige\s*$"""), "").trim()
         // "40g Haferflocken Mehl (80 g )" → erste Menge behalten, Klammer-Menge weg
-        // Aber "(about 20g)" / "(optional)" behalten wir sinnvoll:
-        // Nur doppelte Gramm-Klammern am Ende entfernen wenn schon eine Menge am Anfang steht
         if (Regex("""^\d+[.,]?\d*\s*g\b""", RegexOption.IGNORE_CASE).containsMatchIn(s)) {
             s = s.replace(Regex("""\s*\(\s*\d+[.,]?\d*\s*g\s*\)\s*$""", RegexOption.IGNORE_CASE), " ").trim()
         }
         s = s.replace(Regex("""\s{2,}"""), " ").trim()
-        return s.trimEnd(':', ',', ';', ' ')
+        return s.trimEnd(':', ',', ';', ' ', '•')
     }
 
     /** Schneidet ab erstem klaren Methodenschritt / Makro-Block / Footer ab. */
@@ -460,8 +514,10 @@ object RecipeAiParser {
             val d = line.trim().trimStart('•', '-', '*', ' ').trim()
             val lower = d.lowercase()
             // Method / Anleitung
-            lower == "method" || lower == "zubereitung" || lower == "instructions" ||
+            lower == "method" || lower == "zubereitung" || lower.startsWith("zubereitung") ||
+                lower == "instructions" ||
                 lower == "directions" || lower == "preparation" ||
+                lower.startsWith("nährwerte") || lower.startsWith("naehrwerte") ||
                 lower.startsWith("firstly") || lower.startsWith("first,") ||
                 lower.startsWith("next,") || lower.startsWith("in the meantime") ||
                 lower.startsWith("meanwhile") ||
@@ -481,7 +537,7 @@ object RecipeAiParser {
                 // Nummerierte Zubereitungsschritte
                 (Regex("""^\d+[.)]\s+""").containsMatchIn(d) &&
                     Regex(
-                        """\b(mix|add|stir|pour|bake|cook|heat|divide|refrigerate|spoon|blend|season|fry|simmer|coat|chop|slice|preheat|remove|cover|place)\b""",
+                        """\b(mix|add|stir|pour|bake|cook|heat|divide|refrigerate|spoon|blend|season|fry|simmer|coat|chop|slice|preheat|remove|cover|place|verrühr|geben|garen|auskühl|stellen|erwärm|verteilen|schneiden|mikrowelle)\b""",
                         RegexOption.IGNORE_CASE
                     ).containsMatchIn(d)) ||
                 // Langer Prosa-Absatz mit mehreren Kochverben
@@ -596,7 +652,7 @@ object RecipeAiParser {
         )
         // Vor Mengen: 600g / 15 ml / 1 Tsp / 2 Tbsp / 76.5 g / 1/2 Limette
         // Nicht splitten bei "(about 20g)" / "(optional)" — negative Lookbehind auf "("
-        val unit = """g|kg|ml|l|EL|TL|Tsp|Tbsp|tsp|tbsp|cup|cups|oz|lb|Stück|Stk|pcs|Prise|Tasse|clove|cloves"""
+        val unit = """g|kg|ml|l|EL|TL|Tsp|Tbsp|tsp|tbsp|cup|cups|oz|lb|Stück|Stk|pcs|Prise|Tasse|clove|cloves|Portion|portion|Port\."""
         // Nach Buchstabe → neue Menge mit Einheit (nicht nach "about"/"ca." in Klammern)
         c = c.replace(
             Regex(

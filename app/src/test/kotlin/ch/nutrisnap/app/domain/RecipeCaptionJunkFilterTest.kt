@@ -74,3 +74,90 @@ class RecipeCaptionJunkFilterTest {
         )
     }
 }
+
+    @Test
+    fun rejectsGermanMacroLines() {
+        assertTrue(RecipeAiParser.isJunkIngredientLine("41 g Eiweiß |"))
+        assertTrue(RecipeAiParser.isJunkIngredientLine("23 g Kohlenhydrate |"))
+        assertTrue(RecipeAiParser.isJunkIngredientLine("6 g Fett Anzeige"))
+        assertTrue(RecipeAiParser.isJunkIngredientLine("6 g Fett"))
+        assertTrue(RecipeAiParser.isJunkIngredientLine("Nährwerte gesamt"))
+        assertTrue(RecipeAiParser.isJunkIngredientLine("320 kcal | 41 g Eiweiß | 23 g Kohlenhydrate | 6 g Fett"))
+    }
+
+    @Test
+    fun rejectsDePromoCodeLines() {
+        assertTrue(RecipeAiParser.isPromoIngredientNoise("Aktuell -25 % mit Code: VICCES"))
+        assertTrue(RecipeAiParser.isPromoIngredientNoise("Höchster Rabatt mit Code: VICCES"))
+        assertTrue(RecipeAiParser.isJunkIngredientLine("→ Aktuell -25 % mit Code: VICCES"))
+    }
+
+    @Test
+    fun rejectsDeInstructionLines() {
+        assertTrue(
+            RecipeAiParser.isJunkIngredientLine(
+                "1 Skyr, Designer Whey, Puddingpulver, Wasser und Flavor Powder zu einer glatten Cheesecake-Masse verrühren."
+            )
+        )
+        assertTrue(
+            RecipeAiParser.isJunkIngredientLine(
+                "3 Den Cheesecake 4× für jeweils 1 Minute 30 Sekunden bei 450 Watt in der Mikrowelle garen."
+            )
+        )
+        assertTrue(RecipeAiParser.isJunkIngredientLine("Zubereitung"))
+    }
+
+    @Test
+    fun hanutaCaption_keepsOnlyRealIngredients() {
+        val raw = """
+            HIGH PROTEIN HANUTA CHEESECAKE
+            Cheesecake-Masse
+            210 g Skyr Natur
+            15 g ESN Designer Whey Vanilla Ice Cream
+            Aktuell -25 % mit Code: VICCES
+            20 g Vanillepuddingpulver
+            90 ml Wasser
+            1 Portion ESN Designer Flavor Powder White Chocolate
+            Höchster Rabatt mit Code: VICCES
+            Topping
+            60 g High Protein Schokopudding
+            1 Hanuta Mini
+            Zubereitung
+            1 Skyr, Designer Whey, Puddingpulver, Wasser und Flavor Powder zu einer glatten Cheesecake-Masse verrühren.
+            2 Die Masse in eine mikrowellengeeignete Form geben.
+            3 Den Cheesecake 4× für jeweils 1 Minute 30 Sekunden bei 450 Watt in der Mikrowelle garen.
+            Nährwerte gesamt
+            320 kcal | 41 g Eiweiß | 23 g Kohlenhydrate | 6 g Fett
+            41 g Eiweiß |
+            23 g Kohlenhydrate |
+            6 g Fett Anzeige
+            #esnvicces #highprotein
+        """.trimIndent()
+        val out = RecipeAiParser.formatIngredientText(raw)
+        val lower = out.lowercase()
+        // echte Zutaten
+        assertTrue("expected Skyr in:\n$out", lower.contains("skyr"))
+        assertTrue("expected 210 in:\n$out", out.contains("210"))
+        assertTrue("expected Vanillepudding or 20 g in:\n$out", lower.contains("vanille") || out.contains("20"))
+        assertTrue("expected Wasser/90 in:\n$out", lower.contains("wasser") || out.contains("90"))
+        assertTrue("expected Hanuta or Schoko in:\n$out", lower.contains("hanuta") || lower.contains("schoko"))
+        // junk raus
+        assertFalse("promo leaked:\n$out", lower.contains("vicces") || lower.contains("rabatt") || lower.contains("aktuell"))
+        assertFalse("macro leaked:\n$out", lower.contains("eiweiß") || lower.contains("eiweiss") || lower.contains("kohlenhydrate"))
+        assertFalse("kcal leaked:\n$out", lower.contains("320") && lower.contains("kcal"))
+        assertFalse("instruction leaked:\n$out", lower.contains("verrühren") || lower.contains("mikrowelle"))
+        assertFalse("hashtag leaked:\n$out", lower.contains("#esn") || lower.contains("highprotein"))
+        assertFalse("anzeige leaked:\n$out", lower.contains("anzeige"))
+    }
+
+    @Test
+    fun promoTailStrippedFromIngredientLine() {
+        val out = RecipeAiParser.formatIngredientText(
+            "15 g ESN Designer Whey Vanilla Ice Cream → Aktuell -25 % mit Code: VICCES"
+        )
+        val lower = out.lowercase()
+        assertTrue(lower.contains("esn") || lower.contains("whey") || out.contains("15"))
+        assertFalse(lower.contains("vicces"))
+        assertFalse(lower.contains("aktuell"))
+        assertFalse(lower.contains("code"))
+    }
