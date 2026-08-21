@@ -282,7 +282,7 @@ object RecipeAiParser {
         // Mengen in Klammern (z.B. "1361 g (48 oz)") NICHT als zweite Zutat zählen
         val masked = d.replace(Regex("""\([^)]*\)"""), " ")
         // Schon sauber: nur eine Mengenangabe
-        val unit = """g|kg|ml|l|EL|TL|Tsp|Tbsp|tsp|tbsp|cup|cups|oz|lb|Stück|Stk|pcs|Prise|Tasse|clove|cloves|Portion|portion|Port\."""
+        val unit = """g|kg|ml|l|EL|TL|Tsp|Tbsp|tsp|tbsp|cup|cups|oz|lb|Stück|Stk|pcs|Prise|Tasse|clove|cloves|Portion|portion"""
         val qtyPattern = Regex(
             """(?i)(\d+[.,]?\d*|\d+/\d+|¼|½|¾|⅓|⅔)\s*($unit)\b"""
         )
@@ -652,7 +652,7 @@ object RecipeAiParser {
         )
         // Vor Mengen: 600g / 15 ml / 1 Tsp / 2 Tbsp / 76.5 g / 1/2 Limette
         // Nicht splitten bei "(about 20g)" / "(optional)" — negative Lookbehind auf "("
-        val unit = """g|kg|ml|l|EL|TL|Tsp|Tbsp|tsp|tbsp|cup|cups|oz|lb|Stück|Stk|pcs|Prise|Tasse|clove|cloves|Portion|portion|Port\."""
+        val unit = """g|kg|ml|l|EL|TL|Tsp|Tbsp|tsp|tbsp|cup|cups|oz|lb|Stück|Stk|pcs|Prise|Tasse|clove|cloves|Portion|portion"""
         // Nach Buchstabe → neue Menge mit Einheit (nicht nach "about"/"ca." in Klammern)
         c = c.replace(
             Regex(

@@ -161,3 +161,4 @@ class RecipeCaptionJunkFilterTest {
         assertFalse(lower.contains("aktuell"))
         assertFalse(lower.contains("code"))
     }
+}
