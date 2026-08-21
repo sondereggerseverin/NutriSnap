@@ -429,7 +429,7 @@ object RecipeAiParser {
         if (Regex("""^\d+[.)]?\s+\p{L}""").containsMatchIn(d) &&
             Regex(
                 """\b(mix|add|stir|pour|bake|cook|heat|divide|refrigerate|spoon|blend|whisk|fold|spread|save|method|season|fry|simmer|coat|chop|slice|preheat|remove|cover|place|""" +
-                    """verrühr|verruehr|geben|garen|auskühl|auskuehl|stellen|erwärm|erwaerm|verteilen|schneiden|zerbrechen|mikrowelle)\b""",
+                    """verrühren|verruehren|vermischen|geben|garen|auskühlen|auskuehlen|stellen|erwärmen|erwaermen|verteilen|schneiden|zerbrechen|mikrowelle|pausieren)\b""",
                 RegexOption.IGNORE_CASE
             ).containsMatchIn(d)
         ) return true
@@ -440,7 +440,7 @@ object RecipeAiParser {
         // Lange Sätze mit mehreren Kochverben → Anleitung, keine Zutat
         if (d.length > 90 &&
             Regex(
-                """\b(mix|stir|cook|bake|fry|simmer|season|until|minutes|mins|verrühr|garen|mikrowelle|auskühl|verteilen|erwärm)\b""",
+                """\b(mix|stir|cook|bake|fry|simmer|season|until|minutes|mins|verrühren|verruehren|garen|mikrowelle|auskühlen|auskuehlen|verteilen|erwärmen|erwaermen|pausieren)\b""",
                 RegexOption.IGNORE_CASE
             ).findAll(d).count() >= 2
         ) return true
@@ -537,7 +537,7 @@ object RecipeAiParser {
                 // Nummerierte Zubereitungsschritte
                 (Regex("""^\d+[.)]\s+""").containsMatchIn(d) &&
                     Regex(
-                        """\b(mix|add|stir|pour|bake|cook|heat|divide|refrigerate|spoon|blend|season|fry|simmer|coat|chop|slice|preheat|remove|cover|place|verrühr|geben|garen|auskühl|stellen|erwärm|verteilen|schneiden|mikrowelle)\b""",
+                        """\b(mix|add|stir|pour|bake|cook|heat|divide|refrigerate|spoon|blend|season|fry|simmer|coat|chop|slice|preheat|remove|cover|place|verrühren|verruehren|geben|garen|auskühlen|auskuehlen|stellen|erwärmen|erwaermen|verteilen|schneiden|mikrowelle|pausieren)\b""",
                         RegexOption.IGNORE_CASE
                     ).containsMatchIn(d)) ||
                 // Langer Prosa-Absatz mit mehreren Kochverben
