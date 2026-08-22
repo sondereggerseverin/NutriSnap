@@ -100,7 +100,11 @@ object IngredientNutritionDatabase {
         "couscous"              to Entry(376f, 12.8f, 77f,  0.6f, 5f),
         "quinoa"                to Entry(368f, 14.1f, 64f,  6.1f, 7f),
         "haferflocken"          to Entry(372f, 13.5f, 59f,  7f,   10f),
+        "hafer flocken"         to Entry(372f, 13.5f, 59f,  7f,   10f),
+        "haferflocken zart"     to Entry(372f, 13.5f, 59f,  7f,   10f),
+        "zarte haferflocken"    to Entry(372f, 13.5f, 59f,  7f,   10f),
         "oats"                  to Entry(372f, 13.5f, 59f,  7f,   10f),
+        "oat flakes"            to Entry(372f, 13.5f, 59f,  7f,   10f),
         "mehl"                  to Entry(364f, 10f,   76f,  1f,   2.7f),
         "flour"                 to Entry(364f, 10f,   76f,  1f,   2.7f),
         "vollkornmehl"          to Entry(340f, 13.2f, 72f,  2.5f, 10.7f),
@@ -318,7 +322,10 @@ object IngredientNutritionDatabase {
         "kürbiskerne"           to Entry(559f, 30f,  11f,  49f,  6f),
         "pumpkin seeds"         to Entry(559f, 30f,  11f,  49f,  6f),
         "leinsamen"             to Entry(534f, 18f,  29f,  42f,  27f),
+        "gemahlene leinsamen"   to Entry(534f, 18f,  29f,  42f,  27f),
+        "leinsamenmehl"         to Entry(534f, 18f,  29f,  42f,  27f),
         "flaxseed"              to Entry(534f, 18f,  29f,  42f,  27f),
+        "ground flaxseed"       to Entry(534f, 18f,  29f,  42f,  27f),
         "hanfsamen"             to Entry(553f, 32f,  8.7f, 49f,  4f),
         "hemp seeds"            to Entry(553f, 32f,  8.7f, 49f,  4f),
 
@@ -373,21 +380,44 @@ object IngredientNutritionDatabase {
     /**
      * Looks up nutrition for a free-text ingredient name. Returns the most
      * specific (longest) matching entry, or null if nothing matches.
+     * Normalisiert Leerzeichen/Bindestriche, damit z.B. „Hafer Flocken“ und
+     * „haferflocken“ denselben Eintrag treffen.
      */
     fun lookup(searchTerm: String): Entry? {
         val normalized = searchTerm.trim().lowercase()
+            .replace(Regex("""[–—−]"""), "-")
         if (normalized.isBlank()) return null
 
-        // Exact match first
+        val compact = normalized.replace(Regex("""[\s\-]+"""), "")
+
+        // Exact match (mit und ohne Leerzeichen)
         entries[normalized]?.let { return it }
+        if (compact != normalized) {
+            entries[compact]?.let { return it }
+            // Key mit Leerzeichen, Suche ohne: „haferflocken“ ↔ „hafer flocken“
+            for (key in sortedKeys) {
+                if (key.replace(Regex("""[\s\-]+"""), "") == compact) return entries[key]
+            }
+        }
 
         // Substring match — search term contains a known ingredient name
         for (key in sortedKeys) {
             if (normalized.contains(key)) return entries[key]
         }
+        // Compact substring (z.B. „gemahleneleinsamen“ enthält „leinsamen“)
+        for (key in sortedKeys) {
+            val keyCompact = key.replace(Regex("""[\s\-]+"""), "")
+            if (keyCompact.length >= 4 && compact.contains(keyCompact)) return entries[key]
+        }
         // Fallback: known ingredient name contains the (short) search term
         for (key in sortedKeys) {
             if (key.contains(normalized) && normalized.length >= 4) return entries[key]
+        }
+        if (compact.length >= 4) {
+            for (key in sortedKeys) {
+                val keyCompact = key.replace(Regex("""[\s\-]+"""), "")
+                if (keyCompact.contains(compact)) return entries[key]
+            }
         }
         return null
     }

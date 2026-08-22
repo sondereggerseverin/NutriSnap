@@ -624,12 +624,18 @@ object RecipeNutritionAnalyzer {
                         // Cache-Miss -> normale OFF-Suche (nur wenn allowNetwork), neuer Treffer
                         // wird für's nächste Mal im globalen Wörterbuch abgelegt.
                         val cachedFood = globalDictionary?.lookup(parsed.name)?.let { cached ->
+                            // Cache speichert kein Fiber → lokale Referenz nachziehen
+                            val localFiber = IngredientNutritionDatabase.lookup(parsed.name)?.fiber
+                                ?.takeIf { it > 0f }
+                                ?: IngredientNutritionDatabase.lookup(cached.offProductName)?.fiber
+                                    ?.takeIf { it > 0f }
                             FoodItem(
                                 name     = cached.offProductName,
                                 calories = cached.kcalPer100g.toFloat(),
                                 protein  = cached.proteinPer100g.toFloat(),
                                 carbs    = cached.carbsPer100g.toFloat(),
                                 fat      = cached.fatPer100g.toFloat(),
+                                fiber    = localFiber,
                                 source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
                             )
                         }

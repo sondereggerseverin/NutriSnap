@@ -68,19 +68,43 @@ data class IngredientVerifyState(
     /** Mikronaehrstoffe (Ballaststoffe etc.) für die tatsächlich verwendete Menge —
      *  bei bekanntem FoodItem (override oder Match) anhand der editierbaren Menge skaliert,
      *  sonst anhand des Mengenverhältnisses aus der ursprünglichen Analyse.
-     *  manualFiber überschreibt einen ggf. vorhandenen Fiber-Wert immer. */
+     *  manualFiber überschreibt einen ggf. vorhandenen Fiber-Wert immer.
+     *  Fehlt Fiber am FoodItem (OFF/Cache oft ohne), wird die lokale Referenz-DB nachgezogen. */
     val effectiveMicros: Map<String, Float> get() {
+        val factor = effectiveAmountG / 100f
         val base = effectiveFood?.let { food ->
-            val factor = effectiveAmountG / 100f
             buildMap {
-                food.fiber?.let { put("fiber", it * factor) }
+                val fiberPer100 = food.fiber?.takeIf { it > 0f }
+                    ?: lookupLocalFiberPer100()
+                fiberPer100?.let { put("fiber", it * factor) }
                 food.sugar?.let { put("sugar", it * factor) }
                 food.saturatedFat?.let { put("saturatedFat", it * factor) }
                 food.salt?.let { put("salt", it * factor) }
                 food.sodium?.let { put("sodium", it * factor) }
             }
-        } ?: result.micros.mapValues { it.value * amountRatio }
+        } ?: run {
+            val fromResult = result.micros.mapValues { it.value * amountRatio }
+            if (fromResult.containsKey("fiber")) fromResult
+            else {
+                val local = lookupLocalFiberPer100()
+                if (local != null) fromResult + ("fiber" to local * factor) else fromResult
+            }
+        }
         return manualFiber?.let { base + ("fiber" to it) } ?: base
+    }
+
+    /** Ballaststoffe pro 100 g aus der lokalen Referenz-DB (Name der Zutat / Match). */
+    private fun lookupLocalFiberPer100(): Float? {
+        val candidates = listOfNotNull(
+            result.parsed?.name,
+            effectiveFood?.name,
+            result.line
+        )
+        for (c in candidates) {
+            val entry = IngredientNutritionDatabase.lookup(c) ?: continue
+            if (entry.fiber > 0f) return entry.fiber
+        }
+        return null
     }
 
     fun toOverride(componentGroup: String? = null): IngredientOverride =
