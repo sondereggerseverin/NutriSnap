@@ -39,6 +39,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -332,25 +333,26 @@ private fun CropCanvas(
                 offsetY + b * drawH
             )
 
-        fun clampCrop(l: Float, t: Float, r: Float, b: Float): FloatArray {
-            var nl = l.coerceIn(0f, 0.95f)
-            var nt = t.coerceIn(0f, 0.95f)
-            var nr = r.coerceIn(0.05f, 1f)
-            var nb = b.coerceIn(0.05f, 1f)
-            if (nr - nl < 0.08f) nr = (nl + 0.08f).coerceAtMost(1f)
-            if (nb - nt < 0.08f) nb = (nt + 0.08f).coerceAtMost(1f)
-            return floatArrayOf(nl, nt, nr, nb)
-        }
+        // Min. Crop-Größe (normiert) – verhindert „Kleben“ und Springen der Ecken
+        val minCrop = 0.08f
+
+        // Aktuelle Crop-Werte immer frisch lesen (pointerInput startet sonst nicht neu,
+        // Capture wäre sonst stale → Ziehen/Verkleinern buggt)
+        val currentL by rememberUpdatedState(cropL)
+        val currentT by rememberUpdatedState(cropT)
+        val currentR by rememberUpdatedState(cropR)
+        val currentB by rememberUpdatedState(cropB)
+        val onCropChangeUpdated by rememberUpdatedState(onCropChange)
 
         var activeHandle by remember { mutableIntStateOf(-1) }
 
         Canvas(
             Modifier
                 .fillMaxSize()
-                .pointerInput(drawW, drawH, offsetX, offsetY, bitmap.width, bitmap.height) {
+                .pointerInput(drawW, drawH, offsetX, offsetY, handlePx) {
                     detectDragGestures(
                         onDragStart = { pos ->
-                            val rect = normToPx(cropL, cropT, cropR, cropB)
+                            val rect = normToPx(currentL, currentT, currentR, currentB)
                             val corners = listOf(
                                 Offset(rect.left, rect.top),
                                 Offset(rect.right, rect.top),
@@ -369,35 +371,44 @@ private fun CropCanvas(
                             if (activeHandle < 0 || drawW <= 0f || drawH <= 0f) return@detectDragGestures
                             val dx = drag.x / drawW
                             val dy = drag.y / drawH
+                            val l = currentL
+                            val t = currentT
+                            val r = currentR
+                            val b = currentB
                             when (activeHandle) {
-                                0 -> {
-                                    val c = clampCrop(cropL + dx, cropT + dy, cropR, cropB)
-                                    onCropChange(c[0], c[1], c[2], c[3])
+                                // Ecken: nur die gezogene Kante bewegen, Min-Größe gegen Gegenseite
+                                0 -> { // top-left
+                                    val nl = (l + dx).coerceIn(0f, r - minCrop)
+                                    val nt = (t + dy).coerceIn(0f, b - minCrop)
+                                    onCropChangeUpdated(nl, nt, r, b)
                                 }
-                                1 -> {
-                                    val c = clampCrop(cropL, cropT + dy, cropR + dx, cropB)
-                                    onCropChange(c[0], c[1], c[2], c[3])
+                                1 -> { // top-right
+                                    val nr = (r + dx).coerceIn(l + minCrop, 1f)
+                                    val nt = (t + dy).coerceIn(0f, b - minCrop)
+                                    onCropChangeUpdated(l, nt, nr, b)
                                 }
-                                2 -> {
-                                    val c = clampCrop(cropL + dx, cropT, cropR, cropB + dy)
-                                    onCropChange(c[0], c[1], c[2], c[3])
+                                2 -> { // bottom-left
+                                    val nl = (l + dx).coerceIn(0f, r - minCrop)
+                                    val nb = (b + dy).coerceIn(t + minCrop, 1f)
+                                    onCropChangeUpdated(nl, t, r, nb)
                                 }
-                                3 -> {
-                                    val c = clampCrop(cropL, cropT, cropR + dx, cropB + dy)
-                                    onCropChange(c[0], c[1], c[2], c[3])
+                                3 -> { // bottom-right
+                                    val nr = (r + dx).coerceIn(l + minCrop, 1f)
+                                    val nb = (b + dy).coerceIn(t + minCrop, 1f)
+                                    onCropChangeUpdated(l, t, nr, nb)
                                 }
-                                4 -> {
-                                    var nl = cropL + dx
-                                    var nt = cropT + dy
-                                    var nr = cropR + dx
-                                    var nb = cropB + dy
+                                4 -> { // Fläche verschieben
+                                    var nl = l + dx
+                                    var nt = t + dy
+                                    var nr = r + dx
+                                    var nb = b + dy
                                     val w = nr - nl
                                     val h = nb - nt
                                     if (nl < 0f) { nl = 0f; nr = w }
                                     if (nt < 0f) { nt = 0f; nb = h }
                                     if (nr > 1f) { nr = 1f; nl = 1f - w }
                                     if (nb > 1f) { nb = 1f; nt = 1f - h }
-                                    onCropChange(nl, nt, nr, nb)
+                                    onCropChangeUpdated(nl, nt, nr, nb)
                                 }
                             }
                         }
