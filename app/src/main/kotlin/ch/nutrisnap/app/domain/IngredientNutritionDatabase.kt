@@ -171,6 +171,12 @@ object IngredientNutritionDatabase {
         "avocado"               to Entry(160f, 2f,    8.5f, 14.7f,6.7f),
         "beeren"                to Entry(43f,  0.7f,  10f,  0.3f, 2.4f),
         "berries"               to Entry(43f,  0.7f,  10f,  0.3f, 2.4f),
+        "himbeeren"             to Entry(52f,  1.2f,  12f,  0.7f, 6.5f),
+        "himbeere"              to Entry(52f,  1.2f,  12f,  0.7f, 6.5f),
+        "raspberry"             to Entry(52f,  1.2f,  12f,  0.7f, 6.5f),
+        "raspberries"           to Entry(52f,  1.2f,  12f,  0.7f, 6.5f),
+        "blaubeeren"            to Entry(57f,  0.7f,  14f,  0.3f, 2.4f),
+        "erdbeeren"             to Entry(32f,  0.7f,  7.7f, 0.3f, 2f),
 
         // ── Oils, Fats, Nuts ─────────────────────────────────────────────────
         "olivenöl"              to Entry(884f, 0f,    0f,  100f),
@@ -335,6 +341,16 @@ object IngredientNutritionDatabase {
         "dunkle schokolade"     to Entry(546f, 5f,   60f,  31f,  11f),
         "dark chocolate"        to Entry(546f, 5f,   60f,  31f,  11f),
         "schokolade"            to Entry(535f, 5f,   56f,  33f,  3f),
+        // Lotus Biscoff (typische Werte laut Nährwertkennzeichnung)
+        "lotus biscoff keks"    to Entry(503f, 4.9f,  73f,  20f,  1.8f),
+        "biscoff keks"          to Entry(503f, 4.9f,  73f,  20f,  1.8f),
+        "lotus keks"            to Entry(503f, 4.9f,  73f,  20f,  1.8f),
+        "lotus biscoff"         to Entry(503f, 4.9f,  73f,  20f,  1.8f),
+        "biscoff"               to Entry(503f, 4.9f,  73f,  20f,  1.8f),
+        "lotus biscoff creme"   to Entry(588f, 3f,    57f,  38f,  1.2f),
+        "biscoff creme"         to Entry(588f, 3f,    57f,  38f,  1.2f),
+        "keks"                  to Entry(480f, 6f,    70f,  20f,  2.5f),
+        "cookie"                to Entry(480f, 6f,    70f,  20f,  2.5f),
 
         // ── Beverages & Liquids ───────────────────────────────────────────────
         "kaffee"                to Entry(1f,   0.1f, 0f,   0f),

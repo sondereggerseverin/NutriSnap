@@ -451,13 +451,15 @@ object RecipeNutritionAnalyzer {
                 val name = p.optString("product_name", originalName).ifBlank { originalName }
                 fun g(key: String): Float? =
                     if (n.has(key) && !n.isNull(key)) n.optDouble(key, Double.NaN).toFloat().takeIf { !it.isNaN() } else null
+                val offFiber = g("fiber_100g") ?: g("fibers_100g")
                 return FoodItem(
                     name     = name,
                     calories = kcal,
                     protein  = g("proteins_100g"),
                     carbs    = g("carbohydrates_100g"),
                     fat      = g("fat_100g"),
-                    fiber    = g("fiber_100g") ?: g("fibers_100g"),
+                    // OFF liefert bei vielen Produkten keine Fiber → lokale Referenz nachziehen
+                    fiber    = offFiber ?: localRef?.fiber?.takeIf { it > 0f },
                     source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
                 )
             }
@@ -502,6 +504,15 @@ object RecipeNutritionAnalyzer {
             val amountG = m.manualAmountG ?: m.amountGrams
             val matched = m.matchedFoodItemId != null ||
                 m.matchSource != ch.nutrisnap.app.data.model.MatchSource.UNMATCHED
+            // Fiber: manuell > gespeicherter Match > lokale Referenz-DB
+            val fiberAbs = m.manualFiberG
+                ?: m.matchedFiber
+                ?: run {
+                    val local = IngredientNutritionDatabase.lookup(m.ingredientName)
+                        ?: IngredientNutritionDatabase.lookup(m.matchedFoodName.orEmpty())
+                        ?: IngredientNutritionDatabase.lookup(m.ingredientRaw)
+                    local?.fiber?.takeIf { it > 0f }?.let { it * amountG / 100f }
+                }
             val foodItem = if (matched && m.matchedFoodName != null && amountG > 0f) {
                 FoodItem(
                     name     = m.matchedFoodName,
@@ -509,6 +520,7 @@ object RecipeNutritionAnalyzer {
                     protein  = (m.matchedProtein ?: 0f) / amountG * 100f,
                     carbs    = (m.matchedCarbs ?: 0f) / amountG * 100f,
                     fat      = (m.matchedFat ?: 0f) / amountG * 100f,
+                    fiber    = fiberAbs?.let { it / amountG * 100f },
                     source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
                 )
             } else null
@@ -521,7 +533,7 @@ object RecipeNutritionAnalyzer {
                 carbs    = m.matchedCarbs ?: 0f,
                 fat      = m.matchedFat ?: 0f,
                 matched  = matched,
-                micros   = m.manualFiberG?.let { mapOf("fiber" to it) } ?: emptyMap()
+                micros   = fiberAbs?.let { mapOf("fiber" to it) } ?: emptyMap()
             )
         }
 
@@ -531,6 +543,9 @@ object RecipeNutritionAnalyzer {
         val totalCarbs    = ingredientResults.sumOf { it.carbs.toDouble() }.toFloat()
         val totalFat      = ingredientResults.sumOf { it.fat.toDouble() }.toFloat()
         val totalFiber    = ingredientResults.sumOf { (it.micros["fiber"] ?: 0f).toDouble() }.toFloat()
+        val fiberComplete = ingredientResults.filter { it.matched }.let { matched ->
+            matched.isNotEmpty() && matched.all { it.micros.containsKey("fiber") }
+        }
 
         return AnalysisResult(
             ingredients        = ingredientResults,
@@ -546,8 +561,7 @@ object RecipeNutritionAnalyzer {
             totalCount         = ingredientResults.size,
             estimatedCount     = 0,
             totalMicros        = if (totalFiber > 0f) mapOf("fiber" to totalFiber) else emptyMap(),
-            // Nur Ballaststoffe aus manuellen Angaben verfügbar -> nie "vollständig".
-            fiberComplete      = false
+            fiberComplete      = fiberComplete
         )
     }
 
@@ -589,7 +603,7 @@ object RecipeNutritionAnalyzer {
                                 protein  = local.protein,
                                 carbs    = local.carbs,
                                 fat      = local.fat,
-                                fiber    = local.fiber,
+                                fiber    = local.fiber.takeIf { it > 0f },
                                 source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
                             )
                             return@async IngredientResult(
@@ -677,21 +691,27 @@ object RecipeNutritionAnalyzer {
                     if (r.matched || r.parsed == null) return@map r
                     val est = estimates[r.parsed.name] ?: return@map r
                     val factor = r.parsed.amountG / 100f
+                    // AI liefert oft keine Fiber → lokale Referenz nachziehen
+                    val localFiber = IngredientNutritionDatabase.lookup(r.parsed.name)
+                        ?.fiber?.takeIf { it > 0f }
+                    val aiFood = FoodItem(
+                        name     = r.parsed.name,
+                        calories = est.calories,
+                        protein  = est.protein,
+                        carbs    = est.carbs,
+                        fat      = est.fat,
+                        fiber    = localFiber,
+                        source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
+                    )
                     r.copy(
-                        foodItem = FoodItem(
-                            name            = r.parsed.name,
-                            calories = est.calories,
-                            protein  = est.protein,
-                            carbs    = est.carbs,
-                            fat      = est.fat,
-                            source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
-                        ),
+                        foodItem  = aiFood,
                         calories  = est.calories * factor,
                         protein   = est.protein  * factor,
                         carbs     = est.carbs    * factor,
                         fat       = est.fat      * factor,
                         matched   = true,
-                        estimated = true
+                        estimated = true,
+                        micros    = aiFood.scaledMicros(factor)
                     )
                 }
             }

@@ -671,6 +671,7 @@ class RecipeRepository(db: NutriDatabase, private val context: Context) {
                     matchedProtein = m.matchedProtein ?: old.matchedProtein,
                     matchedCarbs = m.matchedCarbs ?: old.matchedCarbs,
                     matchedFat = m.matchedFat ?: old.matchedFat,
+                    matchedFiber = m.matchedFiber ?: old.matchedFiber,
                     matchSource = if (m.matchSource != ch.nutrisnap.app.data.model.MatchSource.UNMATCHED)
                         m.matchSource else old.matchSource,
                     manualAmountG = m.manualAmountG ?: old.manualAmountG,

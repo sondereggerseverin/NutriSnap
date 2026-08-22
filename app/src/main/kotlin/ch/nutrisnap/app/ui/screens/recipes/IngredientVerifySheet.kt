@@ -585,6 +585,7 @@ fun IngredientVerifySheet(
                                     matchedProtein = s.effectiveProtein,
                                     matchedCarbs = s.effectiveCarbs,
                                     matchedFat = s.effectiveFat,
+                                    matchedFiber = s.effectiveMicros["fiber"],
                                     matchSource = when {
                                         s.override != null -> MatchSource.MANUAL
                                         s.isVerified -> MatchSource.DATABASE

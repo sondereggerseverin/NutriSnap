@@ -4,6 +4,7 @@ import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.IngredientMatch
 import ch.nutrisnap.app.data.model.MatchSource
 import ch.nutrisnap.app.data.model.RecipeComponent
+import ch.nutrisnap.app.domain.IngredientNutritionDatabase
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 
 internal fun fmtMacro(v: Float): String =
@@ -211,6 +212,15 @@ fun matchesToOverrides(matches: List<IngredientMatch>): Map<String, IngredientOv
     return matches.associate { m ->
         val amount = m.manualAmountG ?: m.amountGrams.takeIf { it > 0f }
         val per100 = amount?.takeIf { it > 0f } ?: 100f
+        // Fiber-Priorität: manuell > gespeicherter Match-Wert > lokale Referenz-DB
+        val fiberAbs = m.manualFiberG
+            ?: m.matchedFiber
+            ?: run {
+                val local = IngredientNutritionDatabase.lookup(m.ingredientName)
+                    ?: IngredientNutritionDatabase.lookup(m.matchedFoodName.orEmpty())
+                    ?: IngredientNutritionDatabase.lookup(m.ingredientRaw)
+                local?.fiber?.takeIf { it > 0f }?.let { it * per100 / 100f }
+            }
         val food = if (m.matchedFoodName != null || m.matchedCalories != null) {
             FoodItem(
                 id = m.matchedFoodItemId?.toInt() ?: 0,
@@ -219,7 +229,7 @@ fun matchesToOverrides(matches: List<IngredientMatch>): Map<String, IngredientOv
                 protein = m.matchedProtein?.let { it / per100 * 100f },
                 carbs = m.matchedCarbs?.let { it / per100 * 100f },
                 fat = m.matchedFat?.let { it / per100 * 100f },
-                fiber = m.manualFiberG?.let { it / per100 * 100f }
+                fiber = fiberAbs?.let { it / per100 * 100f }
             )
         } else null
         m.ingredientRaw to IngredientOverride(

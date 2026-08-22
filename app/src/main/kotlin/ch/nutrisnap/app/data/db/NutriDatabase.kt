@@ -81,7 +81,7 @@ interface UserProfileDao {
         RecipeComponent::class,
         FrozenMeal::class
     ],
-    version = 34,
+    version = 35,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -718,6 +718,13 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // IngredientMatch: gematchte Ballaststoffe persistent speichern (nicht nur manuell)
+        private val MIGRATION_34_35 = object : Migration(34, 35) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE ingredient_matches ADD COLUMN matchedFiber REAL DEFAULT NULL")
+            }
+        }
+
 
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
@@ -735,7 +742,7 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
                         MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28,
                         MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32,
-                        MIGRATION_32_33, MIGRATION_33_34
+                        MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35
                     )
                     .build()
                     .also { INSTANCE = it }

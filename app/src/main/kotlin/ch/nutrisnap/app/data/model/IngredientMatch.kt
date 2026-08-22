@@ -23,6 +23,10 @@ data class IngredientMatch(
     val matchedProtein: Float? = null,
     val matchedCarbs: Float? = null,
     val matchedFat: Float? = null,
+    /** Ballaststoffe aus dem Match für die verwendete Menge (nicht pro 100g).
+     *  Wird beim Verifizieren mitgespeichert, damit sie beim erneuten Öffnen
+     *  nicht verloren gehen. manualFiberG hat Vorrang, falls gesetzt. */
+    val matchedFiber: Float? = null,
     val matchSource: MatchSource = MatchSource.UNMATCHED,
     /** "side" | "sauce" | null (Heuristik beim Split). */
     val componentGroup: String? = null,

@@ -383,7 +383,7 @@ fun deriveComponentNutrition(
         proteinG = group.sumOf { (it.matchedProtein ?: 0f).toDouble() }.toFloat(),
         carbsG = group.sumOf { (it.matchedCarbs ?: 0f).toDouble() }.toFloat(),
         fatG = group.sumOf { (it.matchedFat ?: 0f).toDouble() }.toFloat(),
-        fiberG = group.sumOf { (it.manualFiberG ?: 0f).toDouble() }.toFloat(),
+        fiberG = group.sumOf { (it.manualFiberG ?: it.matchedFiber ?: 0f).toDouble() }.toFloat(),
         sortOrder = sortOrder
     )
 }
