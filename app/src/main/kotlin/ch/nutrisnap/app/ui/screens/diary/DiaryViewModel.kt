@@ -637,4 +637,71 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
             onDone(items.size)
         }
     }
+
+    /**
+     * Speichert alle Einträge einer Mahlzeit am aktuellen Tag als MealTemplate.
+     * @return Template-ID oder null bei leerer Mahlzeit / Fehler
+     */
+    fun saveMealAsTemplate(
+        mealType: MealType,
+        name: String,
+        onDone: (Long?) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val entries = _uiState.value.entries.filter { it.mealType == mealType }
+            if (entries.isEmpty()) {
+                onDone(null)
+                return@launch
+            }
+            val items = entries.map { e ->
+                ch.nutrisnap.app.data.model.MealTemplateItem(
+                    templateId = 0,
+                    foodName = e.foodName,
+                    calories = e.calories,
+                    protein = e.protein,
+                    carbs = e.carbs,
+                    fat = e.fat,
+                    quantityGrams = e.amountGrams
+                )
+            }
+            val id = runCatching {
+                templateRepo.saveTemplate(name.trim().ifBlank { mealType.label() }, mealType, items)
+            }.getOrNull()
+            onDone(id)
+        }
+    }
+
+    // ── Automatisch erkannte Mahlzeit-Muster (1-Tap-Relog) ───────────────────
+    private val patternDetector = ch.nutrisnap.app.domain.MealPatternDetector(
+        diaryRepository = repo,
+        mealPatternRepository = ch.nutrisnap.app.data.repository.MealPatternRepository(
+            db.detectedMealPatternDao()
+        )
+    )
+
+    private val _mealPatterns = MutableStateFlow<List<ch.nutrisnap.app.domain.DetectedMealPattern>>(emptyList())
+    val mealPatterns: StateFlow<List<ch.nutrisnap.app.domain.DetectedMealPattern>> = _mealPatterns
+
+    init {
+        viewModelScope.launch {
+            runCatching {
+                patternDetector.detectAndSavePatterns()
+                _mealPatterns.value = patternDetector.getSuggestionsForNow()
+            }
+        }
+    }
+
+    /** 1-Tap: erkanntes Muster als heutige Mahlzeit loggen (pro FoodItem eine Standardportion). */
+    fun applyMealPattern(pattern: ch.nutrisnap.app.domain.DetectedMealPattern, onDone: (Int) -> Unit = {}) {
+        viewModelScope.launch {
+            var n = 0
+            for (foodId in pattern.foodItemIds) {
+                val food = foodRepo.getById(foodId) ?: continue
+                val grams = food.servingSize.takeIf { it > 0f } ?: 100f
+                repo.addEntry(food, grams, pattern.mealType, _date.value)
+                n++
+            }
+            onDone(n)
+        }
+    }
 }

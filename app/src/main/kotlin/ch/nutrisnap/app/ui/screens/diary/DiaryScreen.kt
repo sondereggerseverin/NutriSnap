@@ -223,6 +223,7 @@ fun DiaryScreen(
     val scope = rememberCoroutineScope()
     val quickAddFavorites by vm.favorites.collectAsStateWithLifecycle()
     val autopilotTemplates by vm.autopilotTemplates.collectAsStateWithLifecycle()
+    val mealPatterns by vm.mealPatterns.collectAsStateWithLifecycle()
     val recipesVm: ch.nutrisnap.app.ui.screens.recipes.RecipesViewModel = viewModel()
     val recipesState by recipesVm.uiState.collectAsStateWithLifecycle()
 
@@ -352,6 +353,28 @@ fun DiaryScreen(
                     )
                 }
             }
+            // 1-Tap-Relog für erkannte wiederkehrende Mahlzeiten
+            val openPatternMeals = remember(mealPatterns, state.entries) {
+                val present = state.entries.map { it.mealType }.toSet()
+                mealPatterns.filter { it.mealType !in present }
+            }
+            if (openPatternMeals.isNotEmpty()) {
+                item(key = "meal_pattern_banner") {
+                    MealPatternBanner(
+                        patterns = openPatternMeals,
+                        onApply = { p ->
+                            vm.applyMealPattern(p) { n ->
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        if (n > 0) "${p.label}: $n Einträge übernommen"
+                                        else "Lebensmittel nicht gefunden"
+                                    )
+                                }
+                            }
+                        }
+                    )
+                }
+            }
             if (state.entries.isEmpty()) {
                 item {
                     EmptyState(
@@ -398,6 +421,27 @@ fun DiaryScreen(
                                         Icon(
                                             Icons.Default.ContentCopy,
                                             contentDescription = "Mahlzeit auf mehrere Tage kopieren",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(headerIconSize)
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            val defaultName = "${meal.label()} Vorlage"
+                                            vm.saveMealAsTemplate(meal, defaultName) { id ->
+                                                scope.launch {
+                                                    snackbarHostState.showSnackbar(
+                                                        if (id != null) "Als Vorlage gespeichert"
+                                                        else "Keine Einträge – nichts gespeichert"
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.size(headerBtnSize)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.BookmarkAdd,
+                                            contentDescription = "Als Vorlage speichern",
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(headerIconSize)
                                         )

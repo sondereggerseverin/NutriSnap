@@ -277,3 +277,48 @@ internal fun AutopilotBanner(
         }
     }
 }
+
+@Composable
+internal fun MealPatternBanner(
+    patterns: List<ch.nutrisnap.app.domain.DetectedMealPattern>,
+    onApply: (ch.nutrisnap.app.domain.DetectedMealPattern) -> Unit
+) {
+    Card(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.sm),
+        shape = RoundedCornerShape(NutriRadius.lg),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+        )
+    ) {
+        Column(Modifier.padding(NutriSpacing.md)) {
+            Text("Wiederkehrende Mahlzeit", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(
+                "Aus deinem Verlauf erkannt · 1-Tap-Relog",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            patterns.forEach { p ->
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(p.label, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                        Text(
+                            "${p.mealType.label()} · ~${p.avgKcal.toInt()} kcal · ${p.occurrences}×",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    FilledTonalButton(onClick = { onApply(p) }) {
+                        Text("Übernehmen", fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+    }
+}
