@@ -21,6 +21,7 @@ import ch.nutrisnap.app.domain.NutritionLabelResult
 @Composable
 fun NutritionLabelScanScreen(
     onNavigateBack: () -> Unit,
+    barcode: String? = null,
     vm: NutritionLabelScanViewModel = viewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -41,7 +42,7 @@ fun NutritionLabelScanScreen(
         }
         is LabelScanState.Result -> LabelResultView(
             result = s.result,
-            onSave = { name, result, portionG -> vm.saveAsProduct(name, result, portionG) },
+            onSave = { name, result, portionG -> vm.saveAsProduct(name, result, portionG, barcode) },
             onRetake = { vm.retake() },
             onBack = onNavigateBack
         )
@@ -130,6 +131,7 @@ private fun LabelResultView(
                 "Automatisch aus dem Foto erkannt – bitte kurz prüfen und Produktnamen eingeben.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            // barcode comes from outer NutritionLabelScanScreen via onSave closure
 
             OutlinedTextField(
                 value = name, onValueChange = { name = it },

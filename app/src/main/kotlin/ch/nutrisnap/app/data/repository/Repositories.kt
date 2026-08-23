@@ -874,16 +874,53 @@ class FoodItemRepository(db: NutriDatabase) {
     }
 
     suspend fun searchBarcode(barcode: String): FoodItem? {
+        val bc = ch.nutrisnap.app.utils.BarcodeUtils.normalize(barcode)
+        if (bc.isEmpty()) return null
         // 1) Eigene gespeicherte Produkte (z.B. per Etikett-Foto angelegt)
-        customFoodDao.getByBarcode(barcode)?.let { return it.toFoodItem() }
+        customFoodDao.getByBarcode(bc)?.let { return it.toFoodItem() }
+        // Fallback: falls Alt-Daten mit Leerzeichen gespeichert wurden
+        if (bc != barcode) {
+            customFoodDao.getByBarcode(barcode.trim())?.let { return it.toFoodItem() }
+        }
         // 2) Lokaler food_items-Cache
-        dao.searchByBarcode(barcode)?.let { return it }
+        dao.searchByBarcode(bc)?.let { return it }
+        if (bc != barcode) {
+            dao.searchByBarcode(barcode.trim())?.let { return it }
+        }
         // 3) Remote (OFF / Swiss / …)
-        return remoteRepo.searchByBarcode(barcode)
+        return remoteRepo.searchByBarcode(bc) ?: remoteRepo.searchByBarcode(barcode.trim())
     }
 
+    /**
+     * Speichert CustomFood inkl. normalisiertem Barcode und spiegelt es in food_items,
+     * damit Barcode-Suche lokal sofort trifft (nicht nur custom_foods).
+     */
     suspend fun saveCustomFoodWithBarcode(item: CustomFoodItem): Long {
-        val id = customFoodDao.insert(item).toInt()
+        val bc = ch.nutrisnap.app.utils.BarcodeUtils.normalize(item.barcode)
+        val normalized = item.copy(barcode = bc.ifBlank { null })
+        val id = customFoodDao.insert(normalized).toInt()
+        // food_items-Spiegel: erneuter Scan findet das Produkt auch im lokalen Cache
+        if (!bc.isNullOrBlank()) {
+            val existing = dao.searchByBarcode(bc)
+            val food = FoodItem(
+                id = existing?.id ?: 0,
+                name = normalized.name,
+                brand = normalized.brand,
+                barcode = bc,
+                calories = normalized.calories,
+                protein = normalized.protein,
+                carbs = normalized.carbs,
+                fat = normalized.fat,
+                fiber = normalized.fiber,
+                sugar = normalized.sugar,
+                salt = normalized.salt,
+                servingSize = normalized.portionSizeG.coerceAtLeast(1f),
+                source = FoodSource.MANUAL,
+                completenessScore = 95,
+                timesUsed = existing?.timesUsed ?: 0
+            )
+            dao.insert(food)
+        }
         customFoodDao.getById(id)?.let { saved ->
             pushSafely { SupabaseSync.upsertCustomFood(saved) }
         }

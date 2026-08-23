@@ -83,8 +83,9 @@ fun AddFoodSheet(
 
     if (showScanner) {
         BarcodeScannerScreen(
-            onBarcodeDetected = { barcode ->
+            onBarcodeDetected = { raw ->
                 showScanner = false
+                val barcode = ch.nutrisnap.app.utils.BarcodeUtils.normalize(raw).ifBlank { raw.trim() }
                 barcodeStatus = "Suche Barcode $barcode..."
                 vm.searchBarcode(barcode) { food ->
                     if (food != null) {
@@ -102,64 +103,35 @@ fun AddFoodSheet(
         return
     }
 
-    // Unbekanntes Produkt: Nährwerttabelle fotografieren (1–2 Fotos)
+    // Unbekanntes Produkt: Nährwerttabelle fotografieren (1 Foto reicht, sofort speichern)
     if (labelCaptureStep > 0 && pendingUnknownBarcode != null) {
         PhotoCaptureScreen(
-            title = if (labelCaptureStep == 1) "Nährwerttabelle fotografieren" else "Zweites Foto (optional)",
-            instructions = if (labelCaptureStep == 1)
-                "Barcode $pendingUnknownBarcode – Nährwerttabelle (pro 100g) scharf fotografieren"
-            else
-                "Falls Name/Werte auf der anderen Seite: jetzt fotografieren, oder zurück",
+            title = "Nährwerttabelle fotografieren",
+            instructions = "Barcode $pendingUnknownBarcode – Tabelle (pro 100 g) scharf fotografieren. Danach wird das Produkt gespeichert und ist per Barcode wiederfindbar.",
             onPhotoCaptured = { bitmap ->
-                if (labelCaptureStep == 1) {
-                    firstLabelBitmap = bitmap
-                    labelCaptureStep = 2
-                } else {
-                    isSavingProduct = true
-                    val meal = initialMeal ?: defaultMealForNow()
-                    vm.captureUnknownProduct(
-                        barcode = pendingUnknownBarcode!!,
-                        labelBitmap = firstLabelBitmap!!,
-                        secondBitmap = bitmap,
-                        meal = meal,
-                        amountGrams = 100f
-                    ) { food ->
-                        isSavingProduct = false
-                        labelCaptureStep = 0
-                        firstLabelBitmap = null
-                        pendingUnknownBarcode = null
-                        barcodeStatus = if (food != null)
-                            "„${food.name}“ gespeichert & eingetragen"
-                        else
-                            "Etikett konnte nicht gelesen werden"
-                    }
+                isSavingProduct = true
+                labelCaptureStep = 0
+                val meal = initialMeal ?: defaultMealForNow()
+                val bc = pendingUnknownBarcode!!
+                vm.captureUnknownProduct(
+                    barcode = bc,
+                    labelBitmap = bitmap,
+                    secondBitmap = null,
+                    meal = meal,
+                    amountGrams = 100f
+                ) { food ->
+                    isSavingProduct = false
+                    firstLabelBitmap = null
+                    pendingUnknownBarcode = null
+                    barcodeStatus = if (food != null)
+                        "„${food.name}“ gespeichert – nächstes Mal per Barcode findbar"
+                    else
+                        "Etikett konnte nicht gelesen werden – bitte nochmals versuchen"
                 }
             },
             onNavigateBack = {
-                if (labelCaptureStep == 2 && firstLabelBitmap != null) {
-                    // Ohne zweites Foto speichern
-                    isSavingProduct = true
-                    val meal = initialMeal ?: defaultMealForNow()
-                    vm.captureUnknownProduct(
-                        barcode = pendingUnknownBarcode!!,
-                        labelBitmap = firstLabelBitmap!!,
-                        secondBitmap = null,
-                        meal = meal,
-                        amountGrams = 100f
-                    ) { food ->
-                        isSavingProduct = false
-                        labelCaptureStep = 0
-                        firstLabelBitmap = null
-                        pendingUnknownBarcode = null
-                        barcodeStatus = if (food != null)
-                            "„${food.name}“ gespeichert & eingetragen"
-                        else
-                            "Etikett konnte nicht gelesen werden"
-                    }
-                } else {
-                    labelCaptureStep = 0
-                    firstLabelBitmap = null
-                }
+                labelCaptureStep = 0
+                firstLabelBitmap = null
             }
         )
         return

@@ -243,11 +243,12 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
                         )
                     }
                 }
-                val name = label.productName.ifBlank { "Produkt $barcode" }
+                val bc = ch.nutrisnap.app.utils.BarcodeUtils.normalize(barcode).ifBlank { barcode.trim() }
+                val name = label.productName.ifBlank { "Produkt $bc" }
                 val custom = CustomFoodItem(
                     name = name,
                     brand = label.brand.ifBlank { null },
-                    barcode = barcode,
+                    barcode = bc,
                     calories = label.caloriesPer100g,
                     protein = label.proteinPer100g,
                     carbs = label.carbsPer100g,
@@ -262,7 +263,7 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
                 val food = FoodItem(
                     name = custom.name,
                     brand = custom.brand,
-                    barcode = barcode,
+                    barcode = bc,
                     calories = custom.calories,
                     protein = custom.protein,
                     carbs = custom.carbs,

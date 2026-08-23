@@ -47,24 +47,37 @@ class NutritionLabelScanViewModel(app: Application) : AndroidViewModel(app) {
         _state.value = LabelScanState.Capturing
     }
 
-    fun saveAsProduct(name: String, result: NutritionLabelResult, portionSizeG: Float = 100f) {
+    /**
+     * Speichert das Etikett-Produkt. [barcode] optional – wenn gesetzt, ist das Produkt
+     * beim nächsten Scan per Barcode findbar (custom_foods + food_items).
+     */
+    fun saveAsProduct(
+        name: String,
+        result: NutritionLabelResult,
+        portionSizeG: Float = 100f,
+        barcode: String? = null
+    ) {
         viewModelScope.launch {
-            repo.insert(
-                CustomFoodItem(
-                    name = name.trim(),
-                    calories = result.caloriesPer100g,
-                    protein = result.proteinPer100g,
-                    carbs = result.carbsPer100g,
-                    fat = result.fatPer100g,
-                    fiber = result.fiberPer100g,
-                    sugar = result.sugarPer100g,
-                    salt = result.saltPer100g,
-                    brand = result.brand.ifBlank { null },
-                    portionSizeG = portionSizeG.coerceAtLeast(1f),
-                    source = "label_scan",
-                    verified = true
-                )
+            val bc = ch.nutrisnap.app.utils.BarcodeUtils.normalize(barcode).ifBlank { null }
+            val item = CustomFoodItem(
+                name = name.trim(),
+                calories = result.caloriesPer100g,
+                protein = result.proteinPer100g,
+                carbs = result.carbsPer100g,
+                fat = result.fatPer100g,
+                fiber = result.fiberPer100g,
+                sugar = result.sugarPer100g,
+                salt = result.saltPer100g,
+                brand = result.brand.ifBlank { null },
+                barcode = bc,
+                portionSizeG = portionSizeG.coerceAtLeast(1f),
+                source = "label_scan",
+                verified = true
             )
+            // Über FoodItemRepository, damit Barcode auch in food_items liegt
+            ch.nutrisnap.app.data.repository.FoodItemRepository(
+                ch.nutrisnap.app.data.db.NutriDatabase.getInstance(getApplication())
+            ).saveCustomFoodWithBarcode(item)
             _state.value = LabelScanState.Saved
         }
     }

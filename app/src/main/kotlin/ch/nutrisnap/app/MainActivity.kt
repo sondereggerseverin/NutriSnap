@@ -553,6 +553,25 @@ fun MainScaffold(
                 FoodScanScreen(onNavigateBack = { navController.popBackStack() })
             }
             composable(
+                "nutrition_label_scan?barcode={barcode}",
+                arguments = listOf(
+                    androidx.navigation.navArgument("barcode") {
+                        type = androidx.navigation.NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                ),
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) { entry ->
+                val bc = entry.arguments?.getString("barcode")
+                NutritionLabelScanScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    barcode = bc
+                )
+            }
+            // Alias ohne Query (Deep-Links / alte Aufrufe)
+            composable(
                 "nutrition_label_scan",
                 enterTransition = { pushEnter }, exitTransition = { pushExit },
                 popEnterTransition = { popEnter }, popExitTransition = { popExit }
