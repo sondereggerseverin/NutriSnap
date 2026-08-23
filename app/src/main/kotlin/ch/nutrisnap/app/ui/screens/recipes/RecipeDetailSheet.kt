@@ -177,6 +177,35 @@ fun RecipeDetailSheet(
                     }
                     recipe.prepTimeMinutes?.let { MetaBadge("⏱ $it min") }
                     recipe.platform?.let { MetaBadge("📌 $it") }
+                    if (recipe.timesCooked > 0) {
+                        MetaBadge("🍳 ${recipe.timesCooked}× gekocht")
+                    }
+                    if (recipe.cookRating in 1..5) {
+                        MetaBadge("★".repeat(recipe.cookRating))
+                    }
+                }
+                if (recipe.nextTimeNote.isNotBlank()) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                    ) {
+                        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                            Text(
+                                "Nächstes Mal",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                            Text(
+                                recipe.nextTimeNote,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                    }
                 }
                 Spacer(Modifier.height(6.dp))
                 NutrientSummaryStrip(recipe)

@@ -322,7 +322,15 @@ data class Recipe(
     /** Summe der Zutatenmengen in g (Rohgewicht vor dem Kochen). */
     val totalIngredientWeightG: Float? = null,
     /** Gewicht nach dem Kochen (optional) – z.B. Nudeln mit Wasseraufnahme. */
-    val cookedWeightG: Float? = null
+    val cookedWeightG: Float? = null,
+    /** Wie oft ins Tagebuch übernommen / gekocht. */
+    val timesCooked: Int = 0,
+    /** Unix-ms des letzten Trackings. */
+    val lastCookedAt: Long? = null,
+    /** Letzte Bewertung 1–5 (0 = noch keine). */
+    val cookRating: Int = 0,
+    /** Notiz fürs nächste Mal, z.B. „Himbeeren mit Erythrit süssen“. */
+    val nextTimeNote: String = ""
 ) {
     /** Gewicht für Gramm-Tracking: gekocht falls gesetzt, sonst Roh-Zutatensumme. */
     fun yieldWeightG(): Float? =

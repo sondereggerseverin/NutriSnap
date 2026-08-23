@@ -2,6 +2,7 @@ package ch.nutrisnap.app.domain
 
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeCategory
+import ch.nutrisnap.app.ui.screens.recipes.CookedFilter
 import ch.nutrisnap.app.ui.screens.recipes.RecipeSort
 
 /**
@@ -15,7 +16,8 @@ object RecipeListFilter {
         platformFilter: String?,
         categoryFilter: RecipeCategory?,
         needles: List<String>,
-        sort: RecipeSort
+        sort: RecipeSort,
+        cookedFilter: CookedFilter = CookedFilter.ALL
     ): List<Recipe> {
         var filtered = recipes
         if (platformFilter != null) {
@@ -23,6 +25,11 @@ object RecipeListFilter {
         }
         if (categoryFilter != null) {
             filtered = filtered.filter { it.category() == categoryFilter }
+        }
+        filtered = when (cookedFilter) {
+            CookedFilter.ALL -> filtered
+            CookedFilter.COOKED -> filtered.filter { it.timesCooked > 0 }
+            CookedFilter.NOT_COOKED -> filtered.filter { it.timesCooked <= 0 }
         }
         if (needles.isNotEmpty()) {
             filtered = filtered

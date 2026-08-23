@@ -23,6 +23,9 @@ data class NutritionState(
 
 enum class RecipeSort { NEWEST, NAME, CALORIES }
 
+/** Filter: schon getrackt vs. noch nie gekocht. */
+enum class CookedFilter { ALL, COOKED, NOT_COOKED }
+
 enum class BatchStatus { PENDING, RUNNING, DONE, ERROR }
 
 data class BatchImportItem(
@@ -46,6 +49,7 @@ data class RecipesUiState(
     val categoryFilter:   RecipeCategory? = null, // null = alle Kategorien
     val ingredientNeedles: List<String> = emptyList(), // alle müssen vorkommen
     val sort:             RecipeSort   = RecipeSort.NEWEST,
+    val cookedFilter:     CookedFilter = CookedFilter.ALL,
     val isImporting:      Boolean      = false,
     val importPhase:      String?      = null,
     val importError:      String?      = null,

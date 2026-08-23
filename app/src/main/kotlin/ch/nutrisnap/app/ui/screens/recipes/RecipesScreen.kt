@@ -318,10 +318,11 @@ fun RecipesScreen(
                         .horizontalScroll(rememberScrollState())
                 ) {
                     FilterChip(
-                        selected = state.categoryFilter == null && state.platformFilter == null && !favoritesOnly && collectionFilterId == null,
+                        selected = state.categoryFilter == null && state.platformFilter == null && state.cookedFilter == CookedFilter.ALL && !favoritesOnly && collectionFilterId == null,
                         onClick = {
                             vm.setCategoryFilter(null)
                             vm.setPlatformFilter(null)
+                            vm.setCookedFilter(CookedFilter.ALL)
                             favoritesOnly = false
                             collectionFilterId = null
                         },
@@ -352,6 +353,28 @@ fun RecipesScreen(
                             modifier = Modifier.height(28.dp)
                         )
                     }
+                    FilterChip(
+                        selected = state.cookedFilter == CookedFilter.COOKED,
+                        onClick = {
+                            vm.setCookedFilter(
+                                if (state.cookedFilter == CookedFilter.COOKED) CookedFilter.ALL
+                                else CookedFilter.COOKED
+                            )
+                        },
+                        label = { Text("Schon gekocht", fontSize = 11.sp) },
+                        modifier = Modifier.height(28.dp)
+                    )
+                    FilterChip(
+                        selected = state.cookedFilter == CookedFilter.NOT_COOKED,
+                        onClick = {
+                            vm.setCookedFilter(
+                                if (state.cookedFilter == CookedFilter.NOT_COOKED) CookedFilter.ALL
+                                else CookedFilter.NOT_COOKED
+                            )
+                        },
+                        label = { Text("Noch nicht", fontSize = 11.sp) },
+                        modifier = Modifier.height(28.dp)
+                    )
                     val favCount = state.recipes.count { it.isFavorite }
                     if (favCount > 0 || favoritesOnly) {
                         FilterChip(
@@ -865,7 +888,14 @@ fun RecipesScreen(
     rateAfterDiary?.let { recipe ->
         RecipeQuickRatingDialog(
             recipe = recipe,
-            onDismiss = { rateAfterDiary = null }
+            onSave = { stars, nextTime ->
+                vm.saveCookFeedback(recipe, stars, nextTime, alsoIncrementCook = true)
+                rateAfterDiary = null
+            },
+            onSkip = {
+                vm.recordRecipeCooked(recipe)
+                rateAfterDiary = null
+            }
         )
     }
 

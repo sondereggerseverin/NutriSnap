@@ -11,7 +11,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -19,11 +18,6 @@ import androidx.compose.ui.unit.sp
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeCategory
-import ch.nutrisnap.app.ui.screens.settings.notifDataStore
-import ch.nutrisnap.app.ui.theme.KEY_RECIPE_RATINGS
-import androidx.datastore.preferences.core.edit
-import kotlinx.coroutines.launch
-import org.json.JSONObject
 
 internal enum class DiaryQuantityUnit { SERVING, GRAM }
 
@@ -184,21 +178,32 @@ internal fun MealType.label() = when(this) {
 }
 
 @Composable
-internal fun RecipeQuickRatingDialog(recipe: Recipe, onDismiss: () -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = rememberCoroutineScope()
-    var stars by remember { mutableStateOf(0) }
-    var tasteOk by remember { mutableStateOf(false) }
-    var portionOk by remember { mutableStateOf(false) }
-    var again by remember { mutableStateOf(false) }
+/**
+ * Nach dem Tracken: Sterne + optionale Notiz „Nächstes Mal“.
+ * Speichert direkt am Rezept ([onSave]), nicht nur in DataStore.
+ */
+internal fun RecipeQuickRatingDialog(
+    recipe: Recipe,
+    onSave: (stars: Int, nextTimeNote: String) -> Unit,
+    onSkip: () -> Unit
+) {
+    var stars by remember(recipe.id) { mutableStateOf(recipe.cookRating.coerceIn(0, 5)) }
+    var nextTime by remember(recipe.id) { mutableStateOf(recipe.nextTimeNote) }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = onSkip,
         title = { Text("Wie war’s?") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(recipe.displayTitle(), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Sterne (fürs nächste Mal)", fontSize = 12.sp)
+                if (recipe.timesCooked > 0) {
+                    Text(
+                        "Bereits ${recipe.timesCooked}× getrackt",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text("Sterne", fontSize = 12.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     for (i in 1..5) {
                         IconButton(onClick = { stars = i }, modifier = Modifier.size(36.dp)) {
@@ -211,39 +216,27 @@ internal fun RecipeQuickRatingDialog(recipe: Recipe, onDismiss: () -> Unit) {
                         }
                     }
                 }
-                Text("Kurz-Feedback (optional)", fontSize = 12.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    FilterChip(selected = tasteOk, onClick = { tasteOk = !tasteOk }, label = { Text("Schmeckt", fontSize = 11.sp) })
-                    FilterChip(selected = portionOk, onClick = { portionOk = !portionOk }, label = { Text("Portion ok", fontSize = 11.sp) })
-                    FilterChip(selected = again, onClick = { again = !again }, label = { Text("Nochmal", fontSize = 11.sp) })
-                }
+                Text("Nächstes Mal", fontSize = 12.sp)
+                OutlinedTextField(
+                    value = nextTime,
+                    onValueChange = { nextTime = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("z.B. Himbeeren mit Erythrit süssen", fontSize = 13.sp) },
+                    minLines = 2,
+                    maxLines = 4
+                )
             }
         },
         confirmButton = {
             TextButton(
-                enabled = stars > 0,
+                enabled = stars > 0 || nextTime.isNotBlank(),
                 onClick = {
-                    scope.launch {
-                        context.notifDataStore.edit { prefs ->
-                            val map = runCatching {
-                                JSONObject(prefs[KEY_RECIPE_RATINGS] ?: "{}")
-                            }.getOrElse { JSONObject() }
-                            val obj = JSONObject()
-                            obj.put("stars", stars)
-                            obj.put("tasteOk", tasteOk)
-                            obj.put("portionOk", portionOk)
-                            obj.put("again", again)
-                            obj.put("at", System.currentTimeMillis())
-                            map.put(recipe.id.toString(), obj)
-                            prefs[KEY_RECIPE_RATINGS] = map.toString()
-                        }
-                        onDismiss()
-                    }
+                    onSave(stars, nextTime.trim())
                 }
             ) { Text("Speichern") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Überspringen") }
+            TextButton(onClick = onSkip) { Text("Überspringen") }
         }
     )
 }

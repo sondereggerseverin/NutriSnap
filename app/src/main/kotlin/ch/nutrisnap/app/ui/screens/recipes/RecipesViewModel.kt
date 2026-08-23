@@ -136,6 +136,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     private val _categoryFilter = MutableStateFlow<RecipeCategory?>(null)
     private val _ingredientNeedles = MutableStateFlow<List<String>>(emptyList())
     private val _sort           = MutableStateFlow(RecipeSort.NEWEST)
+    private val _cookedFilter   = MutableStateFlow(CookedFilter.ALL)
     private val _importState    = MutableStateFlow(ImportState())
     private val _nutritionState = MutableStateFlow(NutritionState())
     private val _batchState     = MutableStateFlow(BatchImportState())
@@ -156,36 +157,44 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         return matchesToOverrides(matchDao.getMatchesForRecipeOnce(recipeId))
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private val recipeListFlow: Flow<List<Recipe>> = combine(
-        _query.flatMapLatest { q ->
-            if (q.isBlank()) repo.getAll() else repo.search(q)
-        },
-        _platformFilter,
-        _categoryFilter,
-        _ingredientNeedles,
-        _sort
-    ) { recipes, platformFilter, categoryFilter, needles, sort ->
-        RecipeListFilter.filterAndSort(
-            recipes = recipes,
-            platformFilter = platformFilter,
-            categoryFilter = categoryFilter,
-            needles = needles,
-            sort = sort
-        )
-    }
-
     private data class FilterMeta(
         val query: String,
         val platformFilter: String?,
         val categoryFilter: RecipeCategory?,
         val needles: List<String>,
-        val sort: RecipeSort
+        val sort: RecipeSort,
+        val cookedFilter: CookedFilter
     )
 
     private val filterMetaFlow = combine(
-        _query, _platformFilter, _categoryFilter, _ingredientNeedles, _sort
-    ) { q, p, c, n, s -> FilterMeta(q, p, c, n, s) }
+        _query, _platformFilter, _categoryFilter, _ingredientNeedles, _sort, _cookedFilter
+    ) { arr ->
+        FilterMeta(
+            query = arr[0] as String,
+            platformFilter = arr[1] as String?,
+            categoryFilter = arr[2] as RecipeCategory?,
+            needles = arr[3] as List<String>,
+            sort = arr[4] as RecipeSort,
+            cookedFilter = arr[5] as CookedFilter
+        )
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val recipeListFlow: Flow<List<Recipe>> = combine(
+        _query.flatMapLatest { q ->
+            if (q.isBlank()) repo.getAll() else repo.search(q)
+        },
+        filterMetaFlow
+    ) { recipes, meta ->
+        RecipeListFilter.filterAndSort(
+            recipes = recipes,
+            platformFilter = meta.platformFilter,
+            categoryFilter = meta.categoryFilter,
+            needles = meta.needles,
+            sort = meta.sort,
+            cookedFilter = meta.cookedFilter
+        )
+    }
 
     private val importNutFlow = combine(_importState, _nutritionState, _isTranslating) { imp, nut, tr ->
         Triple(imp, nut, tr)
@@ -204,6 +213,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             categoryFilter    = meta.categoryFilter,
             ingredientNeedles = meta.needles,
             sort              = meta.sort,
+            cookedFilter      = meta.cookedFilter,
             isImporting       = imp.isImporting,
             importPhase       = imp.importPhase,
             importError       = imp.importError,
@@ -218,6 +228,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setQuery(q: String) { _query.value = q }
     fun setPlatformFilter(p: String?) { _platformFilter.value = p }
+    fun setCookedFilter(f: CookedFilter) { _cookedFilter.value = f }
     fun setCategoryFilter(c: RecipeCategory?) { _categoryFilter.value = c }
     fun clearCookFilters() {
         _ingredientNeedles.value = emptyList()
@@ -814,6 +825,43 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     fun toggleFavorite(recipe: Recipe) {
         viewModelScope.launch {
             repo.updateRecipe(recipe.copy(isFavorite = !recipe.isFavorite))
+        }
+    }
+
+    /** Nach Tagebuch-Eintrag: Koch-Zähler + Zeitstempel erhöhen (auch ohne Bewertung). */
+    fun recordRecipeCooked(recipe: Recipe) {
+        viewModelScope.launch {
+            val current = repo.getById(recipe.id) ?: recipe
+            repo.updateRecipe(
+                current.copy(
+                    timesCooked = current.timesCooked + 1,
+                    lastCookedAt = System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    /**
+     * Sterne + „Nächstes Mal“-Notiz speichern.
+     * Zähler wird erhöht, falls [alsoIncrementCook] true (Default nach Tracken).
+     */
+    fun saveCookFeedback(
+        recipe: Recipe,
+        stars: Int,
+        nextTimeNote: String,
+        alsoIncrementCook: Boolean = true
+    ) {
+        viewModelScope.launch {
+            val current = repo.getById(recipe.id) ?: recipe
+            val cooked = if (alsoIncrementCook) current.timesCooked + 1 else current.timesCooked
+            repo.updateRecipe(
+                current.copy(
+                    timesCooked = cooked,
+                    lastCookedAt = if (alsoIncrementCook) System.currentTimeMillis() else current.lastCookedAt,
+                    cookRating = stars.coerceIn(0, 5),
+                    nextTimeNote = nextTimeNote
+                )
+            )
         }
     }
 

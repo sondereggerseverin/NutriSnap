@@ -81,7 +81,7 @@ interface UserProfileDao {
         RecipeComponent::class,
         FrozenMeal::class
     ],
-    version = 35,
+    version = 36,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -725,6 +725,38 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // Rezept: Koch-Zähler, Bewertung und „Nächstes Mal“-Notiz
+        private val MIGRATION_35_36 = object : Migration(35, 36) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE recipes ADD COLUMN timesCooked INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE recipes ADD COLUMN lastCookedAt INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE recipes ADD COLUMN cookRating INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE recipes ADD COLUMN nextTimeNote TEXT NOT NULL DEFAULT ''")
+                // Backfill aus Tagebuch: negative foodItemId = -recipeId oder matchedRecipeId
+                db.execSQL("""
+                    UPDATE recipes SET timesCooked = (
+                        SELECT COUNT(*) FROM diary_entries
+                        WHERE matchedRecipeId = recipes.id
+                           OR foodItemId = -recipes.id
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    UPDATE recipes SET lastCookedAt = (
+                        SELECT MAX(
+                            CASE
+                                WHEN length(dateStr) = 10 THEN
+                                    CAST(strftime('%s', dateStr) AS INTEGER) * 1000
+                                ELSE NULL
+                            END
+                        ) FROM diary_entries
+                        WHERE matchedRecipeId = recipes.id
+                           OR foodItemId = -recipes.id
+                    )
+                    WHERE timesCooked > 0
+                """.trimIndent())
+            }
+        }
+
 
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
@@ -742,7 +774,7 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
                         MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28,
                         MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32,
-                        MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35
+                        MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36
                     )
                     .build()
                     .also { INSTANCE = it }
