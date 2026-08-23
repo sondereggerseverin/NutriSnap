@@ -183,46 +183,76 @@ fun RecipeDetailSheet(
                 Spacer(Modifier.height(8.dp))
             }
 
-            // ── Dichte Portionen-Zeile ───────────────────────────────────────
+            // ── Dichte Portionen-Zeile + Schnell-Chips ───────────────────────
             item {
-                Row(
+                val baseServings = recipe.servings.coerceAtLeast(1)
+                Column(
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
-                    Text("Portionen", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surface) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(0.dp),
-                            modifier = Modifier.padding(horizontal = 2.dp)
-                        ) {
-                            IconButton(onClick = { if (servings > 1) servings-- }, Modifier.size(30.dp)) {
-                                Icon(Icons.Default.Remove, "-", Modifier.size(15.dp))
-                            }
-                            Text(
-                                "$servings",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                modifier = Modifier.widthIn(min = 24.dp),
-                                style = LocalTextStyle.current.copy(textAlign = TextAlign.Center)
-                            )
-                            IconButton(onClick = { servings++ }, Modifier.size(30.dp)) {
-                                Icon(Icons.Default.Add, "+", Modifier.size(15.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Portionen", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surface) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(0.dp),
+                                modifier = Modifier.padding(horizontal = 2.dp)
+                            ) {
+                                IconButton(onClick = { if (servings > 1) servings-- }, Modifier.size(30.dp)) {
+                                    Icon(Icons.Default.Remove, "-", Modifier.size(15.dp))
+                                }
+                                Text(
+                                    "$servings",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp,
+                                    modifier = Modifier.widthIn(min = 24.dp),
+                                    style = LocalTextStyle.current.copy(textAlign = TextAlign.Center)
+                                )
+                                IconButton(onClick = { servings++ }, Modifier.size(30.dp)) {
+                                    Icon(Icons.Default.Add, "+", Modifier.size(15.dp))
+                                }
                             }
                         }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("metrisch", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Switch(
+                                checked = metricMode,
+                                onCheckedChange = { metricMode = it },
+                                modifier = Modifier.height(22.dp).padding(start = 4.dp)
+                            )
+                        }
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("metrisch", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Switch(
-                            checked = metricMode,
-                            onCheckedChange = { metricMode = it },
-                            modifier = Modifier.height(22.dp).padding(start = 4.dp)
-                        )
+                    // Schnell-Faktoren relativ zur Original-Portionszahl
+                    val factors = listOf(0.5f to "½", 1f to "1×", 1.5f to "1½", 2f to "2×")
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        factors.forEach { (factor, label) ->
+                            val target = (baseServings * factor).toInt().coerceAtLeast(1)
+                            val selected = servings == target
+                            FilterChip(
+                                selected = selected,
+                                onClick = { servings = target },
+                                label = {
+                                    Text(
+                                        label,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                },
+                                modifier = Modifier.height(28.dp)
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.height(8.dp))

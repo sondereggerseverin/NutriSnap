@@ -135,7 +135,7 @@ fun CookingModeScreen(recipe: Recipe, onBack: () -> Unit) {
                     Text("Zutaten", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(12.dp))
 
-                    // Portionen-Stepper
+                    // Portionen-Stepper + Schnell-Chips
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -159,11 +159,29 @@ fun CookingModeScreen(recipe: Recipe, onBack: () -> Unit) {
                             }
                         }
                     }
+                    val factors = listOf(0.5f to "½", 1f to "1×", 1.5f to "1½", 2f to "2×")
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        factors.forEach { (factor, label) ->
+                            val target = (baseServings * factor).toInt().coerceAtLeast(1)
+                            val selected = servings == target
+                            FilterChip(
+                                selected = selected,
+                                onClick = { servings = target },
+                                label = { Text(label) }
+                            )
+                        }
+                    }
                     if (servings != baseServings) {
                         Text(
                             "Original: $baseServings Portion${if (baseServings == 1) "" else "en"} – Mengen unten angepasst",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
                         )
                     }
                     Spacer(Modifier.height(16.dp))
