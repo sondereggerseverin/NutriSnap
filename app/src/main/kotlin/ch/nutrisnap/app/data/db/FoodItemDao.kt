@@ -60,6 +60,16 @@ interface FoodItemDao {
     """)
     fun getFrequentFoods(): Flow<List<FoodItem>>
 
+    /** Snapshot-Variante für einmalige Rankings (z. B. Rest-Makro-Vorschläge). */
+    @Query("""
+        SELECT fi.* FROM food_items fi
+        INNER JOIN diary_entries de ON fi.id = de.foodItemId
+        GROUP BY fi.id
+        ORDER BY COUNT(de.id) DESC
+        LIMIT :limit
+    """)
+    suspend fun getFrequentFoodsOnce(limit: Int = 15): List<FoodItem>
+
     // ── Single item by id ─────────────────────────────────────────────────────
     @Query("SELECT * FROM food_items WHERE id = :id")
     suspend fun getById(id: Int): FoodItem?

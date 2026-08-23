@@ -43,8 +43,10 @@ fun HomeScreen(
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val hcState by hcVm.uiState.collectAsStateWithLifecycle()
+    val macroSuggestions by vm.macroSuggestions.collectAsStateWithLifecycle()
     var showWeightDialog by remember { mutableStateOf(false) }
     var showActivityDialog by remember { mutableStateOf(false) }
+    var snackMessage by remember { mutableStateOf<String?>(null) }
     val window = ch.nutrisnap.app.ui.rememberWindowInfo()
 
     ch.nutrisnap.app.ui.AdaptiveContent(window = window) {
@@ -70,6 +72,21 @@ fun HomeScreen(
                     onClick = { meal -> onNavigateToDiary(meal.type, meal.count == 0) },
                     onQuickAdd = { meal -> onNavigateToDiary(meal.type, true) }
                 )
+            }
+            if (macroSuggestions.isNotEmpty() && state.isViewingToday) {
+                item {
+                    RemainingMacroSuggestionsCard(
+                        remainingKcal = state.remaining,
+                        remainingProtein = state.remainingProtein,
+                        suggestions = macroSuggestions,
+                        onAdd = { suggestion ->
+                            vm.applyMacroSuggestion(suggestion) { ok ->
+                                snackMessage = if (ok) "„${suggestion.title}“ hinzugefügt"
+                                else "Konnte nicht hinzufügen"
+                            }
+                        }
+                    )
+                }
             }
             // Breakdown unter den Mahlzeiten, damit Ring + 4 Kacheln ohne Scrollen passen
             item { CalorieBreakdownCard(state) }
@@ -104,6 +121,27 @@ fun HomeScreen(
             },
             onDismiss = { showActivityDialog = false }
         )
+    }
+    snackMessage?.let { msg ->
+        LaunchedEffect(msg) {
+            kotlinx.coroutines.delay(2200)
+            snackMessage = null
+        }
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.inverseSurface,
+                tonalElevation = 4.dp,
+                modifier = Modifier.padding(bottom = 96.dp, start = 24.dp, end = 24.dp)
+            ) {
+                Text(
+                    msg,
+                    color = MaterialTheme.colorScheme.inverseOnSurface,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    fontSize = 14.sp
+                )
+            }
+        }
     }
 }
 

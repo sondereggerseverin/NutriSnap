@@ -1052,3 +1052,77 @@ internal fun BreakdownLine(label: String, value: String, emphasize: Boolean = fa
         )
     }
 }
+
+@Composable
+internal fun RemainingMacroSuggestionsCard(
+    remainingKcal: Float,
+    remainingProtein: Float,
+    suggestions: List<ch.nutrisnap.app.domain.MacroSuggestion>,
+    onAdd: (ch.nutrisnap.app.domain.MacroSuggestion) -> Unit
+) {
+    if (suggestions.isEmpty()) return
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f)
+        )
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Was passt noch?",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    "${remainingKcal.toInt()} kcal · P ${remainingProtein.toInt()}g offen",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            suggestions.forEach { s ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { onAdd(s) }
+                        .padding(vertical = 8.dp, horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val emoji = when (s.kind) {
+                        ch.nutrisnap.app.domain.MacroSuggestionKind.RECIPE -> "🍽️"
+                        ch.nutrisnap.app.domain.MacroSuggestionKind.CUSTOM_FOOD -> "⭐"
+                        ch.nutrisnap.app.domain.MacroSuggestionKind.FREQUENT_FOOD -> "🔁"
+                    }
+                    Text(emoji, fontSize = 18.sp, modifier = Modifier.padding(end = 10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            s.title,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1
+                        )
+                        Text(
+                            s.subtitle,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
+                    FilledTonalButton(
+                        onClick = { onAdd(s) },
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text("Hinzufügen", fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+    }
+}
