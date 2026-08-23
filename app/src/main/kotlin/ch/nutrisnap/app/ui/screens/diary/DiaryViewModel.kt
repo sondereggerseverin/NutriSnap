@@ -648,7 +648,8 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         onDone: (Long?) -> Unit = {}
     ) {
         viewModelScope.launch {
-            val entries = _uiState.value.entries.filter { it.mealType == mealType }
+            val entries = repo.getEntriesForDateOnce(_date.value)
+                .filter { it.mealType == mealType }
             if (entries.isEmpty()) {
                 onDone(null)
                 return@launch
@@ -664,8 +665,14 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
                     quantityGrams = e.amountGrams
                 )
             }
+            val fallbackName = when (mealType) {
+                MealType.BREAKFAST -> "Frühstück Vorlage"
+                MealType.LUNCH -> "Mittag Vorlage"
+                MealType.DINNER -> "Abend Vorlage"
+                MealType.SNACK -> "Snack Vorlage"
+            }
             val id = runCatching {
-                templateRepo.saveTemplate(name.trim().ifBlank { mealType.label() }, mealType, items)
+                templateRepo.saveTemplate(name.trim().ifBlank { fallbackName }, mealType, items)
             }.getOrNull()
             onDone(id)
         }

@@ -275,6 +275,10 @@ fun DiaryScreen(
                 autopilotTemplates.filter { it.mealType !in presentMeals }
             }
         }
+        val openPatternMeals = remember(mealPatterns, state.entries) {
+            val present = state.entries.map { it.mealType }.toSet()
+            mealPatterns.filter { it.mealType !in present }
+        }
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
@@ -354,10 +358,6 @@ fun DiaryScreen(
                 }
             }
             // 1-Tap-Relog für erkannte wiederkehrende Mahlzeiten
-            val openPatternMeals = remember(mealPatterns, state.entries) {
-                val present = state.entries.map { it.mealType }.toSet()
-                mealPatterns.filter { it.mealType !in present }
-            }
             if (openPatternMeals.isNotEmpty()) {
                 item(key = "meal_pattern_banner") {
                     MealPatternBanner(
