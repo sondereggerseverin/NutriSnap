@@ -145,19 +145,23 @@ class RecipeScraper(private val context: Context) {
         if (!useVideoTranscript) return caption
         if (!VideoTranscriptService.isWeakCaption(caption) && isGoodCaption(caption)) return caption
         progress("Video-Transkript…")
-        val mediaUrl = when (platform) {
-            "tiktok" -> VideoTranscriptService.resolveTikTokMediaUrl(url)
-            "instagram" -> shortcode?.let { VideoTranscriptService.resolveInstagramMediaUrl(it) }
-            else -> null
-        } ?: return caption
-        val transcript = VideoTranscriptService.transcribe(mediaUrl) ?: return caption
-        return buildString {
-            if (caption.isNotBlank()) {
-                append(caption.trim())
-                append("\n\n--- Transkript ---\n")
+        // Reines Enrichment — darf den Hauptpfad nie blockieren. Hartes
+        // Gesamtbudget statt der OkHttp-Timeouts (bis zu ~90s) durchschlagen zu lassen.
+        return withTimeoutOrNull(12_000L) {
+            val mediaUrl = when (platform) {
+                "tiktok" -> VideoTranscriptService.resolveTikTokMediaUrl(url)
+                "instagram" -> shortcode?.let { VideoTranscriptService.resolveInstagramMediaUrl(it) }
+                else -> null
+            } ?: return@withTimeoutOrNull caption
+            val transcript = VideoTranscriptService.transcribe(mediaUrl) ?: return@withTimeoutOrNull caption
+            buildString {
+                if (caption.isNotBlank()) {
+                    append(caption.trim())
+                    append("\n\n--- Transkript ---\n")
+                }
+                append(transcript.trim())
             }
-            append(transcript.trim())
-        }
+        } ?: caption
     }
 
     private fun detectPlatform(url: String) = when {
