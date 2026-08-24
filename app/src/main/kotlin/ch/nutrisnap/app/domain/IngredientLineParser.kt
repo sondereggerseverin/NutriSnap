@@ -30,10 +30,11 @@ private val UNIT_ALIASES = mapOf(
     "kg" to "kg", "kilogram" to "kg", "kilogramm" to "kg",
     "ml" to "ml", "milliliter" to "ml", "millilitre" to "ml", "milliliters" to "ml",
     "l" to "l", "liter" to "l", "litre" to "l",
-    "tsp" to "TL", "teaspoon" to "TL", "tl" to "TL",
-    "tbsp" to "EL", "tablespoon" to "EL", "el" to "EL",
+    "tsp" to "TL", "teaspoon" to "TL", "teaspoons" to "TL", "tl" to "TL",
+    "tbsp" to "EL", "tbs" to "EL", "tablespoon" to "EL", "tablespoons" to "EL", "el" to "EL",
     "stück" to "Stück", "stueck" to "Stück", "piece" to "Stück", "pieces" to "Stück",
-    "cookie" to "Stück", "cookies" to "Stück", "pc" to "Stück", "pcs" to "Stück",
+    "cookie" to "Stück", "cookies" to "Stück", "biscuit" to "Stück", "biscuits" to "Stück",
+    "keks" to "Stück", "kekse" to "Stück", "pc" to "Stück", "pcs" to "Stück",
     "prise" to "Prise", "pinch" to "Prise",
     "bund" to "Bund", "dose" to "Dose", "packung" to "Packung",
     "scheibe" to "Scheibe", "slice" to "Scheibe", "zehe" to "Zehe"
@@ -64,7 +65,7 @@ fun stripSectionPrefix(line: String): String =
         ""
     ).trim()
 
-/** Zählbare Lebensmittel: "2 chicken breasts" → Stück, nicht g. */
+/** Zählbare Lebensmittel: "2 chicken breasts" / "2 weetbix" → Stück, nicht g. */
 private val COUNTABLE_NAME_HINTS = listOf(
     "breast", "brust", "filet", "fillet", "thigh", "schenkel",
     "egg", "eggs", "ei", "eier",
@@ -72,7 +73,16 @@ private val COUNTABLE_NAME_HINTS = listOf(
     "clove", "cloves", "zehe", "zehen", "garlic", "knoblauch",
     "tomato", "tomate", "potato", "kartoffel", "avocado",
     "banana", "banane", "apple", "apfel", "lime", "lemon", "zitrone",
-    "piece", "pieces", "stück", "stueck", "stange", "scheibe", "slice"
+    "piece", "pieces", "stück", "stueck", "stange", "scheibe", "slice",
+    // Frühstücks-/Keks-Produkte (häufig in IG-Meal-Prep ohne Einheit)
+    "weetbix", "weetabix", "weet-bix", "weet bix",
+    "biscuit", "biscuits", "cookie", "cookies", "keks", "kekse",
+    "biscoff", "lotus",
+    "cracker", "crackers", "wafer", "wafers",
+    "scoop", "scoops", "kugel", "kugeln",
+    "bar", "bars", "riegel",
+    "tortilla", "tortillas", "wrap", "wraps",
+    "leaf", "leaves", "blatt", "blätter", "blatter"
 )
 
 private fun isCountableName(name: String): Boolean {
@@ -88,12 +98,32 @@ private fun normalizeUnit(raw: String, nameHint: String = ""): String {
     return UNIT_ALIASES[raw.trim().lowercase()] ?: raw.trim()
 }
 
-/** "Haferflocken (null)" aus Yazio-Import entfernen. */
-private fun cleanIngredientName(raw: String): String =
-    raw.trim()
+/**
+ * Filler-Wörter und leere Klammern aus Zutatennamen entfernen.
+ * Typische AI-/Caption-Reste: "of", "heaped", "level", "approx", "crushed", "whole", "melted".
+ */
+private fun cleanIngredientName(raw: String): String {
+    var s = raw.trim()
         .replace(Regex("""\s*\(\s*null\s*\)""", RegexOption.IGNORE_CASE), "")
         .replace(Regex("""\s*\(\s*\)"""), "")
         .trim()
+    // Führende/eingebettete Mengen-Filler und Präpositionen
+    s = s.replace(
+        Regex(
+            """(?i)\b(?:heaped|level|rounded|scant|packed|approx\.?|approximately|about|ca\.?|roughly|optional)\b"""
+        ),
+        " "
+    )
+    // "of X" / "of the X" am Anfang oder nach Menge
+    s = s.replace(Regex("""(?i)^(?:of\s+(?:the\s+)?)"""), "")
+    s = s.replace(Regex("""(?i)\s+of\s+(?=the\s+)?"""), " ")
+    // Zustandswörter, die als Name-Präfix hängen bleiben
+    s = s.replace(
+        Regex("""(?i)\b(?:crushed|whole|melted|chopped|diced|minced|sliced|grated|fresh|dried)\b"""),
+        " "
+    )
+    return s.replace(Regex("""\s{2,}"""), " ").trim()
+}
 
 /** Wandelt "1 ¼", "¼", "2/3", "1 1/8" oder "1.5" in einen reinen Dezimalstring um. */
 private fun parseAmountToken(raw: String): String {
@@ -158,7 +188,22 @@ fun parseIngredientLine(line: String): ParsedIngredient {
             name = name
         )
     }
-    // "2 chicken breasts" ohne erkannte Einheit (Regex braucht oft Whitespace+Name)
+    // "1 heaped teaspoon of cream cheese" / "2 tablespoons of Greek Yogurt"
+    // Adjektiv zwischen Zahl und Einheit → Einheit extrahieren, Filler strippen
+    val adjUnit = Regex(
+        """^(\d+(?:[.,]\d+)?|\d+/\d+|[¼½¾⅓⅔])\s+(?:heaped|level|rounded|scant|packed|approx\.?|approximately|about)?\s*""" +
+            """(teaspoons?|tablespoons?|tsp|tbsp|tbs|TL|EL)\b(?:\s+of)?\s+(.+)$""",
+        RegexOption.IGNORE_CASE
+    ).find(trimmed)
+    if (adjUnit != null) {
+        val name = cleanIngredientName(adjUnit.groupValues[3])
+        return ParsedIngredient(
+            amount = parseAmountToken(adjUnit.groupValues[1]),
+            unit = normalizeUnit(adjUnit.groupValues[2], name),
+            name = name
+        )
+    }
+    // "2 chicken breasts" / "2 weetbix" ohne erkannte Einheit
     val countOnly = Regex(
         """^(\d+(?:[.,]\d+)?)\s+(.+)$"""
     ).find(trimmed)

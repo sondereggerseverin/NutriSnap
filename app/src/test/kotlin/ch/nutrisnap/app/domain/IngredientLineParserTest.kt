@@ -36,4 +36,46 @@ class IngredientLineParserTest {
         val b = normalizeForCoverageMatch("200 g Haferflocken")
         assertEquals(a, b)
     }
+
+    @Test
+    fun `weetbix without unit becomes Stuck`() {
+        val p = parseIngredientLine("2 weetbix")
+        assertEquals("2", p.amount)
+        assertEquals("Stück", p.unit)
+        assertTrue(p.name.contains("weetbix", ignoreCase = true))
+    }
+
+    @Test
+    fun `biscoff biscuit without unit becomes Stuck`() {
+        val p = parseIngredientLine("1 whole biscoff biscuit")
+        assertEquals("1", p.amount)
+        assertEquals("Stück", p.unit)
+        assertTrue(p.name.contains("biscoff", ignoreCase = true) || p.name.contains("biscuit", ignoreCase = true))
+        assertTrue(!p.name.contains("whole", ignoreCase = true))
+    }
+
+    @Test
+    fun `heaped teaspoon of cream cheese parses as TL`() {
+        val p = parseIngredientLine("1 heaped teaspoon of cream cheese")
+        assertEquals("1", p.amount)
+        assertEquals("TL", p.unit)
+        assertTrue(p.name.contains("cream", ignoreCase = true) || p.name.contains("cheese", ignoreCase = true))
+        assertTrue(!p.name.contains("heaped", ignoreCase = true))
+        assertTrue(!p.name.lowercase().trim().startsWith("of "))
+    }
+
+    @Test
+    fun `tablespoons of greek yogurt parses as EL`() {
+        val p = parseIngredientLine("2 tablespoons of Greek Yogurt")
+        assertEquals("2", p.amount)
+        assertEquals("EL", p.unit)
+        assertTrue(p.name.contains("Greek", ignoreCase = true) || p.name.contains("Yogurt", ignoreCase = true))
+    }
+
+    @Test
+    fun `crushed biscoff biscuit becomes Stuck`() {
+        val p = parseIngredientLine("1 crushed biscoff biscuit")
+        assertEquals("1", p.amount)
+        assertEquals("Stück", p.unit)
+    }
 }
