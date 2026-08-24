@@ -99,7 +99,15 @@ object RecipeGermanMetricConverter {
         r = r.replace(Regex("""\s*[)]\s*"""), " ").replace(Regex("""\s*[(]\s*"""), " ")
         r = r.replace(Regex("""\s{2,}"""), " ").trim()
 
-        // 5) Führendes Bullet wiederherstellen wenn Original eins hatte
+        // 5) Filler-Wörter aus Caption/AI-Resten entfernen
+        r = r.replace(
+            Regex("""(?i)\b(?:heaped|level|rounded|scant|packed|approx\.?|approximately|about)\b"""),
+            " "
+        )
+        r = r.replace(Regex("""(?i)\s+of\s+"""), " ")
+        r = r.replace(Regex("""\s{2,}"""), " ").trim()
+
+        // 6) Führendes Bullet wiederherstellen wenn Original eins hatte
         return r
     }
 
@@ -191,41 +199,51 @@ object RecipeGermanMetricConverter {
             parseAmount(mr.groupValues[1])?.let { fmt(it * 28.35, " g") } ?: mr.value
         }
 
-        // cup / tbsp / tsp: abhängig von der Zutat (Name nach der Einheit)
+        // cup → g/ml; tbsp/tsp → EL/TL (deutsche Löffelmasse, präziser als pauschale g-Umrechnung)
+        // Optional: heaped/level/rounded vor der Einheit → Faktor 1.5 / 1.0 / 1.25
         val volPattern = Regex(
-            """(\d+\s+\d+/\d+|\d+/\d+|\d+(?:[.,]\d+)?)\s*(cups?|tbsp|tbs|tablespoons?|tsp|teaspoons?)\b\s*(.*)""",
+            """(\d+\s+\d+/\d+|\d+/\d+|\d+(?:[.,]\d+)?)\s+""" +
+                """(?:(heaped|level|rounded|scant|packed)\s+)?""" +
+                """(cups?|tbsp|tbs|tablespoons?|tsp|teaspoons?)\b\s*(.*)""",
             RegexOption.IGNORE_CASE
         )
         r = volPattern.replace(r) { mr ->
             val amt = parseAmount(mr.groupValues[1]) ?: return@replace mr.value
-            val unit = mr.groupValues[2].lowercase()
-            val rest = mr.groupValues[3]
+            val modifier = mr.groupValues[2].lowercase()
+            val unit = mr.groupValues[3].lowercase()
+            val rest = mr.groupValues[4]
             val name = rest.lowercase()
 
+            // heaped ≈ +50 %, rounded ≈ +25 %, scant ≈ −25 %, level/packed = 1.0
+            val heapedFactor = when (modifier) {
+                "heaped" -> 1.5
+                "rounded" -> 1.25
+                "scant" -> 0.75
+                else -> 1.0
+            }
+            val scaled = amt * heapedFactor
+
             val isLiquid = LIQUID_KEYWORDS.any { name.contains(it) }
-            val densityPerCup = densityGPerCup(name) // null = unbekannt
+            val densityPerCup = densityGPerCup(name)
 
             when {
                 unit.startsWith("cup") -> {
                     when {
-                        isLiquid -> fmt(amt * 240, " ml") + (if (rest.isNotBlank()) " $rest" else "")
-                        densityPerCup != null -> fmt(amt * densityPerCup, " g") + (if (rest.isNotBlank()) " $rest" else "")
-                        else -> fmt(amt * 240, " g") + (if (rest.isNotBlank()) " $rest" else "") // Feststoffe default: g≈ml-Volumen
+                        isLiquid -> fmt(scaled * 240, " ml") + (if (rest.isNotBlank()) " $rest" else "")
+                        densityPerCup != null -> fmt(scaled * densityPerCup, " g") + (if (rest.isNotBlank()) " $rest" else "")
+                        else -> fmt(scaled * 240, " g") + (if (rest.isNotBlank()) " $rest" else "")
                     }
                 }
+                // EL/TL beibehalten — genauer und lesbarer als 15 g / 5 g Defaults
                 unit.startsWith("tbsp") || unit == "tbs" || unit.startsWith("table") -> {
-                    when {
-                        isLiquid -> fmt(amt * 15, " ml") + (if (rest.isNotBlank()) " $rest" else "")
-                        densityPerCup != null -> fmt(amt * densityPerCup / 16.0, " g") + (if (rest.isNotBlank()) " $rest" else "")
-                        else -> fmt(amt * 15, " g") + (if (rest.isNotBlank()) " $rest" else "")
-                    }
+                    val elAmt = if (scaled == scaled.toLong().toDouble()) scaled.toLong().toString()
+                    else "%.1f".format(scaled)
+                    "$elAmt EL" + (if (rest.isNotBlank()) " $rest" else "")
                 }
-                else -> { // tsp
-                    when {
-                        isLiquid -> fmt(amt * 5, " ml") + (if (rest.isNotBlank()) " $rest" else "")
-                        densityPerCup != null -> fmt(amt * densityPerCup / 48.0, " g") + (if (rest.isNotBlank()) " $rest" else "")
-                        else -> fmt(amt * 5, " g") + (if (rest.isNotBlank()) " $rest" else "")
-                    }
+                else -> { // tsp → TL
+                    val tlAmt = if (scaled == scaled.toLong().toDouble()) scaled.toLong().toString()
+                    else "%.1f".format(scaled)
+                    "$tlAmt TL" + (if (rest.isNotBlank()) " $rest" else "")
                 }
             }
         }
@@ -233,15 +251,18 @@ object RecipeGermanMetricConverter {
         return r
     }
 
-    /** g pro US-Cup für gängige feste Zutaten. */
+    /** g pro US-Cup für gängige feste Zutaten (nur noch für cup-Umrechnung relevant). */
     private fun densityGPerCup(nameLower: String): Double? {
         val rules = listOf(
             listOf("flour", "mehl") to 120.0,
             listOf("sugar", "zucker", "coconut sugar") to 200.0,
             listOf("powdered sugar", "icing", "confectioner", "puderzucker") to 120.0,
-            listOf("butter", "butter") to 227.0,
+            listOf("butter") to 227.0,
             listOf("cottage cheese", "hüttenkäse", "huttenkase") to 225.0,
-            listOf("greek yogurt", "joghurt", "yogurt", "yoghurt") to 245.0,
+            listOf("greek yogurt", "greek yoghurt", "griechischer joghurt", "joghurt", "yogurt", "yoghurt") to 245.0,
+            listOf("cream cheese", "frischkäse", "frischkase") to 230.0,
+            listOf("biscoff", "cookie butter", "lotus spread") to 300.0,
+            listOf("peanut butter", "erdnussbutter", "nutella") to 270.0,
             listOf("honey", "honig") to 340.0,
             listOf("protein powder", "proteinpulver", "whey") to 120.0,
             listOf("cinnamon", "zimt") to 125.0,
@@ -251,7 +272,10 @@ object RecipeGermanMetricConverter {
             listOf("cocoa", "kakao") to 85.0,
             listOf("oat", "hafer") to 90.0,
             listOf("rice", "reis") to 185.0,
-            listOf("cheese", "käse", "kase") to 110.0
+            listOf("cheese", "käse", "kase") to 110.0,
+            listOf("chia") to 160.0,
+            listOf("almond flour", "mandelmehl") to 96.0,
+            listOf("coconut flour", "kokosmehl") to 112.0
         )
         for ((keys, dens) in rules) {
             if (keys.any { nameLower.contains(it) }) return dens
@@ -281,8 +305,10 @@ object RecipeGermanMetricConverter {
         Regex("""(?i)^for\s+the\s+(.+?)\s*:?\s*$""") to "Für $1:",
         Regex("""(?i)^dough\s*:?\s*$""") to "Teig:",
         Regex("""(?i)^filling\s*:?\s*$""") to "Füllung:",
+        Regex("""(?i)^base\s*:?\s*$""") to "Boden:",
         Regex("""(?i)^frosting\s*:?\s*$""") to "Glasur:",
         Regex("""(?i)^topping\s*:?\s*$""") to "Belag:",
+        Regex("""(?i)^belag\s*:?\s*$""") to "Belag:",
         Regex("""(?i)^sauce\s*:?\s*$""") to "Sauce:",
         Regex("""(?i)^marinade\s*:?\s*$""") to "Marinade:",
         Regex("""(?i)^batter\s*:?\s*$""") to "Teigmasse:",
@@ -292,6 +318,9 @@ object RecipeGermanMetricConverter {
         Regex("""(?i)^mash\s*:?\s*$""") to "Stampf:",
         Regex("""(?i)^syrup\s*:?\s*$""") to "Sirup:",
         Regex("""(?i)^icing\s*:?\s*$""") to "Glasur:",
+        Regex("""(?i)^option\s+to\s+add\s+(.+?)\s*:?\s*$""") to "Optional: $1",
+        Regex("""(?i)^optional\s*:?\s*$""") to "Optional:",
+        Regex("""(?i)^optional\s+(.+?)\s*:?\s*$""") to "Optional: $1",
         Regex("""(?i)^cream\s+cheese\s+frosting\s*:?\s*$""") to "Frischkäse-Frosting:",
         Regex("""(?i)^coffee\s+cream\s+cheese\s+frosting\s*:?\s*$""") to "Kaffee-Frischkäse-Frosting:",
         Regex("""(?i)^cinnamon\s+coffee\s+filling\s*:?\s*$""") to "Zimt-Kaffee-Füllung:",
@@ -431,6 +460,13 @@ object RecipeGermanMetricConverter {
         Regex("""(?i)\bsugar[- ]free\b""") to "zuckerfrei",
         Regex("""(?i)\bzero calorie\b""") to "kalorienfrei",
         Regex("""(?i)\beggs?\b""") to "Ei",
+        Regex("""(?i)\bbiscoff\s+biscuit\b""") to "Biscoff-Keks",
+        Regex("""(?i)\bbiscoff\s+cookie\b""") to "Biscoff-Keks",
+        Regex("""(?i)\bbiscoff\s+spread\b""") to "Biscoff-Aufstrich",
+        Regex("""(?i)\bmelted\s+biscoff\b""") to "geschmolzener Biscoff",
+        Regex("""(?i)\bweetbix\b""") to "Weetbix",
+        Regex("""(?i)\bweetabix\b""") to "Weetabix",
+        Regex("""(?i)\bweet-bix\b""") to "Weet-Bix",
         Regex("""(?i)\bbiscuit\b""") to "Keks",
         Regex("""(?i)\bspread\b""") to "Aufstrich",
         Regex("""(?i)\bmix all the ingredients\b""") to "Alle Zutaten vermengen",
