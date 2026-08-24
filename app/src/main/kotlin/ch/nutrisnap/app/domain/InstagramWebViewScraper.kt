@@ -36,7 +36,8 @@ object InstagramWebViewScraper {
      */
     @SuppressLint("SetJavaScriptEnabled")
     suspend fun extractCaption(context: Context, url: String): String? =
-        withTimeout(18_000L) {
+        // Gesamttimeout 12 s (früher 18 s) — Race bricht sowieso früher ab
+        withTimeout(12_000L) {
             suspendCancellableCoroutine { cont ->
                 val mainHandler = Handler(Looper.getMainLooper())
                 mainHandler.post {
@@ -76,8 +77,8 @@ object InstagramWebViewScraper {
                     webView.webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView, loadedUrl: String) {
                             if (finished) return
-                            // Längeres Warten: IG React + Caption-Lazy-Load
-                            val delayMs = if (isEmbed) 2_500L else 4_500L
+                            // Kürzeres DOM-Warten (früher 2.5/4.5 s + 2 s Retry)
+                            val delayMs = if (isEmbed) 1_800L else 2_800L
                             mainHandler.postDelayed({
                                 if (finished) return@postDelayed
                                 view.evaluateJavascript(EXTRACT_JS) { rawResult ->
@@ -91,7 +92,7 @@ object InstagramWebViewScraper {
                                             view.evaluateJavascript(EXTRACT_JS) { raw2 ->
                                                 finish(decodeJsString(raw2))
                                             }
-                                        }, 2_000L)
+                                        }, 1_500L)
                                     }
                                 }
                             }, delayMs)

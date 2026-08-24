@@ -58,8 +58,8 @@ class RecipeScraper(private val context: Context) {
     }
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(18, TimeUnit.SECONDS) // Jina/Mirror brauchen oft länger als IG-Embed
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(12, TimeUnit.SECONDS) // an kürzeren IG-Race (12 s) angepasst
         .followRedirects(true)
         .addInterceptor { chain ->
             val req = chain.request().newBuilder()
@@ -190,7 +190,7 @@ class RecipeScraper(private val context: Context) {
         if (isGoodCaption(caption)) {
             progress("Aus Cache…")
         } else {
-            progress(if (fastScrape) "Seite laden (schnell)…" else "Seite laden (parallel)…")
+            progress("Caption holen…")
             caption = raceInstagramCaption(canonicalUrls.first(), shortcode, fastScrape)
             if (isGoodCaption(caption)) saveCachedCaption(key, caption)
         }
@@ -248,8 +248,11 @@ class RecipeScraper(private val context: Context) {
     }
 
     /**
-     * Startet WebView + Embed + Mirror + Reader-Proxies parallel und nimmt die
-     * erste brauchbare Caption. Gesamtdauer typisch unter ~22s.
+     * Instagram-Caption-Race in Phasen:
+     *  1) Schnelle HTTP-Quellen (Embed, GraphQL, Jina, …) — oft <3–5 s
+     *  2) WebViews (Geräte-Cookies) — ab ~3 s parallel, teurer
+     *  3) Langsame Mirrors nur im Standard-Modus
+     * Timeout: 8 s (Fast) / 12 s (Standard) statt früher 22 s.
      */
     private suspend fun raceInstagramCaption(url: String, shortcode: String?, fastScrape: Boolean = false): String =
         coroutineScope {
@@ -257,154 +260,13 @@ class RecipeScraper(private val context: Context) {
 
             val desktopUa =
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-            // Fast: nur schnelle, oft erfolgreiche Quellen; Standard: volle Mirror-Liste.
-            val raceTimeoutMs = if (fastScrape) 10_000L else 22_000L
+            val raceTimeoutMs = if (fastScrape) 8_000L else 12_000L
 
-            val jobs = buildList {
-                // 1) WebView mit Geräte-Cookies (beste Chance bei Login auf dem Gerät)
-                add(async {
-                    runCatching {
-                        InstagramWebViewScraper.extractCaption(context, url)?.let { Cap(it, "webview") }
-                    }.getOrNull()?.takeIf { isGoodCaption(it.text) }
-                })
-                if (shortcode != null) {
-                    // 1b) Andere Pfad-Variante: Collection-Links nutzen oft /p/ für Reels
-                    val altPath = if ("/reel/" in url.lowercase()) {
-                        "https://www.instagram.com/p/$shortcode/"
-                    } else {
-                        "https://www.instagram.com/reel/$shortcode/"
-                    }
-                    if (altPath != url.substringBefore("?").trimEnd('/') + "/") {
-                        add(async {
-                            runCatching {
-                                InstagramWebViewScraper.extractCaption(context, altPath)
-                                    ?.let { Cap(it, "webview-alt") }
-                            }.getOrNull()?.takeIf { isGoodCaption(it.text) }
-                        })
-                    }
-                    // 2) Offizielles IG-Embed (oft ohne Login für öffentliche Posts)
-                    add(async {
-                        runCatching {
-                            fetchInstagramEmbedCaption(shortcode)?.let { Cap(it, "embed") }
-                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
-                    })
-                    // 2b) WebView auf Embed-URL (weniger Login-Wall als /p/)
-                    add(async {
-                        runCatching {
-                            val embedUrl = "https://www.instagram.com/p/$shortcode/embed/captioned/"
-                            InstagramWebViewScraper.extractCaption(context, embedUrl)?.let { Cap(it, "webview-embed") }
-                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
-                    })
-                    add(async {
-                        runCatching {
-                            val embedUrl = "https://www.instagram.com/reel/$shortcode/embed/captioned/"
-                            InstagramWebViewScraper.extractCaption(context, embedUrl)?.let { Cap(it, "webview-reel-embed") }
-                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
-                    })
-                    // 2c) Legacy JSON-Endpoint (?__a=1&__d=dis) — manchmal noch offen
-                    add(async {
-                        runCatching {
-                            fetchInstagramLegacyJsonCaption(shortcode)?.let { Cap(it, "legacy-json") }
-                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
-                    })
-                    // 2d) Öffentliche GraphQL-Shortcode-Query
-                    add(async {
-                        runCatching {
-                            fetchInstagramGraphqlCaption(shortcode)?.let { Cap(it, "graphql") }
-                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
-                    })
-                    // 3) Jina Reader — öffentlicher Page-to-Markdown-Proxy, oft an Login-Wall vorbei
-                    add(async {
-                        runCatching {
-                            fetchJinaReaderCaption("https://www.instagram.com/p/$shortcode/")
-                                ?.let { Cap(it, "jina-p") }
-                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
-                    })
-                    add(async {
-                        runCatching {
-                            fetchJinaReaderCaption("https://www.instagram.com/reel/$shortcode/")
-                                ?.let { Cap(it, "jina-reel") }
-                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
-                    })
-                    add(async {
-                        runCatching {
-                            fetchJinaReaderCaption("https://www.instagram.com/p/$shortcode/embed/captioned/")
-                                ?.let { Cap(it, "jina-embed") }
-                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
-                    })
-                    // 4) AllOrigins als CORS-Proxy aufs Embed
-                    add(async {
-                        runCatching {
-                            val embed = "https://www.instagram.com/p/$shortcode/embed/captioned/"
-                            val proxied = "https://api.allorigins.win/raw?url=${encode(embed)}"
-                            val html = fetchStringWithUA(proxied, desktopUa)
-                            extractCaptionFromHtml(html, embed)?.let { Cap(it, "allorigins-embed") }
-                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
-                    })
-                    // Langsame Mirror-Sites nur im Standard-Modus (nicht bei Fast-Scrape)
-                    if (!fastScrape) {
-                        add(async {
-                            runCatching {
-                                val doc = jsoupGet("https://imginn.com/p/$shortcode/")
-                                val t = doc.select(".desc, .photo-desc, [class*=desc], [class*=caption]").text()
-                                    .ifBlank { doc.select("meta[property=og:description]").attr("content") }
-                                Cap(t, "imginn").takeIf { isGoodCaption(it.text) }
-                            }.getOrNull()
-                        })
-                        add(async {
-                            runCatching {
-                                val doc = jsoupGet("https://www.picuki.com/media/$shortcode")
-                                val t = doc.select(".photo-description, .description, [class*=caption], [class*=desc]").text()
-                                    .ifBlank { doc.select("meta[property=og:description]").attr("content") }
-                                    .ifBlank { doc.select("meta[name=description]").attr("content") }
-                                Cap(t, "picuki").takeIf { isGoodCaption(it.text) }
-                            }.getOrNull()
-                        })
-                        add(async {
-                            runCatching {
-                                val ezUrl = url.replace("www.instagram.com", "www.instagramez.com")
-                                    .replace("instagram.com", "instagramez.com")
-                                val doc = jsoupGetWithUA(ezUrl, desktopUa)
-                                val t = doc.select("meta[property=og:description]").attr("content")
-                                    .ifBlank { doc.select("meta[name=description]").attr("content") }
-                                Cap(t, "instagramez").takeIf { isGoodCaption(it.text) }
-                            }.getOrNull()
-                        })
-                        add(async {
-                            runCatching {
-                                val ddUrl = url.replace("www.instagram.com", "www.ddinstagram.com")
-                                    .replace("instagram.com", "ddinstagram.com")
-                                val doc = jsoupGetWithUA(ddUrl, desktopUa)
-                                val t = doc.select("meta[property=og:description]").attr("content")
-                                    .ifBlank { doc.select("meta[name=description]").attr("content") }
-                                    .ifBlank { doc.select("p, .caption, [class*=caption]").text() }
-                                Cap(t, "ddinstagram").takeIf { isGoodCaption(it.text) }
-                            }.getOrNull()
-                        })
-                        add(async {
-                            runCatching {
-                                val wUrl = "https://ddinstagram.com/p/$shortcode"
-                                val doc = jsoupGetWithUA(wUrl, desktopUa)
-                                val t = doc.select("meta[property=og:description]").attr("content")
-                                    .ifBlank { doc.select("meta[name=description]").attr("content") }
-                                Cap(t, "ddinstagram-apex").takeIf { isGoodCaption(it.text) }
-                            }.getOrNull()
-                        })
-                        // Weitere Mirror (Worker-Frontends)
-                        add(async {
-                            runCatching {
-                                val doc = jsoupGetWithUA("https://www.instagrapi.com/p/$shortcode", desktopUa)
-                                val t = doc.select("meta[property=og:description]").attr("content")
-                                    .ifBlank { doc.select("[class*=caption], .caption, p").text() }
-                                Cap(t, "instagrapi").takeIf { isGoodCaption(it.text) }
-                            }.getOrNull()
-                        })
-                    }
-                }
-            }
-
-            // Erste brauchbare Caption (10 s Fast / 22 s Standard)
-            val winner = withTimeoutOrNull(raceTimeoutMs) {
+            suspend fun awaitFirstGood(
+                jobs: MutableList<kotlinx.coroutines.Deferred<Cap?>>,
+                timeoutMs: Long,
+                onSource: ((String) -> Unit)? = null
+            ): String? = withTimeoutOrNull(timeoutMs) {
                 val pending = jobs.toMutableList()
                 while (pending.isNotEmpty()) {
                     val done = select {
@@ -414,21 +276,167 @@ class RecipeScraper(private val context: Context) {
                     }
                     pending.remove(done.first)
                     val cap = done.second
-                    if (cap != null && isGoodCaption(cap.text)) return@withTimeoutOrNull cap.text
+                    if (cap != null && isGoodCaption(cap.text)) {
+                        onSource?.invoke(cap.source)
+                        return@withTimeoutOrNull cap.text
+                    }
                 }
                 null
             }
 
+            // ── Phase 1: schnelle HTTP-Quellen (kein WebView) ─────────────────
+            progress("Caption: Embed & Proxies…")
+            val fastJobs = mutableListOf<kotlinx.coroutines.Deferred<Cap?>>()
+            if (shortcode != null) {
+                fastJobs += async {
+                    runCatching {
+                        fetchInstagramEmbedCaption(shortcode)?.let { Cap(it, "embed") }
+                    }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                }
+                fastJobs += async {
+                    runCatching {
+                        fetchInstagramLegacyJsonCaption(shortcode)?.let { Cap(it, "legacy-json") }
+                    }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                }
+                fastJobs += async {
+                    runCatching {
+                        fetchInstagramGraphqlCaption(shortcode)?.let { Cap(it, "graphql") }
+                    }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                }
+                fastJobs += async {
+                    runCatching {
+                        fetchJinaReaderCaption("https://www.instagram.com/p/$shortcode/")
+                            ?.let { Cap(it, "jina-p") }
+                    }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                }
+                fastJobs += async {
+                    runCatching {
+                        fetchJinaReaderCaption("https://www.instagram.com/reel/$shortcode/")
+                            ?.let { Cap(it, "jina-reel") }
+                    }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                }
+                fastJobs += async {
+                    runCatching {
+                        fetchJinaReaderCaption("https://www.instagram.com/p/$shortcode/embed/captioned/")
+                            ?.let { Cap(it, "jina-embed") }
+                    }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                }
+                fastJobs += async {
+                    runCatching {
+                        val embed = "https://www.instagram.com/p/$shortcode/embed/captioned/"
+                        val proxied = "https://api.allorigins.win/raw?url=${encode(embed)}"
+                        val html = fetchStringWithUA(proxied, desktopUa)
+                        extractCaptionFromHtml(html, embed)?.let { Cap(it, "allorigins-embed") }
+                    }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                }
+            }
+
+            // Phase 1 max ~4 s — wenn schon Caption, WebView überspringen
+            val phase1Winner = awaitFirstGood(fastJobs, 4_000L) { src ->
+                progress("Caption von $src…")
+            }
+            if (!phase1Winner.isNullOrBlank()) {
+                fastJobs.forEach { it.cancel() }
+                return@coroutineScope phase1Winner
+            }
+
+            // ── Phase 2: WebViews (Login-Cookies auf dem Gerät) ───────────────
+            progress("Caption: WebView…")
+            val webJobs = mutableListOf<kotlinx.coroutines.Deferred<Cap?>>()
+            webJobs += async {
+                runCatching {
+                    InstagramWebViewScraper.extractCaption(context, url)?.let { Cap(it, "webview") }
+                }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+            }
+            if (shortcode != null) {
+                val altPath = if ("/reel/" in url.lowercase()) {
+                    "https://www.instagram.com/p/$shortcode/"
+                } else {
+                    "https://www.instagram.com/reel/$shortcode/"
+                }
+                if (altPath != url.substringBefore("?").trimEnd('/') + "/") {
+                    webJobs += async {
+                        runCatching {
+                            InstagramWebViewScraper.extractCaption(context, altPath)
+                                ?.let { Cap(it, "webview-alt") }
+                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                    }
+                }
+                webJobs += async {
+                    runCatching {
+                        val embedUrl = "https://www.instagram.com/p/$shortcode/embed/captioned/"
+                        InstagramWebViewScraper.extractCaption(context, embedUrl)?.let { Cap(it, "webview-embed") }
+                    }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                }
+                webJobs += async {
+                    runCatching {
+                        val embedUrl = "https://www.instagram.com/reel/$shortcode/embed/captioned/"
+                        InstagramWebViewScraper.extractCaption(context, embedUrl)
+                            ?.let { Cap(it, "webview-reel-embed") }
+                    }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                }
+            }
+
+            // Rest-Timeout für WebView + ggf. Mirrors
+            val remainingMs = (raceTimeoutMs - 4_000L).coerceAtLeast(4_000L)
+            val phase2Jobs = (fastJobs.filter { it.isActive } + webJobs).toMutableList()
+
+            // ── Phase 3: langsame Mirrors nur im Standard-Modus ───────────────
+            if (!fastScrape && shortcode != null) {
+                progress("Caption: Mirror…")
+                phase2Jobs += async {
+                    runCatching {
+                        val doc = jsoupGet("https://imginn.com/p/$shortcode/")
+                        val t = doc.select(".desc, .photo-desc, [class*=desc], [class*=caption]").text()
+                            .ifBlank { doc.select("meta[property=og:description]").attr("content") }
+                        Cap(t, "imginn").takeIf { isGoodCaption(it.text) }
+                    }.getOrNull()
+                }
+                phase2Jobs += async {
+                    runCatching {
+                        val doc = jsoupGet("https://www.picuki.com/media/$shortcode")
+                        val t = doc.select(".photo-description, .description, [class*=caption], [class*=desc]").text()
+                            .ifBlank { doc.select("meta[property=og:description]").attr("content") }
+                            .ifBlank { doc.select("meta[name=description]").attr("content") }
+                        Cap(t, "picuki").takeIf { isGoodCaption(it.text) }
+                    }.getOrNull()
+                }
+                phase2Jobs += async {
+                    runCatching {
+                        val ddUrl = url.replace("www.instagram.com", "www.ddinstagram.com")
+                            .replace("instagram.com", "ddinstagram.com")
+                        val doc = jsoupGetWithUA(ddUrl, desktopUa)
+                        val t = doc.select("meta[property=og:description]").attr("content")
+                            .ifBlank { doc.select("meta[name=description]").attr("content") }
+                            .ifBlank { doc.select("p, .caption, [class*=caption]").text() }
+                        Cap(t, "ddinstagram").takeIf { isGoodCaption(it.text) }
+                    }.getOrNull()
+                }
+                phase2Jobs += async {
+                    runCatching {
+                        val doc = jsoupGetWithUA("https://ddinstagram.com/p/$shortcode", desktopUa)
+                        val t = doc.select("meta[property=og:description]").attr("content")
+                            .ifBlank { doc.select("meta[name=description]").attr("content") }
+                        Cap(t, "ddinstagram-apex").takeIf { isGoodCaption(it.text) }
+                    }.getOrNull()
+                }
+            }
+
+            val winner = awaitFirstGood(phase2Jobs, remainingMs) { src ->
+                progress("Caption von $src…")
+            }
+
             if (!winner.isNullOrBlank()) {
-                jobs.forEach { it.cancel() }
+                phase2Jobs.forEach { it.cancel() }
+                fastJobs.forEach { it.cancel() }
                 return@coroutineScope winner
             }
 
             // Nur valide Captions — niemals den längsten HTML-Müll
-            val best = jobs.mapNotNull { d ->
+            val best = (fastJobs + phase2Jobs).mapNotNull { d ->
                 if (d.isCompleted) runCatching { d.getCompleted() }.getOrNull()?.text else null
             }.filter { isGoodCaption(it) }.maxByOrNull { it.length }.orEmpty()
-            jobs.forEach { it.cancel() }
+            (fastJobs + phase2Jobs).forEach { it.cancel() }
             best
         }
 
