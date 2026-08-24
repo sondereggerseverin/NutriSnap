@@ -192,13 +192,13 @@ internal fun IngredientVerifyRow(
                 )
             }
 
-            // Menge (feste Spalte)
+            // Menge (feste Spalte – etwas breiter für „2 Stück“)
             Text(
                 parts.amountLabel,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.width(56.dp),
+                modifier = Modifier.width(72.dp),
                 maxLines = 1
             )
 
