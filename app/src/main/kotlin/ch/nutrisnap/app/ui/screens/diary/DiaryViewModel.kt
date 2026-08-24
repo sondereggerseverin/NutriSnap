@@ -95,11 +95,10 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
             val trend = AdaptiveTdeeCalculator.computeTrendTdee(weightByDate, intakeByDate)
 
             val manualEnabled = prefs[KEY_MANUAL_ACTIVITY_ENABLED] ?: false
-            val manualByDate = if (manualEnabled) {
-                manualActivities.associate {
-                    LocalDate.parse(it.dateStr) to it.activeCaloriesKcal.toDouble()
-                }
-            } else emptyMap()
+            // Immer anwenden — Toggle steuert nur die permanente UI, nicht die Rechnung
+            val manualByDate = manualActivities.associate {
+                LocalDate.parse(it.dateStr) to it.activeCaloriesKcal.toDouble()
+            }
             val manualToday = manualByDate[selected]
             val hcToday = hcCache?.activeCaloriesKcal
             val todayActiveCombined = run {

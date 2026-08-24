@@ -196,11 +196,11 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         val trend = AdaptiveTdeeCalculator.computeTrendTdee(weightByDate, intakeByDate)
 
         val manualEnabled = prefs[KEY_MANUAL_ACTIVITY_ENABLED] ?: false
-        val manualByDate = if (manualEnabled) {
-            manualActivities.associate {
-                LocalDate.parse(it.dateStr) to it.activeCaloriesKcal.toDouble()
-            }
-        } else emptyMap()
+        // Einträge immer anwenden (auch ohne Toggle) — Toggle steuert nur die permanente Karte.
+        // So kann man z. B. für Gestern einmalig fehlende Samsung-kcal nachtragen.
+        val manualByDate = manualActivities.associate {
+            LocalDate.parse(it.dateStr) to it.activeCaloriesKcal.toDouble()
+        }
         val manualToday = manualByDate[selected]
         val hcToday = hcCache?.activeCaloriesKcal
         // HC + manuell = eine Aktivitätsquelle, beide 1:1 in der Ziel-Rechnung
@@ -284,7 +284,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             tdeeConfidence   = adaptiveTarget?.confidencePercent ?: 0,
             calorieBreakdown = breakdown,
             manualActivityEnabled = manualEnabled,
-            manualActivityKcal = if (manualEnabled) manualToday?.toFloat() else null,
+            // Auch ohne Toggle anzeigen, wenn für den Tag ein Eintrag existiert
+            manualActivityKcal = manualToday?.toFloat(),
             aggressiveSportDay = aggressiveSport,
             selectedDate = selected,
             isViewingToday = viewingToday,
@@ -385,14 +386,15 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun logManualActivity(kcal: Float) {
+    fun logManualActivity(kcal: Float, date: LocalDate = _selectedDate.value) {
         viewModelScope.launch {
+            val key = date.toString()
             if (kcal <= 0f) {
-                manualActivityDao.delete(LocalDate.now().toString())
+                manualActivityDao.delete(key)
             } else {
                 manualActivityDao.upsert(
                     ManualActivityEntry(
-                        dateStr = LocalDate.now().toString(),
+                        dateStr = key,
                         activeCaloriesKcal = kcal
                     )
                 )

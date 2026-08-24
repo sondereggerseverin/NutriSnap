@@ -281,9 +281,15 @@ internal fun HomeHeader(
             // Glas-Karte: 2-Spalten-Grid, damit die Breite für Inhalt statt Luft genutzt wird
             val headerStats = buildList {
                 add(Triple("Gegessen", "${state.totalCalories.toInt()} kcal", Color.White))
-                if (state.burnedKcal > 0f) {
-                    add(Triple("Aktiv", "+${state.burnedKcal.toInt()} kcal", Color(0xFFFFE08A)))
+                // Immer anzeigen — Tap öffnet Korrektur (HC + manueller Zusatz)
+                val aktivLabel = when {
+                    state.manualActivityKcal != null && state.manualActivityKcal!! > 0f ->
+                        "+${state.burnedKcal.toInt()} kcal · ✎"
+                    state.burnedKcal > 0f ->
+                        "+${state.burnedKcal.toInt()} kcal"
+                    else -> "anpassen"
                 }
+                add(Triple("Aktiv", aktivLabel, Color(0xFFFFE08A)))
                 add(Triple("Ziel", "${state.adjustedGoal.toInt()} kcal", Color.White))
                 state.lastWeightKg?.let { kg ->
                     val delta = state.previousWeightKg?.let { prev -> kg - prev }
@@ -310,7 +316,13 @@ internal fun HomeHeader(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         row.forEach { (label, value, color) ->
-                            HeaderStatCell(label, value, color, Modifier.weight(1f))
+                            HeaderStatCell(
+                                label = label,
+                                value = value,
+                                valueColor = color,
+                                modifier = Modifier.weight(1f),
+                                onClick = if (label == "Aktiv") onEditActivity else null
+                            )
                         }
                         if (row.size == 1) Spacer(Modifier.weight(1f))
                     }
@@ -342,9 +354,14 @@ internal fun HeaderStatCell(
     label: String,
     value: String,
     valueColor: Color = Color.White,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null
 ) {
-    Column(modifier) {
+    Column(
+        modifier.then(
+            if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+        )
+    ) {
         Text(
             label,
             fontSize = 10.sp,
@@ -789,7 +806,9 @@ internal fun ManualActivityDialog(
     currentKcal: Float?,
     weightKg: Float,
     onConfirm: (kcal: Float) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    dayLabel: String = "heute",
+    healthConnectKcal: Int? = null
 ) {
     var text by remember {
         mutableStateOf(currentKcal?.takeIf { it > 0f }?.let { it.toInt().toString() } ?: "")
@@ -799,11 +818,13 @@ internal fun ManualActivityDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Aktivität heute") },
+        title = { Text("Aktivität $dayLabel") },
         text = {
             Column {
                 Text(
-                    "Zusätzlich zu Health Connect. Preset nutzt MET × Gewicht × Dauer.",
+                    "Zusatz zu Health Connect (z. B. fehlende Sport-kcal). " +
+                        (healthConnectKcal?.let { "HC: $it kcal. " } ?: "") +
+                        "Preset: MET × Gewicht × Dauer.",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

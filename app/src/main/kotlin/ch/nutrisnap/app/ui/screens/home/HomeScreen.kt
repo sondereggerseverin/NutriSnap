@@ -62,7 +62,8 @@ fun HomeScreen(
                 HomeHeader(
                     state = state,
                     onShowYesterday = { vm.showYesterday() },
-                    onShowToday = { vm.showToday() }
+                    onShowToday = { vm.showToday() },
+                    onEditActivity = { showActivityDialog = true }
                 )
             }
             item {
@@ -112,11 +113,16 @@ fun HomeScreen(
         )
     }
     if (showActivityDialog) {
+        val hcBase = (state.burnedKcal - (state.manualActivityKcal ?: 0f))
+            .toInt().coerceAtLeast(0)
+            .takeIf { state.burnedKcal > 0f || (state.manualActivityKcal ?: 0f) > 0f }
         ManualActivityDialog(
             currentKcal = state.manualActivityKcal,
             weightKg = state.lastWeightKg ?: 75f,
+            dayLabel = if (state.isViewingToday) "heute" else "gestern",
+            healthConnectKcal = hcBase,
             onConfirm = { kcal ->
-                vm.logManualActivity(kcal)
+                vm.logManualActivity(kcal, state.selectedDate)
                 showActivityDialog = false
             },
             onDismiss = { showActivityDialog = false }
