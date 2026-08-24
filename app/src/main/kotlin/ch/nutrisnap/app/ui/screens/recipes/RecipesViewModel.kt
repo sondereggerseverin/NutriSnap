@@ -1062,21 +1062,28 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
 
     fun saveManualRecipe(url: String, title: String?, caption: String) {
         viewModelScope.launch {
-            val cleaned = RecipeAiParser.cleanCaption(caption)
-            val (ingredients, instructions) = parseCaption(cleaned)
             val platform = when {
                 "instagram.com" in url || "instagr.am" in url -> "instagram"
                 "tiktok.com" in url -> "tiktok"
                 else -> "web"
             }
-            val recipe = Recipe(
-                title        = title?.ifBlank { null } ?: RecipeAiParser.extractTitle(caption, "Instagram Rezept"),
-                description  = cleaned.take(500),
-                sourceUrl    = url.ifBlank { null },
-                platform     = platform,
-                ingredients  = ingredients.ifBlank { cleaned },
-                instructions = instructions,
-                tags         = "manuell"
+            // Gleicher AI-Parser wie beim automatischen Import (statt eigenem Regex-Pfad),
+            // damit manuell eingefügte Captions genauso gut geparst werden.
+            val apiKey = runCatching { ch.nutrisnap.app.BuildConfig.GROQ_API_KEY }.getOrElse { "" }
+            val parsed = if (apiKey.isNotBlank()) {
+                RecipeAiParser.parse(caption, url.ifBlank { null }, platform, null, apiKey)
+            } else {
+                RecipeAiParser.fallbackParse(caption, url.ifBlank { null }, platform, null)
+            }
+            // Optionalen User-Titel priorisieren, sonst Parser-/Fallback-Titel behalten.
+            val finalTitle = title?.ifBlank { null } ?: parsed.title.ifBlank {
+                RecipeAiParser.extractTitle(caption, "Instagram Rezept")
+            }
+            val recipe = parsed.copy(
+                title     = finalTitle,
+                sourceUrl = url.ifBlank { null },
+                platform  = platform,
+                tags      = listOf(parsed.tags, "manuell").filter { it.isNotBlank() }.joinToString(",")
             )
             var saved = recipe.copy(id = repo.saveRecipe(recipe))
             val forceGerman = platform in setOf("instagram", "tiktok")
@@ -1084,7 +1091,4 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             _importState.update { it.copy(lastImport = saved) }
         }
     }
-
-    private fun parseCaption(caption: String): Pair<String, String> =
-        RecipeCaptionParser.parseCaption(caption)
 }
