@@ -135,6 +135,7 @@ internal fun Recipe.isIncomplete(): Boolean {
     return (t == "Rezept" || t.startsWith("Rezept von")) && imageUrl.isNullOrBlank() && totalCalories == null
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecipesScreen(
     vm: RecipesViewModel = viewModel(),
