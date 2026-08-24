@@ -168,6 +168,7 @@ fun RecipesScreen(
     var showCookSheet     by remember { mutableStateOf(false) }
     var cookingRecipe     by remember { mutableStateOf<Recipe?>(null) }
     var showCollections   by remember { mutableStateOf(false) }
+    var showFilterSheet   by remember { mutableStateOf(false) }
     var assignCollectionRecipe by remember { mutableStateOf<Recipe?>(null) }
     val batchState by vm.batchState.collectAsStateWithLifecycle()
     val budgetScaleState by vm.budgetScaleState.collectAsStateWithLifecycle()
@@ -303,7 +304,22 @@ fun RecipesScreen(
                 }
             }
 
-            // Eine Zeile: Kategorie + Plattform + Favoriten + Sammlungen + Sort
+            // Primärleiste: Alle · ★ Favoriten · Filter · Sort (kein endloses Swipen)
+            val favCount = state.recipes.count { it.isFavorite }
+            val incompleteCount = state.recipes.count { it.isIncomplete() }
+            val hasActiveFilters = state.categoryFilter != null ||
+                state.platformFilter != null ||
+                state.cookedFilter != CookedFilter.ALL ||
+                collectionFilterId != null ||
+                hideIncomplete
+            val activeFilterCount = listOf(
+                state.categoryFilter != null,
+                state.platformFilter != null,
+                state.cookedFilter != CookedFilter.ALL,
+                collectionFilterId != null,
+                hideIncomplete
+            ).count { it }
+
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -312,110 +328,65 @@ fun RecipesScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .horizontalScroll(rememberScrollState())
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     FilterChip(
-                        selected = state.categoryFilter == null && state.platformFilter == null && state.cookedFilter == CookedFilter.ALL && !favoritesOnly && collectionFilterId == null,
+                        selected = !favoritesOnly && !hasActiveFilters,
                         onClick = {
                             vm.setCategoryFilter(null)
                             vm.setPlatformFilter(null)
                             vm.setCookedFilter(CookedFilter.ALL)
                             favoritesOnly = false
                             collectionFilterId = null
+                            hideIncomplete = false
                         },
-                        label = { Text("Alle", fontSize = 11.sp) },
-                        modifier = Modifier.height(28.dp)
-                    )
-                    RecipeCategory.entries.forEach { cat ->
-                        FilterChip(
-                            selected = state.categoryFilter == cat,
-                            onClick = {
-                                vm.setCategoryFilter(if (state.categoryFilter == cat) null else cat)
-                            },
-                            label = { Text("${cat.emoji} ${cat.label}", fontSize = 11.sp) },
-                            modifier = Modifier.height(28.dp)
-                        )
-                    }
-                    listOf(
-                        "instagram" to "📷 IG",
-                        "tiktok" to "🎵 TikTok",
-                        "web" to "🌐 Web",
-                        "ki" to "✨ KI",
-                        "manual" to "✏️ Frei"
-                    ).forEach { (value, label) ->
-                        FilterChip(
-                            selected = state.platformFilter == value,
-                            onClick = { vm.setPlatformFilter(if (state.platformFilter == value) null else value) },
-                            label = { Text(label, fontSize = 11.sp) },
-                            modifier = Modifier.height(28.dp)
-                        )
-                    }
-                    FilterChip(
-                        selected = state.cookedFilter == CookedFilter.COOKED,
-                        onClick = {
-                            vm.setCookedFilter(
-                                if (state.cookedFilter == CookedFilter.COOKED) CookedFilter.ALL
-                                else CookedFilter.COOKED
-                            )
-                        },
-                        label = { Text("Schon gekocht", fontSize = 11.sp) },
-                        modifier = Modifier.height(28.dp)
+                        label = { Text("Alle", fontSize = 12.sp) },
+                        modifier = Modifier.height(32.dp)
                     )
                     FilterChip(
-                        selected = state.cookedFilter == CookedFilter.NOT_COOKED,
+                        selected = favoritesOnly,
                         onClick = {
-                            vm.setCookedFilter(
-                                if (state.cookedFilter == CookedFilter.NOT_COOKED) CookedFilter.ALL
-                                else CookedFilter.NOT_COOKED
+                            favoritesOnly = !favoritesOnly
+                            if (favoritesOnly) collectionFilterId = null
+                        },
+                        label = {
+                            Text(
+                                if (favCount > 0) "★ $favCount" else "★ Favoriten",
+                                fontSize = 12.sp
                             )
                         },
-                        label = { Text("Noch nicht", fontSize = 11.sp) },
-                        modifier = Modifier.height(28.dp)
+                        modifier = Modifier.height(32.dp)
                     )
-                    val favCount = state.recipes.count { it.isFavorite }
-                    if (favCount > 0 || favoritesOnly) {
-                        FilterChip(
-                            selected = favoritesOnly,
-                            onClick = {
-                                favoritesOnly = !favoritesOnly
-                                if (favoritesOnly) collectionFilterId = null
-                            },
-                            label = { Text(if (favCount > 0) "★ $favCount" else "★", fontSize = 11.sp) },
-                            modifier = Modifier.height(28.dp)
-                        )
-                    }
-                    collections.forEach { col ->
-                        val colCount = state.recipes.count { it.collectionId == col.id }
-                        if (colCount > 0 || collectionFilterId == col.id) {
-                            FilterChip(
-                                selected = collectionFilterId == col.id,
-                                onClick = {
-                                    collectionFilterId =
-                                        if (collectionFilterId == col.id) null else col.id
-                                    if (collectionFilterId != null) favoritesOnly = false
-                                },
-                                label = {
-                                    Text(
-                                        "${col.emoji}${if (colCount > 0) colCount else ""}",
-                                        fontSize = 11.sp
-                                    )
-                                },
-                                modifier = Modifier.height(28.dp)
+                    FilterChip(
+                        selected = hasActiveFilters,
+                        onClick = { showFilterSheet = true },
+                        label = {
+                            Text(
+                                if (activeFilterCount > 0) "Filter · $activeFilterCount" else "Filter",
+                                fontSize = 12.sp
                             )
-                        }
-                    }
-                    val incompleteCount = state.recipes.count { it.isIncomplete() }
-                    if (incompleteCount > 0) {
-                        FilterChip(
-                            selected = hideIncomplete,
-                            onClick = { hideIncomplete = !hideIncomplete },
-                            label = { Text("🧹 $incompleteCount", fontSize = 11.sp) },
-                            modifier = Modifier.height(28.dp)
-                        )
-                    }
+                        },
+                        leadingIcon = if (hasActiveFilters) {
+                            {
+                                Icon(
+                                    Icons.Default.FilterList,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        } else {
+                            {
+                                Icon(
+                                    Icons.Default.Tune,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        },
+                        modifier = Modifier.height(32.dp)
+                    )
                 }
                 IconButton(
                     onClick = {
@@ -434,6 +405,264 @@ fun RecipesScreen(
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(18.dp)
                     )
+                }
+            }
+
+            // Aktive Filter als abwählbare Chips (ohne Scrollen der ganzen Kategorie-Leiste)
+            if (hasActiveFilters) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 12.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    state.categoryFilter?.let { cat ->
+                        InputChip(
+                            selected = true,
+                            onClick = { vm.setCategoryFilter(null) },
+                            label = { Text("${cat.emoji} ${cat.label}", fontSize = 11.sp) },
+                            trailingIcon = {
+                                Icon(Icons.Default.Close, null, Modifier.size(14.dp))
+                            },
+                            modifier = Modifier.height(28.dp)
+                        )
+                    }
+                    state.platformFilter?.let { pf ->
+                        val label = when (pf) {
+                            "instagram" -> "📷 IG"
+                            "tiktok" -> "🎵 TikTok"
+                            "web" -> "🌐 Web"
+                            "ki" -> "✨ KI"
+                            "manual" -> "✏️ Frei"
+                            else -> pf
+                        }
+                        InputChip(
+                            selected = true,
+                            onClick = { vm.setPlatformFilter(null) },
+                            label = { Text(label, fontSize = 11.sp) },
+                            trailingIcon = {
+                                Icon(Icons.Default.Close, null, Modifier.size(14.dp))
+                            },
+                            modifier = Modifier.height(28.dp)
+                        )
+                    }
+                    if (state.cookedFilter == CookedFilter.COOKED) {
+                        InputChip(
+                            selected = true,
+                            onClick = { vm.setCookedFilter(CookedFilter.ALL) },
+                            label = { Text("Schon gekocht", fontSize = 11.sp) },
+                            trailingIcon = {
+                                Icon(Icons.Default.Close, null, Modifier.size(14.dp))
+                            },
+                            modifier = Modifier.height(28.dp)
+                        )
+                    }
+                    if (state.cookedFilter == CookedFilter.NOT_COOKED) {
+                        InputChip(
+                            selected = true,
+                            onClick = { vm.setCookedFilter(CookedFilter.ALL) },
+                            label = { Text("Noch nicht", fontSize = 11.sp) },
+                            trailingIcon = {
+                                Icon(Icons.Default.Close, null, Modifier.size(14.dp))
+                            },
+                            modifier = Modifier.height(28.dp)
+                        )
+                    }
+                    collectionFilterId?.let { cid ->
+                        val col = collections.find { it.id == cid }
+                        if (col != null) {
+                            InputChip(
+                                selected = true,
+                                onClick = { collectionFilterId = null },
+                                label = { Text("${col.emoji} ${col.name}", fontSize = 11.sp) },
+                                trailingIcon = {
+                                    Icon(Icons.Default.Close, null, Modifier.size(14.dp))
+                                },
+                                modifier = Modifier.height(28.dp)
+                            )
+                        }
+                    }
+                    if (hideIncomplete) {
+                        InputChip(
+                            selected = true,
+                            onClick = { hideIncomplete = false },
+                            label = { Text("🧹 Unvollständig aus", fontSize = 11.sp) },
+                            trailingIcon = {
+                                Icon(Icons.Default.Close, null, Modifier.size(14.dp))
+                            },
+                            modifier = Modifier.height(28.dp)
+                        )
+                    }
+                    TextButton(
+                        onClick = {
+                            vm.setCategoryFilter(null)
+                            vm.setPlatformFilter(null)
+                            vm.setCookedFilter(CookedFilter.ALL)
+                            collectionFilterId = null
+                            hideIncomplete = false
+                        },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                    ) {
+                        Text("Zurücksetzen", fontSize = 11.sp)
+                    }
+                }
+            }
+
+            if (showFilterSheet) {
+                ModalBottomSheet(
+                    onDismissRequest = { showFilterSheet = false },
+                    sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                ) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp)
+                            .padding(bottom = 32.dp)
+                    ) {
+                        Text(
+                            "Filter",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(16.dp))
+
+                        Text("Kategorie", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            RecipeCategory.entries.forEach { cat ->
+                                FilterChip(
+                                    selected = state.categoryFilter == cat,
+                                    onClick = {
+                                        vm.setCategoryFilter(
+                                            if (state.categoryFilter == cat) null else cat
+                                        )
+                                    },
+                                    label = { Text("${cat.emoji} ${cat.label}", fontSize = 12.sp) }
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+                        Text("Quelle", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf(
+                                "instagram" to "📷 IG",
+                                "tiktok" to "🎵 TikTok",
+                                "web" to "🌐 Web",
+                                "ki" to "✨ KI",
+                                "manual" to "✏️ Frei"
+                            ).forEach { (value, label) ->
+                                FilterChip(
+                                    selected = state.platformFilter == value,
+                                    onClick = {
+                                        vm.setPlatformFilter(
+                                            if (state.platformFilter == value) null else value
+                                        )
+                                    },
+                                    label = { Text(label, fontSize = 12.sp) }
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+                        Text("Status", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            FilterChip(
+                                selected = state.cookedFilter == CookedFilter.COOKED,
+                                onClick = {
+                                    vm.setCookedFilter(
+                                        if (state.cookedFilter == CookedFilter.COOKED) CookedFilter.ALL
+                                        else CookedFilter.COOKED
+                                    )
+                                },
+                                label = { Text("Schon gekocht", fontSize = 12.sp) }
+                            )
+                            FilterChip(
+                                selected = state.cookedFilter == CookedFilter.NOT_COOKED,
+                                onClick = {
+                                    vm.setCookedFilter(
+                                        if (state.cookedFilter == CookedFilter.NOT_COOKED) CookedFilter.ALL
+                                        else CookedFilter.NOT_COOKED
+                                    )
+                                },
+                                label = { Text("Noch nicht", fontSize = 12.sp) }
+                            )
+                            if (incompleteCount > 0) {
+                                FilterChip(
+                                    selected = hideIncomplete,
+                                    onClick = { hideIncomplete = !hideIncomplete },
+                                    label = { Text("🧹 Unvollständig aus ($incompleteCount)", fontSize = 12.sp) }
+                                )
+                            }
+                        }
+
+                        if (collections.isNotEmpty()) {
+                            Spacer(Modifier.height(16.dp))
+                            Text("Sammlungen", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                collections.forEach { col ->
+                                    val colCount = state.recipes.count { it.collectionId == col.id }
+                                    FilterChip(
+                                        selected = collectionFilterId == col.id,
+                                        onClick = {
+                                            collectionFilterId =
+                                                if (collectionFilterId == col.id) null else col.id
+                                            if (collectionFilterId != null) favoritesOnly = false
+                                        },
+                                        label = {
+                                            Text(
+                                                "${col.emoji} ${col.name}" +
+                                                    if (colCount > 0) " ($colCount)" else "",
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(20.dp))
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    vm.setCategoryFilter(null)
+                                    vm.setPlatformFilter(null)
+                                    vm.setCookedFilter(CookedFilter.ALL)
+                                    collectionFilterId = null
+                                    hideIncomplete = false
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Zurücksetzen")
+                            }
+                            Button(
+                                onClick = { showFilterSheet = false },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Fertig")
+                            }
+                        }
+                    }
                 }
             }
 
