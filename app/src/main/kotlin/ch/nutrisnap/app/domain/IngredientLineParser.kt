@@ -167,6 +167,27 @@ fun parseIngredientLine(line: String): ParsedIngredient {
         )
     }
 
+    // MUSS vor INGREDIENT_AMOUNT_REGEX stehen: der generische Regex matched
+    // "1 heaped teaspoon of X" mit leerer Einheit und Name="heaped teaspoon of X"
+    // → fälschlich 1 g. Hier Adjektiv + EL/TL sauber extrahieren.
+    val adjUnit = Regex(
+        """^(?:(\d+(?:[.,]\d+)?)|(\d+/\d+)|([¼½¾⅓⅔]))\s+""" +
+            """(?:(?:heaped|level|rounded|scant|packed|approx\.?|approximately|about|ca\.?)\s+)?""" +
+            """(teaspoons?|tablespoons?|tsp\.?|tbsp\.?|tbs\.?|TL|EL)\s*(?:of\s+)?(.+)$""",
+        RegexOption.IGNORE_CASE
+    ).find(trimmed)
+    if (adjUnit != null) {
+        val amountRaw = adjUnit.groupValues[1].ifBlank {
+            adjUnit.groupValues[2].ifBlank { adjUnit.groupValues[3] }
+        }
+        val name = cleanIngredientName(adjUnit.groupValues[5])
+        return ParsedIngredient(
+            amount = parseAmountToken(amountRaw),
+            unit = normalizeUnit(adjUnit.groupValues[4], name),
+            name = name
+        )
+    }
+
     val m = INGREDIENT_AMOUNT_REGEX.find(trimmed)
     if (m != null) {
         val name = cleanIngredientName(m.groupValues[3])
@@ -185,21 +206,6 @@ fun parseIngredientLine(line: String): ParsedIngredient {
         return ParsedIngredient(
             amount = loose.groupValues[1].replace(',', '.'),
             unit = normalizeUnit(loose.groupValues[2], name),
-            name = name
-        )
-    }
-    // "1 heaped teaspoon of cream cheese" / "2 tablespoons of Greek Yogurt"
-    // Adjektiv zwischen Zahl und Einheit → Einheit extrahieren, Filler strippen
-    val adjUnit = Regex(
-        """^(\d+(?:[.,]\d+)?|\d+/\d+|[¼½¾⅓⅔])\s+(?:heaped|level|rounded|scant|packed|approx\.?|approximately|about)?\s*""" +
-            """(teaspoons?|tablespoons?|tsp|tbsp|tbs|TL|EL)\b(?:\s+of)?\s+(.+)$""",
-        RegexOption.IGNORE_CASE
-    ).find(trimmed)
-    if (adjUnit != null) {
-        val name = cleanIngredientName(adjUnit.groupValues[3])
-        return ParsedIngredient(
-            amount = parseAmountToken(adjUnit.groupValues[1]),
-            unit = normalizeUnit(adjUnit.groupValues[2], name),
             name = name
         )
     }
