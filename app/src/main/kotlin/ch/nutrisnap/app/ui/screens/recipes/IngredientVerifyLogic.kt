@@ -299,8 +299,19 @@ fun computeVerifiedTotals(states: List<IngredientVerifyState>): VerifiedTotals {
 data class VerifyLineParts(val amountLabel: String, val name: String)
 
 fun formatVerifyLineParts(state: IngredientVerifyState): VerifyLineParts {
+    val parsed = state.result.parsed
     val g = state.effectiveAmountG
-    val amountStr = when {
+    // Stück-/Zähl-Anzeige: "2 Stück" statt "75 g", solange Menge proportional zur Original-Stückzahl
+    val amountStr = if (parsed?.count != null && parsed.countUnit != null && parsed.count > 0f) {
+        val ratio = g / parsed.amountG.coerceAtLeast(0.1f)
+        val displayCount = parsed.count * ratio
+        val countLabel = when {
+            kotlin.math.abs(displayCount - displayCount.toLong().toFloat()) < 0.05f ->
+                displayCount.toLong().toString()
+            else -> "%.1f".format(displayCount)
+        }
+        "$countLabel ${parsed.countUnit}"
+    } else when {
         !g.isFinite() || g <= 0f -> "–"
         g >= 10f -> "${g.toInt()} g"
         else -> "${"%.1f".format(g)} g"
@@ -321,14 +332,16 @@ fun formatVerifyLineParts(state: IngredientVerifyState): VerifyLineParts {
         )
         .replace(Regex("""(?i)^ingredients?\s*(\([^)]*\))?\s*:?\s*"""), "")
         .replace(Regex("""(?i)^zutaten\s*(\([^)]*\))?\s*:?\s*"""), "")
-        .replace(Regex("""(?i)^\d+([.,]\d+)?\s*(g|ml|kg|el|tl|cup|tbsp|tsp|oz)\s+"""), "")
+        .replace(Regex("""(?i)^\d+([.,]\d+)?\s*(g|ml|kg|el|tl|stück|stueck|cup|tbsp|tsp|oz)\s+"""), "")
+        // "Stück Weetbix" → "Weetbix" wenn Einheit schon in amountLabel steckt
+        .replace(Regex("""(?i)^(stück|stueck|pieces?)\s+"""), "")
         // Englische Füllwörter nach der Menge: "of cocoa powder", "of Milch or Wasser"
         .replace(Regex("""(?i)^(of|a|an)\s+"""), "")
         .trim()
         .trimStart(':', '–', '-', ' ')
         .trim()
 
-    val fromParsed = state.result.parsed?.name?.takeIf { it.isNotBlank() }?.let { clean(it) }
+    val fromParsed = parsed?.name?.takeIf { it.isNotBlank() }?.let { clean(it) }
     val fromLine = clean(state.result.line).takeIf { it.isNotBlank() }
     val fromFood = state.effectiveFood?.name?.takeIf { it.isNotBlank() }?.let { clean(it) }
 

@@ -108,7 +108,18 @@ internal fun IngredientVerifyRow(
     }
 
     fun saveAmount() {
-        parseAmountInput(amountInput)?.let { onAmountSaved(it) }
+        val parsedVal = parseAmountInput(amountInput) ?: run {
+            editingAmount = false
+            return
+        }
+        val count = state.result.parsed?.count
+        val unit = state.result.parsed?.countUnit
+        // Bei Stück-Eingabe: Feld = g pro Stück → Gesamt = count × g/Stück
+        if (count != null && unit != null && count > 0f) {
+            onAmountSaved(parsedVal * count)
+        } else {
+            onAmountSaved(parsedVal)
+        }
         editingAmount = false
     }
 
@@ -283,49 +294,78 @@ internal fun IngredientVerifyRow(
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                // Menge — immer aus dem Rezept (parsed), editierbar mit +/- und Freitext ("100g")
+                // Menge — Stück-Zutaten: Anzahl + g/Stück; sonst Gesamt-Gramm
+                val parsedCount = state.result.parsed?.count
+                val parsedUnit = state.result.parsed?.countUnit
+                val isPiece = parsedCount != null && parsedUnit != null && parsedCount > 0f
+                val gPerUnit = if (isPiece) {
+                    state.effectiveAmountG / parsedCount!!.coerceAtLeast(0.1f)
+                } else null
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(bottom = 8.dp).fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "Menge: ${"%.0f".format(state.effectiveAmountG)} g",
-                            fontSize = 13.sp, fontWeight = FontWeight.SemiBold
-                        )
-                        if (state.amountOverride != null &&
-                            kotlin.math.abs(state.amountOverride - state.originalAmountG) > 0.5f
-                        ) {
+                        if (isPiece) {
+                            val cnt = parsedCount!!
+                            val cntLabel = if (kotlin.math.abs(cnt - cnt.toLong().toFloat()) < 0.05f)
+                                cnt.toLong().toString() else "%.1f".format(cnt)
                             Text(
-                                "Rezept: ${"%.0f".format(state.originalAmountG)} g",
+                                "$cntLabel $parsedUnit · ≈ ${"%.0f".format(state.effectiveAmountG)} g",
+                                fontSize = 13.sp, fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                "≈ ${"%.0f".format(gPerUnit ?: 0f)} g pro $parsedUnit – tippen zum Anpassen",
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                        } else {
+                            Text(
+                                "Menge: ${"%.0f".format(state.effectiveAmountG)} g",
+                                fontSize = 13.sp, fontWeight = FontWeight.SemiBold
+                            )
+                            if (state.amountOverride != null &&
+                                kotlin.math.abs(state.amountOverride - state.originalAmountG) > 0.5f
+                            ) {
+                                Text(
+                                    "Rezept: ${"%.0f".format(state.originalAmountG)} g",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
-                    // − 10g
+                    // − / + (bei Stück: ±1 g pro Stück; sonst ±10 g gesamt)
                     IconButton(
                         onClick = {
-                            val next = (state.effectiveAmountG - 10f).coerceAtLeast(1f)
-                            onAmountSaved(next)
+                            if (isPiece) {
+                                val nextPer = ((gPerUnit ?: 50f) - 1f).coerceAtLeast(1f)
+                                onAmountSaved(nextPer * parsedCount!!)
+                            } else {
+                                onAmountSaved((state.effectiveAmountG - 10f).coerceAtLeast(1f))
+                            }
                         },
                         modifier = Modifier.size(36.dp)
                     ) {
-                        Icon(Icons.Default.Remove, "−10 g", Modifier.size(18.dp))
+                        Icon(Icons.Default.Remove, if (isPiece) "−1 g/Stück" else "−10 g", Modifier.size(18.dp))
                     }
-                    // + 10g
                     IconButton(
                         onClick = {
-                            onAmountSaved(state.effectiveAmountG + 10f)
+                            if (isPiece) {
+                                val nextPer = (gPerUnit ?: 50f) + 1f
+                                onAmountSaved(nextPer * parsedCount!!)
+                            } else {
+                                onAmountSaved(state.effectiveAmountG + 10f)
+                            }
                         },
                         modifier = Modifier.size(36.dp)
                     ) {
-                        Icon(Icons.Default.Add, "+10 g", Modifier.size(18.dp))
+                        Icon(Icons.Default.Add, if (isPiece) "+1 g/Stück" else "+10 g", Modifier.size(18.dp))
                     }
-                    // Freitext (100 / 100g)
                     IconButton(onClick = {
-                        amountInput = "%.0f".format(state.effectiveAmountG)
+                        amountInput = if (isPiece) "%.0f".format(gPerUnit ?: 50f)
+                        else "%.0f".format(state.effectiveAmountG)
                         editingAmount = true
                     }) {
                         Icon(Icons.Default.Edit, "Menge tippen", Modifier.size(18.dp),
@@ -339,8 +379,15 @@ internal fun IngredientVerifyRow(
                         OutlinedTextField(
                             value = amountInput,
                             onValueChange = { amountInput = it },
-                            label = { Text("Menge (g)", fontSize = 11.sp) },
-                            placeholder = { Text("z.B. 350 oder 350g") },
+                            label = {
+                                Text(
+                                    if (isPiece) "g pro ${parsedUnit ?: "Stück"}" else "Menge (g)",
+                                    fontSize = 11.sp
+                                )
+                            },
+                            placeholder = {
+                                Text(if (isPiece) "z.B. 37" else "z.B. 350 oder 350g")
+                            },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             singleLine = true,
                             modifier = Modifier.weight(1f).focusRequester(amountFocusRequester),

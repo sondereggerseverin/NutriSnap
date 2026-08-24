@@ -54,9 +54,19 @@ object RecipeNutritionAnalyzer {
         val micros: Map<String, Float> = emptyMap()
     )
 
+    /**
+     * @param amountG Gesamtgewicht in Gramm (für Nährwert-Rechnung)
+     * @param name Lebensmittelname ohne Mengen-/Einheitenpräfix
+     * @param count Anzahl bei Stück-Angaben (z.B. 2), null bei reinen g/ml
+     * @param countUnit Anzeige-Einheit (z.B. "Stück", "EL"), null bei g/ml
+     * @param gramsPerUnit g pro 1 countUnit (z.B. 37 g/Weetbix), null wenn unbekannt
+     */
     data class ParsedIngredient(
         val amountG: Float,
-        val name:    String
+        val name: String,
+        val count: Float? = null,
+        val countUnit: String? = null,
+        val gramsPerUnit: Float? = null
     )
 
     data class AnalysisResult(
@@ -190,7 +200,24 @@ object RecipeNutritionAnalyzer {
         "thigh" to 120f, "thighs" to 120f, "schenkel" to 120f,
         "stange" to 200f, "porree" to 200f, "lauch" to 200f,
         "packung" to 150f, "pack" to 150f, "dose" to 200f,
-        "bund" to 50f, "scheibe" to 25f, "scheiben" to 25f
+        "bund" to 50f, "scheibe" to 25f, "scheiben" to 25f,
+        // Frühstücks-/Keks-Produkte (g pro Stück)
+        "weetbix" to 37.5f, "weetabix" to 37.5f, "weet-bix" to 37.5f,
+        "biscoff" to 8f, "lotus" to 8f,
+        "biscuit" to 12f, "biscuits" to 12f, "cookie" to 12f, "cookies" to 12f,
+        "keks" to 12f, "kekse" to 12f,
+        "cracker" to 8f, "crackers" to 8f,
+        "tortilla" to 40f, "tortillas" to 40f, "wrap" to 45f, "wraps" to 45f
+    )
+
+    /** Display-Label für Zähl-Einheiten (intern lowercase). */
+    private val COUNT_UNIT_LABELS = mapOf(
+        "stück" to "Stück", "stueck" to "Stück", "piece" to "Stück", "pieces" to "Stück",
+        "portion" to "Portion", "portionen" to "Portion",
+        "scoop" to "Scoop", "scoops" to "Scoop",
+        "packung" to "Packung", "pack" to "Packung", "pkg" to "Packung",
+        "dose" to "Dose", "bund" to "Bund", "stange" to "Stange",
+        "zehe" to "Zehe", "scheibe" to "Scheibe", "scheiben" to "Scheibe"
     )
 
     private fun isIngredientLine(line: String): Boolean {
@@ -339,15 +366,50 @@ object RecipeNutritionAnalyzer {
             return ParsedIngredient((amount * mult).coerceAtLeast(1f), foodName.ifBlank { rest }.take(50))
         }
 
-        // Zähl-Einheiten: "1 Stange Porree", "2 Packung Frischkäse"
+        // Zähl-Einheiten: "2 Stück Weetbix", "1 Stange Porree", "2 Packung Frischkäse"
+        val leadingCountUnit = COUNT_UNIT_LABELS.keys.sortedByDescending { it.length }
+            .firstOrNull { restLc == it || restLc.startsWith("$it ") }
+        if (leadingCountUnit != null) {
+            val foodName = rest.substring(leadingCountUnit.length).trim()
+                .ifBlank { rest }.take(50)
+            val gPer = resolveGramsPerUnit(foodName.ifBlank { rest })
+            val unitLabel = COUNT_UNIT_LABELS[leadingCountUnit] ?: "Stück"
+            return ParsedIngredient(
+                amountG = (amount * gPer).coerceAtLeast(1f),
+                name = foodName.ifBlank { rest }.take(50),
+                count = amount,
+                countUnit = unitLabel,
+                gramsPerUnit = gPer
+            )
+        }
         val countKey = COUNT_WEIGHTS.keys.sortedByDescending { it.length }
             .firstOrNull { restLc.contains(it) }
-        if (countKey != null) {
-            val gramWeight = amount * (COUNT_WEIGHTS[countKey] ?: 100f)
-            return ParsedIngredient(gramWeight.coerceAtLeast(1f), rest.take(50))
+        if (countKey != null && amount < 20f) {
+            // "2 Weetbix" / "1 Ei" ohne explizites "Stück"
+            val gPer = COUNT_WEIGHTS[countKey] ?: 50f
+            val unitLabel = when {
+                countKey in listOf("egg", "eggs", "ei", "eier") -> "Stück"
+                countKey.contains("scheibe") -> "Scheibe"
+                countKey.contains("zehe") || countKey.contains("clove") -> "Zehe"
+                else -> "Stück"
+            }
+            return ParsedIngredient(
+                amountG = (amount * gPer).coerceAtLeast(1f),
+                name = rest.take(50),
+                count = amount,
+                countUnit = unitLabel,
+                gramsPerUnit = gPer
+            )
         }
-        if (GENERIC_PIECE_UNITS.any { restLc.startsWith(it) || restLc.contains(" $it") }) {
-            return ParsedIngredient((amount * 50f).coerceAtLeast(1f), rest.take(50))
+        if (GENERIC_PIECE_UNITS.any { restLc.contains(it) } && amount < 20f) {
+            val gPer = 50f
+            return ParsedIngredient(
+                amountG = (amount * gPer).coerceAtLeast(1f),
+                name = rest.take(50),
+                count = amount,
+                countUnit = "Stück",
+                gramsPerUnit = gPer
+            )
         }
 
         // WICHTIG: kein amount*100 mehr!
@@ -359,6 +421,14 @@ object RecipeNutritionAnalyzer {
             else -> amount * 50f             // 1–4 Stück ohne bekannte Bezeichnung
         }
         return ParsedIngredient(gramWeight.coerceAtLeast(1f), rest.take(50))
+    }
+
+    /** g pro Stück anhand bekannter Lebensmittel-Keywords. */
+    private fun resolveGramsPerUnit(name: String): Float {
+        val lc = name.lowercase()
+        val key = COUNT_WEIGHTS.keys.sortedByDescending { it.length }
+            .firstOrNull { lc.contains(it) }
+        return key?.let { COUNT_WEIGHTS[it] } ?: 50f
     }
 
     private fun parseNumber(s: String): Float {
