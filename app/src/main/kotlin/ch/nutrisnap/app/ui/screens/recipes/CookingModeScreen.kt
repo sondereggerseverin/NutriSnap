@@ -159,9 +159,22 @@ fun CookingModeScreen(recipe: Recipe, onBack: () -> Unit) {
                             }
                         }
                     }
+                    // Bei baseServings=1 kollidieren ½/1× und 1½/2× durch Int-Rundung —
+                    // pro Ziel-Portion nur den Faktor mit geringstem Rundungsfehler aktiv.
                     val factors = listOf(0.5f to "½", 1f to "1×", 1.5f to "1½", 2f to "2×")
-                    val currentFactor = servings.toFloat() / baseServings.toFloat()
-                    val closestFactor = factors.minByOrNull { kotlin.math.abs(it.first - currentFactor) }?.first
+                    val factorPriority = mapOf(1f to 0, 2f to 1, 0.5f to 2, 1.5f to 3)
+                    val targetFor = { f: Float ->
+                        kotlin.math.round(baseServings * f).toInt().coerceAtLeast(1)
+                    }
+                    val preferredFactorByTarget: Map<Int, Float> = factors
+                        .groupBy { targetFor(it.first) }
+                        .mapValues { (target, group) ->
+                            group.minWith(
+                                compareBy<Pair<Float, String>> {
+                                    kotlin.math.abs(baseServings * it.first - target)
+                                }.thenBy { factorPriority[it.first] ?: 9 }
+                            ).first
+                        }
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -169,14 +182,12 @@ fun CookingModeScreen(recipe: Recipe, onBack: () -> Unit) {
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         factors.forEach { (factor, label) ->
-                            val rawTarget = baseServings * factor
-                            val target = kotlin.math.round(rawTarget).toInt().coerceAtLeast(1)
-                            val collapsesToSameAsOne = factor != 1f && target == baseServings
-                            val selected = !collapsesToSameAsOne && factor == closestFactor &&
-                                kotlin.math.abs(currentFactor - factor) < 0.05f
+                            val target = targetFor(factor)
+                            val isPreferred = preferredFactorByTarget[target] == factor
+                            val selected = isPreferred && target == servings
                             FilterChip(
                                 selected = selected,
-                                enabled = !collapsesToSameAsOne,
+                                enabled = isPreferred,
                                 onClick = { servings = target },
                                 label = { Text(label) }
                             )
