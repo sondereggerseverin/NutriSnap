@@ -549,9 +549,26 @@ object RecipeGermanMetricConverter {
         }
     }
 
-    /** Offline: Einheiten metrisch + Namen deutsch (ohne KI) + Klammer-Cleanup. */
-    fun convertOfflineFull(text: String): String =
-        cleanupMetricText(translateNamesToGerman(convertUnitsToMetric(text)))
+    /** Offline: Einheiten metrisch + Namen deutsch (ohne KI) + Klammer-Cleanup + Zeilen-Normalisierung. */
+    fun convertOfflineFull(text: String): String {
+        val converted = cleanupMetricText(translateNamesToGerman(convertUnitsToMetric(text)))
+        return converted.lines().joinToString("\n") { line ->
+            val t = line.trim().trimStart('•', '-', '*', ' ').trim()
+            if (t.isBlank()) return@joinToString line
+            // Abschnittsheader (Für … / Optional / Belag) nicht parsen
+            if (Regex("""(?i)^(für\s|for\s|optional|belag|füllung|fuellung|boden|base|sauce|marinade|topping|teig|dough)""").containsMatchIn(t) &&
+                !Regex("""^\d""").containsMatchIn(t)
+            ) {
+                return@joinToString t
+            }
+            if (!Regex("""^(\d+[.,]?\d*|\d+/\d+|[¼½¾⅓⅔])\b""").containsMatchIn(t)) {
+                return@joinToString if (line.trimStart().startsWith("•")) "• $t" else t
+            }
+            val joined = joinIngredientLine(parseIngredientLine(t))
+            val out = joined.ifBlank { t }
+            if (line.trimStart().startsWith("•")) "• $out" else out
+        }
+    }
 
     /**
      * KI: Zutaten + Zubereitung ins Deutsche übersetzen und metrisch umrechnen.

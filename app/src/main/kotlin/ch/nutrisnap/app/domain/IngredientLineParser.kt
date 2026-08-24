@@ -222,6 +222,20 @@ fun parseIngredientLine(line: String): ParsedIngredient {
             name = name
         )
     }
+    // "Heaped teaspoon of melted biscoff" ohne führende Zahl → 1 TL …
+    val bareUnit = Regex(
+        """^(?:(heaped|level|rounded|scant|packed)\s+)?""" +
+            """(teaspoons?|tablespoons?|tsp\.?|tbsp\.?|tbs\.?|TL|EL)\s*(?:of\s+)?(.+)$""",
+        RegexOption.IGNORE_CASE
+    ).find(trimmed)
+    if (bareUnit != null) {
+        val name = cleanIngredientName(bareUnit.groupValues[3])
+        return ParsedIngredient(
+            amount = "1",
+            unit = normalizeUnit(bareUnit.groupValues[2], name),
+            name = name
+        )
+    }
     return ParsedIngredient(amount = "", unit = "g", name = cleanIngredientName(trimmed))
 }
 

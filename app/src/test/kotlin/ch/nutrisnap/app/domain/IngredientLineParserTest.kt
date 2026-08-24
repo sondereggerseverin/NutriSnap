@@ -78,4 +78,12 @@ class IngredientLineParserTest {
         assertEquals("1", p.amount)
         assertEquals("Stück", p.unit)
     }
+
+    @Test
+    fun `bare heaped teaspoon without number becomes 1 TL`() {
+        val p = parseIngredientLine("Heaped teaspoon of melted biscoff")
+        assertEquals("1", p.amount)
+        assertEquals("TL", p.unit)
+        assertTrue(p.name.contains("biscoff", ignoreCase = true))
+    }
 }
