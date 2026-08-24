@@ -258,8 +258,13 @@ fun RecipeDetailSheet(
                             )
                         }
                     }
-                    // Schnell-Faktoren relativ zur Original-Portionszahl
+                    // Schnell-Faktoren relativ zur Original-Portionszahl.
+                    // Wichtig: bei baseServings=1 werden ½ und 1½ durch Int-Rundung
+                    // beide zu 1 — Selection deshalb über nächsten Faktor zur Ratio,
+                    // nicht über servings == target.
                     val factors = listOf(0.5f to "½", 1f to "1×", 1.5f to "1½", 2f to "2×")
+                    val currentFactor = servings.toFloat() / baseServings.toFloat()
+                    val closestFactor = factors.minByOrNull { kotlin.math.abs(it.first - currentFactor) }?.first
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -267,10 +272,16 @@ fun RecipeDetailSheet(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         factors.forEach { (factor, label) ->
-                            val target = (baseServings * factor).toInt().coerceAtLeast(1)
-                            val selected = servings == target
+                            val rawTarget = baseServings * factor
+                            val target = kotlin.math.round(rawTarget).toInt().coerceAtLeast(1)
+                            // Chip deaktivieren, wenn er keine andere Portionszahl liefert
+                            // als der 1×-Chip (z.B. ½ bei 1 Basis-Portion → ebenfalls 1)
+                            val collapsesToSameAsOne = factor != 1f && target == baseServings
+                            val selected = !collapsesToSameAsOne && factor == closestFactor &&
+                                kotlin.math.abs(currentFactor - factor) < 0.05f
                             FilterChip(
                                 selected = selected,
+                                enabled = !collapsesToSameAsOne,
                                 onClick = { servings = target },
                                 label = {
                                     Text(
