@@ -114,9 +114,10 @@ private fun cleanIngredientName(raw: String): String {
         ),
         " "
     )
-    // "of X" / "of the X" am Anfang oder nach Menge
-    s = s.replace(Regex("""(?i)^(?:of\s+(?:the\s+)?)"""), "")
-    s = s.replace(Regex("""(?i)\s+of\s+(?=the\s+)?"""), " ")
+    // "of X" / "of the X" am Anfang oder mitten im Namen
+    // Kein quantifizierter Lookahead — Android ICU wirft PatternSyntaxException.
+    s = s.replace(Regex("""(?i)^of(?:\s+the)?\s+"""), "")
+    s = s.replace(Regex("""(?i)\s+of(?:\s+the)?\s+"""), " ")
     // Zustandswörter, die als Name-Präfix hängen bleiben
     s = s.replace(
         Regex("""(?i)\b(?:crushed|whole|melted|chopped|diced|minced|sliced|grated|fresh|dried)\b"""),
