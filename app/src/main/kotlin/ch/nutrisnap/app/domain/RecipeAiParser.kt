@@ -240,31 +240,11 @@ object RecipeAiParser {
             .filter { it.isNotBlank() && !isJunkIngredientLine(it) }
             .map { cleanIngredientLineNoise(it) }
             .map { RecipeGermanMetricConverter.cleanupMetricLine(it) }
-            // Parse+Join: Zählwaren→Stück, heaped tsp→TL, Filler-Wörter strippen
-            .map { line -> normalizeIngredientLineForStorage(line) }
             .filter { it.isNotBlank() }
             .joinToString("\n") { line ->
                 if (isSectionHeaderLine(line)) line.trimEnd(':').trim()
                 else "• $line"
             }
-    }
-
-    /**
-     * Wendet [parseIngredientLine]/[joinIngredientLine] auf normale Zutatenzeilen an,
-     * damit Import-Text sofort konsistent ist (Stück statt g, EL/TL, saubere Namen).
-     * Abschnittsheader bleiben unverändert.
-     */
-    private fun normalizeIngredientLineForStorage(line: String): String {
-        val trimmed = line.trim().trimStart('•', '-', '*', ' ').trim()
-        if (trimmed.isBlank() || isSectionHeaderLine(trimmed)) return trimmed
-        // Zeilen ohne erkennbare Menge (z.B. nur Gewürzname) nicht kaputt-parsen
-        val hasLeadingQty = Regex(
-            """^(\d+[.,]?\d*|\d+/\d+|[¼½¾⅓⅔])\b"""
-        ).containsMatchIn(trimmed)
-        if (!hasLeadingQty) return trimmed
-        val parsed = parseIngredientLine(trimmed)
-        if (parsed.amount.isBlank() && parsed.name.isBlank()) return trimmed
-        return joinIngredientLine(parsed).ifBlank { trimmed }
     }
 
     /**

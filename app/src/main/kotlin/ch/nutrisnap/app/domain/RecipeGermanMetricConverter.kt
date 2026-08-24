@@ -47,12 +47,35 @@ object RecipeGermanMetricConverter {
         return try {
             text.lines().joinToString("\n") { line ->
                 runCatching {
-                    cleanupMetricLine(convertLineToMetric(line))
+                    val converted = cleanupMetricLine(convertLineToMetric(line))
+                    // Nach Metric: Zählwaren→Stück, Filler strippen (nicht vor cups/oz!)
+                    normalizeParsedLine(converted)
                 }.getOrDefault(line)
             }
         } catch (_: Exception) {
             text
         }
+    }
+
+    /** Parse+Join nur wenn keine imperialen Einheiten mehr in der Zeile stehen. */
+    private fun normalizeParsedLine(line: String): String {
+        val bullet = line.trimStart().startsWith("•")
+        val t = line.trim().trimStart('•', '-', '*', ' ').trim()
+        if (t.isBlank()) return line
+        // Noch cups/oz/tbsp? → Metric hat nicht gegriffen, nicht als g parsen
+        if (Regex(
+                """(?i)\b(cups?|tbsp|tbs|tablespoons?|tsp|teaspoons?|oz|ounces?|lbs?|pounds?)\b"""
+            ).containsMatchIn(t)
+        ) return line
+        if (!Regex("""^(\d+[.,]?\d*|\d+/\d+|[¼½¾⅓⅔])\b""").containsMatchIn(t) &&
+            !Regex(
+                """(?i)^(?:heaped|level|rounded|scant|packed)?\s*(teaspoons?|tablespoons?|tsp|tbsp|TL|EL)\b"""
+            ).containsMatchIn(t)
+        ) {
+            return line
+        }
+        val joined = joinIngredientLine(parseIngredientLine(t)).ifBlank { t }
+        return if (bullet) "• $joined" else joined
     }
 
     /**
@@ -549,26 +572,9 @@ object RecipeGermanMetricConverter {
         }
     }
 
-    /** Offline: Einheiten metrisch + Namen deutsch (ohne KI) + Klammer-Cleanup + Zeilen-Normalisierung. */
-    fun convertOfflineFull(text: String): String {
-        val converted = cleanupMetricText(translateNamesToGerman(convertUnitsToMetric(text)))
-        return converted.lines().joinToString("\n") { line ->
-            val t = line.trim().trimStart('•', '-', '*', ' ').trim()
-            if (t.isBlank()) return@joinToString line
-            // Abschnittsheader (Für … / Optional / Belag) nicht parsen
-            if (Regex("""(?i)^(für\s|for\s|optional|belag|füllung|fuellung|boden|base|sauce|marinade|topping|teig|dough)""").containsMatchIn(t) &&
-                !Regex("""^\d""").containsMatchIn(t)
-            ) {
-                return@joinToString t
-            }
-            if (!Regex("""^(\d+[.,]?\d*|\d+/\d+|[¼½¾⅓⅔])\b""").containsMatchIn(t)) {
-                return@joinToString if (line.trimStart().startsWith("•")) "• $t" else t
-            }
-            val joined = joinIngredientLine(parseIngredientLine(t))
-            val out = joined.ifBlank { t }
-            if (line.trimStart().startsWith("•")) "• $out" else out
-        }
-    }
+    /** Offline: Einheiten metrisch + Namen deutsch (ohne KI) + Klammer-Cleanup. */
+    fun convertOfflineFull(text: String): String =
+        cleanupMetricText(translateNamesToGerman(convertUnitsToMetric(text)))
 
     /**
      * KI: Zutaten + Zubereitung ins Deutsche übersetzen und metrisch umrechnen.
