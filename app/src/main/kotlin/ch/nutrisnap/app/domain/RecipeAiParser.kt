@@ -592,8 +592,10 @@ object RecipeAiParser {
             lower.startsWith("beilage") || lower.startsWith("sauce") ||
             lower.startsWith("marinade") || lower.startsWith("topping") ||
             lower.startsWith("dressing") || lower.startsWith("garnish") ||
+            lower.startsWith("option to add") || lower.startsWith("optional") ||
             lower == "dough" || lower == "teig" ||
             lower == "filling" || lower == "füllung" || lower == "fuellung" ||
+            lower == "base" || lower == "boden" ||
             lower == "frosting" || lower == "glasur" || lower == "icing" ||
             lower == "syrup" || lower == "sirup" ||
             lower == "batter" || lower == "teigmasse" ||
@@ -753,6 +755,10 @@ Rules:
 - ingredient_sections: group by section headers exactly as written (e.g. "For the chicken", "For the sauce", "Served with", "Marinade", "Topping", "DOUGH", "CINNAMON COFFEE FILLING", "COFFEE SYRUP", "FROSTING"). ALL-CAPS lines without quantities are section headers — never put them inside items. Items separated by "-", "•", "*", or newlines. If no sections, use one section named "".
 - CRITICAL: Each ingredient item must be ONE ingredient only (e.g. "2 chicken breasts", "1 tsp olive oil", "150ml chicken stock") — NEVER merge multiple ingredients into one string.
 - CRITICAL: Section headers must NOT include the first ingredient. Wrong: "For the chicken: 2 chicken breasts". Right: section_name="For the chicken", items=["2 chicken breasts", ...].
+- CRITICAL ingredient format: always "quantity unit name" or "quantity name" for countable items. Examples: "2 Weetbix", "75 ml milk", "2 tbsp Greek yogurt", "1 tsp cream cheese", "1 Biscoff biscuit". NEVER invent grams for countable items (Weetbix, biscuits, cookies, eggs, onions). NEVER leave filler words in the name ("of", "heaped", "level", "whole", "crushed", "melted") — put modifiers only if essential, prefer clean names.
+- Prefer original spoon units (tsp/tbsp) over guessed gram conversions for small amounts.
+- Items may be plain strings OR objects {"quantity":"2","unit":"tbsp","name":"Greek yogurt"} — prefer clean string form "2 tbsp Greek yogurt".
+- "Option to add X" / "Optional: X" → own section_name (e.g. "Optional") with the optional ingredient as item, not merged into another section.
 - NEVER put into ingredient items: cooking instructions ("Firstly, season…", "Next, fry…", "In the meantime…"), macro summaries ("265 kcals", "39g | P"), numbered method steps ("1. Mix…"), hashtags, @mentions, "Method", "Zubereitung", promo ("Save this", "link in bio"), "Ingredients (serves 2)".
 - "Served with: Mashed potato / broccoli" → own section "Served with" with those items — they are sides, not instructions.
 - Prefer lines that look like "40g oat flour", "1 tsp oregano", "2 chicken breasts" over any surrounding caption noise.
@@ -852,6 +858,23 @@ Rules:
         return parseLlmJson(JSONObject(content))
     }
 
+    /**
+     * Items können String ("2 tbsp Greek yogurt") oder Objekt
+     * {"quantity":"2","unit":"tbsp","name":"Greek yogurt"} sein.
+     */
+    private fun formatIngredientItem(raw: Any?): String {
+        if (raw == null || raw == JSONObject.NULL) return ""
+        if (raw is String) return raw.trim()
+        if (raw is JSONObject) {
+            val qty = raw.optString("quantity", raw.optString("amount", "")).trim()
+            val unit = raw.optString("unit", "").trim()
+            val name = raw.optString("name", raw.optString("ingredient", "")).trim()
+            if (name.isBlank() && qty.isBlank()) return ""
+            return listOf(qty, unit, name).filter { it.isNotBlank() }.joinToString(" ")
+        }
+        return raw.toString().trim()
+    }
+
     private fun parseLlmJson(j: JSONObject): Recipe {
         // Build ingredients string from sections
         val sectionsArr = j.optJSONArray("ingredient_sections")
@@ -866,7 +889,8 @@ Rules:
                     val items = section.optJSONArray("items")
                     if (items != null) {
                         for (k in 0 until items.length()) {
-                            append("• ${items.getString(k)}\n")
+                            val itemLine = formatIngredientItem(items.opt(k))
+                            if (itemLine.isNotBlank()) append("• $itemLine\n")
                         }
                     }
                     if (i < sectionsArr.length() - 1) append("\n")
