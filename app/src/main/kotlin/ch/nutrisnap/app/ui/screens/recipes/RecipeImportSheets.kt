@@ -1,5 +1,7 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
@@ -75,6 +77,15 @@ fun ImportSheet(
 
     LaunchedEffect(error) {
         if (error != null && isInstagram) showManual = true
+    }
+    // Beim Öffnen des Manual-Sheets Clipboard vorbefüllen (Caption nach „Instagram öffnen“).
+    LaunchedEffect(showManual) {
+        if (!showManual || manualCaption.isNotBlank()) return@LaunchedEffect
+        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        val clip = cm?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()?.trim()
+        if (!clip.isNullOrBlank() && clip.length >= 40) {
+            manualCaption = clip
+        }
     }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
