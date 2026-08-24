@@ -174,7 +174,8 @@ internal fun HealthStatItem(icon: String, value: String, label: String) {
 internal fun HomeHeader(
     state: HomeUiState,
     onShowYesterday: () -> Unit = {},
-    onShowToday: () -> Unit = {}
+    onShowToday: () -> Unit = {},
+    onEditActivity: () -> Unit = {}
 ) {
     val appTheme = LocalAppTheme.current
     val overGoal = state.totalCalories > state.adjustedGoal && state.adjustedGoal > 0f
