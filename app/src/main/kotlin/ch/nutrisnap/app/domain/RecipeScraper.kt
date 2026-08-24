@@ -169,7 +169,7 @@ class RecipeScraper(private val context: Context) {
 
     // ── INSTAGRAM ──────────────────────────────────────────────────────────────
 
-    private suspend fun scrapeInstagram(url: String, fastScrape: Boolean = false, fastAi: Boolean = false): Recipe {
+    private suspend fun scrapeInstagram(url: String, fastScrape: Boolean = false, fastAi: Boolean = false): Recipe = coroutineScope {
         val shortcode = extractInstagramShortcode(url)
         // Collection-/F12-Links sind oft /p/SHORTCODE auch bei Reels.
         // Share-Link aus der App ist korrekt /reel/… — beide Varianten versuchen.
@@ -177,13 +177,19 @@ class RecipeScraper(private val context: Context) {
         val key = shortcode?.let { "ig:$it" } ?: cacheKey(url)
 
         progress("Metadaten laden…")
-        val oEmbed = canonicalUrls.firstNotNullOfOrNull { u ->
-            runCatching {
-                fetchOEmbed("https://api.instagram.com/oembed/?url=${encode(u)}&omitscript=true")
-            }.getOrNull()?.takeIf { !it["thumbnail_url"].isNullOrBlank() || !it["title"].isNullOrBlank() }
+        // oEmbed lief früher SEQUENZIELL über alle canonicalUrls, jede Anfrage mit bis zu
+        // 8s Connect- + 12s Read-Timeout — bei blockiertem/hängendem oEmbed-Endpoint allein
+        // schon bis zu ~20s PRO URL. Das war die Hauptursache für die ~35s Wartezeit bis
+        // zum "Instagram blockiert"-Fallback. Jetzt parallel gestartet und NEBEN der
+        // ohnehin nötigen Caption-Race gefahren, mit hartem Extra-Timeout danach —
+        // Thumbnail/Autor sind nur "nice to have" und dürfen die Caption nie ausbremsen.
+        val oEmbedJobs = canonicalUrls.map { u ->
+            async {
+                runCatching {
+                    fetchOEmbed("https://api.instagram.com/oembed/?url=${encode(u)}&omitscript=true")
+                }.getOrNull()?.takeIf { !it["thumbnail_url"].isNullOrBlank() || !it["title"].isNullOrBlank() }
+            }
         }
-        var thumbnail = oEmbed?.get("thumbnail_url")
-        val author = oEmbed?.get("author_name")
 
         // Cache: Prozess + optional persistent
         var caption = loadCachedCaption(key)
@@ -194,6 +200,15 @@ class RecipeScraper(private val context: Context) {
             caption = raceInstagramCaption(canonicalUrls.first(), shortcode, fastScrape)
             if (isGoodCaption(caption)) saveCachedCaption(key, caption)
         }
+
+        // oEmbed ist an dieser Stelle praktisch immer schon fertig (lief parallel zur
+        // Caption-Race); maximal 2s zusätzlich warten, Rest hart canceln.
+        val oEmbed = withTimeoutOrNull(2_000L) {
+            oEmbedJobs.firstNotNullOfOrNull { it.await() }
+        }
+        oEmbedJobs.forEach { it.cancel() }
+        var thumbnail = oEmbed?.get("thumbnail_url")
+        val author = oEmbed?.get("author_name")
 
         if (thumbnail.isNullOrBlank() && shortcode != null) {
             thumbnail = "https://www.instagram.com/p/$shortcode/media/?size=l"
@@ -238,7 +253,7 @@ class RecipeScraper(private val context: Context) {
             else -> RecipeAiParser.extractTitle(caption, fallback = "Rezept")
         }.ifBlank { "Rezept" }
 
-        return parsed.copy(
+        parsed.copy(
             title     = betterTitle,
             imageUrl  = thumbnail ?: parsed.imageUrl,
             sourceUrl = url,
