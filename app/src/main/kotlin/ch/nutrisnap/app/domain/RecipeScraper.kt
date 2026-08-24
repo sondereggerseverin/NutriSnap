@@ -267,8 +267,8 @@ class RecipeScraper(private val context: Context) {
      *  1) Schnelle HTTP-Quellen (Embed, GraphQL, Jina, …) — oft <2–3 s
      *  2) WebViews (Geräte-Cookies) — ab ~2.5 s parallel, teurer
      *  3) Langsame Mirrors nur im Standard-Modus
-     * Timeout: 5 s (Fast) / 7 s (Standard) — Instagram blockiert die meisten
-     * Quellen inzwischen, daher schneller in den Manual-Fallback.
+     * Timeout: 8 s (Fast) / 12 s (Standard) — gibt HTTP-Quellen und WebView
+     * genug Zeit, bevor in den Manual-Fallback gewechselt wird.
      */
     private suspend fun raceInstagramCaption(url: String, shortcode: String?, fastScrape: Boolean = false): String =
         coroutineScope {
@@ -276,9 +276,8 @@ class RecipeScraper(private val context: Context) {
 
             val desktopUa =
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-            // Instagram blockiert inzwischen die meisten HTTP-Quellen → schneller
-            // in den Manual-Fallback, statt 12s zu warten. Fast: 5s, Standard: 7s.
-            val raceTimeoutMs = if (fastScrape) 5_000L else 7_000L
+            // Fast: 8s, Standard: 12s — höhere Erfolgsrate statt schnellerem Fallback.
+            val raceTimeoutMs = if (fastScrape) 8_000L else 12_000L
 
             suspend fun awaitFirstGood(
                 jobs: MutableList<kotlinx.coroutines.Deferred<Cap?>>,
@@ -349,8 +348,8 @@ class RecipeScraper(private val context: Context) {
                 }
             }
 
-            // Phase 1 max ~2.5 s — wenn schon Caption, WebView überspringen
-            val phase1Ms = 2_500L
+            // Phase 1 max ~4 s — wenn schon Caption, WebView überspringen
+            val phase1Ms = 4_000L
             val phase1Winner = awaitFirstGood(fastJobs, phase1Ms) { src ->
                 progress("Caption von $src…")
             }
