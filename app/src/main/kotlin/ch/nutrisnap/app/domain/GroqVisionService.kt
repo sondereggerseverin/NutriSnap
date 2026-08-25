@@ -285,38 +285,50 @@ $clipped
 
             val prompt = """
 Du siehst ein Foto oder einen Screenshot von einem oder mehreren Rezepten
-(Rezeptkarte, Kochbuchseite, Blog, Social Media, Notiz, Collage).
+(Rezeptkarte, Kochbuchseite, Blog, Social Media wie TikTok/Instagram/Reels, Notiz, Collage).
 
 Aufgabe:
 - Wenn MEHRERE klar getrennte Rezepte sichtbar sind (z.B. zwei Rezepte auf einer Kochbuchseite,
   Collage, mehrere Karten), extrahiere JEDES als eigenen Eintrag in "recipes".
-- Wenn nur EIN Rezept sichtbar ist, liefere genau einen Eintrag in "recipes".
-- Teile nicht willkürlich Abschnitte desselben Rezepts (z.B. Teig/Füllung) in mehrere Rezepte.
+- Wenn nur EIN Rezept sichtbar ist (auch über mehrere Caption-Abschnitte / „more“-Text),
+  liefere genau einen Eintrag in "recipes".
+- Teile nicht willkürlich Abschnitte desselben Rezepts (z.B. Teig/Füllung oder Oats/Topping)
+  in mehrere Rezepte — Abschnitte gehören in ingredients mit Überschrift.
+
+Social-Media-Screenshots (TikTok, Instagram, Reels):
+- UI-Chrome komplett ignorieren: Statusleiste, Like/Comment/Share-Zahlen, Profilbild,
+  Suchleiste, Tab-Leiste, „LIVE“, „For You“, „Following“, Watermarks, Sticker.
+- Nur Rezeptinhalt: Titel, Zutaten, Mengen, Zubereitungsschritte, sichtbare Nährwerte.
+- Werbung, Ebook-Links, „Link in bio“, Rabattcodes, Hashtags, Emotes ohne Inhalt weglassen.
+- Wenn Mengen sowohl imperial als auch metrisch stehen (z.B. „1/2 cup (125 g)“),
+  die metrische Angabe bevorzugen.
 
 Regeln pro Rezept:
-- ingredients: jede Zutat in einer eigenen Zeile, idealerweise mit Menge.
-  Wenn imperial/US-Mengen sichtbar sind (cup, tbsp, tsp, oz, lb), darfst du sie belassen —
-  die App rechnet sie offline nach; erfinde keine metrischen Werte, die nicht im Bild stehen.
-  Gruppiere optional mit Überschriften wie "dough:" / "filling:" wenn das Bild das so zeigt.
-- instructions: nummerierte Schritte, einer pro Zeile (1. ... 2. ...).
-- Wenn Nährwerte pro Portion sichtbar sind (kcal, Protein, KH, Fett), übernimm sie.
+- IMMER auf Deutsch ausgeben: title, description, ingredients, instructions.
+  Englische Quelltexte sauber ins Deutsche übersetzen (Zutatenamen + Anleitung).
+- ingredients: jede Zutat in einer eigenen Zeile, mit Menge in g/ml/EL/TL wo möglich.
+  US-Mengen (cup, tbsp, tsp, oz) in sinnvolle metrische Werte umrechnen, wenn im Bild
+  keine Metrik steht (übliche Küchenumrechnung). Gruppiere optional mit Überschriften
+  wie „Oats:“ / „Topping:“ wenn das Bild Abschnitte zeigt.
+- instructions: nummerierte Schritte auf Deutsch, einer pro Zeile (1. … 2. …).
+- Wenn Nährwerte pro Portion sichtbar sind (kcal, Protein, KH, Fett, Ballaststoffe), übernimm sie.
 - Wenn Anzahl Portionen / servings sichtbar ist, übernimm sie; sonst servings = 1.
 - Zeiten in Minuten umrechnen falls nötig (z.B. 1 h → 60).
-- Titel: wenn kein klarer Titel lesbar ist, kurze sinnvolle Bezeichnung aus dem Gericht ableiten.
-- Erfinde keine Zutaten/Schritte/Nährwerte, die nicht lesbar sind. Unleserliche Teile weglassen.
-- Sprache der Zutaten/Anleitung beibehalten (Englisch bleibt Englisch, Deutsch bleibt Deutsch).
+- Titel: klarer Rezeptname auf Deutsch; wenn keiner lesbar, kurze sinnvolle Bezeichnung.
+- Erfinde keine Zutaten/Schritte/Nährwerte, die weder im Bild noch im OCR stehen.
+  Unleserliche Teile weglassen.
 $ocrBlock
 Antworte NUR mit folgendem JSON (kein Markdown):
 {
   "recipes": [
     {
-      "title": "Rezepttitel",
-      "description": "Kurze Beschreibung falls vorhanden, sonst leer",
-      "ingredients": "1 cup cottage cheese\n1/4 cup milk\n...",
-      "instructions": "1. Preheat oven...\n2. Blend...",
-      "servings": 12,
+      "title": "Rezepttitel auf Deutsch",
+      "description": "Kurze Beschreibung auf Deutsch falls vorhanden, sonst leer",
+      "ingredients": "100 g Hüttenkäse\n60 ml Milch\n...",
+      "instructions": "1. Ofen vorheizen…\n2. Alles vermengen…",
+      "servings": 1,
       "prepTimeMinutes": 15,
-      "cookTimeMinutes": 46,
+      "cookTimeMinutes": 0,
       "caloriesPerServing": 142,
       "proteinPerServing": 13,
       "carbsPerServing": 14,
