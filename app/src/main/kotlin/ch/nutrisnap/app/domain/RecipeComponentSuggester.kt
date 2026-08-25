@@ -20,12 +20,13 @@ object RecipeComponentSuggester {
 
     fun isSauce(text: String): Boolean {
         val n = text.lowercase()
+        // Nur echte Sauce-/Fleisch-Signale – nicht Mehl, Salz, Quark, Ei (Backrezepte!)
         return listOf(
-            "poulet", "huhn", "chicken", "fleisch", "tomate", "rahm", "sahne", "cream",
-            "joghurt", "yogurt", "püree", "puree", "gewürz", "garam", "sauce", "butter",
-            "masala", "chili", "ingwer", "knoblauch", "zwiebel", "öl", "oil", "speiseöl",
-            "fromage", "rôti", "roti", "kebab"
-        ).any { it in n }
+            "poulet", "huhn", "chicken", "rindfleisch", "hackfleisch", "schweinefleisch",
+            "fleischsauce", "tomatenpassata", "rahmsoße", "rahm sosse", "currysauce",
+            "sojasauce", "sauce ", " soße", " sosse", "gravy", "masala-sauce"
+        ).any { it in n } ||
+            Regex("""(?i)\b(sauce|soße|sosse)\b""").containsMatchIn(n)
     }
 
     fun resolveKey(m: IngredientMatch): String {
@@ -36,13 +37,15 @@ object RecipeComponentSuggester {
             isSide(key) && !isSauce(key) -> "side"
             isSauce(key) -> "sauce"
             isSide(key) -> "side"
-            else -> "sauce"
+            // Kein Default auf „sauce“ – sonst landen Mehl/Salz/Quark unter „Sauce / Fleisch“
+            else -> "main"
         }
     }
 
-    fun displayName(key: String): String = when (key) {
+    fun displayName(key: String): String = when (key.lowercase()) {
         "side" -> "Beilage"
         "sauce" -> "Sauce / Fleisch"
+        "main" -> "Hauptteil"
         else -> key
     }
 

@@ -316,36 +316,46 @@ internal fun parseIngredientSections(ingredients: String): List<Pair<String, Lis
     var currentLines = mutableListOf<String>()
 
     fun isHeader(line: String): Boolean {
-        val d = line.trim()
+        val d = line.trim().trimStart('•', '-', '*', ' ').trim()
         if (d.length <= 2) return false
-        if (d.startsWith("•") || d.startsWith("-") || d.startsWith("*")) return false
         if (d.first().isDigit()) return false
-        if (d.first().isWhitespace()) return false
-        // Menge in der Zeile → Zutat, kein Header
-        if (Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tbsp|tsp|cup|oz)\b""", RegexOption.IGNORE_CASE).containsMatchIn(d)) {
+        // Menge in der Zeile → Zutat, kein Header (auch "1 Ei", "Prise Salz" mit Kontext)
+        if (Regex(
+                """\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tbsp|tsp|cup|oz|stück|stk)\b""",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(d)
+        ) return false
+        // "1 Ei", "2 Eier", "Prise Salz" = Zutat, kein Abschnitt
+        if (Regex("""(?i)^\d+\s+(ei|eier|prise|bund|zehe|scheibe|dose)\b""").containsMatchIn(d)) {
             return false
         }
+        if (Regex("""(?i)^(prise|etwas|wenig)\s+\p{L}""").containsMatchIn(d)) return false
         val lc = d.lowercase().trimEnd(':').trim()
-        // Explizite Abschnitts-Muster (inkl. Back-Abschnitte)
+        // Explizite Abschnitts-Muster (inkl. Back-Abschnitte) – NICHT jede kurze Zeile
         if (lc.startsWith("für die ") || lc.startsWith("für den ") || lc.startsWith("für das ") ||
-            lc.startsWith("for the ") || lc.startsWith("for ") || d.trim().endsWith(":") ||
+            lc.startsWith("for the ") ||
+            (d.trim().endsWith(":") && d.length in 4..48 && !d.any { it.isDigit() }) ||
             lc == "dough" || lc == "teig" || lc == "filling" || lc == "füllung" || lc == "fuellung" ||
             lc == "frosting" || lc == "glasur" || lc == "syrup" || lc == "sirup" ||
+            lc == "topping" || lc == "belag" || lc == "boden" || lc == "crust" ||
             lc.endsWith(" filling") || lc.endsWith(" füllung") || lc.endsWith(" fuellung") ||
             lc.endsWith(" frosting") || lc.endsWith(" glasur") ||
             lc.endsWith(" syrup") || lc.endsWith(" sirup") ||
             lc.endsWith(" dough") || lc.endsWith(" teig") ||
+            lc.endsWith(" cookie teig") || lc.endsWith(" cheesecake teig") ||
             lc.endsWith("-füllung") || lc.endsWith("-fuellung") ||
             lc.endsWith("-frosting") || lc.endsWith("-sirup") || lc.endsWith("-teig") ||
-            lc.endsWith("-sauce") || lc.endsWith("-glasur")
+            lc.endsWith("-sauce") || lc.endsWith("-glasur") ||
+            // "Raspberry Cookie Teig", "Cheesecake Teig" ohne Doppelpunkt
+            (lc.contains("teig") && d.length in 4..48 && !d.any { it.isDigit() })
         ) return true
         // Reine GROSSBUCHSTABEN ohne Menge = Social-Caption-Header
         val lettersOnly = d.filter { it.isLetter() || it.isWhitespace() || it == '-' || it == '&' }
         if (lettersOnly.isNotBlank() && lettersOnly == lettersOnly.uppercase() &&
             lettersOnly.replace(" ", "").length in 3..40
         ) return true
-        // Kurze Titel ohne Bullet/Ziffer (wie Rezept-Ansicht): "Fleisch", "Sauce", "Mais & Bohnen"
-        return true
+        // Kein pauschales true mehr – sonst wird „Prise Salz“ zum Abschnitt
+        return false
     }
 
     fun flush() {

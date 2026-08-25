@@ -587,10 +587,20 @@ object RecipeAiParser {
         return chrome >= 2 || keywordHits >= 2
     }
 
-    /** @prozis, doppelte (80 g)-Klammern o.ä. aus Zutatenzeilen entfernen. */
+    /** @prozis, Affiliate-Klammern, doppelte (80 g)-Klammern o.ä. aus Zutatenzeilen entfernen. */
     private fun cleanIngredientLineNoise(line: String): String {
         var s = line
+        // "(von @inline.de | Code: Blondy)" / "(von @x | Code: y)"
+        s = s.replace(
+            Regex("""(?i)\s*\(\s*von\s*@?[\w.]+[^)]*code\s*:\s*[^)]+\)"""),
+            ""
+        ).trim()
         s = s.replace(Regex("""@\w+"""), "").trim()
+        // "von .de | Code: Blondy" nach Handle-Entfernung
+        s = s.replace(
+            Regex("""(?i)\s*von\s+[\w.]*\s*\|\s*code\s*:\s*\w+"""),
+            ""
+        ).trim()
         // Promo-Anhängsel abschneiden: "15 g ESN Whey → Aktuell -25 % mit Code: VICCES"
         s = s.replace(
             Regex(
@@ -603,12 +613,17 @@ object RecipeAiParser {
             ""
         ).trim()
         s = s.replace(Regex("""(?i)\s+anzeige\s*$"""), "").trim()
+        // "gibt's in der Backabteilung…" Promo-Nachsatz
+        s = s.replace(
+            Regex("""(?i)\s*\(?(gibt'?s|gibt es)\s+in\s+der\s+[^)]+\)?"""),
+            ""
+        ).trim()
         // "40g Haferflocken Mehl (80 g )" → erste Menge behalten, Klammer-Menge weg
         if (Regex("""^\d+[.,]?\d*\s*g\b""", RegexOption.IGNORE_CASE).containsMatchIn(s)) {
             s = s.replace(Regex("""\s*\(\s*\d+[.,]?\d*\s*g\s*\)\s*$""", RegexOption.IGNORE_CASE), " ").trim()
         }
         s = s.replace(Regex("""\s{2,}"""), " ").trim()
-        return s.trimEnd(':', ',', ';', ' ', '•')
+        return s.trimEnd(':', ',', ';', ' ', '•', '|')
     }
 
     /** Schneidet ab erstem klaren Methodenschritt / Makro-Block / Footer ab. */
@@ -657,7 +672,7 @@ object RecipeAiParser {
     /** Bereinigt Zubereitungstext: Hashtags, Promo, reine Meta-Zeilen raus. */
     fun formatInstructionsText(raw: String): String {
         if (raw.isBlank()) return raw
-        return raw.lines()
+        val cleaned = raw.lines()
             .map { line ->
                 line.trim()
                     .replace(Regex("""^[\p{So}\p{Cn}\p{Sk}]+"""), "")
@@ -666,13 +681,14 @@ object RecipeAiParser {
             .filter { line ->
                 if (line.isBlank()) return@filter false
                 val lower = line.lowercase().trimEnd(':').trim()
-                // Reine Header ohne Inhalt ("ZUBEREITUNG:", "Method", "alle") raus
+                // Reine Header ohne Inhalt ("ZUBEREITUNG:", "Method") raus
+                // "alle" allein nur wenn wirklich nur das Wort – nicht "Alle Zutaten…"
                 if (lower == "zubereitung" || lower == "method" || lower == "instructions" ||
                     lower == "directions" || lower == "preparation" || lower == "anleitung" ||
-                    lower == "alle" || lower == "steps"
+                    lower == "steps" || lower == "guten appetit" || lower == "guten appetit ♥" ||
+                    lower == "guten appetit ❤️"
                 ) return@filter false
-                // Einzelnes Wort ohne Inhalt (oft AI-Müll)
-                if (lower.length <= 4 && !lower.any { it.isDigit() }) return@filter false
+                if (lower == "alle" || lower == "zutaten") return@filter false
                 !line.startsWith("#") &&
                     !lower.startsWith("save this") &&
                     !lower.contains("products linked") &&
@@ -681,8 +697,34 @@ object RecipeAiParser {
                     !lower.contains("ich schicke dir") &&
                     !(line.startsWith("@") && line.length < 40)
             }
-            .joinToString("\n")
-            .trim()
+
+        // Fortsetzungszeilen an den vorherigen Schritt hängen
+        // (verhindert "1. Alle" / "Zutaten bis auf…" / "für den Teig…" als 3 Schritte)
+        val merged = mutableListOf<String>()
+        val startsStep = Regex("""^\d+[.)]\s+""")
+        for (line in cleaned) {
+            val isNewStep = startsStep.containsMatchIn(line)
+            if (merged.isEmpty() || isNewStep) {
+                merged += line
+            } else {
+                val prev = merged.last()
+                // Kurze Fortsetzung oder beginnend mit „für/und/mit/bis“ → anhängen
+                val cont = line.lowercase()
+                val looksContinuation =
+                    !line.first().isUpperCase() ||
+                        cont.startsWith("für ") || cont.startsWith("fuer ") ||
+                        cont.startsWith("und ") || cont.startsWith("mit ") ||
+                        cont.startsWith("bis ") || cont.startsWith("sowie ") ||
+                        cont.startsWith("danach ") || cont.startsWith("dann ") ||
+                        line.length < 60
+                if (looksContinuation && prev.length < 280) {
+                    merged[merged.lastIndex] = prev.trimEnd() + " " + line.trimStart()
+                } else {
+                    merged += line
+                }
+            }
+        }
+        return merged.joinToString("\n").trim()
     }
 
     /** True wenn der Text zerquetscht ist ODER viele Junk-Zeilen (Makros/Schritte) enthält. */

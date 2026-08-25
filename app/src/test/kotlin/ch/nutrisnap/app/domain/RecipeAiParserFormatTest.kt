@@ -239,3 +239,23 @@ Preheat the oven to 150°C and bake for 15-20 minutes.
         assertTrue("at least 4 non-bullet header lines", lines.count { !it.startsWith("•") } >= 4)
     }
 }
+
+    @Test
+    fun `formatInstructionsText merges continuation fragments`() {
+        val raw = """
+            1. Alle
+            Zutaten bis auf die Himbeeren
+            für den Raspberry Cookie Teig vermengen und am Ende die gehackten Himbeeren unterheben
+            2. Alle Zutaten für den Cheesecake Teig verrühren
+            3. Die Hälfte vom Raspberry Cookie Teig in eine Auflaufform auf den Boden drücken
+        """.trimIndent()
+        val out = RecipeAiParser.formatInstructionsText(raw)
+        val lines = out.lines().filter { it.isNotBlank() }
+        assertTrue("expected merged step 1, got:\n$out", lines.size <= 4)
+        assertTrue(
+            "step 1 should contain Himbeeren/Teig:\n$out",
+            lines.first().contains("Himbeeren", ignoreCase = true) ||
+                lines.first().contains("Cookie", ignoreCase = true)
+        )
+        assertFalse("should not keep lone Alle:\n$out", lines.any { it.trim().equals("Alle", true) })
+    }
