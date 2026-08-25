@@ -238,8 +238,6 @@ Preheat the oven to 150°C and bake for 15-20 minutes.
         assertFalse("instructions must not be in ingredients", recipe.ingredients.lowercase().contains("stand mixer"))
         assertTrue("at least 4 non-bullet header lines", lines.count { !it.startsWith("•") } >= 4)
     }
-}
-
     @Test
     fun `formatInstructionsText merges continuation fragments`() {
         val raw = """
@@ -259,3 +257,5 @@ Preheat the oven to 150°C and bake for 15-20 minutes.
         )
         assertFalse("should not keep lone Alle:\n$out", lines.any { it.trim().equals("Alle", true) })
     }
+}
+
