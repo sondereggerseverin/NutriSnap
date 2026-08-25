@@ -94,6 +94,19 @@ class UsdaFoodApi(private val apiKey: String) {
             var fiber: Float? = null; var sodium: Float? = null; var sugar: Float? = null
             var saturatedFat: Float? = null; var potassium: Float? = null; var addedSugars: Float? = null
 
+            // Vitamine/Mineralstoffe, die USDA FoodData Central tatsaechlich liefert (Nutrient-IDs
+            // gemaess offizieller USDA-Nutrientliste, https://fdc.nal.usda.gov). Jod und Biotin bewusst
+            // NICHT gemappt: SR/FDC's regulaeres foodNutrients-Array deckt beide praktisch nicht ab
+            // (Jod hat bei USDA eine separate Spezial-Datenbank, nicht Teil der Standard-Suche) - ein
+            // Mapping wuerde nur scheinbare Vollstaendigkeit vortaeuschen.
+            var vitaminA: Float? = null; var vitaminB1: Float? = null; var vitaminB2: Float? = null
+            var vitaminB3: Float? = null; var vitaminB5: Float? = null; var vitaminB6: Float? = null
+            var vitaminB11: Float? = null; var vitaminB12: Float? = null; var vitaminC: Float? = null
+            var vitaminD: Float? = null; var vitaminE: Float? = null; var vitaminK: Float? = null
+            var calcium: Float? = null; var iron: Float? = null; var magnesium: Float? = null
+            var zinc: Float? = null; var phosphorus: Float? = null; var copper: Float? = null
+            var manganese: Float? = null; var selenium: Float? = null
+
             for (i in 0 until nutrients.length()) {
                 val n = nutrients.getJSONObject(i)
                 val nutrientId = n.optInt("nutrientId", n.optJSONObject("nutrient")?.optInt("id") ?: 0)
@@ -113,6 +126,28 @@ class UsdaFoodApi(private val apiKey: String) {
                     606 -> saturatedFat = value
                     306 -> potassium = value / 1000f
                     539, 1235 -> addedSugars = value
+                    // Mineralstoffe: USDA liefert mg (Selen: µg) — intern immer Gramm.
+                    301 -> calcium = value / 1000f
+                    303 -> iron = value / 1000f
+                    304 -> magnesium = value / 1000f
+                    305 -> phosphorus = value / 1000f
+                    309 -> zinc = value / 1000f
+                    312 -> copper = value / 1000f
+                    315 -> manganese = value / 1000f
+                    317 -> selenium = value / 1_000_000f
+                    // Vitamine: USDA liefert mg fuer B1/B2/B3/B5/B6/C/E, µg fuer A(RAE)/B11/B12/D/K.
+                    404 -> vitaminB1 = value / 1000f
+                    405 -> vitaminB2 = value / 1000f
+                    406 -> vitaminB3 = value / 1000f
+                    410 -> vitaminB5 = value / 1000f
+                    415 -> vitaminB6 = value / 1000f
+                    401 -> vitaminC = value / 1000f
+                    323 -> vitaminE = value / 1000f
+                    320 -> vitaminA = value / 1_000_000f
+                    417 -> vitaminB11 = value / 1_000_000f
+                    418 -> vitaminB12 = value / 1_000_000f
+                    328 -> vitaminD = value / 1_000_000f
+                    430 -> vitaminK = value / 1_000_000f
                 }
             }
 
@@ -132,6 +167,26 @@ class UsdaFoodApi(private val apiKey: String) {
                 saturatedFat = saturatedFat,
                 sodium = sodium,
                 potassium = potassium,
+                vitaminA = vitaminA,
+                vitaminB1 = vitaminB1,
+                vitaminB2 = vitaminB2,
+                vitaminB3 = vitaminB3,
+                vitaminB5 = vitaminB5,
+                vitaminB6 = vitaminB6,
+                vitaminB11 = vitaminB11,
+                vitaminB12 = vitaminB12,
+                vitaminC = vitaminC,
+                vitaminD = vitaminD,
+                vitaminE = vitaminE,
+                vitaminK = vitaminK,
+                calcium = calcium,
+                iron = iron,
+                magnesium = magnesium,
+                zinc = zinc,
+                phosphorus = phosphorus,
+                copper = copper,
+                manganese = manganese,
+                selenium = selenium,
                 source = FoodSource.USDA,
                 completenessScore = completeness.coerceAtMost(100)
             )
