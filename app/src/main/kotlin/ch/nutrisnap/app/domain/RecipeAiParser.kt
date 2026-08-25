@@ -219,6 +219,15 @@ object RecipeAiParser {
         // Hashtags entfernen
         t = t.replace(Regex("""(?:\s*#\w+)+[\s:]*$""", RegexOption.IGNORE_CASE), "").trim()
         t = t.replace(Regex("""#\w+"""), " ").trim()
+        // DE Engagement-Bait-Zeilen früh raus (sonst kleben sie an Mengen/Abschnitten)
+        t = t.lines().filter { line ->
+            val l = line.lowercase()
+            !(l.contains("kommentiere") ||
+                l.contains("ich schicke dir") ||
+                l.contains("zum speichern") ||
+                l.contains("in die kommentare") ||
+                (l.contains("check deine") && l.contains("dm")))
+        }.joinToString("\n")
         // Inline-Abschnitte hart trennen (TikTok-Klumpen ohne Newlines)
         t = t.replace(
             Regex("""(?i)(?<=\S)\s*(?=Zubereitung\b|Method\b|Instructions\b|Nährwerte\b|Naehrwerte\b)"""),
@@ -374,7 +383,7 @@ object RecipeAiParser {
         if (d.trim().startsWith("#") || Regex("""^(#\w+\s*)+$""").matches(d.trim())) return true
         // Marketing-/Subtitle ohne Mengenangabe (Caption-Intro, nicht Zutat)
         val hasQuantity = Regex(
-            """(?i)((\d+[.,]?\d*|½|¼|¾|⅓|⅔)\s*(g|kg|ml|l|tl|el|tsp|tbsp|cup|cups|oz|lb|stück|stk|prise|bund|dose|pack|scheibe|scheiben|packet|packets)\b|(½|¼|¾|⅓|⅔)\s+\p{L})"""
+            """(?i)((\d+[.,]?\d*|½|¼|¾|⅓|⅔)\s*(g|kg|ml|l|tl|el|tsp|tbsp|cup|cups|oz|lb|stück|stk|prise|bund|dose|pack|päckchen|paeckchen|scheibe|scheiben|packet|packets)\b|(½|¼|¾|⅓|⅔)\s+\p{L})"""
         ).containsMatchIn(d)
         if (!hasQuantity && !isSectionHeaderLine(d)) {
             val marketingHits = listOf(
