@@ -310,6 +310,10 @@ data class Recipe(
     val saturatedFatPerServing: Float? = null,
     val saltPerServing: Float? = null,
     val sodiumPerServing: Float? = null,
+    /** Vitamine/Mineralstoffe pro Portion als JSON-Map (z.B. {"vitaminC":0.012,"iron":0.003}).
+     *  Einzelne Spalten wie bei FoodItem wären hier Overkill — die Werte kommen ohnehin
+     *  nur aus der Analyse und werden nie einzeln abgefragt/gefiltert. */
+    val microNutrientsJson: String? = null,
     val servings: Int = 1,
     val prepTimeMinutes: Int? = null,
     val tags: String = "",          // Komma-separierte DietTag-Namen

@@ -526,6 +526,17 @@ class RecipeRepository(db: NutriDatabase, private val context: Context) {
             .filterNot { it.startsWith("📊") }.joinToString("\n").trim()
         val newDesc = if (baseDesc.isNotBlank()) "$baseDesc\n\n$macroLine" else macroLine
         val servDiv = recipe.servings.coerceAtLeast(1)
+        // fiber/sugar/saturatedFat/salt/sodium haben eigene Spalten — der Rest (Vitamine,
+        // Mineralstoffe, monoFat/polyFat/... ) wurde bisher berechnet, aber nie gespeichert.
+        val dedicatedKeys = setOf("fiber", "sugar", "saturatedFat", "salt", "sodium")
+        val restPerServing = analysis.totalMicros
+            .filterKeys { it !in dedicatedKeys }
+            .mapValues { (_, total) -> total / servDiv }
+        val microJson = if (restPerServing.isEmpty()) null else {
+            val obj = org.json.JSONObject()
+            restPerServing.forEach { (k, v) -> obj.put(k, v.toDouble()) }
+            obj.toString()
+        }
         val updated = recipe.copy(
             totalCalories = analysis.totalCalories,
             proteinPerServing = analysis.proteinPerServing,
@@ -537,6 +548,7 @@ class RecipeRepository(db: NutriDatabase, private val context: Context) {
                 ?: recipe.saturatedFatPerServing,
             saltPerServing = analysis.totalMicros["salt"]?.div(servDiv) ?: recipe.saltPerServing,
             sodiumPerServing = analysis.totalMicros["sodium"]?.div(servDiv) ?: recipe.sodiumPerServing,
+            microNutrientsJson = microJson ?: recipe.microNutrientsJson,
             description = newDesc
         )
         updateRecipe(updated)

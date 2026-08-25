@@ -962,11 +962,29 @@ internal fun NutritionAnalysisCard(
     val saltPerServ   = result?.totalMicros?.get("salt")?.let { it / servDiv } ?: recipe.saltPerServing
     val sodiumPerServ = result?.totalMicros?.get("sodium")?.let { it / servDiv } ?: recipe.sodiumPerServing
 
+    // Vitamine/Mineralstoffe: frische Analyse (falls vorhanden) hat Vorrang, sonst
+    // die zuletzt gespeicherten Werte aus microNutrientsJson.
+    val dedicatedKeys = setOf("fiber", "sugar", "saturatedFat", "salt", "sodium")
+    val microsPerServ: Map<String, Float> = remember(result, recipe.microNutrientsJson) {
+        if (result != null) {
+            result.totalMicros.filterKeys { it !in dedicatedKeys }.mapValues { it.value / servDiv }
+        } else {
+            recipe.microNutrientsJson?.let { raw ->
+                runCatching {
+                    val obj = org.json.JSONObject(raw)
+                    buildMap {
+                        obj.keys().forEach { k -> put(k, obj.getDouble(k).toFloat()) }
+                    }
+                }.getOrDefault(emptyMap())
+            } ?: emptyMap()
+        }
+    }
+
     val hasMacros = calsPerServ != null || protPerServ != null
 
     var showDetails by remember { mutableStateOf(false) }
     val hasDetails = fiberPerServ != null || sugarPerServ != null || satFatPerServ != null ||
-        saltPerServ != null || result != null
+        saltPerServ != null || microsPerServ.isNotEmpty() || result != null
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
@@ -1085,6 +1103,13 @@ internal fun NutritionAnalysisCard(
                                         if (r.estimatedCount > 0) " · ${r.estimatedCount} KI-geschätzt" else "",
                                     fontSize = 10.sp,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                )
+                            }
+                            if (microsPerServ.isNotEmpty()) {
+                                MicronutrientTable(
+                                    perServing = microsPerServ,
+                                    ratio = ratio,
+                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                             }
                         }
