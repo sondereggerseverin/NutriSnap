@@ -578,13 +578,24 @@ object RecipeAiParser {
     fun formatInstructionsText(raw: String): String {
         if (raw.isBlank()) return raw
         return raw.lines()
-            .map { it.trim() }
+            .map { line ->
+                line.trim()
+                    .replace(Regex("""^[\p{So}\p{Cn}\p{Sk}]+"""), "")
+                    .trim()
+            }
             .filter { line ->
-                line.isNotBlank() &&
-                    !line.startsWith("#") &&
-                    !line.lowercase().startsWith("save this") &&
-                    !line.lowercase().contains("products linked") &&
-                    !line.lowercase().contains("link in bio") &&
+                if (line.isBlank()) return@filter false
+                val lower = line.lowercase().trimEnd(':').trim()
+                // Reine Header ohne Inhalt ("ZUBEREITUNG:", "Method", "alle") raus
+                if (lower == "zubereitung" || lower == "method" || lower == "instructions" ||
+                    lower == "directions" || lower == "preparation" || lower == "anleitung" ||
+                    lower == "alle" || lower == "steps"
+                ) return@filter false
+                !line.startsWith("#") &&
+                    !lower.startsWith("save this") &&
+                    !lower.contains("products linked") &&
+                    !lower.contains("link in bio") &&
+                    !lower.startsWith("kommentiere") &&
                     !(line.startsWith("@") && line.length < 40)
             }
             .joinToString("\n")
@@ -607,7 +618,10 @@ object RecipeAiParser {
     }
 
     private fun isSectionHeaderLine(line: String): Boolean {
-        val d = line.trim().trimStart('•', '-', '*', ' ').trim()
+        val d = line.trim()
+            .replace(Regex("""^[\p{So}\p{Cn}\p{Sk}]+"""), "")
+            .trimStart('•', '-', '*', ' ')
+            .trim()
         if (d.length < 3) return false
         val lower = d.lowercase().trimEnd(':').trim()
         // Explizite Abschnitts-Marker (EN + DE + typische Back-/Koch-Abschnitte)
@@ -728,13 +742,15 @@ object RecipeAiParser {
     fun extractTitle(caption: String, fallback: String = "Rezept"): String {
         val cleaned = cleanCaption(caption)
         val lines   = cleaned.lines().map { it.trim() }.filter { it.isNotBlank() }
-        return lines.firstOrNull { line ->
-            val lower = line.lowercase()
-            line.length > 3 &&
-            line.any { it.isLetter() } &&
-            !line.startsWith("#") &&
-            !Regex("""^\d+[.,]?\d*\s*[KkMm]?\s*(likes?|comments?|followers|views)""", RegexOption.IGNORE_CASE).containsMatchIn(line) &&
-            !Regex("""^\d{4}-\d{2}-\d{2}""").containsMatchIn(line) &&
+        val raw = lines.firstOrNull { line ->
+            val stripped = line.trim().trimStart('"', '\u201c', '\u201d', '\'')
+                .replace(Regex("""^[\p{So}\p{Cn}\p{Sk}]+"""), "").trim()
+            val lower = stripped.lowercase()
+            stripped.length > 3 &&
+            stripped.any { it.isLetter() } &&
+            !stripped.startsWith("#") &&
+            !Regex("""^\d+[.,]?\d*\s*[KkMm]?\s*(likes?|comments?|followers|views)""", RegexOption.IGNORE_CASE).containsMatchIn(stripped) &&
+            !Regex("""^\d{4}-\d{2}-\d{2}""").containsMatchIn(stripped) &&
             !lower.startsWith("zutaten") &&
             !lower.startsWith("ingredients") &&
             !lower.startsWith("zubereitung") &&
@@ -742,8 +758,18 @@ object RecipeAiParser {
             !lower.startsWith("für ") &&
             !lower.startsWith("method") &&
             !lower.startsWith("instructions") &&
-            !lower.startsWith("served with")
-        }?.take(80) ?: fallback
+            !lower.startsWith("served with") &&
+            !lower.startsWith("kommentiere")
+        } ?: return fallback
+        // Anführungszeichen, trailing " -", " - 40g Protein" abschneiden
+        return raw
+            .trim()
+            .trimStart('"', '\u201c', '\u201d', '\'')
+            .trimEnd('"', '\u201c', '\u201d', '\'', '-', '–', '—', ' ')
+            .replace(Regex("""\s*[-–—]\s*\d+[.,]?\d*\s*g\s*(protein|eiwei[sß]).*$""", RegexOption.IGNORE_CASE), "")
+            .trimEnd(' ', '-', '–', '—')
+            .take(80)
+            .ifBlank { fallback }
     }
 
     // ── LLM call ──────────────────────────────────────────────────────────────
@@ -1024,6 +1050,13 @@ Rules:
             Regex("""(?m)^(?:zutaten|ingredients)\s*:""", RegexOption.IGNORE_CASE)
         )
 
+        // Führende Emojis/Symbole abstreifen (🔹 380g … / 📘 ZUTATEN Teig:)
+        fun stripLeadingDecor(line: String): String =
+            line.trim()
+                .replace(Regex("""^[\p{So}\p{Cn}\p{Sk}\p{Sm}]+"""), "")
+                .trimStart('•', '-', '*', ' ', '\t')
+                .trim()
+
         fun findSectionIndex(keywords: List<String>): Int? =
             keywords.firstNotNullOfOrNull { kw ->
                 lower.indexOf(kw).takeIf { i -> i > 0 }
@@ -1034,13 +1067,13 @@ Rules:
                 val m = re.find(cleaned) ?: continue
                 return m.range.first
             }
-            // Fallback: "ingredients"/"zutaten" nur wenn am Zeilenanfang und
-            // die Zeile kurz ist (Header), nicht mitten in einem Promo-Satz.
+            // Fallback: "ingredients"/"zutaten" – auch mit führendem Emoji
+            // (📘 ZUTATEN Teig: / 🥣 Ingredients – Makes 3)
             for ((idx, line) in lines.withIndex()) {
-                val t = line.trim().lowercase()
+                val t = stripLeadingDecor(line).lowercase().trimEnd(':').trim()
                 if (t.length > 60) continue
                 if (t.startsWith("ingredients") || t.startsWith("zutaten") ||
-                    t == "recipe" || t.startsWith("✨recipe") || t.endsWith("recipe✨")
+                    t == "recipe" || t.startsWith("recipe ")
                 ) {
                     // Promo-Sätze rausfiltern
                     if (t.contains("with a *") || t.contains("from @") ||
@@ -1063,18 +1096,27 @@ Rules:
         val ingrIdx  = findIngredientHeaderIndex()
 
         val ingredientLineRegex = Regex(
-            """^(?:[-•*]|\d+\s*(?:g|ml|l|kg|cup|cups|tbsp?|tsp?|oz|lb|St[üu]ck|stk\.?|EL|TL|Prise|Tasse|Zehe))|""" +
+            """^(?:[-•*▪▫●○◆◇]|\d+[.,]?\d*\s*(?:g|ml|l|kg|cup|cups|tbsp?|tsp?|oz|lb|St[üu]ck|stk\.?|EL|TL|Prise|Tasse|Zehe|Päckchen|Paeckchen|Packung))|""" +
             """^\d+[.,]?\d*\s+\w""",
             RegexOption.IGNORE_CASE
         )
 
         // Mengen-Zeilen + Abschnitts-Header (DOUGH / Füllung / …) in Original-Reihenfolge.
         // Früher nur qty-Zeilen → Header ohne Zahl (DOUGH, FROSTING) gingen verloren.
-        fun isQtyIngredientLine(line: String): Boolean =
-            ingredientLineRegex.containsMatchIn(line) ||
-                line.startsWith("-") || line.startsWith("•") ||
-                (line.startsWith("*") && Regex("""\d""").containsMatchIn(line))
-
+        // Wichtig: Emoji-Bullets (🔹 380g Dinkelmehl) müssen nach Strip als Qty gelten.
+        fun isQtyIngredientLine(line: String): Boolean {
+            val core = stripLeadingDecor(line)
+            if (core.isBlank()) return false
+            return ingredientLineRegex.containsMatchIn(core) ||
+                core.startsWith("-") || core.startsWith("•") ||
+                (core.startsWith("*") && Regex("""\d""").containsMatchIn(core)) ||
+                Regex(
+                    """^\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tsp|tbsp|cup|oz|lb|stück|stk|päckchen|paeckchen|packung)\b""",
+                    RegexOption.IGNORE_CASE
+                ).containsMatchIn(core) ||
+                Regex("""^\d+\s+(päckchen|paeckchen|packung|pack|packet)\b""", RegexOption.IGNORE_CASE)
+                    .containsMatchIn(core)
+        }
         val qtyIngrLines = lines.filter { line ->
             isQtyIngredientLine(line) && !isJunkIngredientLine(line) && !isPromoIngredientNoise(line)
         }

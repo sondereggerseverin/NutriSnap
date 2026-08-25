@@ -213,4 +213,50 @@ class RecipeCaptionJunkFilterTest {
         assertFalse("instruction leaked:\n$out", lower.contains("verkneten") || lower.contains("ausrollen"))
         assertFalse("hashtag leaked:\n$out", lower.contains("#highprotein") || lower.contains("#pide"))
     }
+
+
+    @Test
+    fun germanPideFallbackParseExtractsIngredientsAndSteps() {
+        val caption = """
+            Salami Käse Pide - 40g Protein
+            ✅ 6 Portionen
+            ✅ Pro Portion: 414 kcal, Fett 6,7g, KH 48,6g, P 40g
+            💬 Kommentiere „PIDE“ und ich schicke dir das Rezept zum speichern oder ausdrucken kostenlos zu.
+            📘 ZUTATEN Teig:
+            🔹 380g Dinkelmehl Typ 630
+            🔹 500g Magerquark
+            🔹 1 Päckchen Backpulver
+            📘 ZUTATEN Belag
+            🔹 270g EatLean Käse gerieben
+            🔹 90g Gratinkäse
+            🔹 38g Geflügelsalami
+            🧑‍🍳 ZUBEREITUNG:
+            1. alle Zutaten für den Teig in einer Schüssel mit der Hand verkneten.
+            2. in sechs gleich große Portionen aufteilen und länglich ausrollen
+            3. Käse darauf verteilen und zu Schiffchen formen.
+            4. Salami darauf geben
+            5. im Backofen bei 200° für circa 15 Minuten backen.
+            #highproteinrezepte #pide #proteinpide
+        """.trimIndent()
+        val recipe = RecipeAiParser.fallbackParse(caption, null, "instagram", null)
+        val ing = recipe.ingredients.lowercase()
+        assertTrue("expected Dinkelmehl/380 in:\n${recipe.ingredients}",
+            ing.contains("dinkelmehl") || recipe.ingredients.contains("380"))
+        assertTrue("expected Magerquark/500 in:\n${recipe.ingredients}",
+            ing.contains("magerquark") || recipe.ingredients.contains("500"))
+        assertTrue("expected Backpulver in:\n${recipe.ingredients}",
+            ing.contains("backpulver"))
+        assertFalse("bait in ingredients:\n${recipe.ingredients}",
+            ing.contains("kommentiere") || ing.contains("schicke dir"))
+        assertFalse("empty tip placeholder:\n${recipe.ingredients}",
+            recipe.ingredients.startsWith("Tippe"))
+        val instr = recipe.instructions.lowercase()
+        assertFalse("bare ZUBEREITUNG header:\n${recipe.instructions}",
+            instr.trim() == "zubereitung" || instr.trim() == "zubereitung:")
+        assertFalse("orphan 'alle':\n${recipe.instructions}",
+            instr.lines().any { it.trim() == "alle" })
+        assertFalse("quoted title: ${recipe.title}", recipe.title.startsWith("\""))
+        assertTrue("title has Pide: ${recipe.title}",
+            recipe.title.lowercase().contains("pide") || recipe.title.lowercase().contains("salami"))
+    }
 }
