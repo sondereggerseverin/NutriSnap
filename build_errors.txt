@@ -1,10 +1,10 @@
-# Build errors - run 981
+# Build errors - run 983
 
 ## Unit Tests (test_output.log) - Error lines
 ```
-RecipeAiParserFormatTestKt > initializationError FAILED
+RecipeCaptionParserTest > without sections returns full caption as ingredients FAILED
 > Task :app:testDebugUnitTest FAILED
-BUILD FAILED in 2m 8s
+BUILD FAILED in 1m 42s
 ```
 
 ## Unit Tests (test_output.log) - Last 150 lines
@@ -157,7 +157,7 @@ Caused by: org.gradle.api.internal.exceptions.MarkedVerificationException: There
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 
 
-BUILD FAILED in 2m 8s
+BUILD FAILED in 1m 42s
 31 actionable tasks: 31 executed
 ```
 
