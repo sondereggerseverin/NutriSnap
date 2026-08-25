@@ -12,6 +12,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -40,7 +41,8 @@ import java.time.ZoneOffset
 fun AnalysisScreen(
     vm: AnalysisViewModel = viewModel(),
     onNavigateToInsights: () -> Unit = {},
-    onNavigateToChat: () -> Unit = {}
+    onNavigateToChat: () -> Unit = {},
+    onNavigateToDeficiencyTrend: () -> Unit = {}
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     var showDatePicker by remember { mutableStateOf(false) }
@@ -110,6 +112,32 @@ fun AnalysisScreen(
                         Text("Frag deine App", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                         Text("Chat über deine Daten", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                }
+            }
+        }
+
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onNavigateToDeficiencyTrend),
+                shape = RoundedCornerShape(NutriRadius.md)
+            ) {
+                Row(
+                    Modifier.padding(NutriSpacing.md),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.WarningAmber, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(NutriSpacing.md))
+                    Column(Modifier.weight(1f)) {
+                        Text("Nährstoffmangel-Trend", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text(
+                            "Vitamine & Mineralstoffe der letzten 14 Tage",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

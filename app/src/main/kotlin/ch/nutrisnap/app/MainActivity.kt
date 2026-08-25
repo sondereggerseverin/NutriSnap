@@ -47,6 +47,7 @@ import ch.nutrisnap.app.ui.screens.auth.AuthViewModel
 import ch.nutrisnap.app.ui.screens.auth.LoginScreen
 import ch.nutrisnap.app.ui.screens.customfood.CreateCustomFoodScreen
 import ch.nutrisnap.app.ui.screens.customfood.CustomFoodListScreen
+import ch.nutrisnap.app.ui.screens.deficiency.DeficiencyTrendScreen
 import ch.nutrisnap.app.ui.screens.diary.DiaryScreen
 import ch.nutrisnap.app.ui.screens.export.ExportScreen
 import ch.nutrisnap.app.ui.screens.insights.InsightsScreen
@@ -394,7 +395,8 @@ fun MainScaffold(
             ) {
                 AnalysisScreen(
                     onNavigateToInsights = { navController.navigate("insights") },
-                    onNavigateToChat      = { navController.navigate("chat") }
+                    onNavigateToChat      = { navController.navigate("chat") },
+                    onNavigateToDeficiencyTrend = { navController.navigate("deficiency_trend") }
                 )
             }
             composable(
@@ -456,6 +458,13 @@ fun MainScaffold(
                 popEnterTransition = { popEnter }, popExitTransition = { popExit }
             ) {
                 InsightsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                "deficiency_trend",
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) {
+                DeficiencyTrendScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 "chat",
