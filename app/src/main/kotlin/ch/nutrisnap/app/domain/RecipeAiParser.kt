@@ -497,6 +497,7 @@ object RecipeAiParser {
         ) return true
         // Social / Promo (Affiliate-Codes, Rabatt-Hinweise)
         if (isPromoIngredientNoise(d)) return true
+        if (isSocialUiChromeLine(d)) return true
         // Reine Hashtag-/Code-Zeilen
         if (d.startsWith("@") && d.length < 40) return true
         if (!d.any { it.isLetter() }) return true
@@ -534,7 +535,56 @@ object RecipeAiParser {
         if (Regex("""\bcode\s+[a-z0-9_]+\b""", RegexOption.IGNORE_CASE).containsMatchIn(lower) &&
             !Regex("""^\d+\s*(g|ml|tsp|tbsp)\b""", RegexOption.IGNORE_CASE).containsMatchIn(lower)
         ) return true
+        // Ebook / Promo-Blöcke in Captions
+        if (lower.contains("link in my profile") || lower.contains("link in profile") ||
+            lower.contains("recipe ebook") || lower.contains("my brand new") ||
+            lower.contains("ebook:") || lower.contains("healthy food made easy")
+        ) return true
         return false
+    }
+
+    /**
+     * TikTok/Instagram/Reels UI-Chrome – nie Zutat, nie Anleitung.
+     * Wenn der OCR-Rohtext viele solcher Treffer hat, Vision erzwingen.
+     */
+    fun isSocialUiChromeLine(line: String): Boolean {
+        val d = line.trim()
+        if (d.isBlank()) return false
+        val lower = d.lowercase()
+        // Navigation / Tabs
+        if (lower in setOf(
+                "for you", "following", "friends", "inbox", "profile", "home",
+                "community", "live", "search", "less", "more", "repost"
+            )
+        ) return true
+        if (lower.startsWith("for you") || lower.startsWith("following") ||
+            lower == "community" || lower.startsWith("community ")
+        ) return true
+        // Engagement-Zähler: "230.7K", "101.3K", "19.2K", "319"
+        if (Regex("""^\d+[.,]?\d*\s*[kmb]\s*$""", RegexOption.IGNORE_CASE).matches(d)) return true
+        // Suchleiste / App-Chrome
+        if (lower.startsWith("search ·") || lower.startsWith("search ·") ||
+            lower.startsWith("search -") || lower.startsWith("q search")
+        ) return true
+        if (lower.contains("search · overnight") || lower.contains("search - overnight")) return true
+        // Reine Creator-Handles ohne Menge
+        if (Regex("""^@?\w{3,24}$""").matches(d) && !Regex("""\d""").containsMatchIn(d)) {
+            if (lower in setOf("fitfoodieselma", "fitfoodiejules")) return true
+        }
+        return false
+    }
+
+    /** Rohtext wirkt wie Social-Screenshot (viel UI-Chrome). */
+    fun looksLikeSocialScreenshotOcr(text: String): Boolean {
+        val lines = text.lines().map { it.trim() }.filter { it.isNotBlank() }
+        if (lines.isEmpty()) return false
+        val chrome = lines.count { isSocialUiChromeLine(it) || isPromoIngredientNoise(it) }
+        val blob = text.lowercase()
+        val keywordHits = listOf(
+            "for you", "following", "community", " inbox", "\ninbox",
+            "link in my profile", "link in bio", "230.", "101.3", "vm.tiktok"
+        ).count { it in blob }
+        return chrome >= 2 || keywordHits >= 2
     }
 
     /** @prozis, doppelte (80 g)-Klammern o.ä. aus Zutatenzeilen entfernen. */

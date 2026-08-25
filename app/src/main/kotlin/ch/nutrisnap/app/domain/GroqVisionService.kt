@@ -381,9 +381,12 @@ Regeln:
 - title, description, ingredients, instructions auf Deutsch
 - ingredients: eine Zutat pro Zeile, Mengen in g/ml/EL/TL; Abschnittsüberschriften erlaubt (z.B. „Topping:“)
 - instructions: nummeriert (1. … 2. …), klar und knapp
-- Keine Werbung, keine Hashtags, kein „Link in bio“
+- STRENG entfernen: TikTok/Instagram-UI (For You, Following, Community, LIVE, Inbox, Profile,
+  Like-/Share-Zahlen wie 230.7K), Creator-Namen, Ebook-Werbung, Link in bio, Hashtags
+- Keine englischen UI-Reste in Zutaten oder Anleitung
 - Nährwerte und servings nur behalten wenn sinnvoll; sonst weglassen/null
 - Erfinde keine neuen Zutaten; nur glätten, übersetzen, metrisch machen
+- Wenn Eingabe voller Müll ist, behalte nur klar erkennbare Lebensmittelzeilen mit Mengen
 
 Eingabe:
 ${JSONObject().apply {

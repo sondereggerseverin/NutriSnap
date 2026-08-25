@@ -328,4 +328,37 @@ class RecipeCaptionJunkFilterTest {
         assertFalse("steps in ingredients:\n${recipe.ingredients}",
             ing.contains("preheat") || ing.contains("bake for"))
     }
+
+    @Test
+    fun rejectsTikTokUiChrome() {
+        assertTrue(RecipeAiParser.isSocialUiChromeLine("For You"))
+        assertTrue(RecipeAiParser.isSocialUiChromeLine("Following"))
+        assertTrue(RecipeAiParser.isSocialUiChromeLine("Community"))
+        assertTrue(RecipeAiParser.isSocialUiChromeLine("230.7K"))
+        assertTrue(RecipeAiParser.isSocialUiChromeLine("101.3K"))
+        assertTrue(RecipeAiParser.isJunkIngredientLine("For You"))
+        assertTrue(RecipeAiParser.isJunkIngredientLine("230.7K"))
+        assertTrue(RecipeAiParser.isPromoIngredientNoise("Link in my profile"))
+        assertFalse(RecipeAiParser.isSocialUiChromeLine("100 g Himbeeren"))
+        assertFalse(RecipeAiParser.isJunkIngredientLine("100 g Himbeeren"))
+    }
+
+    @Test
+    fun detectsSocialScreenshotOcr() {
+        val ocr = """
+            For You
+            Following
+            fitfoodieselma
+            Healthy Overnight Oats
+            100 g raspberries
+            230.7K
+            Link in my profile
+        """.trimIndent()
+        assertTrue(RecipeAiParser.looksLikeSocialScreenshotOcr(ocr))
+        assertFalse(
+            RecipeAiParser.looksLikeSocialScreenshotOcr(
+                "100 g Haferflocken\n200 ml Milch\n1 EL Honig"
+            )
+        )
+    }
 }

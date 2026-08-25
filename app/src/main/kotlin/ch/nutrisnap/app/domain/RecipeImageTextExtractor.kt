@@ -121,8 +121,12 @@ object RecipeImageTextExtractor {
             }
         }.joinToString("\n\n").ifBlank { null }
 
-        // Einzelbild + starke OCR → Vision sparen
-        if (bitmaps.size == 1) {
+        // Social-Screenshot (TikTok/IG-Chrome im OCR): nie OCR-only – Vision muss laufen
+        val socialChrome = combinedOcr != null &&
+            RecipeAiParser.looksLikeSocialScreenshotOcr(combinedOcr)
+
+        // Einzelbild + starke OCR → Vision sparen — aber nicht bei Social-Chrome
+        if (bitmaps.size == 1 && !socialChrome) {
             val ocrList = ocrAttempts.first().recipes
             val ocrScore = ocrList?.firstOrNull()?.let { ingredientQualityScore(it.ingredients) } ?: -1
             if (ocrList != null && ocrList.size == 1 && ocrScore >= STRONG_INGREDIENT_SCORE) {
@@ -131,7 +135,11 @@ object RecipeImageTextExtractor {
         }
 
         // Kombinierter OCR als Caption-Parse (hilft bei reinen Text-Screenshots)
-        val combinedOcrList = if (!combinedOcr.isNullOrBlank() && looksLikeRecipeText(combinedOcr)) {
+        val combinedOcrList = if (
+            !combinedOcr.isNullOrBlank() &&
+            looksLikeRecipeText(combinedOcr) &&
+            !socialChrome
+        ) {
             runCatching {
                 RecipeAiParser.parse(
                     caption = combinedOcr,
@@ -144,7 +152,9 @@ object RecipeImageTextExtractor {
             }.getOrNull()
         } else null
 
-        val visionResult = runCatching { visionProvider(combinedOcr) }
+        // OCR-Hint für Vision: UI-Chrome/Promo-Zeilen raus, damit das Modell weniger Müll sieht
+        val cleanedOcrHint = combinedOcr?.let { sanitizeOcrHintForVision(it) }
+        val visionResult = runCatching { visionProvider(cleanedOcrHint) }
         val visionList = visionResult.getOrDefault(emptyList())
         val ocrList = combinedOcrList ?: ocrAttempts.firstOrNull()?.recipes
 
@@ -153,15 +163,84 @@ object RecipeImageTextExtractor {
                 visionResult.exceptionOrNull()?.let { throw it }
                 emptyList()
             }
+            // Social-Chrome oder mehrere Bilder: Vision hat Vorrang (OCR nur Fallback)
+            (socialChrome || bitmaps.size > 1) && visionList.isNotEmpty() -> {
+                if (visionList.size > 1 || ocrList.isNullOrEmpty()) visionList
+                else listOf(mergeBestPreferVision(ocrList.first(), visionList.first()))
+            }
             ocrList.isNullOrEmpty() -> visionList
             visionList.isEmpty() -> ocrList
-            // Mehrere Screenshots oder Collage → Vision priorisieren, OCR nur mergen
-            bitmaps.size > 1 || visionList.size > 1 -> {
-                if (visionList.size > 1) visionList
-                else listOf(mergeBest(ocrList.first(), visionList.first()))
-            }
+            visionList.size > 1 -> visionList
             else -> listOf(mergeBest(ocrList.first(), visionList.first()))
         }
+    }
+
+    /**
+     * Wie [mergeBest], aber bei Social-Screenshots: Vision-Zutaten/Anleitung gewinnen,
+     * sobald sie nicht leer sind (OCR oft voller UI-Müll).
+     */
+    internal fun mergeBestPreferVision(
+        ocr: RecipeFromImageResult,
+        vision: RecipeFromImageResult
+    ): RecipeFromImageResult {
+        val ingredients = when {
+            vision.ingredients.isNotBlank() &&
+                ingredientQualityScore(vision.ingredients) >=
+                ingredientQualityScore(ocr.ingredients) - 2 -> vision.ingredients
+            vision.ingredients.isNotBlank() &&
+                RecipeAiParser.looksLikeSocialScreenshotOcr(ocr.ingredients) -> vision.ingredients
+            else -> {
+                val a = ingredientQualityScore(ocr.ingredients)
+                val b = ingredientQualityScore(vision.ingredients)
+                if (b >= a) vision.ingredients else ocr.ingredients
+            }
+        }
+        val instructions = when {
+            vision.instructions.isNotBlank() -> vision.instructions
+            else -> ocr.instructions
+        }
+        val title = when {
+            vision.title.isNotBlank() && !isPlaceholderTitle(vision.title) -> vision.title
+            else -> pickBetterTitle(ocr.title, vision.title)
+        }
+        return RecipeFromImageResult(
+            title = title,
+            description = vision.description.trim().ifBlank { ocr.description },
+            ingredients = runCatching {
+                RecipeAiParser.formatIngredientText(ingredients)
+            }.getOrDefault(ingredients),
+            instructions = runCatching {
+                RecipeAiParser.formatInstructionsText(instructions)
+            }.getOrDefault(instructions),
+            servings = when {
+                vision.servings > 1 -> vision.servings
+                ocr.servings > 1 -> ocr.servings
+                else -> maxOf(vision.servings, ocr.servings).coerceAtLeast(1)
+            },
+            prepTimeMinutes = vision.prepTimeMinutes ?: ocr.prepTimeMinutes,
+            cookTimeMinutes = vision.cookTimeMinutes ?: ocr.cookTimeMinutes,
+            caloriesPerServing = vision.caloriesPerServing ?: ocr.caloriesPerServing,
+            proteinPerServing = vision.proteinPerServing ?: ocr.proteinPerServing,
+            carbsPerServing = vision.carbsPerServing ?: ocr.carbsPerServing,
+            fatPerServing = vision.fatPerServing ?: ocr.fatPerServing
+        )
+    }
+
+    /** OCR-Rohtext für Vision: Social-Chrome und Promo-Zeilen entfernen. */
+    internal fun sanitizeOcrHintForVision(ocr: String): String {
+        return ocr.lines()
+            .map { it.trimEnd() }
+            .filter { line ->
+                val t = line.trim()
+                if (t.isBlank()) return@filter true // Abschnitts-Trenner behalten
+                if (t.startsWith("--- Screenshot")) return@filter true
+                !RecipeAiParser.isSocialUiChromeLine(t) &&
+                    !RecipeAiParser.isPromoIngredientNoise(t)
+            }
+            .joinToString("\n")
+            .replace(Regex("\n{3,}"), "\n\n")
+            .trim()
+            .ifBlank { ocr.take(2000) }
     }
 
     /**
