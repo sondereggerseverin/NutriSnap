@@ -160,4 +160,57 @@ class RecipeCaptionJunkFilterTest {
         assertFalse(lower.contains("aktuell"))
         assertFalse(lower.contains("code"))
     }
+
+    @Test
+    fun rejectsGermanEngagementBait() {
+        assertTrue(RecipeAiParser.isJunkIngredientLine(
+            "Kommentiere „PIDE“ und ich schicke dir das Rezept zum speichern oder ausdrucken kostenlos zu."
+        ))
+        assertTrue(RecipeAiParser.isJunkIngredientLine(
+            "40 g Kommentiere „PIDE“ und ich schicke dir das Rezept zum speichern oder ausdrucken kostenlos zu."
+        ))
+        assertTrue(RecipeAiParser.isJunkIngredientLine("Schreib PIDE in die Kommentare"))
+        assertTrue(RecipeAiParser.isJunkIngredientLine("Check deine DMs"))
+        assertTrue(RecipeAiParser.isPromoIngredientNoise(
+            "Kommentiere „PIDE“ und ich schicke dir das Rezept"
+        ))
+    }
+
+    @Test
+    fun germanPideStyleCaptionKeepsRealIngredientsDropsBait() {
+        val raw = """
+            Salami Käse Pide - 40g Protein
+            ✅ 6 Portionen
+            ✅ Pro Portion: 414 kcal, Fett 6,7g, KH 48,6g, P 40g
+            💬 Kommentiere „PIDE“ und ich schicke dir das Rezept zum speichern oder ausdrucken kostenlos zu.
+            📘 ZUTATEN Teig:
+            🔹 380g Dinkelmehl Typ 630
+            🔹 500g Magerquark
+            🔹 1 Päckchen Backpulver
+            📘 ZUTATEN Belag
+            🔹 270g EatLean Käse gerieben
+            🔹 90g Gratinkäse
+            🔹 38g Geflügelsalami
+            🧑‍🍳 ZUBEREITUNG:
+            1. alle Zutaten für den Teig in einer Schüssel mit der Hand verkneten.
+            2. in sechs gleich große Portionen aufteilen und länglich ausrollen
+            3. Käse darauf verteilen und zu Schiffchen formen.
+            4. Salami darauf geben
+            5. im Backofen bei 200° für circa 15 Minuten backen.
+            #highproteinrezepte #pide #proteinpide
+        """.trimIndent()
+        val out = RecipeAiParser.formatIngredientText(raw)
+        val lower = out.lowercase()
+        assertTrue("expected Dinkelmehl:\n$out", lower.contains("dinkelmehl") || out.contains("380"))
+        assertTrue("expected Magerquark:\n$out", lower.contains("magerquark") || out.contains("500"))
+        assertTrue("expected Backpulver:\n$out", lower.contains("backpulver"))
+        assertTrue("expected Käse/Salami:\n$out",
+            lower.contains("eatlean") || lower.contains("gratinkäse") || lower.contains("salami") ||
+                out.contains("270") || out.contains("38")
+        )
+        assertFalse("bait leaked:\n$out", lower.contains("kommentiere") || lower.contains("schicke dir"))
+        assertFalse("macro leaked:\n$out", lower.contains("414") && lower.contains("kcal"))
+        assertFalse("instruction leaked:\n$out", lower.contains("verkneten") || lower.contains("ausrollen"))
+        assertFalse("hashtag leaked:\n$out", lower.contains("#highprotein") || lower.contains("#pide"))
+    }
 }

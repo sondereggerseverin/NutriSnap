@@ -358,6 +358,18 @@ object RecipeAiParser {
             lower.startsWith("this is exactly") || lower.startsWith("using lean") ||
             lower == "macros" || lower.startsWith("protein bowl")
         ) return true
+        // DE Engagement-Bait (häufig bei High-Protein-Posts): "Kommentiere „PIDE“ und ich schicke…"
+        // Auch wenn LLM/Fallback eine Makro-Zahl davorklebt: "40 g Kommentiere „PIDE“…"
+        if (lower.startsWith("kommentiere") || lower.startsWith("kommentar ") ||
+            lower.startsWith("schreib ") || lower.startsWith("schreibe ") ||
+            lower.startsWith("check deine") || lower.startsWith("check your") ||
+            lower.contains("kommentiere") ||
+            lower.contains("ich schicke dir") || lower.contains("ich sende dir") ||
+            lower.contains("zum speichern") || lower.contains("zum ausdrucken") ||
+            lower.contains("kostenlos zu") || lower.contains("in die kommentare") ||
+            lower.contains("comment \"") || lower.contains("comment „") ||
+            Regex("""(?i)\d+[.,]?\d*\s*g\s+kommentiere""").containsMatchIn(lower)
+        ) return true
         // Reine Hashtag-Zeile
         if (d.trim().startsWith("#") || Regex("""^(#\w+\s*)+$""").matches(d.trim())) return true
         // Marketing-/Subtitle ohne Mengenangabe (Caption-Intro, nicht Zutat)
@@ -462,7 +474,10 @@ object RecipeAiParser {
         val lower = line.trim().lowercase()
         if (lower.isBlank()) return false
         if (lower.startsWith("save this") || lower.startsWith("comment ") ||
-            lower.startsWith("link in bio") || lower.startsWith("dm me")
+            lower.startsWith("link in bio") || lower.startsWith("dm me") ||
+            lower.startsWith("kommentiere") || lower.startsWith("schreib ") ||
+            lower.contains("ich schicke dir") || lower.contains("zum speichern") ||
+            lower.contains("in die kommentare")
         ) return true
         if (lower.contains("all prozis") || lower.contains("products linked")) return true
         if (lower.contains("will give you") && (lower.contains("discount") || lower.contains("code"))) return true
@@ -767,6 +782,11 @@ Rules:
 - tags: comma-separated, max 5, lowercase
 - All numeric fields must be numbers (not strings), null if unknown
 - Ignore: "Comment X for...", "DM me for...", "Link in bio", hashtags, storage/heating tips unless they are actual steps
+- German engagement bait is NEVER an ingredient: "Kommentiere „PIDE“ und ich schicke dir das Rezept…", "Schreib X in die Kommentare", "Check deine DMs", "zum speichern oder ausdrucken kostenlos". Drop these lines completely.
+- German high-protein captions often look like:
+  Title line → macros ("Pro Portion: 414 kcal, Fett 6,7g…") → bait → "📘 ZUTATEN Teig:" / "📘 ZUTATEN Belag" with diamond/emoji bullets → "🧑‍🍳 ZUBEREITUNG:" numbered steps.
+  Extract sections from "ZUTATEN Teig", "ZUTATEN Belag", "Teig", "Belag" etc. Put cooking steps only into instructions. Never put "ZUBEREITUNG:" or "alle" as an ingredient or instruction body.
+- When caption has "6 Portionen" / "Pro Portion: 414 kcal" use servings=6 and calories_per_serving=414. Macro summary lines are not ingredients.
     """.trimIndent()
 
     /**
