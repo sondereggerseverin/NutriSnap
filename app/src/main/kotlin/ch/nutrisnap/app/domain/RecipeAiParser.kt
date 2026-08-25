@@ -468,15 +468,14 @@ object RecipeAiParser {
         ) return true
         // Nummerierte Zubereitungsschritte (EN "1.) Preheat…" / DE "1. Die Nudeln…" /
         // auch "1 Skyr … verrühren" ohne Punkt nach der Zahl)
-        if (Regex("""^\d+[.)]?\s+\S""").containsMatchIn(d)) {
+        if (Regex("""^\d+[.)]?\s*\S""").containsMatchIn(d)) {
             val stepVerbs = Regex(
                 """\b(mix|add|stir|pour|bake|cook|heat|divide|refrigerate|spoon|blend|whisk|fold|spread|save|method|season|fry|simmer|coat|chop|slice|preheat|remove|cover|place|peel|top|finish|enjoy|""" +
                     """verrühren|verruehren|vermischen|geben|garen|auskühlen|auskuehlen|stellen|erwärmen|erwaermen|verteilen|schneiden|zerbrechen|mikrowelle|pausieren|kochen|würzen|wuerzen|anbraten|durchpürieren|durchpuerieren|mixen|rühren|ruehren|toppen|abkühlen|abkuehlen)\b""",
                 RegexOption.IGNORE_CASE
             )
-            // Mit Punkt/Klammer nach Zahl → Schritt wenn Verb ODER lang
-            // Ohne Punkt ("1 Skyr, … verrühren") → nur bei klarem Kochverb
-            val strictNumbered = Regex("""^\d+[.)]\s+""").containsMatchIn(d)
+            // "1. Mix", "1) Mix", "1.) Preheat" — EN oft mit .)
+            val strictNumbered = Regex("""^\d+[.)]+\s*""").containsMatchIn(d)
             if (stepVerbs.containsMatchIn(d) && (strictNumbered || d.length > 50)) return true
             if (strictNumbered && d.length > 60) return true
         }
@@ -1265,7 +1264,8 @@ Rules:
         }
         fun isNumberedStepLine(line: String): Boolean {
             val core = stripLeadingDecor(line)
-            return Regex("""^\d+[.)]\s+\S+""").containsMatchIn(core)
+            // "1. Mix…", "1) Mix…", "1.) Preheat…" (EN oft mit .) )
+            return Regex("""^\d+[.)]+\s*\S+""").containsMatchIn(core)
         }
         val instrLineIdx = lines.indexOfFirst { isInstrHeaderLine(it) }
             .takeIf { it >= 0 }
