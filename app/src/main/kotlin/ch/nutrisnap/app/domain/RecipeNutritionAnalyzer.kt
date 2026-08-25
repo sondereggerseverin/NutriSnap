@@ -90,8 +90,10 @@ object RecipeNutritionAnalyzer {
         val fiberComplete:      Boolean = true
     )
 
-    /** Alle nicht-null Mikronaehrstoffe eines FoodItem (pro 100g), skaliert auf [factor]. */
-    private fun FoodItem.scaledMicros(factor: Float): Map<String, Float> = buildMap {
+    /** Alle nicht-null Mikronaehrstoffe eines FoodItem (pro 100g), skaliert auf [factor].
+     *  internal (nicht private): wird auch von NutrientDeficiencyEngine wiederverwendet,
+     *  damit es nur eine Stelle gibt, die weiss, welche FoodItem-Felder Mikronaehrstoffe sind. */
+    internal fun FoodItem.scaledMicros(factor: Float): Map<String, Float> = buildMap {
         fiber?.let { put("fiber", it * factor) }
         sugar?.let { put("sugar", it * factor) }
         saturatedFat?.let { put("saturatedFat", it * factor) }
