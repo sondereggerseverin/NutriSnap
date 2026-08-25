@@ -606,11 +606,14 @@ object RecipeAiParser {
                     lower == "directions" || lower == "preparation" || lower == "anleitung" ||
                     lower == "alle" || lower == "steps"
                 ) return@filter false
+                // Einzelnes Wort ohne Inhalt (oft AI-Müll)
+                if (lower.length <= 4 && !lower.any { it.isDigit() }) return@filter false
                 !line.startsWith("#") &&
                     !lower.startsWith("save this") &&
                     !lower.contains("products linked") &&
                     !lower.contains("link in bio") &&
                     !lower.startsWith("kommentiere") &&
+                    !lower.contains("ich schicke dir") &&
                     !(line.startsWith("@") && line.length < 40)
             }
             .joinToString("\n")
@@ -1185,31 +1188,55 @@ Rules:
             }
         }
 
-        // Wenn Zubereitung vor Zutaten steht: nur bis zum Zutaten-Block
-        val instructions = when {
-            instrIdx == null -> {
-                // Ohne Keyword: ab erster klarer Koch-Anweisung (Preheat / Bake / …)
+        // Zubereitung zeilenbasiert (zuverlässiger als char-Index in lower/cleaned)
+        fun isInstrHeaderLine(line: String): Boolean {
+            val core = stripLeadingDecor(line).lowercase().trimEnd(':').trim()
+            return core == "zubereitung" || core == "method" || core == "instructions" ||
+                core == "directions" || core == "preparation" || core == "anleitung" ||
+                core.startsWith("zubereitung") || core.startsWith("method ") ||
+                core.startsWith("how to")
+        }
+        fun isNumberedStepLine(line: String): Boolean {
+            val core = stripLeadingDecor(line)
+            return Regex("""^\d+[.)]\s+\S+""").containsMatchIn(core)
+        }
+        val instrLineIdx = lines.indexOfFirst { isInstrHeaderLine(it) }
+            .takeIf { it >= 0 }
+            ?: lines.indexOfFirst { isNumberedStepLine(it) }.takeIf { it >= 0 }
+
+        val instructionsRaw = when {
+            instrLineIdx != null -> {
+                // Ab Header/erstem Schritt bis Hashtags / Dateiende; Header-Zeile selbst weglassen
+                val from = if (isInstrHeaderLine(lines[instrLineIdx])) instrLineIdx + 1 else instrLineIdx
+                lines.drop(from)
+                    .takeWhile { line ->
+                        val t = line.trim()
+                        !(t.startsWith("#") || t.startsWith("http"))
+                    }
+                    .joinToString("\n")
+            }
+            else -> {
                 val stepStart = lines.indexOfFirst { line ->
-                    val l = line.lowercase().trim()
+                    val l = stripLeadingDecor(line).lowercase()
                     l.startsWith("preheat") || l.startsWith("vorheizen") ||
                         l.startsWith("bake ") || l.startsWith("mix all") ||
-                        (l.startsWith("place ") && l.length > 40) ||
-                        (l.startsWith("split ") && l.length > 40)
+                        (l.startsWith("place ") && l.length > 40)
                 }.takeIf { it >= 0 }
                 if (stepStart != null) lines.drop(stepStart).joinToString("\n") else ""
             }
-            ingrIdx != null && instrIdx < ingrIdx ->
-                cleaned.substring(instrIdx, ingrIdx).trim()
-            else ->
-                cleaned.substring(instrIdx).trim()
         }
+
+        val formattedIngredients = formatIngredientText(ingredients)
+            .ifBlank {
+                // Letzter Notnagel: alle Qty-Zeilen roh behalten
+                qtyIngrLines.joinToString("\n").ifBlank { "Tippe ✏️ um Zutaten hinzuzufügen." }
+            }
 
         return Recipe(
             title           = title,
             description     = cals?.let { "📊 Pro Portion: ${it.toInt()} kcal" } ?: "",
-            ingredients     = formatIngredientText(ingredients)
-                .ifBlank { "Tippe ✏️ um Zutaten hinzuzufügen." },
-            instructions    = formatInstructionsText(instructions),
+            ingredients     = formattedIngredients,
+            instructions    = formatInstructionsText(instructionsRaw),
             servings        = servings,
             totalCalories   = cals?.let { it * servings },
             sourceUrl       = sourceUrl,

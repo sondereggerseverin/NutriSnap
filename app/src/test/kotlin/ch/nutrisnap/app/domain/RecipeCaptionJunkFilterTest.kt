@@ -255,8 +255,12 @@ class RecipeCaptionJunkFilterTest {
             instr.trim() == "zubereitung" || instr.trim() == "zubereitung:")
         assertFalse("orphan 'alle':\n${recipe.instructions}",
             instr.lines().any { it.trim() == "alle" })
+        assertTrue("expected cooking steps:\n${recipe.instructions}",
+            instr.contains("verkneten") || instr.contains("ausrollen") ||
+                instr.contains("backen") || instr.contains("schiffchen"))
         assertFalse("quoted title: ${recipe.title}", recipe.title.startsWith("\""))
         assertTrue("title has Pide: ${recipe.title}",
             recipe.title.lowercase().contains("pide") || recipe.title.lowercase().contains("salami"))
+        assertTrue("servings should be 6, was ${recipe.servings}", recipe.servings == 6)
     }
 }
