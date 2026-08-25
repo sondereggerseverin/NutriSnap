@@ -135,9 +135,13 @@ fun RecipeEditSheet(
         )
     }
 
+    // Voll expandiert: bei Tastatur kein manuelles Hochziehen nötig
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = { if (!suppressDismiss) onDismiss() },
-        modifier = Modifier.fillMaxHeight(0.96f)
+        sheetState = sheetState,
+        modifier = Modifier.fillMaxHeight(0.96f),
+        contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
     ) {
         Column(Modifier.fillMaxSize()) {
             // ── Header ──────────────────────────────────────────────────────
@@ -413,7 +417,8 @@ fun ManualRecipeCreateSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        modifier = Modifier.fillMaxHeight(0.96f)
+        modifier = Modifier.fillMaxHeight(0.96f),
+        contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
     ) {
         Column(
             Modifier

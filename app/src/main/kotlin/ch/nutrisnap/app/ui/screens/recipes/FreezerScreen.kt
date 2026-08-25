@@ -277,7 +277,12 @@ fun FreezeMealSheet(
         mutableStateOf(initialLines.map { it.copy() })
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
+    ) {
         Column(
             Modifier
                 .padding(horizontal = 16.dp)
