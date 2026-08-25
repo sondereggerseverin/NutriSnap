@@ -107,14 +107,29 @@ object RecipeAiParser {
             !isWeakIngredients(fallback.ingredients) -> fallback.ingredients
             else -> ai.ingredients.ifBlank { fallback.ingredients }
         }
-        // Caption-Klumpen in saubere Zeilen + Abschnitte zerlegen
-        val ingredients = formatIngredientText(ingredientsRaw)
+        // Caption-Klumpen in saubere Zeilen + Abschnitte zerlegen.
+        // Wenn formatIngredientText alles wegfiltert, Rohtext mit leichtem Junk-Filter behalten.
+        val formatted = formatIngredientText(ingredientsRaw)
+        val ingredients = when {
+            !isWeakIngredients(formatted) -> formatted
+            !isWeakIngredients(ingredientsRaw) -> ingredientsRaw.lines()
+                .map { it.trim() }
+                .filter { it.isNotBlank() && !isJunkIngredientLine(it) && !isPromoIngredientNoise(it) }
+                .joinToString("\n")
+                .ifBlank { formatted.ifBlank { ingredientsRaw } }
+            else -> formatted.ifBlank { ingredientsRaw }
+        }
 
-        val instructions = formatInstructionsText(
-            ai.instructions.trim()
-                .takeUnless { it.isBlank() || it.equals("null", true) }
-                ?: fallback.instructions
+        // Anweisungen: AI bevorzugt, aber nackte Header ("ZUBEREITUNG:", "alle") verwerfen
+        val aiInstr = formatInstructionsText(
+            ai.instructions.trim().takeUnless { it.isBlank() || it.equals("null", true) }.orEmpty()
         )
+        val fbInstr = formatInstructionsText(fallback.instructions)
+        val instructions = when {
+            aiInstr.lines().count { it.trim().length > 8 } >= 2 -> aiInstr
+            fbInstr.isNotBlank() -> fbInstr
+            else -> aiInstr.ifBlank { fbInstr }
+        }
 
         val description = ai.description.trim()
             .takeUnless { it.isBlank() || it.equals("null", true) }
@@ -1029,8 +1044,12 @@ Rules:
         val title = extractTitle(cleaned,
             fallback = if (platform == "tiktok") "TikTok Rezept" else "Instagram Rezept")
 
-        val servings = Regex("""(?:makes?|für|ergibt|serves?|portionen?|servings?)\s*(\d+)""",
-            RegexOption.IGNORE_CASE).find(lower)?.groupValues?.get(1)?.toIntOrNull() ?: 1
+        val servings = Regex(
+            """(?:makes?|für|ergibt|serves?|servings?)\s*(\d+)|(\d+)\s*(?:portionen?|servings?|serves?)\b""",
+            RegexOption.IGNORE_CASE
+        ).find(lower)?.let { m ->
+            m.groupValues[1].ifBlank { m.groupValues[2] }.toIntOrNull()
+        } ?: 1
 
         val cals = Regex("""(\d{3,4})\s*(?:cal|kcal|calories)""", RegexOption.IGNORE_CASE)
             .find(cleaned)?.groupValues?.get(1)?.toFloatOrNull()

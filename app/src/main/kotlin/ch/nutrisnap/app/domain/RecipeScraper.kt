@@ -41,9 +41,32 @@ class RecipeScraper(private val context: Context) {
         val lc = t.lowercase()
         val recipeHints = listOf(
             "zutaten", "ingredient", "rezept", "recipe", "anleitung", "instructions",
-            " tbsp", " tsp", " el ", " tl ", "gramm", " ml", " cup"
+            "zubereitung", "method", " tbsp", " tsp", " el ", " tl ", "gramm", " ml", " cup",
+            "päckchen", "paeckchen", "backpulver", "portionen"
         )
+        // Mindestens 2 Mengenangaben (380g / 500 g / 1 EL) → klar strukturierte Caption
+        val qtyCount = Regex(
+            """\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tsp|tbsp|cup|oz|lb|stück|stk|päckchen|paeckchen)\b""",
+            RegexOption.IGNORE_CASE
+        ).findAll(t).count()
+        if (qtyCount >= 2) return true
         return t.length >= 80 || recipeHints.any { it in lc }
+    }
+
+    /** true wenn das geparste Rezept brauchbare Zutaten hat (nicht Platzhalter/leer). */
+    private fun hasUsableIngredients(recipe: Recipe): Boolean {
+        val s = recipe.ingredients.trim()
+        if (s.isBlank()) return false
+        if (s.startsWith("Tippe") || s.equals("Zutaten nicht gefunden.", true)) return false
+        if (s.length < 12) return false
+        val lines = s.lines().map { it.trim() }.filter { it.isNotBlank() }
+        if (lines.isEmpty()) return false
+        // Mindestens eine Zeile mit Menge oder 2+ Lebensmittel-Zeilen
+        val hasQty = lines.any {
+            Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tsp|tbsp|cup|oz|päckchen|paeckchen|packung)\b""", RegexOption.IGNORE_CASE)
+                .containsMatchIn(it)
+        }
+        return hasQty || lines.size >= 3
     }
 
     /** DOCTYPE, script, Cloudflare-Challenge usw. → kein Rezepttext. */
@@ -233,11 +256,33 @@ class RecipeScraper(private val context: Context) {
         if (!isGoodCaption(caption)) throw InstagramBlockedException(url)
 
         progress("Rezept extrahieren…")
-        val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
-        val parsed = if (apiKey.isNotBlank()) {
-            RecipeAiParser.parse(caption, url, "instagram", thumbnail, apiKey, fastModel = fastAi)
-        } else {
-            RecipeAiParser.fallbackParse(caption, url, "instagram", thumbnail)
+        var workingCaption = caption
+        var parsed = parseCaptionToRecipe(workingCaption, url, "instagram", thumbnail, fastAi)
+
+        // Qualitäts-Gate (AMM-ähnlich): leere/schwache Zutaten → Fallback erzwingen,
+        // ggf. Transkript nachladen und nochmal parsen.
+        if (!hasUsableIngredients(parsed)) {
+            progress("Struktur nachbessern…")
+            val fallback = RecipeAiParser.fallbackParse(workingCaption, url, "instagram", thumbnail)
+            if (hasUsableIngredients(fallback)) {
+                parsed = fallback
+            }
+        }
+        if (!hasUsableIngredients(parsed)) {
+            // Auch ohne User-Toggle: einmal Transkript versuchen (kurzes Budget)
+            val prevToggle = useVideoTranscript
+            useVideoTranscript = true
+            val enriched = enrichWithTranscript("instagram", url, shortcode, workingCaption)
+            useVideoTranscript = prevToggle
+            if (enriched != workingCaption && isGoodCaption(enriched)) {
+                workingCaption = enriched
+                progress("Rezept aus Transkript…")
+                parsed = parseCaptionToRecipe(workingCaption, url, "instagram", thumbnail, fastAi = false)
+                if (!hasUsableIngredients(parsed)) {
+                    val fb = RecipeAiParser.fallbackParse(workingCaption, url, "instagram", thumbnail)
+                    if (hasUsableIngredients(fb)) parsed = fb
+                }
+            }
         }
 
         // Titel nachbessern, wenn Parser nur „Rezept“ liefert
@@ -245,7 +290,8 @@ class RecipeScraper(private val context: Context) {
             parsed.title.isNotBlank() &&
                 !parsed.title.equals("Rezept", true) &&
                 !parsed.title.equals("Instagram Rezept", true) &&
-                !parsed.title.equals("null", true) -> parsed.title
+                !parsed.title.equals("null", true) &&
+                !parsed.title.startsWith("\"") -> parsed.title
             oEmbedTitle.isNotBlank() -> {
                 RecipeAiParser.extractTitle(oEmbedTitle, fallback = "")
                     .ifBlank {
@@ -254,8 +300,8 @@ class RecipeScraper(private val context: Context) {
                             .orEmpty()
                     }
             }
-            else -> RecipeAiParser.extractTitle(caption, fallback = "Rezept")
-        }.ifBlank { "Rezept" }
+            else -> RecipeAiParser.extractTitle(workingCaption, fallback = "Rezept")
+        }.ifBlank { "Rezept" }.let { RecipeAiParser.extractTitle(it, fallback = it) }
 
         parsed.copy(
             title     = betterTitle,
@@ -264,6 +310,22 @@ class RecipeScraper(private val context: Context) {
             platform  = "instagram",
             tags      = listOfNotNull(parsed.tags.ifBlank { null }, author?.let { "@$it" }).joinToString(",").take(200)
         )
+    }
+
+    /** AI-Parse mit API-Key, sonst reiner Regex-Fallback. */
+    private suspend fun parseCaptionToRecipe(
+        caption: String,
+        url: String,
+        platform: String,
+        thumbnail: String?,
+        fastAi: Boolean
+    ): Recipe {
+        val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
+        return if (apiKey.isNotBlank()) {
+            RecipeAiParser.parse(caption, url, platform, thumbnail, apiKey, fastModel = fastAi)
+        } else {
+            RecipeAiParser.fallbackParse(caption, url, platform, thumbnail)
+        }
     }
 
     /**
@@ -687,13 +749,30 @@ class RecipeScraper(private val context: Context) {
         }
 
         progress("Rezept extrahieren…")
-        val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
-        val parsed = if (apiKey.isNotBlank()) {
-            RecipeAiParser.parse(caption!!, url, "tiktok", thumbnail, apiKey, fastModel = fastAi)
-        } else {
-            RecipeAiParser.fallbackParse(caption!!, url, "tiktok", thumbnail)
+        var workingCaption = caption!!
+        var parsed = parseCaptionToRecipe(workingCaption, url, "tiktok", thumbnail, fastAi)
+        if (!hasUsableIngredients(parsed)) {
+            progress("Struktur nachbessern…")
+            val fallback = RecipeAiParser.fallbackParse(workingCaption, url, "tiktok", thumbnail)
+            if (hasUsableIngredients(fallback)) parsed = fallback
+        }
+        if (!hasUsableIngredients(parsed)) {
+            val prevToggle = useVideoTranscript
+            useVideoTranscript = true
+            val reEnriched = enrichWithTranscript("tiktok", expandedUrl, null, workingCaption)
+            useVideoTranscript = prevToggle
+            if (reEnriched != workingCaption && isGoodCaption(reEnriched)) {
+                workingCaption = reEnriched
+                progress("Rezept aus Transkript…")
+                parsed = parseCaptionToRecipe(workingCaption, url, "tiktok", thumbnail, fastAi = false)
+                if (!hasUsableIngredients(parsed)) {
+                    val fb = RecipeAiParser.fallbackParse(workingCaption, url, "tiktok", thumbnail)
+                    if (hasUsableIngredients(fb)) parsed = fb
+                }
+            }
         }
         return parsed.copy(
+            title     = RecipeAiParser.extractTitle(parsed.title.ifBlank { workingCaption }, fallback = parsed.title.ifBlank { "TikTok Rezept" }),
             imageUrl  = thumbnail ?: parsed.imageUrl,
             sourceUrl = url,
             platform  = "tiktok",
