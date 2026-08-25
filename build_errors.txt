@@ -1,10 +1,10 @@
-# Build errors - run 972
+# Build errors - run 974
 
 ## Unit Tests (test_output.log) - Error lines
 ```
-RecipeCaptionJunkFilterTest > rejectsDeInstructionLines FAILED
+RecipeCaptionJunkFilterTest > englishCupCaptionFallbackExtractsIngredients FAILED
 > Task :app:testDebugUnitTest FAILED
-BUILD FAILED in 2m 11s
+BUILD FAILED in 2m 17s
 ```
 
 ## Unit Tests (test_output.log) - Last 150 lines
@@ -157,7 +157,7 @@ Caused by: org.gradle.api.internal.exceptions.MarkedVerificationException: There
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 
 
-BUILD FAILED in 2m 11s
+BUILD FAILED in 2m 17s
 31 actionable tasks: 31 executed
 ```
 
