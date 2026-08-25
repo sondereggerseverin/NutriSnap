@@ -331,9 +331,17 @@ internal fun parseIngredientSections(ingredients: String): List<Pair<String, Lis
         }
         if (Regex("""(?i)^(prise|etwas|wenig)\s+\p{L}""").containsMatchIn(d)) return false
         val lc = d.lowercase().trimEnd(':').trim()
+        // Anleitungssätze nie als Abschnitt (auch „für den … vermengen“)
+        if (Regex(
+                """(?i)\b(vermischen|vermengen|verrühren|verruehren|unterheben|backen|""" +
+                    """drücken|toppen|kochen)\b"""
+            ).containsMatchIn(d)
+        ) return false
+        if (d.length > 55) return false
         // Explizite Abschnitts-Muster (inkl. Back-Abschnitte) – NICHT jede kurze Zeile
-        if (lc.startsWith("für die ") || lc.startsWith("für den ") || lc.startsWith("für das ") ||
-            lc.startsWith("for the ") ||
+        val shortFuer = Regex("""(?i)^für\s+(die|den|das)\s+[^:]{2,40}$""").matches(lc) ||
+            Regex("""(?i)^for\s+the\s+[^:]{2,40}$""").matches(lc)
+        if (shortFuer ||
             (d.trim().endsWith(":") && d.length in 4..48 && !d.any { it.isDigit() }) ||
             lc == "dough" || lc == "teig" || lc == "filling" || lc == "füllung" || lc == "fuellung" ||
             lc == "frosting" || lc == "glasur" || lc == "syrup" || lc == "sirup" ||

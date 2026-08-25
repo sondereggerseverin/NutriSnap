@@ -471,14 +471,32 @@ object RecipeAiParser {
         if (Regex("""^\d+[.)]?\s*\S""").containsMatchIn(d)) {
             val stepVerbs = Regex(
                 """\b(mix|add|stir|pour|bake|cook|heat|divide|refrigerate|spoon|blend|whisk|fold|spread|save|method|season|fry|simmer|coat|chop|slice|preheat|remove|cover|place|peel|top|finish|enjoy|""" +
-                    """verrühren|verruehren|vermischen|geben|garen|auskühlen|auskuehlen|stellen|erwärmen|erwaermen|verteilen|schneiden|zerbrechen|mikrowelle|pausieren|kochen|würzen|wuerzen|anbraten|durchpürieren|durchpuerieren|mixen|rühren|ruehren|toppen|abkühlen|abkuehlen)\b""",
+                    """verrühren|verruehren|vermischen|vermengen|unterheben|geben|garen|auskühlen|auskuehlen|stellen|erwärmen|erwaermen|verteilen|schneiden|zerbrechen|mikrowelle|pausieren|kochen|würzen|wuerzen|anbraten|durchpürieren|durchpuerieren|mixen|rühren|ruehren|toppen|abkühlen|abkuehlen|drücken)\b""",
                 RegexOption.IGNORE_CASE
             )
             // "1. Mix", "1) Mix", "1.) Preheat" — EN oft mit .)
             val strictNumbered = Regex("""^\d+[.)]+\s*""").containsMatchIn(d)
             if (stepVerbs.containsMatchIn(d) && (strictNumbered || d.length > 50)) return true
             if (strictNumbered && d.length > 60) return true
+            // Kaputte Fragmente aus Caption-Split: "1. Alle", "2. Alle", "3. Zutaten"
+            if (strictNumbered && Regex(
+                    """(?i)^\d+[.)]+\s*(alle|zutaten|dann|danach|nun|jetzt)\s*$"""
+                ).containsMatchIn(d)
+            ) return true
+            if (strictNumbered && d.length <= 20 &&
+                !Regex("""(?i)\d+\s*(g|ml|el|tl)\b""").containsMatchIn(d)
+            ) return true
         }
+        // Anleitungssätze ohne Nummer, die in die Zutaten gerutscht sind
+        if (Regex(
+                """(?i)^(alle\s+zutaten|für\s+den\s+\w+.+\b(vermengen|verrühren|verruehren|unterheben)\b)"""
+            ).containsMatchIn(d)
+        ) return true
+        if (d.length > 50 && Regex(
+                """(?i)\b(vermengen|verrühren|verruehren|unterheben|auf\s+den\s+boden\s+drücken)\b"""
+            ).containsMatchIn(d) &&
+            !Regex("""(?i)\d+[.,]?\d*\s*(g|ml)\b""").containsMatchIn(d)
+        ) return true
         // DE-Schritte ohne Nummer, die klar Anleitung sind
         if (Regex(
                 """(?i)^(die nudeln|das like|die gekochten|die soße|die sosse|am ende|guten appetit)"""
@@ -749,50 +767,69 @@ object RecipeAiParser {
             .trim()
         if (d.length < 3) return false
         val lower = d.lowercase().trimEnd(':').trim()
-        // Explizite Abschnitts-Marker (EN + DE + typische Back-/Koch-Abschnitte)
-        if (lower.startsWith("für ") || lower.startsWith("for the ") || lower.startsWith("for ") ||
-            lower.startsWith("served with") || lower.startsWith("dazu") ||
-            lower.startsWith("beilage") || lower.startsWith("sauce") ||
-            lower.startsWith("marinade") || lower.startsWith("topping") ||
+
+        // Zutaten mit Menge / Stückzahl / Prise → nie Header
+        if (Regex(
+                """\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tsp|tbsp|cup|oz|stück|stk)\b""",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(d)
+        ) return false
+        if (d.first().isDigit()) return false
+        if (Regex("""(?i)^(prise|etwas|wenig)\s+\p{L}""").containsMatchIn(d)) return false
+        // Anleitungssätze (Kochverben) → nie Header, auch wenn sie mit „für den“ starten
+        if (Regex(
+                """(?i)\b(vermischen|vermengen|verrühren|verruehren|unterheben|backen|kochen|""" +
+                    """geben|drücken|toppen|streuen|rühren|ruehren|erhitzen|braten|schneiden)\b"""
+            ).containsMatchIn(d)
+        ) return false
+        // Lange Zeilen (>55) sind selten Abschnittsnamen
+        if (d.length > 55) return false
+
+        // Explizite Abschnitts-Marker – „für X“ nur als kurzer Header, nicht als Satz
+        val shortFuerHeader = Regex(
+            """(?i)^für\s+(die|den|das)\s+[^:]{2,40}$"""
+        ).matches(lower) || Regex(
+            """(?i)^for\s+the\s+[^:]{2,40}$"""
+        ).matches(lower)
+        if (shortFuerHeader) return true
+
+        if (lower.startsWith("served with") || lower.startsWith("dazu") ||
+            lower.startsWith("beilage") || lower == "sauce" || lower.startsWith("sauce ") ||
+            lower.startsWith("marinade") || lower == "topping" || lower.startsWith("topping ") ||
             lower.startsWith("dressing") || lower.startsWith("garnish") ||
-            lower.startsWith("option to add") || lower.startsWith("optional") ||
             lower == "dough" || lower == "teig" ||
             lower == "filling" || lower == "füllung" || lower == "fuellung" ||
             lower == "base" || lower == "boden" ||
             lower == "frosting" || lower == "glasur" || lower == "icing" ||
             lower == "syrup" || lower == "sirup" ||
             lower == "batter" || lower == "teigmasse" ||
-            lower == "crust" || lower == "boden" ||
-            lower == "streusel" || lower == "glaze" ||
+            lower == "crust" || lower == "streusel" || lower == "glaze" ||
             lower.endsWith(" filling") || lower.endsWith(" füllung") || lower.endsWith(" fuellung") ||
             lower.endsWith(" frosting") || lower.endsWith(" glasur") ||
             lower.endsWith(" syrup") || lower.endsWith(" sirup") ||
             lower.endsWith(" dough") || lower.endsWith(" teig") ||
             lower.endsWith(" sauce") || lower.endsWith(" marinade") ||
-            lower.endsWith(" topping") || lower.endsWith(" belag")
-        ) {
-            // "For the chicken: 2 breasts" ist KEIN reiner Header — splitHeaderFromFirstItem
-            // kümmert sich darum. Hier true, damit die Zeile als Header-Kandidat gilt.
-            return true
-        }
-        // "Ingredients (serves 2)" / "Zutaten für 4" = Meta, kein Abschnittsname für Split
+            lower.endsWith(" topping") || lower.endsWith(" belag") ||
+            // "Raspberry Cookie Teig" / "Cheesecake Teig" (kurz, kein Verb)
+            (lower.contains("teig") && d.length in 4..48)
+        ) return true
+
+        // Endet auf ":" und ist kurz → Header ("Zutaten:", "Cheesecake Teig:")
+        if (d.trim().endsWith(":") && d.length in 4..48 && !d.any { it.isDigit() }) return true
+
+        // "Ingredients (serves 2)" / "Zutaten für 4"
         if (lower.startsWith("ingredients") || lower.startsWith("zutaten")) return true
-        // Kurzer Titel ohne Menge
-        if (Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tsp|tbsp|cup|oz)\b""", RegexOption.IGNORE_CASE)
-                .containsMatchIn(d)
-        ) return false
-        if (d.first().isDigit()) return false
-        // Reine GROSSBUCHSTABEN-Zeile ohne Menge = klassischer Social-Caption-Header
-        // (DOUGH, CINNAMON COFFEE FILLING, COFFEE SYRUP, …)
+
+        // Reine GROSSBUCHSTABEN-Zeile ohne Menge = Social-Caption-Header
         val lettersOnly = d.filter { it.isLetter() || it.isWhitespace() || it == '-' || it == '&' }
         if (lettersOnly.isNotBlank() && lettersOnly == lettersOnly.uppercase() &&
             lettersOnly.replace(" ", "").length in 3..40 &&
             !Regex("""\d""").containsMatchIn(d)
         ) return true
-        // Emoji + kurzer Name (z.B. "Charred Zuckermais & beans 🫘")
-        val withoutEmoji = d.replace(Regex("""[\p{So}\p{Cn}]"""), "").trim()
-        return withoutEmoji.length in 3..48 &&
-            !withoutEmoji.contains(Regex("""\d+\s*(g|ml)""", RegexOption.IGNORE_CASE))
+
+        // KEIN generisches „kurze Zeile = Header“ mehr
+        // (sonst werden „Prise Salz“ / „Butter Vanille Aroma“ zu Abschnitten)
+        return false
     }
 
     /**

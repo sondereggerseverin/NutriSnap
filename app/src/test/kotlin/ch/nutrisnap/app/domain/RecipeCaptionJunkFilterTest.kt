@@ -361,4 +361,42 @@ class RecipeCaptionJunkFilterTest {
             )
         )
     }
+
+    @Test
+    fun rejectsInstructionFragmentsInIngredients() {
+        assertTrue(RecipeAiParser.isJunkIngredientLine("1. Alle"))
+        assertTrue(RecipeAiParser.isJunkIngredientLine("2. Alle"))
+        assertTrue(
+            RecipeAiParser.isJunkIngredientLine(
+                "für den Raspberry Cookie Teig vermengen und am Ende die gehackten Himbeeren unterheben"
+            )
+        )
+        assertFalse(RecipeAiParser.isJunkIngredientLine("Prise Salz"))
+        assertFalse(RecipeAiParser.isJunkIngredientLine("Butter Vanille Aroma"))
+        assertFalse(RecipeAiParser.isJunkIngredientLine("80g Erythrit Stevia Mix"))
+    }
+
+    @Test
+    fun formatIngredientTextKeepsAromaAndSaltDropsSteps() {
+        val raw = """
+            Raspberry Cookie Teig:
+            100g Becel Vital -30%
+            50g Magerquark
+            1 Ei
+            Butter Vanille Aroma
+            Prise Salz
+            20g Gehackte gefriergetrocknete Himbeeren
+            Cheesecake Teig:
+            50g Frischkäse
+            1. Alle Zutaten bis auf die Himbeeren für den Raspberry Cookie Teig vermengen
+            2. Alle Zutaten für den Cheesecake Teig verrühren
+        """.trimIndent()
+        val out = RecipeAiParser.formatIngredientText(raw)
+        val lower = out.lowercase()
+        assertTrue("salt kept:\n$out", lower.contains("salz"))
+        assertTrue("aroma kept:\n$out", lower.contains("aroma") || lower.contains("vanille"))
+        assertFalse("no vermengen in ingredients:\n$out", lower.contains("vermengen"))
+        assertFalse("no 1. alle:\n$out", Regex("""(?i)1\.?\s*alle""").containsMatchIn(out))
+        assertTrue("cookie teig header:\n$out", lower.contains("cookie") || lower.contains("teig"))
+    }
 }
