@@ -219,6 +219,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             importError       = imp.importError,
             lastImport        = imp.lastImport,
             instagramBlocked  = imp.instagramBlocked,
+            needsScreenshot   = imp.needsScreenshot,
             blockedUrl        = imp.blockedUrl,
             nutritionState    = nut,
             isTranslating     = translating
@@ -266,7 +267,13 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     fun importFromUrl(url: String) {
         viewModelScope.launch {
             _importState.update {
-                it.copy(isImporting = true, importPhase = "Starte…", importError = null, instagramBlocked = false)
+                it.copy(
+                    isImporting = true,
+                    importPhase = "Starte…",
+                    importError = null,
+                    instagramBlocked = false,
+                    needsScreenshot = false
+                )
             }
             // Bestehendes Rezept unter dieser URL nicht neu scrapen/übersetzen/überschreiben
             val existing = repo.findBySourceUrl(url)
@@ -286,15 +293,30 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 val updated = repo.applyGermanMetricIfNeeded(
                     r, enabled = shouldAutoGermanMetric(), force = forceGerman
                 )
+                val weak = isWeakRecipeContent(updated.ingredients, updated.instructions)
+                val social = platform in setOf("instagram", "tiktok") || isSocialRecipeUrl(url)
                 _importState.update {
-                    it.copy(isImporting = false, importPhase = null, lastImport = updated)
+                    it.copy(
+                        isImporting = false,
+                        importPhase = null,
+                        lastImport = updated,
+                        // Caption/Scrape zu dünn → Screenshot nachladen anbieten
+                        needsScreenshot = weak && social,
+                        blockedUrl = if (weak && social) url else it.blockedUrl
+                    )
                 }
                 return@launch
             }
             _importState.update { state ->
                 when {
                     result.instagramBlocked ->
-                        state.copy(isImporting = false, importPhase = null, instagramBlocked = true, blockedUrl = url)
+                        state.copy(
+                            isImporting = false,
+                            importPhase = null,
+                            instagramBlocked = true,
+                            needsScreenshot = true,
+                            blockedUrl = url
+                        )
                     else ->
                         state.copy(
                             isImporting = false,
@@ -306,23 +328,69 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Zu wenige Zutatenzeilen / zu kurzer Text → Social-Caption oft unbrauchbar. */
+    internal fun isWeakRecipeContent(ingredients: String, instructions: String): Boolean {
+        val ingLines = ingredients.lines().map { it.trim() }.filter { it.isNotBlank() }
+        val qtyHits = ingLines.count { line ->
+            Regex(
+                """(?i)\d+[.,]?\d*\s*(?:g|kg|ml|l|el|tl|cup|tbsp|tsp|oz)\b"""
+            ).containsMatchIn(line)
+        }
+        if (ingLines.size < 3 || qtyHits < 2) return true
+        if (ingredients.length < 50) return true
+        if (instructions.length < 30 && ingLines.size < 5) return true
+        return false
+    }
+
+    private fun isSocialRecipeUrl(url: String): Boolean {
+        val u = url.lowercase()
+        return "instagram.com" in u || "instagr.am" in u ||
+            "tiktok.com" in u || "vm.tiktok.com" in u
+    }
+
+    fun clearNeedsScreenshot() {
+        _importState.update { it.copy(needsScreenshot = false) }
+    }
+
     /**
      * Importiert ein oder mehrere Rezepte aus einem Foto/Screenshot (Rezeptkarte, Kochbuchseite,
      * Collage, Blog-Screenshot). OCR + optional Vision mit Qualitäts-Merge der Zutaten;
      * bei starkem OCR-Text Vision übersprungen. Speichert mit platform = "bild".
      * [ImportState.lastImport] zeigt das erste gespeicherte Rezept (Navigation/Feedback).
      */
-    fun importFromImage(bitmap: Bitmap) {
+    fun importFromImage(bitmap: Bitmap) = importFromImages(listOf(bitmap))
+
+    /**
+     * Ein oder mehrere Screenshots (z.B. TikTok-Caption über 2 Bilder) → ein/mehrere Rezepte.
+     * Mehrere Bilder werden gemeinsam an Vision + OCR übergeben und zusammengeführt.
+     */
+    fun importFromImages(bitmaps: List<Bitmap>) {
         viewModelScope.launch {
+            val images = bitmaps.filter { !it.isRecycled && it.width > 0 && it.height > 0 }
+            if (images.isEmpty()) {
+                _importState.update {
+                    it.copy(isImporting = false, importPhase = null, importError = "Kein gültiges Bild")
+                }
+                return@launch
+            }
             _importState.update {
-                it.copy(isImporting = true, importPhase = "Rezept(e) aus Bild lesen…", importError = null, instagramBlocked = false)
+                it.copy(
+                    isImporting = true,
+                    importPhase = if (images.size > 1)
+                        "${images.size} Screenshots analysieren…"
+                    else
+                        "Rezept(e) aus Bild lesen…",
+                    importError = null,
+                    instagramBlocked = false,
+                    needsScreenshot = false
+                )
             }
             try {
                 _importState.update { it.copy(importPhase = "Text & Bild analysieren…") }
-                val extractedList = RecipeImageTextExtractor.extractWithVisionFallback(bitmap) { ocrHint ->
+                val extractedList = RecipeImageTextExtractor.extractWithVisionFallback(images) { ocrHint ->
                     val vision = GroqVisionService()
-                    val base64 = vision.bitmapToBase64JpegForText(bitmap, quality = 85)
-                    vision.extractRecipesFromImage(base64, ocrHint = ocrHint).getOrElse { e ->
+                    val base64List = images.map { vision.bitmapToBase64JpegForText(it, quality = 85) }
+                    vision.extractRecipesFromImages(base64List, ocrHint = ocrHint).getOrElse { e ->
                         throw e
                     }
                 }
@@ -345,6 +413,11 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     val totalMin = listOfNotNull(extracted.prepTimeMinutes, extracted.cookTimeMinutes)
                         .takeIf { it.isNotEmpty() }?.sum()
+                    val multiTag = when {
+                        images.size > 1 && extractedList.size == 1 -> "bild,screenshots"
+                        extractedList.size > 1 -> "bild,mehrfach"
+                        else -> "bild"
+                    }
                     val recipe = Recipe(
                         title = extracted.title.ifBlank { "Rezept aus Bild" },
                         description = extracted.description,
@@ -357,7 +430,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                         proteinPerServing = extracted.proteinPerServing,
                         carbsPerServing = extracted.carbsPerServing,
                         fatPerServing = extracted.fatPerServing,
-                        tags = if (extractedList.size > 1) "bild,mehrfach" else "bild"
+                        tags = multiTag
                     )
                     var saved = recipe.copy(id = repo.saveRecipe(recipe))
                     // Gleicher Nachlauf wie URL-/Caption-Import (DE/metrisch + Nährwerte)
@@ -370,9 +443,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                         isImporting = false,
                         importPhase = null,
                         lastImport = firstSaved,
-                        importError = if (extractedList.size > 1)
-                            null // Erfolg: mehrere gespeichert; UI öffnet firstSaved
-                        else null
+                        importError = null
                     )
                 }
             } catch (e: Exception) {
@@ -388,22 +459,21 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Hybrid-Import: Instagram-/Social-Link (Quelle + Bildvorschau) + optional Rezept-Screenshot
-     * (Zutaten/Anleitung aus dem Bild). Typischer Fall: Caption leer/schwach, Rezept steht
-     * im Bild oder in den Kommentaren → Screenshot liefert den Text, der Link die Meta-Daten.
-     *
-     * - Link wird gescraped → imageUrl, sourceUrl, Titel (falls vorhanden)
-     * - Screenshot (falls vorhanden) → Vision extrahiert Zutaten/Anleitung (priorisiert)
-     * - Ergebnis: ein Rezept mit funktionierendem Link, Bildvorschau und sauberem Text
+     * Hybrid-Import: Social-Link (Instagram/TikTok) + optional ein/mehrere Rezept-Screenshots.
+     * Caption leer/schwach → Screenshot liefert Zutaten/Anleitung, Link liefert Meta/Bild.
      */
-    fun importHybridFromInstagram(url: String, recipeScreenshot: Bitmap?) {
+    fun importHybridFromInstagram(url: String, recipeScreenshot: Bitmap?) =
+        importHybridFromSocial(url, recipeScreenshot?.let { listOf(it) }.orEmpty())
+
+    fun importHybridFromSocial(url: String, recipeScreenshots: List<Bitmap>) {
         viewModelScope.launch {
             _importState.update {
                 it.copy(
                     isImporting = true,
                     importPhase = "Link laden…",
                     importError = null,
-                    instagramBlocked = false
+                    instagramBlocked = false,
+                    needsScreenshot = false
                 )
             }
             try {
@@ -414,10 +484,15 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     return@launch
                 }
+                val platformGuess = when {
+                    "tiktok" in trimmedUrl.lowercase() -> "tiktok"
+                    else -> "instagram"
+                }
+                val shots = recipeScreenshots.filter { !it.isRecycled && it.width > 0 }
 
                 // Bereits gespeichert unter dieser URL? → unverändert öffnen, kein Re-Scrape/Overwrite
                 val existingByUrl = repo.findBySourceUrl(trimmedUrl)
-                if (existingByUrl != null) {
+                if (existingByUrl != null && shots.isEmpty()) {
                     _importState.update {
                         it.copy(
                             isImporting = false,
@@ -434,21 +509,20 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 }
 
                 if (scrapeResult.instagramBlocked) {
-                    // Blockiert: ohne Screenshot können wir nichts Sinnvolles speichern
-                    if (recipeScreenshot == null) {
+                    if (shots.isEmpty()) {
                         _importState.update {
                             it.copy(
                                 isImporting = false,
                                 importPhase = null,
                                 instagramBlocked = true,
+                                needsScreenshot = true,
                                 blockedUrl = trimmedUrl
                             )
                         }
                         return@launch
                     }
-                    // Mit Screenshot: trotzdem aus dem Bild bauen und Link manuell setzen
                     _importState.update { it.copy(importPhase = "Rezept aus Screenshot lesen…") }
-                    val extracted = extractRecipeFromScreenshot(recipeScreenshot)
+                    val extracted = extractRecipeFromScreenshots(shots)
                     if (extracted == null || (extracted.title.isBlank() && extracted.ingredients.isBlank())) {
                         _importState.update {
                             it.copy(
@@ -462,10 +536,10 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                     val totalMin = listOfNotNull(extracted.prepTimeMinutes, extracted.cookTimeMinutes)
                         .takeIf { it.isNotEmpty() }?.sum()
                     val recipe = Recipe(
-                        title = extracted.title.ifBlank { "Instagram Rezept" },
+                        title = extracted.title.ifBlank { "$platformGuess Rezept" },
                         description = extracted.description,
                         sourceUrl = trimmedUrl,
-                        platform = "instagram",
+                        platform = platformGuess,
                         ingredients = extracted.ingredients,
                         instructions = extracted.instructions,
                         servings = extracted.servings.coerceAtLeast(1),
@@ -476,25 +550,24 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                         proteinPerServing = extracted.proteinPerServing,
                         carbsPerServing = extracted.carbsPerServing,
                         fatPerServing = extracted.fatPerServing,
-                        tags = "instagram,hybrid"
+                        tags = "$platformGuess,hybrid"
                     )
                     var saved = recipe.copy(id = repo.saveRecipe(recipe))
-                    saved = repo.applyGermanMetricIfNeeded(
-                        saved, enabled = shouldAutoGermanMetric(), force = true
-                    )
-                    saved = repo.analyzeAndPersistNutrition(saved)?.first ?: saved
-                    _importState.update { it.copy(isImporting = false, importPhase = null, lastImport = saved) }
+                    saved = postProcessImported(saved, forceGerman = true, withNutrition = true)
+                    _importState.update {
+                        it.copy(isImporting = false, importPhase = null, lastImport = saved, needsScreenshot = false)
+                    }
                     return@launch
                 }
 
                 if (!scrapeResult.success || scrapeResult.recipe == null) {
-                    // Scrape fehlgeschlagen – mit Screenshot allein weitermachen
-                    if (recipeScreenshot == null) {
+                    if (shots.isEmpty()) {
                         _importState.update {
                             it.copy(
                                 isImporting = false,
                                 importPhase = null,
-                                importError = scrapeResult.error ?: "Link konnte nicht geladen werden"
+                                importError = scrapeResult.error ?: "Link konnte nicht geladen werden",
+                                needsScreenshot = isSocialRecipeUrl(trimmedUrl)
                             )
                         }
                         return@launch
@@ -503,23 +576,30 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
 
                 var base = scrapeResult.recipe
                     ?: Recipe(
-                        title = "Instagram Rezept",
+                        title = "$platformGuess Rezept",
                         sourceUrl = trimmedUrl,
-                        platform = "instagram",
-                        tags = "instagram,hybrid"
+                        platform = platformGuess,
+                        tags = "$platformGuess,hybrid"
                     )
 
-                // 2) Optional: Screenshot → Zutaten/Anleitung priorisieren (OCR zuerst, sonst Vision)
-                if (recipeScreenshot != null) {
-                    _importState.update { it.copy(importPhase = "Rezept aus Screenshot lesen…") }
-                    val extracted = extractRecipeFromScreenshot(recipeScreenshot)
+                // 2) Optional: Screenshot(s) → Zutaten/Anleitung priorisieren
+                if (shots.isNotEmpty()) {
+                    _importState.update {
+                        it.copy(
+                            importPhase = if (shots.size > 1)
+                                "${shots.size} Screenshots lesen…"
+                            else
+                                "Rezept aus Screenshot lesen…"
+                        )
+                    }
+                    val extracted = extractRecipeFromScreenshots(shots)
                     if (extracted != null &&
                         (extracted.ingredients.isNotBlank() || extracted.instructions.isNotBlank())
                     ) {
                         val totalMin = listOfNotNull(extracted.prepTimeMinutes, extracted.cookTimeMinutes)
                             .takeIf { it.isNotEmpty() }?.sum()
                         base = base.copy(
-                            title = extracted.title.ifBlank { base.title }.ifBlank { "Instagram Rezept" },
+                            title = extracted.title.ifBlank { base.title }.ifBlank { "$platformGuess Rezept" },
                             description = extracted.description.ifBlank { base.description },
                             ingredients = extracted.ingredients.ifBlank { base.ingredients },
                             instructions = extracted.instructions.ifBlank { base.instructions },
@@ -532,13 +612,12 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                             carbsPerServing = extracted.carbsPerServing ?: base.carbsPerServing,
                             fatPerServing = extracted.fatPerServing ?: base.fatPerServing,
                             sourceUrl = base.sourceUrl ?: trimmedUrl,
-                            platform = base.platform ?: "instagram",
+                            platform = base.platform ?: platformGuess,
                             tags = listOfNotNull(
                                 base.tags.takeIf { it.isNotBlank() },
                                 "hybrid"
-                            ).joinToString(",").ifBlank { "instagram,hybrid" }
+                            ).joinToString(",").ifBlank { "$platformGuess,hybrid" }
                         )
-                        // Scrape hatte das Rezept schon gespeichert → updaten statt neu speichern
                         if (base.id > 0) {
                             repo.updateRecipe(base)
                         } else {
@@ -547,17 +626,21 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
 
-                // 3) Auto-Übersetzung / Metrik falls gewünscht
+                // 3) DE/metrisch + Nährwerte
                 if (shouldAutoGermanMetric()) {
                     _importState.update { it.copy(importPhase = "Übersetze…") }
                 }
-                base = repo.applyGermanMetricIfNeeded(
-                    base, enabled = shouldAutoGermanMetric(), force = false
-                )
-                base = repo.analyzeAndPersistNutrition(base)?.first ?: base
+                base = postProcessImported(base, forceGerman = true, withNutrition = true)
 
+                val stillWeak = isWeakRecipeContent(base.ingredients, base.instructions)
                 _importState.update {
-                    it.copy(isImporting = false, importPhase = null, lastImport = base)
+                    it.copy(
+                        isImporting = false,
+                        importPhase = null,
+                        lastImport = base,
+                        needsScreenshot = stillWeak && shots.isEmpty(),
+                        blockedUrl = if (stillWeak && shots.isEmpty()) trimmedUrl else it.blockedUrl
+                    )
                 }
             } catch (e: Exception) {
                 _importState.update {
@@ -572,19 +655,22 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Einzelnes Rezept aus Screenshot: OCR + Vision mit Qualitäts-Merge.
-     * @return null wenn weder OCR noch Vision etwas Brauchbares liefern.
+     * Rezept aus einem oder mehreren Screenshots: OCR + Vision mit Qualitäts-Merge.
      */
-    private suspend fun extractRecipeFromScreenshot(bitmap: Bitmap): RecipeFromImageResult? {
-        val list = RecipeImageTextExtractor.extractWithVisionFallback(bitmap) { ocrHint ->
+    private suspend fun extractRecipeFromScreenshots(bitmaps: List<Bitmap>): RecipeFromImageResult? {
+        if (bitmaps.isEmpty()) return null
+        val list = RecipeImageTextExtractor.extractWithVisionFallback(bitmaps) { ocrHint ->
             val vision = GroqVisionService()
-            val base64 = vision.bitmapToBase64JpegForText(bitmap, quality = 85)
-            vision.extractRecipeFromImage(base64, ocrHint = ocrHint).getOrNull()?.let { listOf(it) }.orEmpty()
+            val base64List = bitmaps.map { vision.bitmapToBase64JpegForText(it, quality = 85) }
+            vision.extractRecipesFromImages(base64List, ocrHint = ocrHint).getOrNull().orEmpty()
         }
         return list.firstOrNull()?.takeIf {
             it.ingredients.isNotBlank() || it.title.isNotBlank() || it.instructions.isNotBlank()
         }
     }
+
+    private suspend fun extractRecipeFromScreenshot(bitmap: Bitmap): RecipeFromImageResult? =
+        extractRecipeFromScreenshots(listOf(bitmap))
 
     private suspend fun shouldAutoGermanMetric(): Boolean {
         return runCatching {

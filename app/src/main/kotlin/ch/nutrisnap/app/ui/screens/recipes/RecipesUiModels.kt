@@ -11,6 +11,8 @@ internal data class ImportState(
     val importError:      String? = null,
     val lastImport:       Recipe? = null,
     val instagramBlocked: Boolean = false,
+    /** Caption/Link zu dünn – Nutzer soll Screenshot(s) anhängen. */
+    val needsScreenshot:  Boolean = false,
     val blockedUrl:       String  = ""
 )
 
@@ -55,6 +57,7 @@ data class RecipesUiState(
     val importError:      String?      = null,
     val lastImport:       Recipe?      = null,
     val instagramBlocked: Boolean      = false,
+    val needsScreenshot:  Boolean      = false,
     val blockedUrl:       String       = "",
     val nutritionState:   NutritionState = NutritionState(),
     val isTranslating:    Boolean      = false

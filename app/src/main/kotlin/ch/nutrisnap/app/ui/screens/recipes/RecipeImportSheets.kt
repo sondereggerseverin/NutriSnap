@@ -48,31 +48,33 @@ fun ImportSheet(
     var url by remember(prefillUrl) { mutableStateOf(prefillUrl) }
     var showManual by remember(openAtManualCaption) { mutableStateOf(openAtManualCaption) }
     var manualTitle by remember { mutableStateOf("") }; var manualCaption by remember { mutableStateOf("") }
-    var hybridScreenshot by remember { mutableStateOf<Bitmap?>(null) }
-    val isInstagram = "instagram.com" in url.lowercase() || "instagr.am" in url.lowercase()
+    var hybridScreenshots by remember { mutableStateOf<List<Bitmap>>(emptyList()) }
+    val urlLower = url.lowercase()
+    val isInstagram = "instagram.com" in urlLower || "instagr.am" in urlLower
+    val isTikTok = "tiktok.com" in urlLower || "vm.tiktok.com" in urlLower
+    val isSocial = isInstagram || isTikTok
 
     fun decodePickedBitmap(uri: Uri): Bitmap? =
         ch.nutrisnap.app.utils.ImageDecodeUtils.decodeUri(context, uri, maxEdgePx = 2048)
 
     // Bild-Import / Hybrid-Screenshot: kein Crop (OCR braucht volle Tabelle/Text).
-    // Zuschneiden nur bei Rezept-Fotos (RecipeEditSheet).
-    // Decode immer mit Downsampling – volle Kamera-MP → sonst OOM/Hänger.
+    // Mehrfachauswahl: z.B. TikTok-Caption über 2–3 Screenshots.
     val imagePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
+        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 4)
+    ) { uris: List<Uri> ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
         runCatching {
-            val bitmap = decodePickedBitmap(uri)
-                ?: throw IllegalStateException("Bild konnte nicht geladen werden")
-            vm.importFromImage(bitmap)
+            val bitmaps = uris.mapNotNull { decodePickedBitmap(it) }
+            if (bitmaps.isEmpty()) throw IllegalStateException("Bild konnte nicht geladen werden")
+            vm.importFromImages(bitmaps)
         }
     }
 
     val hybridScreenshotPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        hybridScreenshot = decodePickedBitmap(uri)
+        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 4)
+    ) { uris: List<Uri> ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        hybridScreenshots = uris.mapNotNull { decodePickedBitmap(it) }
     }
 
     LaunchedEffect(error) {
@@ -172,7 +174,7 @@ fun ImportSheet(
                     Text("Rezept aus Bild importieren")
                 }
                 Text(
-                    "Screenshot oder Foto einer Rezeptkarte auswählen",
+                    "Ein oder mehrere Screenshots (z.B. TikTok Caption Seite 1+2)",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -187,8 +189,8 @@ fun ImportSheet(
                     leadingIcon={Icon(Icons.Default.Link,null)}, modifier=Modifier.fillMaxWidth(), singleLine=true, isError=error!=null)
                 if (error != null) Text(error, color=MaterialTheme.colorScheme.error, fontSize=13.sp, modifier=Modifier.padding(top=4.dp))
 
-                // Hybrid: bei Instagram-Link optional Rezept-Screenshot anhängen
-                if (isInstagram && url.isNotBlank()) {
+                // Hybrid: bei Instagram/TikTok optional Rezept-Screenshot(s) anhängen
+                if (isSocial && url.isNotBlank()) {
                     Spacer(Modifier.height(12.dp))
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -199,13 +201,14 @@ fun ImportSheet(
                     ) {
                         Column(Modifier.padding(12.dp)) {
                             Text(
-                                "Caption leer? Rezept-Screenshot anhängen",
+                                "Caption leer oder unvollständig?",
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 13.sp
                             )
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                "Link liefert Bild + Quelle, Screenshot die Zutaten/Anleitung.",
+                                "Link liefert Quelle + Vorschaubild. Ein oder mehrere Screenshots " +
+                                    "liefern Zutaten und Zubereitung (z.B. Caption Seite 1 + 2).",
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -228,14 +231,17 @@ fun ImportSheet(
                                     Icon(Icons.Default.AddPhotoAlternate, null, Modifier.size(18.dp))
                                     Spacer(Modifier.width(6.dp))
                                     Text(
-                                        if (hybridScreenshot != null) "Screenshot gewählt"
-                                        else "Screenshot wählen"
+                                        when (hybridScreenshots.size) {
+                                            0 -> "Screenshot(s) wählen"
+                                            1 -> "1 Screenshot gewählt"
+                                            else -> "${hybridScreenshots.size} Screenshots gewählt"
+                                        }
                                     )
                                 }
-                                if (hybridScreenshot != null) {
+                                if (hybridScreenshots.isNotEmpty()) {
                                     Spacer(Modifier.width(8.dp))
                                     IconButton(
-                                        onClick = { hybridScreenshot = null },
+                                        onClick = { hybridScreenshots = emptyList() },
                                         enabled = !isLoading
                                     ) {
                                         Icon(Icons.Default.Close, "Entfernen")
@@ -249,8 +255,8 @@ fun ImportSheet(
                 Spacer(Modifier.height(12.dp))
                 Button(
                     onClick = {
-                        if (isInstagram && hybridScreenshot != null) {
-                            vm.importHybridFromInstagram(url.trim(), hybridScreenshot)
+                        if (isSocial && hybridScreenshots.isNotEmpty()) {
+                            vm.importHybridFromSocial(url.trim(), hybridScreenshots)
                         } else {
                             onImport(url.trim())
                         }
@@ -270,7 +276,8 @@ fun ImportSheet(
                         when {
                             isLoading && !importPhase.isNullOrBlank() -> importPhase
                             isLoading -> "Importiere…"
-                            isInstagram && hybridScreenshot != null -> "Link + Screenshot importieren"
+                            isSocial && hybridScreenshots.isNotEmpty() ->
+                                "Link + Screenshot(s) importieren"
                             else -> "Importieren"
                         }
                     )

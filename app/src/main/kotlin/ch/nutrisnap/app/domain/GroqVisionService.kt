@@ -212,7 +212,7 @@ confidence ist "hoch", "mittel" oder "niedrig". Erfinde keine Zutaten, die nicht
 """.trimIndent()
         // Hoeheres Token-Limit als Standard-1000: bei vielen kleinen Zutaten (Bowls, Mezze-Teller)
         // braucht die JSON-Antwort mit einem Eintrag pro Zutat mehr Platz als eine einzelne Schaetzung.
-        callVisionRaw(prompt, base64Jpeg, maxTokens = 2000).mapCatching { json.decodeFromString<DishScanResult>(it) }
+        callVisionRaw(prompt, listOf(base64Jpeg), maxTokens = 2000).mapCatching { json.decodeFromString<DishScanResult>(it) }
     }
 
     /** Erkennt vorhandene Zutaten auf einem Foto (z.B. offener Kühlschrank/Vorratsschrank). */
@@ -228,7 +228,7 @@ Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
   "ingredients": ["Rüebli", "Naturejoghurt", "Eier", "Zwiebeln"]
 }
 """.trimIndent()
-        callVisionRaw(prompt, base64Jpeg).mapCatching { json.decodeFromString<FridgeScanResult>(it) }
+        callVisionRaw(prompt, listOf(base64Jpeg)).mapCatching { json.decodeFromString<FridgeScanResult>(it) }
     }
 
     /** Liest eine fotografierte Nährwerttabelle aus und gibt die Werte pro 100g zurück. */
@@ -253,7 +253,7 @@ Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
   "brand": "Marke"
 }
 """.trimIndent()
-        callVisionRaw(prompt, base64Jpeg).mapCatching { json.decodeFromString<NutritionLabelResult>(it) }
+        callVisionRaw(prompt, listOf(base64Jpeg)).mapCatching { json.decodeFromString<NutritionLabelResult>(it) }
     }
 
     /**
@@ -268,9 +268,31 @@ Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
         base64Jpeg: String,
         ocrHint: String? = null
     ): Result<List<RecipeFromImageResult>> =
+        extractRecipesFromImages(listOf(base64Jpeg), ocrHint)
+
+    /**
+     * Mehrere Screenshots/Fotos desselben oder mehrerer Rezepte (z.B. TikTok-Caption
+     * über 2–3 Screenshots). Bilder + optionaler kombinierter OCR-Hinweis.
+     */
+    suspend fun extractRecipesFromImages(
+        base64Jpegs: List<String>,
+        ocrHint: String? = null
+    ): Result<List<RecipeFromImageResult>> =
         withContext(Dispatchers.IO) {
+            val images = base64Jpegs.filter { it.isNotBlank() }
+            if (images.isEmpty()) {
+                return@withContext Result.failure(IllegalArgumentException("Keine Bilder übergeben"))
+            }
+            val multiNote = if (images.size > 1) {
+                """
+Du siehst ${images.size} Screenshots/Fotos. Oft ist es EIN Rezept, das über mehrere
+Bilder verteilt ist (Caption „more“, Zutaten auf Bild 1, Schritte auf Bild 2).
+Führe zusammengehörige Teile zu EINEM Rezept zusammen. Nur wenn klar getrennte
+verschiedene Gerichte sichtbar sind, mehrere Einträge in "recipes".
+"""
+            } else ""
             val ocrBlock = ocrHint?.trim()?.takeIf { it.length >= 20 }?.let { text ->
-                val clipped = text.take(3500)
+                val clipped = text.take(6000)
                 """
 
 Zusätzlicher OCR-Rohtext vom Gerät (kann Fehler enthalten, Mengen/Namen aber oft treuer als reine Bildanalyse).
@@ -286,7 +308,7 @@ $clipped
             val prompt = """
 Du siehst ein Foto oder einen Screenshot von einem oder mehreren Rezepten
 (Rezeptkarte, Kochbuchseite, Blog, Social Media wie TikTok/Instagram/Reels, Notiz, Collage).
-
+$multiNote
 Aufgabe:
 - Wenn MEHRERE klar getrennte Rezepte sichtbar sind (z.B. zwei Rezepte auf einer Kochbuchseite,
   Collage, mehrere Karten), extrahiere JEDES als eigenen Eintrag in "recipes".
@@ -337,10 +359,70 @@ Antworte NUR mit folgendem JSON (kein Markdown):
   ]
 }
 """.trimIndent()
-            callVisionRaw(prompt, base64Jpeg, maxTokens = 4000).mapCatching { raw ->
-                parseRecipesFromImageJson(raw).map { normalizeExtractedRecipe(it) }
+            callVisionRaw(prompt, images, maxTokens = 4000).mapCatching { raw ->
+                parseRecipesFromImageJson(raw).map { extracted ->
+                    val normalized = normalizeExtractedRecipe(extracted)
+                    // Zweiter Text-Pass: saubere DE/metrische Zutaten & Schritte ohne Bild
+                    polishExtractedRecipe(normalized)
+                }
             }
         }
+
+    /**
+     * Nach Vision: reiner Text-Cleanup (kein Bild). Deutsch, metrisch, Promo raus,
+     * nummerierte Schritte – wie manuelles „Claude-Format“.
+     */
+    internal suspend fun polishExtractedRecipe(raw: RecipeFromImageResult): RecipeFromImageResult {
+        if (raw.ingredients.isBlank() && raw.instructions.isBlank()) return raw
+        val prompt = """
+Du bereinigst ein extrahiertes Rezept. Ausgabe NUR als JSON (kein Markdown).
+
+Regeln:
+- title, description, ingredients, instructions auf Deutsch
+- ingredients: eine Zutat pro Zeile, Mengen in g/ml/EL/TL; Abschnittsüberschriften erlaubt (z.B. „Topping:“)
+- instructions: nummeriert (1. … 2. …), klar und knapp
+- Keine Werbung, keine Hashtags, kein „Link in bio“
+- Nährwerte und servings nur behalten wenn sinnvoll; sonst weglassen/null
+- Erfinde keine neuen Zutaten; nur glätten, übersetzen, metrisch machen
+
+Eingabe:
+${JSONObject().apply {
+            put("title", raw.title)
+            put("description", raw.description)
+            put("ingredients", raw.ingredients)
+            put("instructions", raw.instructions)
+            put("servings", raw.servings)
+            raw.prepTimeMinutes?.let { put("prepTimeMinutes", it) }
+            raw.proteinPerServing?.let { put("proteinPerServing", it) }
+            raw.caloriesPerServing?.let { put("caloriesPerServing", it) }
+        }}
+
+JSON-Schema:
+{"title":"…","description":"…","ingredients":"…","instructions":"…","servings":1,"prepTimeMinutes":null,"caloriesPerServing":null,"proteinPerServing":null,"carbsPerServing":null,"fatPerServing":null}
+""".trimIndent()
+
+        val textResult = if (GeminiService.isAvailable()) {
+            GeminiService.generateText(prompt = prompt, temperature = 0.2, maxTokens = 2500)
+        } else {
+            Result.failure(Exception("Kein Text-Modell"))
+        }
+        val cleaned = textResult.getOrNull()?.trim()
+            ?.removePrefix("```json")?.removePrefix("```")?.removeSuffix("```")?.trim()
+            ?: return raw
+        return runCatching {
+            val parsed = json.decodeFromString<RecipeFromImageResult>(cleaned)
+            normalizeExtractedRecipe(
+                parsed.copy(
+                    // Nährwerte: poliertes behalten wenn gesetzt, sonst Original
+                    caloriesPerServing = parsed.caloriesPerServing ?: raw.caloriesPerServing,
+                    proteinPerServing = parsed.proteinPerServing ?: raw.proteinPerServing,
+                    carbsPerServing = parsed.carbsPerServing ?: raw.carbsPerServing,
+                    fatPerServing = parsed.fatPerServing ?: raw.fatPerServing,
+                    servings = if (parsed.servings > 0) parsed.servings else raw.servings
+                )
+            )
+        }.getOrDefault(raw)
+    }
 
     /**
      * Rückwärtskompatibel: liefert das erste erkannte Rezept (oder Fehler wenn keines).
@@ -350,7 +432,7 @@ Antworte NUR mit folgendem JSON (kein Markdown):
         base64Jpeg: String,
         ocrHint: String? = null
     ): Result<RecipeFromImageResult> =
-        extractRecipesFromImage(base64Jpeg, ocrHint).mapCatching { list ->
+        extractRecipesFromImages(listOf(base64Jpeg), ocrHint).mapCatching { list ->
             list.firstOrNull()
                 ?: throw IllegalStateException("Kein Rezept im Bild erkannt")
         }
@@ -461,13 +543,27 @@ Antworte NUR mit folgendem JSON (kein Markdown):
      * beiden fehl, wird auf das Ergebnis des anderen gewartet statt neu zu starten.
      */
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    private suspend fun callVisionRaw(prompt: String, base64Jpeg: String, maxTokens: Int = 1000): Result<String> = coroutineScope {
-        val groqDeferred: Deferred<Result<String>> = async(Dispatchers.IO) { callGroqVision(prompt, base64Jpeg, maxTokens) }
+    private suspend fun callVisionRaw(
+        prompt: String,
+        base64Jpegs: List<String>,
+        maxTokens: Int = 1000
+    ): Result<String> = coroutineScope {
+        val images = base64Jpegs.filter { it.isNotBlank() }
+        if (images.isEmpty()) {
+            return@coroutineScope Result.failure(IllegalArgumentException("Keine Bilder"))
+        }
+        val groqDeferred: Deferred<Result<String>> =
+            async(Dispatchers.IO) { callGroqVision(prompt, images, maxTokens) }
 
         if (!GeminiService.isAvailable()) return@coroutineScope groqDeferred.await()
 
         val geminiDeferred: Deferred<Result<String>> = async(Dispatchers.IO) {
-            GeminiService.generateVision(prompt = prompt, base64Jpeg = base64Jpeg, temperature = 0.3, maxTokens = maxTokens)
+            GeminiService.generateVision(
+                prompt = prompt,
+                base64Jpegs = images,
+                temperature = 0.3,
+                maxTokens = maxTokens
+            )
         }
 
         val result = select<Result<String>> {
@@ -479,7 +575,11 @@ Antworte NUR mit folgendem JSON (kein Markdown):
         result
     }
 
-    private fun callGroqVision(prompt: String, base64Jpeg: String, maxTokens: Int = 1000): Result<String> {
+    private fun callGroqVision(
+        prompt: String,
+        base64Jpegs: List<String>,
+        maxTokens: Int = 1000
+    ): Result<String> {
         return try {
             val apiKey = BuildConfig.GROQ_API_KEY
             if (apiKey.isBlank()) return Result.failure(Exception(
@@ -488,12 +588,15 @@ Antworte NUR mit folgendem JSON (kein Markdown):
 
             val content = JSONArray().apply {
                 put(JSONObject().apply { put("type", "text"); put("text", prompt) })
-                put(JSONObject().apply {
-                    put("type", "image_url")
-                    put("image_url", JSONObject().apply {
-                        put("url", "data:image/jpeg;base64,$base64Jpeg")
+                // Max. 4 Screenshots – Payload-Limit; Reihenfolge = Nutzer-Auswahl
+                base64Jpegs.take(4).forEach { b64 ->
+                    put(JSONObject().apply {
+                        put("type", "image_url")
+                        put("image_url", JSONObject().apply {
+                            put("url", "data:image/jpeg;base64,$b64")
+                        })
                     })
-                })
+                }
             }
             val requestJson = JSONObject().apply {
                 put("model", VISION_MODEL)

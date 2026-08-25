@@ -120,8 +120,27 @@ object GeminiService {
         base64Jpeg: String,
         temperature: Double = 0.3,
         maxTokens: Int = 1000
+    ): Result<String> = generateVision(
+        prompt = prompt,
+        base64Jpegs = listOf(base64Jpeg),
+        temperature = temperature,
+        maxTokens = maxTokens
+    )
+
+    /**
+     * Vision-Call mit einem oder mehreren JPEGs (z.B. mehrere Social-Screenshots).
+     */
+    suspend fun generateVision(
+        prompt: String,
+        base64Jpegs: List<String>,
+        temperature: Double = 0.3,
+        maxTokens: Int = 1000
     ): Result<String> = withContext(Dispatchers.IO) {
         if (!isAvailable()) return@withContext Result.failure(Exception("Kein GEMINI_API_KEY konfiguriert"))
+        val images = base64Jpegs.filter { it.isNotBlank() }.take(4)
+        if (images.isEmpty()) {
+            return@withContext Result.failure(IllegalArgumentException("Keine Bilder"))
+        }
 
         try {
             val contents = JSONArray().apply {
@@ -129,12 +148,14 @@ object GeminiService {
                     put("role", "user")
                     put("parts", JSONArray().apply {
                         put(JSONObject().apply { put("text", prompt) })
-                        put(JSONObject().apply {
-                            put("inlineData", JSONObject().apply {
-                                put("mimeType", "image/jpeg")
-                                put("data", base64Jpeg)
+                        images.forEach { b64 ->
+                            put(JSONObject().apply {
+                                put("inlineData", JSONObject().apply {
+                                    put("mimeType", "image/jpeg")
+                                    put("data", b64)
+                                })
                             })
-                        })
+                        }
                     })
                 })
             }

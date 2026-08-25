@@ -214,7 +214,10 @@ fun RecipesScreen(
     LaunchedEffect(sharedUrl) { if (!sharedUrl.isNullOrBlank()) showImportSheet = true }
     LaunchedEffect(sharedRecipeJson) { if (!sharedRecipeJson.isNullOrBlank()) vm.importFromSharedJson(sharedRecipeJson) }
     LaunchedEffect(state.instagramBlocked) { if (state.instagramBlocked) showImportSheet = true }
-    LaunchedEffect(state.lastImport) { if (state.lastImport != null) showImportSheet = false }
+    LaunchedEffect(state.needsScreenshot) { if (state.needsScreenshot) showImportSheet = true }
+    LaunchedEffect(state.lastImport, state.needsScreenshot) {
+        if (state.lastImport != null && !state.needsScreenshot) showImportSheet = false
+    }
     LaunchedEffect(sharedBatchUrls) {
         if (sharedBatchUrls.isNotEmpty()) { vm.addBatchUrls(sharedBatchUrls); showBatchSheet = true }
     }
@@ -774,13 +777,24 @@ fun RecipesScreen(
 
     if (showImportSheet) {
         ImportSheet(
-            prefillUrl = if (state.instagramBlocked) state.blockedUrl else (sharedUrl ?: ""),
+            prefillUrl = when {
+                state.instagramBlocked || state.needsScreenshot -> state.blockedUrl
+                else -> sharedUrl ?: ""
+            },
             isLoading = state.isImporting,
             importPhase = state.importPhase,
-            error = state.importError,
-            openAtManualCaption = state.instagramBlocked,
+            error = state.importError
+                ?: if (state.needsScreenshot)
+                    "Zutaten unvollständig – bitte Screenshot(s) der Caption anhängen"
+                else null,
+            openAtManualCaption = state.instagramBlocked && !state.needsScreenshot,
             onImport = { url -> vm.importFromUrl(url) },
-            onDismiss = { showImportSheet = false; vm.clearError(); vm.clearInstagramBlocked() }
+            onDismiss = {
+                showImportSheet = false
+                vm.clearError()
+                vm.clearInstagramBlocked()
+                vm.clearNeedsScreenshot()
+            }
         )
     }
 

@@ -101,19 +101,53 @@ object RecipeImageTextExtractor {
     suspend fun extractWithVisionFallback(
         bitmap: Bitmap,
         visionProvider: suspend (ocrHint: String?) -> List<RecipeFromImageResult>
-    ): List<RecipeFromImageResult> = coroutineScope {
-        val ocrAttempt = tryExtractDetailed(bitmap)
-        val ocrList = ocrAttempt.recipes
-        val ocrHint = ocrAttempt.rawText
-        val ocrScore = ocrList?.firstOrNull()?.let { ingredientQualityScore(it.ingredients) } ?: -1
+    ): List<RecipeFromImageResult> =
+        extractWithVisionFallback(listOf(bitmap), visionProvider)
 
-        // Starke Einzel-OCR → Vision sparen (schnell + texttreu)
-        if (ocrList != null && ocrList.size == 1 && ocrScore >= STRONG_INGREDIENT_SCORE) {
-            return@coroutineScope ocrList
+    /**
+     * Ein oder mehrere Screenshots: OCR je Bild, kombinierter Hinweis an Vision.
+     * Bei mehreren Bildern immer Vision (Teile eines Rezepts über Screenshots verteilt).
+     */
+    suspend fun extractWithVisionFallback(
+        bitmaps: List<Bitmap>,
+        visionProvider: suspend (ocrHint: String?) -> List<RecipeFromImageResult>
+    ): List<RecipeFromImageResult> = coroutineScope {
+        if (bitmaps.isEmpty()) return@coroutineScope emptyList()
+
+        val ocrAttempts = bitmaps.map { tryExtractDetailed(it) }
+        val combinedOcr = ocrAttempts.mapIndexedNotNull { index, attempt ->
+            attempt.rawText?.trim()?.takeIf { it.isNotBlank() }?.let { text ->
+                if (bitmaps.size > 1) "--- Screenshot ${index + 1} ---\n$text" else text
+            }
+        }.joinToString("\n\n").ifBlank { null }
+
+        // Einzelbild + starke OCR → Vision sparen
+        if (bitmaps.size == 1) {
+            val ocrList = ocrAttempts.first().recipes
+            val ocrScore = ocrList?.firstOrNull()?.let { ingredientQualityScore(it.ingredients) } ?: -1
+            if (ocrList != null && ocrList.size == 1 && ocrScore >= STRONG_INGREDIENT_SCORE) {
+                return@coroutineScope ocrList
+            }
         }
 
-        val visionResult = runCatching { visionProvider(ocrHint) }
+        // Kombinierter OCR als Caption-Parse (hilft bei reinen Text-Screenshots)
+        val combinedOcrList = if (!combinedOcr.isNullOrBlank() && looksLikeRecipeText(combinedOcr)) {
+            runCatching {
+                RecipeAiParser.parse(
+                    caption = combinedOcr,
+                    sourceUrl = null,
+                    platform = "bild",
+                    imageUrl = null,
+                    apiKey = BuildConfig.GROQ_API_KEY,
+                    fastModel = false
+                )?.takeIf { isUsableRecipe(it) }?.toImageResult()?.let { listOf(it) }
+            }.getOrNull()
+        } else null
+
+        val visionResult = runCatching { visionProvider(combinedOcr) }
         val visionList = visionResult.getOrDefault(emptyList())
+        val ocrList = combinedOcrList ?: ocrAttempts.firstOrNull()?.recipes
+
         when {
             ocrList.isNullOrEmpty() && visionList.isEmpty() -> {
                 visionResult.exceptionOrNull()?.let { throw it }
@@ -121,9 +155,11 @@ object RecipeImageTextExtractor {
             }
             ocrList.isNullOrEmpty() -> visionList
             visionList.isEmpty() -> ocrList
-            // Vision hat mehrere Rezepte (Collage) → Vision priorisieren
-            visionList.size > 1 -> visionList
-            // Beide Einzelrezepte → Merge der stärksten Felder
+            // Mehrere Screenshots oder Collage → Vision priorisieren, OCR nur mergen
+            bitmaps.size > 1 || visionList.size > 1 -> {
+                if (visionList.size > 1) visionList
+                else listOf(mergeBest(ocrList.first(), visionList.first()))
+            }
             else -> listOf(mergeBest(ocrList.first(), visionList.first()))
         }
     }
