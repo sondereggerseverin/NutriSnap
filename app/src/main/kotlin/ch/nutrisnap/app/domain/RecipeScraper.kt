@@ -63,8 +63,10 @@ class RecipeScraper(private val context: Context) {
         if (lines.isEmpty()) return false
         // Mindestens eine Zeile mit Menge oder 2+ Lebensmittel-Zeilen
         val hasQty = lines.any {
-            Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tsp|tbsp|cup|oz|päckchen|paeckchen|packung)\b""", RegexOption.IGNORE_CASE)
-                .containsMatchIn(it)
+            Regex(
+                """(\d+/\d+|\d+[.,]?\d*)\s*(g|kg|ml|l|el|tl|tsp|tbsp|cups?|oz|päckchen|paeckchen|packung)\b""",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(it)
         }
         return hasQty || lines.size >= 3
     }
@@ -323,14 +325,17 @@ class RecipeScraper(private val context: Context) {
         thumbnail: String?,
         fastAi: Boolean
     ): Recipe {
-        // 1) Server (wenn Supabase + Edge Function deployed)
-        progress("Server-Normalisierung…")
-        val server = RecipeNormalizeServer.normalize(caption, url, platform, thumbnail)
+        // 1) Server (wenn Supabase + Edge Function deployed & konfiguriert)
+        val server = if (RecipeNormalizeServer.isConfigured()) {
+            progress("Server-Normalisierung…")
+            RecipeNormalizeServer.normalize(caption, url, platform, thumbnail)
+        } else null
         if (server != null && hasUsableIngredients(server)) {
             return server
         }
 
         // 2) Lokal: Gemini/Groq-Race
+        progress("Rezept extrahieren…")
         val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
         val local = if (apiKey.isNotBlank()) {
             RecipeAiParser.parse(caption, url, platform, thumbnail, apiKey, fastModel = fastAi)

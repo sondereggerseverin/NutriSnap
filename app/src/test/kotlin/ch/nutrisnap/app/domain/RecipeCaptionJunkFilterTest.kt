@@ -291,4 +291,41 @@ class RecipeCaptionJunkFilterTest {
         assertTrue(lower.contains("hähnchen") || lower.contains("haehnchen") || out.contains("180"))
         assertFalse("step leaked:\n$out", lower.contains("packungsanleitung") || lower.contains("anbraten"))
     }
+
+
+    @Test
+    fun englishCupCaptionFallbackExtractsIngredients() {
+        val caption = """
+            Another Hailey recipe & it slaps!! Who knew she was a chef? This pizza is amazing!
+            INGREDIENTS:
+            The crust
+            1/4 cup cottage cheese
+            1/3 cup liquid egg whites
+            1/3 cup all purpose flour
+            1.5 tbsp coconut flour
+            1 tsp baking powder
+            Oregano
+            The toppings
+            1/3 cup marinara sauce
+            1/2 cup mozzarella cheese
+            1.) Preheat your oven to 350. Mix all crust ingredients in a bowl.
+            2.) Bake for 10 minutes, peel the crust off the parchment.
+            3.) Bake 10 more minutes until the cheese is bubbly.
+            Save this one so you have it ready next time!
+        """.trimIndent()
+        val recipe = RecipeAiParser.fallbackParse(caption, null, "instagram", null)
+        val ing = recipe.ingredients.lowercase()
+        assertTrue("expected cottage/cup in:\n${recipe.ingredients}",
+            ing.contains("cottage") || ing.contains("1/4") || ing.contains("cup"))
+        assertTrue("expected flour in:\n${recipe.ingredients}",
+            ing.contains("flour") || ing.contains("1/3"))
+        assertFalse("promo title:\n${recipe.title}", RecipeAiParser.isPromoTitle(recipe.title))
+        assertFalse("bait title:\n${recipe.title}",
+            recipe.title.lowercase().contains("slaps") || recipe.title.lowercase().startsWith("another"))
+        val instr = recipe.instructions.lowercase()
+        assertTrue("expected bake/preheat in steps:\n${recipe.instructions}",
+            instr.contains("bake") || instr.contains("preheat") || instr.contains("350"))
+        assertFalse("steps in ingredients:\n${recipe.ingredients}",
+            ing.contains("preheat") || ing.contains("bake for"))
+    }
 }

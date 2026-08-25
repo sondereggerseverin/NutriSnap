@@ -88,8 +88,10 @@ object RecipeAiParser {
             if (junk >= 2 && junk >= lines.size / 2) return true
             // Keine echte Mengenangabe → schwach
             val hasQty = lines.any {
-                Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tsp|tbsp)\b""", RegexOption.IGNORE_CASE)
-                    .containsMatchIn(it)
+                Regex(
+                    """(\d+/\d+|\d+[.,]?\d*)\s*(g|kg|ml|l|el|tl|tsp|tbsp|cups?|oz)\b""",
+                    RegexOption.IGNORE_CASE
+                ).containsMatchIn(it)
             }
             return !hasQty
         }
@@ -99,10 +101,10 @@ object RecipeAiParser {
             !isPlaceholderTitle(ai.title) && !isPromoTitle(ai.title) -> ai.title.trim()
             !isPlaceholderTitle(fallback.title) && !isPromoTitle(fallback.title) -> fallback.title.trim()
             titleFromCaption.isNotBlank() && !isPromoTitle(titleFromCaption) -> titleFromCaption
-            else -> listOf(ai.title, fallback.title, titleFromCaption)
-                .map { it.trim() }
-                .firstOrNull { it.isNotBlank() && !isPlaceholderTitle(it) && !isPromoTitle(it) }
-                ?: "Rezept"
+            else -> inventTitleFromIngredients(
+                listOf(ai.ingredients, fallback.ingredients, cleanedCaption)
+                    .firstOrNull { it.length > 20 } ?: ""
+            )
         }
 
         val ingredientsRaw = when {
@@ -811,14 +813,42 @@ object RecipeAiParser {
         if (lower.length < 4) return true
         if (lower.startsWith("comment ") || lower.startsWith("kommentiere") ||
             lower.startsWith("dm me") || lower.startsWith("save this") ||
-            lower.startsWith("another ") && lower.contains("slaps") ||
+            lower.startsWith("another ") ||
             lower.contains("i'll dm") || lower.contains("ill dm") ||
             lower.contains("who knew she") || lower.contains("it slaps") ||
-            lower.contains("link in bio") || lower.contains("full recipe") && lower.contains("comment")
+            lower.contains("link in bio") ||
+            (lower.contains("full recipe") && (lower.contains("comment") || lower.contains("dm"))) ||
+            lower.startsWith("liked by") ||
+            (lower.contains("viral protein") && lower.length > 40)
         ) return true
-        // Sehr lange Promo-Sätze ohne klaren Dish-Namen
         if (title.length > 90 && (lower.contains("!") || lower.contains("?"))) return true
+        if (lower.startsWith("this ") && (lower.contains("amazing") || lower.contains("slaps") ||
+                lower.contains("looking") || lower.contains("macros"))
+        ) return true
         return false
+    }
+
+    /**
+     * Baut einen kurzen Gerichtnamen aus Zutaten, wenn der Caption-Titel Promo ist.
+     */
+    fun inventTitleFromIngredients(ingredients: String, fallback: String = "Rezept"): String {
+        val blob = ingredients.lowercase()
+        val hits = listOf(
+            "pizza" to "Pizza", "pasta" to "Pasta", "pide" to "Pide",
+            "burrito" to "Burrito", "quesadilla" to "Quesadilla", "bowl" to "Bowl",
+            "salad" to "Salat", "salat" to "Salat", "wrap" to "Wrap",
+            "taco" to "Taco", "soup" to "Suppe", "suppe" to "Suppe",
+            "brownie" to "Brownie", "pancake" to "Pancakes", "oats" to "Oats"
+        )
+        val dish = hits.firstOrNull { it.first in blob }?.second
+        val protein = when {
+            "cottage cheese" in blob || "hüttenkäse" in blob || "huettenkaese" in blob -> "Cottage-Cheese"
+            "hähnchen" in blob || "haehnchen" in blob || "chicken" in blob -> "Hähnchen"
+            "lachs" in blob || "salmon" in blob -> "Lachs"
+            "tofu" in blob -> "Tofu"
+            else -> null
+        }
+        return listOfNotNull(protein, dish).joinToString(" ").ifBlank { fallback }.take(60)
     }
 
     // ── LLM call ──────────────────────────────────────────────────────────────
@@ -1160,9 +1190,15 @@ Rules:
         fun isQtyIngredientLine(line: String): Boolean {
             val core = stripLeadingDecor(line)
             if (core.isBlank()) return false
+            // EN: "1/4 cup cottage cheese", "1.5 tbsp coconut flour"
+            val usVolume = Regex(
+                """^(?:\d+/\d+|\d+[.,]?\d*)\s*(cups?|tbsp|tsp|tablespoons?|teaspoons?|oz|lb)\b""",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(core)
             return ingredientLineRegex.containsMatchIn(core) ||
                 core.startsWith("-") || core.startsWith("•") ||
                 (core.startsWith("*") && Regex("""\d""").containsMatchIn(core)) ||
+                usVolume ||
                 Regex(
                     """^\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tsp|tbsp|cup|oz|lb|stück|stk|päckchen|paeckchen|packung)\b""",
                     RegexOption.IGNORE_CASE
@@ -1263,8 +1299,16 @@ Rules:
                 qtyIngrLines.joinToString("\n").ifBlank { "Tippe ✏️ um Zutaten hinzuzufügen." }
             }
 
+        val finalTitle = when {
+            title.isNotBlank() && !isPromoTitle(title) &&
+                !title.equals("Rezept", true) &&
+                !title.equals("Instagram Rezept", true) &&
+                !title.equals("TikTok Rezept", true) -> title
+            else -> inventTitleFromIngredients(formattedIngredients, fallback = title.ifBlank { "Rezept" })
+        }
+
         return Recipe(
-            title           = title,
+            title           = finalTitle,
             description     = cals?.let { "📊 Pro Portion: ${it.toInt()} kcal" } ?: "",
             ingredients     = formattedIngredients,
             instructions    = formatInstructionsText(instructionsRaw),

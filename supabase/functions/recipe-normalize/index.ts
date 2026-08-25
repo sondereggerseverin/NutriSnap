@@ -49,6 +49,14 @@ Rules:
 - servings: from "Makes N", "N Portionen", "serves N". Default 1.
 - calories_per_serving / protein_g / carbs_g / fat_g: per serving if stated, else null.
 - Ignore: "Comment X for recipe", "Kommentiere …", "link in bio", hashtags, ads.
+
+Hard caption examples:
+1) EN cups + promo: "Another Hailey recipe & it slaps!! … INGREDIENTS: The crust 1/4 cup cottage cheese … 1.) Preheat oven…"
+   → title "Protein Cottage Cheese Pizza", sections Crust/Toppings, numbered steps, no promo title.
+2) DE emoji: "📘 ZUTATEN Teig: 🔹 380g Dinkelmehl … ZUBEREITUNG: 1. verkneten…"
+   → sections Teig/Belag, German steps only.
+3) Bait-only title: "Comment recipe & I'll DM you…" with ingredient names below
+   → invent dish title from ingredients; never use bait as title.
 `;
 
 const cors = {
