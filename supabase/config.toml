@@ -1,0 +1,5 @@
+# NutriSnap Supabase – lokal / CLI
+# Edge Function: recipe-normalize (kostenlose Caption→Rezept-Normalisierung via Groq)
+
+[functions.recipe-normalize]
+verify_jwt = false

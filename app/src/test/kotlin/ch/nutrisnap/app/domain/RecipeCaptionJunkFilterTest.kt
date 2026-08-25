@@ -263,4 +263,32 @@ class RecipeCaptionJunkFilterTest {
             recipe.title.lowercase().contains("pide") || recipe.title.lowercase().contains("salami"))
         assertTrue("servings should be 6, was ${recipe.servings}", recipe.servings == 6)
     }
+
+
+    @Test
+    fun rejectsPromoTitles() {
+        assertTrue(RecipeAiParser.isPromoTitle("Comment \"recipe\" & I'll DM you the full recipe!"))
+        assertTrue(RecipeAiParser.isPromoTitle("Another Hailey recipe & it slaps!! Who knew she was a chef?"))
+        assertTrue(RecipeAiParser.isPromoTitle("Kommentiere PIDE und ich schicke dir das Rezept"))
+        assertFalse(RecipeAiParser.isPromoTitle("Hailey Bieber Protein Pizza"))
+        assertFalse(RecipeAiParser.isPromoTitle("Hähnchen Alfredo Pasta"))
+        assertFalse(RecipeAiParser.isPromoTitle("Salami Käse Pide"))
+    }
+
+    @Test
+    fun dropsNumberedStepsFromIngredients() {
+        val raw = """
+            2 hartgekochte Eier
+            150g Frischkäse
+            180g Like Hähnchen
+            1. Die Nudeln nach Packungsanleitung kochen
+            2. Das Like Hähnchen nach Belieben würzen und anbraten
+            3. Die gekochten Eier, Frischkäse, Parmesan mixen
+        """.trimIndent()
+        val out = RecipeAiParser.formatIngredientText(raw)
+        val lower = out.lowercase()
+        assertTrue(lower.contains("frischkäse") || out.contains("150"))
+        assertTrue(lower.contains("hähnchen") || lower.contains("haehnchen") || out.contains("180"))
+        assertFalse("step leaked:\n$out", lower.contains("packungsanleitung") || lower.contains("anbraten"))
+    }
 }

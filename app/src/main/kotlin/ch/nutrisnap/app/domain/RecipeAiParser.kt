@@ -96,10 +96,13 @@ object RecipeAiParser {
 
         val titleFromCaption = extractTitle(cleanedCaption, fallback = "")
         val title = when {
-            !isPlaceholderTitle(ai.title) -> ai.title.trim()
-            !isPlaceholderTitle(fallback.title) -> fallback.title.trim()
-            titleFromCaption.isNotBlank() -> titleFromCaption
-            else -> "Rezept"
+            !isPlaceholderTitle(ai.title) && !isPromoTitle(ai.title) -> ai.title.trim()
+            !isPlaceholderTitle(fallback.title) && !isPromoTitle(fallback.title) -> fallback.title.trim()
+            titleFromCaption.isNotBlank() && !isPromoTitle(titleFromCaption) -> titleFromCaption
+            else -> listOf(ai.title, fallback.title, titleFromCaption)
+                .map { it.trim() }
+                .firstOrNull { it.isNotBlank() && !isPlaceholderTitle(it) && !isPromoTitle(it) }
+                ?: "Rezept"
         }
 
         val ingredientsRaw = when {
@@ -461,12 +464,18 @@ object RecipeAiParser {
             lower.startsWith("für jeweils") || lower.startsWith("fuer jeweils") ||
             lower.startsWith("für mindestens") || lower.startsWith("fuer mindestens")
         ) return true
-        // Nummerierte Zubereitungsschritte
-        if (Regex("""^\d+[.)]?\s+\p{L}""").containsMatchIn(d) &&
-            Regex(
-                """\b(mix|add|stir|pour|bake|cook|heat|divide|refrigerate|spoon|blend|whisk|fold|spread|save|method|season|fry|simmer|coat|chop|slice|preheat|remove|cover|place|""" +
-                    """verrühren|verruehren|vermischen|geben|garen|auskühlen|auskuehlen|stellen|erwärmen|erwaermen|verteilen|schneiden|zerbrechen|mikrowelle|pausieren)\b""",
+        // Nummerierte Zubereitungsschritte (EN "1.) Preheat…" / DE "1. Die Nudeln…")
+        if (Regex("""^\d+[.)]\s+\S""").containsMatchIn(d)) {
+            val stepVerbs = Regex(
+                """\b(mix|add|stir|pour|bake|cook|heat|divide|refrigerate|spoon|blend|whisk|fold|spread|save|method|season|fry|simmer|coat|chop|slice|preheat|remove|cover|place|peel|top|finish|enjoy|""" +
+                    """verrühren|verruehren|vermischen|geben|garen|auskühlen|auskuehlen|stellen|erwärmen|erwaermen|verteilen|schneiden|zerbrechen|mikrowelle|pausieren|kochen|würzen|wuerzen|anbraten|durchpürieren|durchpuerieren|mixen|rühren|ruehren|toppen|abkühlen|abkuehlen)\b""",
                 RegexOption.IGNORE_CASE
+            )
+            if (stepVerbs.containsMatchIn(d) || d.length > 60) return true
+        }
+        // DE-Schritte ohne Nummer, die klar Anleitung sind
+        if (Regex(
+                """(?i)^(die nudeln|das like|die gekochten|die soße|die sosse|am ende|guten appetit)"""
             ).containsMatchIn(d)
         ) return true
         if (lower == "method" || lower.startsWith("method ") || lower == "zubereitung" ||
@@ -767,6 +776,7 @@ object RecipeAiParser {
             stripped.length > 3 &&
             stripped.any { it.isLetter() } &&
             !stripped.startsWith("#") &&
+            !isPromoTitle(stripped) &&
             !Regex("""^\d+[.,]?\d*\s*[KkMm]?\s*(likes?|comments?|followers|views)""", RegexOption.IGNORE_CASE).containsMatchIn(stripped) &&
             !Regex("""^\d{4}-\d{2}-\d{2}""").containsMatchIn(stripped) &&
             !lower.startsWith("zutaten") &&
@@ -788,6 +798,22 @@ object RecipeAiParser {
             .trimEnd(' ', '-', '–', '—')
             .take(80)
             .ifBlank { fallback }
+    }
+
+    /** Promo-/Bait-Titel die nie als Gerichtname gelten. */
+    fun isPromoTitle(title: String): Boolean {
+        val lower = title.trim().lowercase()
+        if (lower.length < 4) return true
+        if (lower.startsWith("comment ") || lower.startsWith("kommentiere") ||
+            lower.startsWith("dm me") || lower.startsWith("save this") ||
+            lower.startsWith("another ") && lower.contains("slaps") ||
+            lower.contains("i'll dm") || lower.contains("ill dm") ||
+            lower.contains("who knew she") || lower.contains("it slaps") ||
+            lower.contains("link in bio") || lower.contains("full recipe") && lower.contains("comment")
+        ) return true
+        // Sehr lange Promo-Sätze ohne klaren Dish-Namen
+        if (title.length > 90 && (lower.contains("!") || lower.contains("?"))) return true
+        return false
     }
 
     // ── LLM call ──────────────────────────────────────────────────────────────

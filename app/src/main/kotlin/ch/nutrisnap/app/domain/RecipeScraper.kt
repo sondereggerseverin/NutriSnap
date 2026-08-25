@@ -312,7 +312,10 @@ class RecipeScraper(private val context: Context) {
         )
     }
 
-    /** AI-Parse mit API-Key, sonst reiner Regex-Fallback. */
+    /**
+     * AMM-ähnlich: zuerst Server-Normalisierung (Supabase Edge + Groq, kostenlos),
+     * dann lokaler AI-Parser, dann Regex-Fallback.
+     */
     private suspend fun parseCaptionToRecipe(
         caption: String,
         url: String,
@@ -320,12 +323,25 @@ class RecipeScraper(private val context: Context) {
         thumbnail: String?,
         fastAi: Boolean
     ): Recipe {
+        // 1) Server (wenn Supabase + Edge Function deployed)
+        progress("Server-Normalisierung…")
+        val server = RecipeNormalizeServer.normalize(caption, url, platform, thumbnail)
+        if (server != null && hasUsableIngredients(server)) {
+            return server
+        }
+
+        // 2) Lokal: Gemini/Groq-Race
         val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
-        return if (apiKey.isNotBlank()) {
+        val local = if (apiKey.isNotBlank()) {
             RecipeAiParser.parse(caption, url, platform, thumbnail, apiKey, fastModel = fastAi)
         } else {
             RecipeAiParser.fallbackParse(caption, url, platform, thumbnail)
         }
+        if (hasUsableIngredients(local)) return local
+
+        // 3) Server-Ergebnis auch bei schwachen Zutaten nutzen falls besser als lokal
+        if (server != null && server.ingredients.length > local.ingredients.length) return server
+        return local
     }
 
     /**
