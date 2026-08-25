@@ -464,14 +464,19 @@ object RecipeAiParser {
             lower.startsWith("für jeweils") || lower.startsWith("fuer jeweils") ||
             lower.startsWith("für mindestens") || lower.startsWith("fuer mindestens")
         ) return true
-        // Nummerierte Zubereitungsschritte (EN "1.) Preheat…" / DE "1. Die Nudeln…")
-        if (Regex("""^\d+[.)]\s+\S""").containsMatchIn(d)) {
+        // Nummerierte Zubereitungsschritte (EN "1.) Preheat…" / DE "1. Die Nudeln…" /
+        // auch "1 Skyr … verrühren" ohne Punkt nach der Zahl)
+        if (Regex("""^\d+[.)]?\s+\S""").containsMatchIn(d)) {
             val stepVerbs = Regex(
                 """\b(mix|add|stir|pour|bake|cook|heat|divide|refrigerate|spoon|blend|whisk|fold|spread|save|method|season|fry|simmer|coat|chop|slice|preheat|remove|cover|place|peel|top|finish|enjoy|""" +
                     """verrühren|verruehren|vermischen|geben|garen|auskühlen|auskuehlen|stellen|erwärmen|erwaermen|verteilen|schneiden|zerbrechen|mikrowelle|pausieren|kochen|würzen|wuerzen|anbraten|durchpürieren|durchpuerieren|mixen|rühren|ruehren|toppen|abkühlen|abkuehlen)\b""",
                 RegexOption.IGNORE_CASE
             )
-            if (stepVerbs.containsMatchIn(d) || d.length > 60) return true
+            // Mit Punkt/Klammer nach Zahl → Schritt wenn Verb ODER lang
+            // Ohne Punkt ("1 Skyr, … verrühren") → nur bei klarem Kochverb
+            val strictNumbered = Regex("""^\d+[.)]\s+""").containsMatchIn(d)
+            if (stepVerbs.containsMatchIn(d) && (strictNumbered || d.length > 50)) return true
+            if (strictNumbered && d.length > 60) return true
         }
         // DE-Schritte ohne Nummer, die klar Anleitung sind
         if (Regex(
