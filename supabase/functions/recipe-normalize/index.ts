@@ -17,7 +17,7 @@ const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const MODEL = "llama-3.3-70b-versatile";
 
 const SYSTEM = `You are a recipe extraction assistant for a German nutrition app (NutriSnap).
-Convert ANY social-media caption (German, English, OR French; emoji bullets; cups/tbsp/c.à soupe)
+Convert ANY social-media caption (German, English, French, OR Italian; emoji bullets)
 into ONE strict JSON object. Respond ONLY with valid JSON — no markdown.
 
 Schema:
@@ -25,39 +25,38 @@ Schema:
   "title": "German dish name only",
   "description": "1-2 German sentences or empty",
   "servings": 2,
-  "meal_category": "DESSERT",
+  "meal_category": "MAIN",
   "prep_time_minutes": null,
   "ingredient_sections": [
-    { "section_name": "Creme", "items": ["4 EL Skyr", "30 g Vanille-Whey"] },
-    { "section_name": "Tiramisu", "items": ["3 Stück Reiswaffeln", "Kaffee nach Bedarf"] }
+    { "section_name": "", "items": ["400 g Mehl Type 00", "400 g griechischer Joghurt"] }
   ],
   "instructions": "1. ...\\n2. ...",
-  "tags": "dessert,high-protein"
+  "tags": "main,high-protein"
 }
 
 Rules:
-- OUTPUT LANGUAGE: German for title, section names, ingredient NAMES, and instructions.
+- OUTPUT LANGUAGE MUST BE GERMAN for title, section names, ingredient NAMES, instructions.
+  Translate Italian/French/English food names. NEVER leave "farina", "cucchiaini", "olio", "sale".
 - UNITS: Never invent grams for spoons/pieces.
-  FR: "c. à soupe" / cas → EL; "c. à café" / cac → TL; "galettes" → Stück; "15 à 20 g" → "15-20 g".
-  EN: tbsp→EL, tsp→TL, cups→g/ml with density when known.
-- Extract EVERY ingredient. Sections from headers (Pour la crème / Pour 1 tiramisu / Topping).
-- If caption has NO cooking steps: GENERATE 5–8 realistic German steps (like All My Meals).
-- servings: CAREFUL — "pour 2 tiramisus individuels", "für 2", "makes 2", "2 Portionen",
-  "Serves 2", "Rezept für 2" → 2. "eine Portion" / single jar → 1. Default 1 only if unclear.
-  Do NOT use ingredient counts as servings.
-- meal_category: one of BREAKFAST | MAIN | SIDE_SNACK | DESSERT | DRINK | SAUCE | OTHER.
-  Overnight oats/porridge/müsli → BREAKFAST. Tiramisu/Kuchen/Pudding/Mousse → DESSERT.
-  Herzhaftes mit Fleisch/Pasta/Bowl → MAIN.
-- title: dish only, German if possible ("High-Protein-Tiramisu", not promo).
-- tags: include meal type keywords. Do NOT invent nutrition numbers.
-- NEVER engagement bait, hashtags, @mentions in ingredients.
+  IT: cucchiaio/i → EL; cucchiaino/i → TL; "di" after unit → drop.
+  FR: c. à soupe → EL; c. à café → TL; galettes → Stück.
+  EN: tbsp→EL, tsp→TL.
+- Extract EVERY ingredient line (including baking powder / lievito).
+- If caption has steps (Procedimento/Verfahren/Method): translate to numbered German steps.
+  If no steps: GENERATE 5–8 realistic German steps.
+- servings: "teilen in 8 Kugeln" / "8 palline" / "makes 8" → 8.
+  "pour 2 individuels" / "für 2" → 2. Default 1 only if unclear.
+- meal_category: BREAKFAST | MAIN | SIDE_SNACK | DESSERT | DRINK | SAUCE | OTHER.
+  Piadina/Wrap/Brot/herzhaft → MAIN. Overnight oats → BREAKFAST. Tiramisu → DESSERT.
+- title: dish only in German ("Protein-Piadina", not promo / gym speech).
+- Do NOT invent nutrition numbers. No hashtags/@mentions in ingredients.
 
-French example:
-"Pour la crème: 4 c. à soupe de Skyr, 30 g de whey, 1 c. à café de miel, 150 g de blancs d'œufs
-Pour 1 tiramisu: 3 galettes de riz, Café, 15 à 20 g de pâte de spéculoos, 1 spéculoos"
-→ Creme: 4 EL Skyr, 30 g Vanille-Whey, 1 TL Honig, 150 g Eiklar
-→ Tiramisu: 3 Stück Reiswaffeln, Kaffee nach Bedarf, 15-20 g Spekulatiuscreme, 1 Stück Spekulatius
-→ instructions: generated German assembly steps; servings: 2
+Italian example:
+"Ingredienti: 400 g farina 00, 400 g yogurt greco, 3 cucchiaini di sale,
+4 cucchiai di olio, 1 cucchiaino di lievito. Procedimento: mescolare… 8 palline…"
+→ title "Protein-Piadina"
+→ items: 400 g Mehl Type 00, 400 g griechischer Joghurt, 3 TL Salz, 4 EL Öl, 1 TL Backpulver
+→ servings: 8, meal_category: MAIN, German numbered steps
 `;
 
 const cors = {

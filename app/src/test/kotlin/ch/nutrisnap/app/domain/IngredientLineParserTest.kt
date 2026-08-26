@@ -148,4 +148,29 @@ class IngredientLineParserTest {
         assertEquals("3", p.amount)
         assertEquals("Stück", p.unit)
     }
+
+
+    @Test
+    fun italianTeaspoonBecomesTL() {
+        val p = parseIngredientLine("3 cucchiaini di sale")
+        assertEquals("3", p.amount)
+        assertEquals("TL", p.unit)
+        assertTrue(p.name.contains("Salz", ignoreCase = true))
+    }
+
+    @Test
+    fun italianTablespoonBecomesEL() {
+        val p = parseIngredientLine("4 cucchiai di olio")
+        assertEquals("4", p.amount)
+        assertEquals("EL", p.unit)
+        assertTrue(p.name.contains("Öl", ignoreCase = true) || p.name.contains("Ol", ignoreCase = true))
+    }
+
+    @Test
+    fun italianFlourLine() {
+        val p = parseIngredientLine("400 g di farina 00")
+        assertEquals("400", p.amount)
+        assertEquals("g", p.unit)
+        assertTrue("name=${p.name}", p.name.contains("Mehl", ignoreCase = true))
+    }
 }

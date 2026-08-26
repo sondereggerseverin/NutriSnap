@@ -35,6 +35,9 @@ private val UNIT_ALIASES = mapOf(
     // Französisch (Instagram FR): c. à soupe / c. à café
     "cas" to "EL", "c.a.s." to "EL", "c.a.s" to "EL", "cs" to "EL",
     "cac" to "TL", "c.a.c." to "TL", "c.a.c" to "TL", "cc" to "TL",
+    // Italienisch: cucchiaio = EL, cucchiaino = TL
+    "cucchiai" to "EL", "cucchiaio" to "EL", "cucchiaiate" to "EL",
+    "cucchiaini" to "TL", "cucchiaino" to "TL",
     "stück" to "Stück", "stueck" to "Stück", "piece" to "Stück", "pieces" to "Stück",
     "cookie" to "Stück", "cookies" to "Stück", "biscuit" to "Stück", "biscuits" to "Stück",
     "keks" to "Stück", "kekse" to "Stück", "pc" to "Stück", "pcs" to "Stück",
@@ -57,28 +60,45 @@ private val INGREDIENT_RANGE_REGEX = Regex(
 )
 
 /**
- * FR/EN-Löffelmaße und Zählwaren vor dem Parsen normalisieren.
- * "4 c. à soupe de Skyr" → "4 EL Skyr" (sonst wird es fälschlich "4 g …").
+ * FR/IT/EN-Löffelmaße und Zählwaren vor dem Parsen normalisieren.
+ * "4 c. à soupe de Skyr" → "4 EL Skyr"
+ * "3 cucchiaini di sale" → "3 TL sale"
  */
 fun normalizeCulinaryUnits(line: String): String {
     var r = line.trim()
     if (r.isBlank()) return r
-    // c. à soupe / cuillère(s) à soupe → EL
+    // IT: cucchiaio/i = Esslöffel, cucchiaino/i = Teelöffel (vor generischem "di")
+    r = Regex(
+        """(?i)(\d+[.,]?\d*)\s*(?:cucchiai|cucchiaio|cucchiaiate)\b"""
+    ).replace(r) { "${it.groupValues[1]} EL" }
+    r = Regex(
+        """(?i)(\d+[.,]?\d*)\s*(?:cucchiaini|cucchiaino)\b"""
+    ).replace(r) { "${it.groupValues[1]} TL" }
+    // FR: c. à soupe / cuillère(s) à soupe → EL
     r = Regex(
         """(?i)(\d+[.,]?\d*)\s*(?:c\.\s*à\s*soupe|c\s*à\s*soupe|cuillères?\s*à\s*soupe|c\.a\.s\.?|cas)\b"""
     ).replace(r) { "${it.groupValues[1]} EL" }
-    // c. à café / cuillère à café → TL
+    // FR: c. à café → TL
     r = Regex(
         """(?i)(\d+[.,]?\d*)\s*(?:c\.\s*à\s*café|c\s*à\s*café|c\.\s*à\s*cafe|cuillères?\s*à\s*café|c\.a\.c\.?|cac)\b"""
     ).replace(r) { "${it.groupValues[1]} TL" }
-    // "de " nach Einheit strippen (FR)
-    r = Regex("""(?i)(\d+[.,]?\d*\s*(?:EL|TL|g|kg|ml|l|Stück))\s+de\s+""").replace(r) {
+    // FR/IT Präposition nach Einheit: "de " / "di "
+    r = Regex("""(?i)(\d+[.,]?\d*\s*(?:EL|TL|g|kg|ml|l|Stück))\s+(?:de|di)\s+""").replace(r) {
         "${it.groupValues[1]} "
     }
     // FR-Bereich "15 à 20 g" → "15-20 g"
     r = Regex(
         """(?i)(\d+[.,]?\d*)\s+à\s+(\d+[.,]?\d*)\s*(g|kg|ml|l|EL|TL)\b"""
     ).replace(r) { "${it.groupValues[1]}-${it.groupValues[2]} ${it.groupValues[3]}" }
+    // Häufige IT-Zutatennamen → DE (nur wenn klar)
+    r = r.replace(Regex("""(?i)\bfarina\s*00\b"""), "Mehl Type 00")
+    r = r.replace(Regex("""(?i)\bfarina\b"""), "Mehl")
+    r = r.replace(Regex("""(?i)\byogurt\s+greco\b"""), "griechischer Joghurt")
+    r = r.replace(Regex("""(?i)\bjoghurt\s+greco\b"""), "griechischer Joghurt")
+    r = r.replace(Regex("""(?i)\bsale\b"""), "Salz")
+    r = r.replace(Regex("""(?i)\bolio\b"""), "Öl")
+    r = r.replace(Regex("""(?i)\blievito\s*(per\s*dolci|in\s*polvere)?\b"""), "Backpulver")
+    r = r.replace(Regex("""(?i)\bacqua\b"""), "Wasser")
     return r
 }
 
