@@ -34,6 +34,33 @@ class RecipeCaptionParserTest {
     }
 
     @Test
+    fun `DEBUG bueno overnight oats mit topping block`() {
+        val caption = """
+            Bueno Overnight Oats 😍 der perfekte Frühstücks-Snack!
+            .
+            Zutaten:
+            60g Hafermehl
+            250ml Milch
+            1 EL Chiasamen
+            1 TL Agavendicksaft
+            Topping: Haselnussmus, Schokolade (+ etwas Kokosöl)
+            .
+            Zubereitung:
+            1. Hafermehl mit Milch und Chiasamen vermischen.
+            2. Über Nacht im Kühlschrank ziehen lassen.
+            3. Mit Topping servieren.
+        """.trimIndent()
+        val (ing, instr) = RecipeCaptionParser.parseCaption(caption)
+        println("=== INGREDIENTS ===\n$ing")
+        println("=== INSTRUCTIONS ===\n$instr")
+        assertTrue("Chiasamen fehlt: $ing", ing.contains("Chiasamen"))
+        assertTrue("Agavendicksaft fehlt: $ing", ing.contains("Agavendicksaft"))
+        assertTrue("Haselnussmus fehlt: $ing", ing.contains("Haselnussmus"))
+        assertTrue("Schokolade fehlt: $ing", ing.contains("Schokolade"))
+        assertTrue("Kokosöl fehlt: $ing", ing.contains("Kokosöl") || ing.contains("Kokosoel"))
+    }
+
+    @Test
     fun `promo ingredients with star does not steal the ingredients block`() {
         val caption = """
             These Oreo oats are SO scrummy
