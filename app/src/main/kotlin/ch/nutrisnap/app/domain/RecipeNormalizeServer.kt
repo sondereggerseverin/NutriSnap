@@ -2,6 +2,7 @@ package ch.nutrisnap.app.domain
 
 import ch.nutrisnap.app.BuildConfig
 import ch.nutrisnap.app.data.model.Recipe
+import ch.nutrisnap.app.data.model.RecipeCategory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -117,29 +118,14 @@ object RecipeNormalizeServer {
         val instructions = j.optString("instructions", "").trim()
         if (ingredients.length < 8 && instructions.length < 8) return null
 
-        val servings = j.optInt("servings", 1).coerceAtLeast(1)
-        val cals = j.optDouble("calories_per_serving")
-            .takeIf { !j.isNull("calories_per_serving") && it > 0 }?.toFloat()
-        val protein = j.optDouble("protein_g")
-            .takeIf { !j.isNull("protein_g") && it > 0 }?.toFloat()
-        val carbs = j.optDouble("carbs_g")
-            .takeIf { !j.isNull("carbs_g") && it > 0 }?.toFloat()
-        val fat = j.optDouble("fat_g")
-            .takeIf { !j.isNull("fat_g") && it > 0 }?.toFloat()
+        val servings = j.optInt("servings", 1).coerceIn(1, 24)
         val prep = j.optInt("prep_time_minutes")
             .takeIf { !j.isNull("prep_time_minutes") && it > 0 }
 
-        val desc = buildString {
-            val d = j.optString("description", "").trim()
-            if (d.isNotBlank() && !d.equals("null", true)) append(d)
-            if (cals != null) {
-                if (isNotEmpty()) append("\n\n")
-                append("📊 Pro Portion: ${cals.toInt()} kcal")
-                protein?.let { append(" · ${it.toInt()}g Protein") }
-                carbs?.let { append(" · ${it.toInt()}g Kohlenhydrate") }
-                fat?.let { append(" · ${it.toInt()}g Fett") }
-            }
-        }
+        // Beschreibung ohne Server-Nährwerte – Nutzer nutzt Verifizieren/Berechnen in der App
+        val desc = j.optString("description", "").trim()
+            .takeUnless { it.isBlank() || it.equals("null", true) }
+            .orEmpty()
 
         // AMM-Pfad: Server-Ergebnis ist Wahrheit.
         // Kein formatIngredientText – der hat FR-Einheiten und Abschnitte zerstört.
@@ -148,7 +134,6 @@ object RecipeNormalizeServer {
             .map { it.trim() }
             .filter { it.isNotBlank() && !RecipeAiParser.isJunkIngredientLine(it) }
             .map { line ->
-                // Nur Einheiten-Fix (c. à soupe → EL), keine Struktur-Zerstörung
                 if (line.startsWith("•") || line.startsWith("-")) {
                     val body = line.trimStart('•', '-', '*', ' ')
                     "• ${normalizeCulinaryUnits(body)}"
@@ -163,16 +148,14 @@ object RecipeNormalizeServer {
 
         val cleanInstr = instructions.trim().ifBlank { "" }
 
+        // Kategorie: Server meal_category → sonst Heuristik aus Titel/Zutaten
+        val serverCat = j.optString("meal_category", "").trim().uppercase()
+        val validCats = setOf(
+            "BREAKFAST", "MAIN", "SIDE_SNACK", "DESSERT", "DRINK", "SAUCE", "OTHER"
+        )
         val mealCat = when {
-            j.optString("tags").contains("dessert", true) ||
-                cleanTitle.contains("Tiramisu", true) ||
-                cleanTitle.contains("Kuchen", true) ||
-                cleanTitle.contains("Brownie", true) -> "DESSERT"
-            j.optString("tags").contains("breakfast", true) ||
-                j.optString("tags").contains("frühstück", true) ||
-                cleanTitle.contains("Overnight", true) ||
-                cleanTitle.contains("Hafer", true) -> "BREAKFAST"
-            else -> ""
+            serverCat in validCats && serverCat != "OTHER" -> serverCat
+            else -> RecipeCategory.guess(cleanTitle, cleanIng, desc).name
         }
 
         return Recipe(
@@ -181,10 +164,6 @@ object RecipeNormalizeServer {
             ingredients = cleanIng,
             instructions = cleanInstr,
             servings = servings,
-            totalCalories = cals?.let { it * servings },
-            proteinPerServing = protein,
-            carbsPerServing = carbs,
-            fatPerServing = fat,
             prepTimeMinutes = prep,
             sourceUrl = sourceUrl ?: j.optString("sourceUrl").ifBlank { null },
             platform = platform,

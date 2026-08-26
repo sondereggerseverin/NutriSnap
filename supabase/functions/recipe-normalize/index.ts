@@ -24,11 +24,8 @@ Schema:
 {
   "title": "German dish name only",
   "description": "1-2 German sentences or empty",
-  "servings": 1,
-  "calories_per_serving": null,
-  "protein_g": null,
-  "carbs_g": null,
-  "fat_g": null,
+  "servings": 2,
+  "meal_category": "DESSERT",
   "prep_time_minutes": null,
   "ingredient_sections": [
     { "section_name": "Creme", "items": ["4 EL Skyr", "30 g Vanille-Whey"] },
@@ -45,9 +42,14 @@ Rules:
   EN: tbsp→EL, tsp→TL, cups→g/ml with density when known.
 - Extract EVERY ingredient. Sections from headers (Pour la crème / Pour 1 tiramisu / Topping).
 - If caption has NO cooking steps: GENERATE 5–8 realistic German steps (like All My Meals).
-- servings: from "pour 2", "für 2", "makes 2", "2 individuels" → 2.
+- servings: CAREFUL — "pour 2 tiramisus individuels", "für 2", "makes 2", "2 Portionen",
+  "Serves 2", "Rezept für 2" → 2. "eine Portion" / single jar → 1. Default 1 only if unclear.
+  Do NOT use ingredient counts as servings.
+- meal_category: one of BREAKFAST | MAIN | SIDE_SNACK | DESSERT | DRINK | SAUCE | OTHER.
+  Overnight oats/porridge/müsli → BREAKFAST. Tiramisu/Kuchen/Pudding/Mousse → DESSERT.
+  Herzhaftes mit Fleisch/Pasta/Bowl → MAIN.
 - title: dish only, German if possible ("High-Protein-Tiramisu", not promo).
-- tags: include meal type (dessert/breakfast/…) and language-agnostic keywords.
+- tags: include meal type keywords. Do NOT invent nutrition numbers.
 - NEVER engagement bait, hashtags, @mentions in ingredients.
 
 French example:
@@ -155,22 +157,32 @@ serve(async (req) => {
 
     const servings = Math.max(1, Number(parsed.servings) || 1);
 
+    const mealCat = String(parsed.meal_category ?? "").toUpperCase().trim();
+    const allowedCats = [
+      "BREAKFAST",
+      "MAIN",
+      "SIDE_SNACK",
+      "DESSERT",
+      "DRINK",
+      "SAUCE",
+      "OTHER",
+    ];
+
     return json({
       title: String(parsed.title ?? "Rezept").slice(0, 120),
       description: String(parsed.description ?? ""),
       ingredients: ingredientLines.join("\n"),
       instructions: String(parsed.instructions ?? ""),
       servings,
-      calories_per_serving: numOrNull(parsed.calories_per_serving),
-      protein_g: numOrNull(parsed.protein_g),
-      carbs_g: numOrNull(parsed.carbs_g),
-      fat_g: numOrNull(parsed.fat_g),
+      meal_category: allowedCats.includes(mealCat) ? mealCat : "",
       prep_time_minutes: numOrNull(parsed.prep_time_minutes),
+      // Nährwerte bewusst NICHT vom Server – Nutzer verifiziert in der App
       tags: String(parsed.tags ?? platform).slice(0, 200),
       sourceUrl: sourceUrl || null,
       platform,
       imageUrl,
       caption_chars: caption.length,
+      caption_score: scoreCaption(caption),
       normalized_by: "recipe-normalize@groq+fetch",
     });
   } catch (e) {
@@ -181,7 +193,37 @@ serve(async (req) => {
   }
 });
 
-/** Parallel caption fetch – first usable wins (AMM-style server side). */
+/** Score: recipe-like text beats mere length (oEmbed title alone scores low). */
+function scoreCaption(text: string): number {
+  if (!text || text.length < 30) return 0;
+  let s = Math.min(text.length / 20, 40);
+  const qty = (text.match(
+    /\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|cas|cac|tbsp|tsp|cup|stück|c\.\s*à)/gi,
+  ) || []).length;
+  s += Math.min(qty * 8, 40);
+  const lower = text.toLowerCase();
+  for (
+    const m of [
+      "zutaten",
+      "ingredient",
+      "zubereitung",
+      "pour la",
+      "topping",
+      "recette",
+      "method",
+      "c. à soupe",
+      "overnight",
+    ]
+  ) {
+    if (lower.includes(m)) s += 5;
+  }
+  // Login walls / chrome
+  if (lower.includes("log in") || lower.includes("sign up")) s -= 20;
+  if (lower.includes("content-security-policy")) s -= 50;
+  return Math.max(0, s);
+}
+
+/** Parallel multi-source caption fetch; best score wins. */
 async function fetchCaptionFromUrl(
   url: string,
   platform: string,
@@ -194,60 +236,82 @@ async function fetchCaptionFromUrl(
     return c.signal;
   };
 
+  const jina = async (target: string, ms = 9000) => {
+    const r = await fetch(`https://r.jina.ai/${target}`, {
+      signal: timeout(ms),
+      headers: {
+        Accept: "text/plain",
+        "X-Return-Format": "text",
+        "User-Agent": "Mozilla/5.0 NutriSnapBot/1.0",
+      },
+    });
+    const text = await r.text();
+    return { caption: cleanFetchedText(text), imageUrl: null as string | null };
+  };
+
   const jobs: Promise<{ caption: string; imageUrl: string | null }>[] = [];
+  jobs.push(jina(url, 9000));
 
-  // 1) Jina Reader (often gets full IG/TikTok text)
-  jobs.push(
-    (async () => {
-      const jinaUrl = `https://r.jina.ai/${url}`;
-      const r = await fetch(jinaUrl, {
-        signal: timeout(8000),
-        headers: {
-          Accept: "text/plain",
-          "X-Return-Format": "text",
-        },
-      });
-      const text = await r.text();
-      return { caption: cleanFetchedText(text), imageUrl: null };
-    })(),
-  );
+  const isIg = platform.includes("instagram") || url.includes("instagram");
+  if (isIg) {
+    const m = url.match(/instagram\.com\/(?:reel|p|tv)\/([A-Za-z0-9_-]+)/i);
+    const code = m?.[1] ?? null;
 
-  // 2) Instagram oEmbed
-  if (platform.includes("instagram") || url.includes("instagram")) {
     jobs.push(
       (async () => {
         const oe =
-          `https://api.instagram.com/oembed/?url=${encodeURIComponent(url)}&omitscript=true`;
+          `https://api.instagram.com/oembed/?url=${
+            encodeURIComponent(url)
+          }&omitscript=true`;
         const r = await fetch(oe, { signal: timeout(5000) });
         const j = await r.json();
-        const title = String(j.title ?? "");
-        const thumb = j.thumbnail_url ? String(j.thumbnail_url) : null;
-        return { caption: cleanFetchedText(title), imageUrl: thumb };
+        return {
+          caption: cleanFetchedText(String(j.title ?? "")),
+          imageUrl: j.thumbnail_url ? String(j.thumbnail_url) : null,
+        };
       })(),
     );
 
-    // 3) ddinstagram mirror
-    const dd = url
-      .replace("www.instagram.com", "ddinstagram.com")
-      .replace("instagram.com", "ddinstagram.com");
-    if (dd !== url) {
-      jobs.push(
-        (async () => {
-          const r = await fetch(`https://r.jina.ai/${dd}`, {
-            signal: timeout(7000),
-            headers: { Accept: "text/plain" },
-          });
-          const text = await r.text();
-          return { caption: cleanFetchedText(text), imageUrl: null };
-        })(),
-      );
+    if (code) {
+      const variants = [
+        `https://www.instagram.com/p/${code}/`,
+        `https://www.instagram.com/reel/${code}/`,
+        `https://www.instagram.com/p/${code}/embed/captioned/`,
+        `https://www.instagram.com/reel/${code}/embed/captioned/`,
+        `https://ddinstagram.com/p/${code}/`,
+        `https://ddinstagram.com/reel/${code}/`,
+        `https://imginn.com/p/${code}/`,
+        `https://www.picuki.com/media/${code}`,
+      ];
+      for (const v of variants) {
+        jobs.push(jina(v, 8000));
+      }
+    } else {
+      const dd = url
+        .replace("www.instagram.com", "ddinstagram.com")
+        .replace("instagram.com", "ddinstagram.com");
+      if (dd !== url) jobs.push(jina(dd, 8000));
     }
   }
 
-  // 4) TikTok: oEmbed + jina already covered; try vm.tiktok expand via jina only
+  if (platform.includes("tiktok") || url.includes("tiktok")) {
+    jobs.push(
+      (async () => {
+        const oe =
+          `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
+        const r = await fetch(oe, { signal: timeout(5000) });
+        const j = await r.json();
+        return {
+          caption: cleanFetchedText(
+            [j.title, j.author_name].filter(Boolean).join("\n"),
+          ),
+          imageUrl: j.thumbnail_url ? String(j.thumbnail_url) : null,
+        };
+      })(),
+    );
+  }
 
   const results = await Promise.allSettled(jobs);
-  // cancel leftovers
   controllers.forEach((c) => {
     try {
       c.abort();
@@ -256,17 +320,18 @@ async function fetchCaptionFromUrl(
     }
   });
 
-  let best = { caption: "", imageUrl: null as string | null };
+  let best = { caption: "", imageUrl: null as string | null, score: -1 };
   for (const r of results) {
     if (r.status !== "fulfilled") continue;
     const c = r.value;
-    if (c.caption.length > best.caption.length) {
-      best = { caption: c.caption, imageUrl: c.imageUrl ?? best.imageUrl };
+    const sc = scoreCaption(c.caption);
+    if (sc > best.score) {
+      best = { caption: c.caption, imageUrl: c.imageUrl ?? best.imageUrl, score: sc };
     } else if (!best.imageUrl && c.imageUrl) {
       best.imageUrl = c.imageUrl;
     }
   }
-  return best;
+  return { caption: best.caption, imageUrl: best.imageUrl };
 }
 
 function cleanFetchedText(raw: string): string {
@@ -275,25 +340,19 @@ function cleanFetchedText(raw: string): string {
     .replace(/https?:\/\/\S+/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-  // Drop obvious page chrome from jina
-  const markers = [
-    "Zutaten:",
-    "Ingredients",
-    "Zubereitung:",
-    "Method",
-    "INGREDIENTS",
-    "Pour la",
-    "c. à soupe",
-    "c. à café",
-    "recette",
-    "Topping",
-  ];
-  const lower = t.toLowerCase();
-  const hasRecipe = markers.some((m) => lower.includes(m.toLowerCase())) ||
-    /\d+\s*g\b/i.test(t) ||
-    /\d+\s*el\b/i.test(t) ||
-    /\d+\s*c\.\s*à/i.test(t);
-  if (!hasRecipe && t.length > 4000) t = t.slice(0, 4000);
+  // Drop jina chrome lines
+  t = t
+    .split("\n")
+    .filter((line) => {
+      const l = line.toLowerCase();
+      if (l.startsWith("title:") && l.length < 40) return false;
+      if (l.startsWith("url source:")) return false;
+      if (l.includes("markdown content")) return false;
+      return true;
+    })
+    .join("\n")
+    .trim();
+  if (scoreCaption(t) < 15 && t.length > 4000) t = t.slice(0, 4000);
   return t.slice(0, 12000);
 }
 
