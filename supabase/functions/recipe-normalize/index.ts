@@ -16,14 +16,14 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const MODEL = "llama-3.3-70b-versatile";
 
-const SYSTEM = `You are a recipe extraction assistant. Convert ANY social-media caption
-(German or English, emoji bullets, cups/tbsp or grams, engagement bait) into ONE strict JSON object.
-Respond ONLY with valid JSON — no markdown, no explanation.
+const SYSTEM = `You are a recipe extraction assistant for a German nutrition app (NutriSnap).
+Convert ANY social-media caption (German, English, OR French; emoji bullets; cups/tbsp/c.à soupe)
+into ONE strict JSON object. Respond ONLY with valid JSON — no markdown.
 
 Schema:
 {
-  "title": "Dish name only",
-  "description": "1-2 sentences or empty string",
+  "title": "German dish name only",
+  "description": "1-2 German sentences or empty",
   "servings": 1,
   "calories_per_serving": null,
   "protein_g": null,
@@ -31,35 +31,31 @@ Schema:
   "fat_g": null,
   "prep_time_minutes": null,
   "ingredient_sections": [
-    { "section_name": "Basis", "items": ["60 g Hafermehl", "50 g Joghurt"] },
-    { "section_name": "Topping", "items": ["Haselnussmus nach Bedarf", "Schokolade nach Bedarf"] }
+    { "section_name": "Creme", "items": ["4 EL Skyr", "30 g Vanille-Whey"] },
+    { "section_name": "Tiramisu", "items": ["3 Stück Reiswaffeln", "Kaffee nach Bedarf"] }
   ],
   "instructions": "1. ...\\n2. ...",
-  "tags": "overnight-oats,breakfast"
+  "tags": "dessert,high-protein"
 }
 
 Rules:
-- title: DISH NAME only (max ~40 chars). NEVER "Tag 12/30", "Rezepte unter 2€", "Folgt mir",
-  "Comment recipe", "Kommentiere", "DM me". Strip series prefixes. Keep food name only
-  (e.g. "Bueno Overnight Oats", not "Tag 12/30: Rezepte unter 2€ - Bueno Overnight Oats").
-- CRITICAL: Extract EVERY ingredient line under Zutaten/Ingredients/Topping. Do NOT skip
-  fractional amounts (1/2 EL, ½ EL), ranges (1-1,5 EL), or "nach Wahl" / "nach Bedarf" lines.
-- ingredient_sections: use "Basis" (or "") for main list and "Topping" when caption has Topping.
-  Each item ONE ingredient. Keep EL/TL/g/ml. Optional lines: "optional: 1 EL veganes Proteinpulver"
-  as a single item — do NOT create a section named only "Optional".
-- "Milch nach Wahl", "Joghurt nach Wahl", toppings without grams are VALID — always include.
-- NEVER put cooking steps into items.
-- NEVER put engagement bait, hashtags, music credits into items or title.
-- instructions: numbered steps only. Split long German blobs into 1. 2. 3.
-- servings: default 1 for "eine Portion" / single-serve overnight oats.
-- Ignore: "Folgt mir", "Tag X/30", "unter 2€ Reihe", hashtags, ads.
+- OUTPUT LANGUAGE: German for title, section names, ingredient NAMES, and instructions.
+- UNITS: Never invent grams for spoons/pieces.
+  FR: "c. à soupe" / cas → EL; "c. à café" / cac → TL; "galettes" → Stück; "15 à 20 g" → "15-20 g".
+  EN: tbsp→EL, tsp→TL, cups→g/ml with density when known.
+- Extract EVERY ingredient. Sections from headers (Pour la crème / Pour 1 tiramisu / Topping).
+- If caption has NO cooking steps: GENERATE 5–8 realistic German steps (like All My Meals).
+- servings: from "pour 2", "für 2", "makes 2", "2 individuels" → 2.
+- title: dish only, German if possible ("High-Protein-Tiramisu", not promo).
+- tags: include meal type (dessert/breakfast/…) and language-agnostic keywords.
+- NEVER engagement bait, hashtags, @mentions in ingredients.
 
-Example (must not drop Chia/Agave/Milch/Topping):
-Caption: "Zutaten: 60g Hafermehl / 1/2 EL Chiasamen / 1 EL gemahlene Haselnüsse /
-1-1,5 EL Agavendicksaft / 50g Joghurt nach Wahl / Milch nach Wahl /
-Optional: 1 EL veganes Proteinpulver / Topping: Haselnussmus, Schokolade (+ etwas Kokosöl)"
-→ title "Bueno Overnight Oats"
-→ Basis items: all six + optional protein; Topping: Haselnussmus, Schokolade, Kokosöl nach Bedarf
+French example:
+"Pour la crème: 4 c. à soupe de Skyr, 30 g de whey, 1 c. à café de miel, 150 g de blancs d'œufs
+Pour 1 tiramisu: 3 galettes de riz, Café, 15 à 20 g de pâte de spéculoos, 1 spéculoos"
+→ Creme: 4 EL Skyr, 30 g Vanille-Whey, 1 TL Honig, 150 g Eiklar
+→ Tiramisu: 3 Stück Reiswaffeln, Kaffee nach Bedarf, 15-20 g Spekulatiuscreme, 1 Stück Spekulatius
+→ instructions: generated German assembly steps; servings: 2
 `;
 
 const cors = {

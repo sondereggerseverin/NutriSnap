@@ -160,7 +160,8 @@ object RecipeGermanMetricConverter {
      * Cups/tbsp/tsp werden nicht pauschal als Volumen belassen.
      */
     private fun convertLineToMetric(line: String): String {
-        var r = line
+        // FR-Löffelmaße zuerst → sonst "4 c. à soupe" → "4 g"
+        var r = normalizeCulinaryUnits(line)
         val unicodeFractions = mapOf(
             '¼' to "1/4", '½' to "1/2", '¾' to "3/4",
             '⅓' to "1/3", '⅔' to "2/3", '⅛' to "1/8",

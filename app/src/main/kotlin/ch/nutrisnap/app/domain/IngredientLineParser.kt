@@ -32,6 +32,9 @@ private val UNIT_ALIASES = mapOf(
     "l" to "l", "liter" to "l", "litre" to "l",
     "tsp" to "TL", "teaspoon" to "TL", "teaspoons" to "TL", "tl" to "TL",
     "tbsp" to "EL", "tbs" to "EL", "tablespoon" to "EL", "tablespoons" to "EL", "el" to "EL",
+    // Französisch (Instagram FR): c. à soupe / c. à café
+    "cas" to "EL", "c.a.s." to "EL", "c.a.s" to "EL", "cs" to "EL",
+    "cac" to "TL", "c.a.c." to "TL", "c.a.c" to "TL", "cc" to "TL",
     "stück" to "Stück", "stueck" to "Stück", "piece" to "Stück", "pieces" to "Stück",
     "cookie" to "Stück", "cookies" to "Stück", "biscuit" to "Stück", "biscuits" to "Stück",
     "keks" to "Stück", "kekse" to "Stück", "pc" to "Stück", "pcs" to "Stück",
@@ -47,10 +50,37 @@ private val INGREDIENT_AMOUNT_REGEX = Regex(
         "\\s*($UNIT_PATTERN)?\\s+(.+)",
     RegexOption.IGNORE_CASE
 )
+// Bereiche: "15-20 g", "15 – 20 g", FR "15 à 20 g"
 private val INGREDIENT_RANGE_REGEX = Regex(
-    "^(\\d+(?:[.,]\\d+)?)\\s*[-–—]\\s*(\\d+(?:[.,]\\d+)?)\\s*($UNIT_PATTERN)?\\b\\s*(.*)$",
+    "^(\\d+(?:[.,]\\d+)?)\\s*(?:[-–—]|\\bà\\b)\\s*(\\d+(?:[.,]\\d+)?)\\s*($UNIT_PATTERN)?\\b\\s*(.*)$",
     RegexOption.IGNORE_CASE
 )
+
+/**
+ * FR/EN-Löffelmaße und Zählwaren vor dem Parsen normalisieren.
+ * "4 c. à soupe de Skyr" → "4 EL Skyr" (sonst wird es fälschlich "4 g …").
+ */
+fun normalizeCulinaryUnits(line: String): String {
+    var r = line.trim()
+    if (r.isBlank()) return r
+    // c. à soupe / cuillère(s) à soupe → EL
+    r = Regex(
+        """(?i)(\d+[.,]?\d*)\s*(?:c\.\s*à\s*soupe|c\s*à\s*soupe|cuillères?\s*à\s*soupe|c\.a\.s\.?|cas)\b"""
+    ).replace(r) { "${it.groupValues[1]} EL" }
+    // c. à café / cuillère à café → TL
+    r = Regex(
+        """(?i)(\d+[.,]?\d*)\s*(?:c\.\s*à\s*café|c\s*à\s*café|c\.\s*à\s*cafe|cuillères?\s*à\s*café|c\.a\.c\.?|cac)\b"""
+    ).replace(r) { "${it.groupValues[1]} TL" }
+    // "de " nach Einheit strippen (FR)
+    r = Regex("""(?i)(\d+[.,]?\d*\s*(?:EL|TL|g|kg|ml|l|Stück))\s+de\s+""").replace(r) {
+        "${it.groupValues[1]} "
+    }
+    // FR-Bereich "15 à 20 g" → "15-20 g"
+    r = Regex(
+        """(?i)(\d+[.,]?\d*)\s+à\s+(\d+[.,]?\d*)\s*(g|kg|ml|l|EL|TL)\b"""
+    ).replace(r) { "${it.groupValues[1]}-${it.groupValues[2]} ${it.groupValues[3]}" }
+    return r
+}
 
 /** Schneidet Abschnitts-Präfixe wie "Für die Sauce:" vor der eigentlichen Menge ab.
  *  Gemeinsam genutzt von [parseIngredientLine] und [RecipeNutritionAnalyzer.parseIngredientLine]. */
@@ -83,7 +113,8 @@ private val COUNTABLE_NAME_HINTS = listOf(
     // Frühstücks-/Keks-Produkte (häufig in IG-Meal-Prep ohne Einheit)
     "weetbix", "weetabix", "weet-bix", "weet bix",
     "biscuit", "biscuits", "cookie", "cookies", "keks", "kekse",
-    "biscoff", "lotus",
+    "biscoff", "lotus", "spéculoos", "speculoos", "spekulatius",
+    "galette", "galettes", "riz", // galettes de riz = Reiswaffeln → Stück
     "cracker", "crackers", "wafer", "wafers",
     "scoop", "scoops", "kugel", "kugeln",
     "bar", "bars", "riegel",
@@ -158,7 +189,9 @@ private fun formatAmount(value: Float): String =
     if (value == value.toLong().toFloat()) value.toLong().toString() else "%.2f".format(value)
 
 fun parseIngredientLine(line: String): ParsedIngredient {
-    val trimmed = stripSectionPrefix(line.trimStart('•', '-', ' ', '*'))
+    val trimmed = normalizeCulinaryUnits(
+        stripSectionPrefix(line.trimStart('•', '-', ' ', '*'))
+    )
     if (trimmed.isBlank()) return ParsedIngredient(amount = "", unit = "g", name = "")
 
     val rangeMatch = INGREDIENT_RANGE_REGEX.find(trimmed)

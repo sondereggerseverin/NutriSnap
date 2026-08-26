@@ -118,4 +118,34 @@ class IngredientLineParserTest {
         assertEquals("TL", p.unit)
         assertTrue(p.name.contains("Curry", ignoreCase = true))
     }
+
+
+    @Test
+    fun frenchTablespoonBecomesEL() {
+        val p = parseIngredientLine("4 c. à soupe de Skyr")
+        assertEquals("4", p.amount)
+        assertEquals("EL", p.unit)
+        assertTrue(p.name.contains("Skyr", ignoreCase = true))
+    }
+
+    @Test
+    fun frenchTeaspoonBecomesTL() {
+        val p = parseIngredientLine("1 c. à café de miel")
+        assertEquals("1", p.amount)
+        assertEquals("TL", p.unit)
+    }
+
+    @Test
+    fun frenchRangeAvecA() {
+        val p = parseIngredientLine("15 à 20 g de pâte de spéculoos")
+        assertTrue("amount was ${p.amount}", p.amount.toFloatOrNull() ?: 0f >= 15f)
+        assertEquals("g", p.unit)
+    }
+
+    @Test
+    fun galettesArePieces() {
+        val p = parseIngredientLine("3 galettes de riz complet")
+        assertEquals("3", p.amount)
+        assertEquals("Stück", p.unit)
+    }
 }
