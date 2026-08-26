@@ -275,15 +275,22 @@ class RecipeScraper(private val context: Context) {
             val serverRecipe = RecipeNormalizeServer.importFromUrl(url, "instagram")
             if (serverRecipe != null && hasUsableIngredients(serverRecipe)) {
                 val sc = ingredientQualityScore(serverRecipe)
-                if (sc >= 70 && !looksLikeIngredientAsTitle(serverRecipe.title) &&
+                // Nur bei sehr starkem Ergebnis sofort return (≥6 Mengenzeilen, Score ≥85)
+                val qtyLines = serverRecipe.ingredients.lines().count {
+                    Regex(
+                        """(\d+/\d+|\d+[.,]?\d*)\s*(g|ml|el|tl|kg)\b""",
+                        RegexOption.IGNORE_CASE
+                    ).containsMatchIn(it)
+                }
+                if (sc >= 85 && qtyLines >= 6 &&
+                    !looksLikeIngredientAsTitle(serverRecipe.title) &&
                     !RecipeAiParser.isPromoTitle(serverRecipe.title)
                 ) {
                     val title = RecipeAiParser.cleanDishTitle(
                         serverRecipe.title, serverRecipe.ingredients
                     )
                     publishReport(
-                        "path=server-url-strong score=$sc title=$title " +
-                            "ingLines=${serverRecipe.ingredients.lines().count { it.isNotBlank() }} url=$url"
+                        "path=server-url-strong score=$sc qty=$qtyLines title=$title url=$url"
                     )
                     return@coroutineScope serverRecipe.copy(
                         title = title,
@@ -446,16 +453,24 @@ class RecipeScraper(private val context: Context) {
         thumbnail: String?,
         fastAi: Boolean
     ): Recipe {
-        // 1) Server (wenn Supabase + Edge Function deployed & konfiguriert)
+        fun finalize(r: Recipe): Recipe {
+            val merged = RecipeAiParser.mergeIngredientsFromCaption(r.ingredients, caption)
+            val title = RecipeAiParser.cleanDishTitle(r.title, merged)
+            return r.copy(
+                ingredients = merged,
+                title = if (looksLikeIngredientAsTitle(title)) {
+                    RecipeAiParser.inventTitleFromIngredients(merged, title)
+                } else title
+            )
+        }
+
+        // 1) Server-Normalisierung mit voller Caption
         val server = if (RecipeNormalizeServer.isConfigured()) {
             progress("Server-Normalisierung…")
             RecipeNormalizeServer.normalize(caption, url, platform, thumbnail)
         } else null
-        if (server != null && hasUsableIngredients(server)) {
-            return server
-        }
 
-        // 2) Lokal: Gemini/Groq-Race
+        // 2) Lokal: Gemini/Groq oder Regex-Fallback
         progress("Rezept extrahieren…")
         val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
         val local = if (apiKey.isNotBlank()) {
@@ -463,11 +478,14 @@ class RecipeScraper(private val context: Context) {
         } else {
             RecipeAiParser.fallbackParse(caption, url, platform, thumbnail)
         }
-        if (hasUsableIngredients(local)) return local
+        val fallback = RecipeAiParser.fallbackParse(caption, url, platform, thumbnail)
 
-        // 3) Server-Ergebnis auch bei schwachen Zutaten nutzen falls besser als lokal
-        if (server != null && server.ingredients.length > local.ingredients.length) return server
-        return local
+        // Bestes Ergebnis nach Score, dann Caption-Zeilen nachziehen
+        val candidates = listOfNotNull(server, local, fallback)
+            .map { finalize(it) }
+        val best = candidates.maxByOrNull { ingredientQualityScore(it) }
+            ?: finalize(fallback)
+        return best
     }
 
     /**

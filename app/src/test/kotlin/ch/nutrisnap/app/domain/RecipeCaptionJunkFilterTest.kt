@@ -419,4 +419,39 @@ class RecipeCaptionJunkFilterTest {
             cleaned.lowercase().contains("bueno") || cleaned.lowercase().contains("oats") ||
                 cleaned.lowercase().contains("haselnuss"))
     }
+
+
+    @Test
+    fun mergeIngredientsPullsMissingChiaAgave() {
+        val caption = """
+            Tag 12/30: Rezepte unter 2€ - Bueno Overnight Oats
+            Folgt mir unbedingt!
+            Zutaten:
+            60g Hafermehl
+            1/2 EL Chiasamen
+            1 EL gemahlene Haselnüsse
+            1-1,5 EL Agavendicksaft
+            50g Joghurt nach Wahl
+            Milch nach Wahl
+            Optional: 1 EL veganes Proteinpulver
+            Topping: Haselnussmus, Schokolade (+ etwas Kokosöl)
+            Zubereitung:
+            Alles vermischen und 1h kühlen.
+        """.trimIndent()
+        // Unvollständiges LLM-Ergebnis wie in der App
+        val weak = """
+            • 60 g Hafermehl
+            • 1 EL gemahlene Haselnüsse
+            • 50 g Joghurt nach Wahl
+            Optional
+            • 1 EL veganes Proteinpulver
+        """.trimIndent()
+        val merged = RecipeAiParser.mergeIngredientsFromCaption(weak, caption)
+        val lower = merged.lowercase()
+        assertTrue("chia missing:\n$merged", lower.contains("chia"))
+        assertTrue("agave missing:\n$merged", lower.contains("agave"))
+        assertTrue("milch missing:\n$merged", lower.contains("milch"))
+        assertTrue("topping/mus missing:\n$merged",
+            lower.contains("haselnussmus") || lower.contains("schokolade"))
+    }
 }

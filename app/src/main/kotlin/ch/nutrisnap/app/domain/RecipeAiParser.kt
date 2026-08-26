@@ -1009,6 +1009,121 @@ object RecipeAiParser {
         return listOfNotNull(flavor, dish).joinToString(" ").ifBlank { fallback }.take(60)
     }
 
+    /**
+     * Deterministisch: Mengenzeilen aus der Roh-Caption nachziehen, die der LLM
+     * ausgelassen hat (häufig bei 1/2 EL, Ranges, „nach Wahl“, Topping).
+     * AMM-Stabilität kommt genau von so einer harten Struktur-Schicht.
+     */
+    fun mergeIngredientsFromCaption(ingredients: String, caption: String): String {
+        if (caption.length < 30) return ingredients
+        val cleaned = cleanCaption(caption)
+        val lines = cleaned.lines().map { it.trim() }.filter { it.isNotBlank() }
+
+        fun stripDecor(line: String): String =
+            line.replace(Regex("""^[\p{So}\p{Cn}\p{Sk}\p{Sm}•\-*]+\s*"""), "").trim()
+
+        fun isQtyOrNeedLine(line: String): Boolean {
+            val core = stripDecor(line)
+            if (core.isBlank() || isJunkIngredientLine(core)) return false
+            if (isSectionHeaderLine(core)) return false
+            val lower = core.lowercase()
+            // Zubereitung / Promo stoppen
+            if (lower.startsWith("zubereitung") || lower.startsWith("method") ||
+                lower.startsWith("folgt mir") || lower.startsWith("tag ")
+            ) return false
+            if (Regex(
+                    """(?i)^(\d+/\d+|\d+[–\-]\d+[.,]?\d*|\d+[.,]?\d*|½|¼|¾)\s*(g|kg|ml|l|el|tl|tsp|tbsp|cups?)\b"""
+                ).containsMatchIn(core)
+            ) return true
+            if (lower.contains("nach wahl") || lower.contains("nach bedarf")) return true
+            if (lower.startsWith("optional:") || lower.startsWith("optional ")) return true
+            // Topping-Inline: "Haselnussmus, Schokolade (+ etwas Kokosöl)"
+            if (lower.startsWith("topping:") || lower.startsWith("topping ")) return true
+            return false
+        }
+
+        fun foodKey(line: String): String {
+            var s = stripDecor(line).lowercase()
+            s = s.replace(Regex("""(?i)^(optional:\s*)"""), "")
+            s = s.replace(Regex("""(?i)^(topping:\s*)"""), "")
+            s = s.replace(
+                Regex(
+                    """(?i)^(\d+/\d+|\d+[–\-]\d+[.,]?\d*|\d+[.,]?\d*|½|¼|¾)\s*(g|kg|ml|l|el|tl|tsp|tbsp|cups?)\s*"""
+                ),
+                ""
+            )
+            s = s.replace(Regex("""[^a-zäöüß0-9]+"""), " ").trim()
+            // erstes sinnvolles Wort
+            return s.split(" ").filter { it.length >= 3 }.take(2).joinToString(" ")
+        }
+
+        val existingKeys = ingredients.lines()
+            .map { foodKey(it) }
+            .filter { it.isNotBlank() }
+            .toMutableSet()
+        val existingLower = ingredients.lowercase()
+
+        val missing = mutableListOf<String>()
+        var inTopping = false
+        for (raw in lines) {
+            val core = stripDecor(raw)
+            val lower = core.lowercase()
+            if (lower.startsWith("zubereitung") || lower.startsWith("method") ||
+                lower.startsWith("#")
+            ) break
+            if (lower == "topping" || lower.startsWith("topping:") || lower.startsWith("topping ")) {
+                inTopping = true
+            }
+            if (!isQtyOrNeedLine(core) && !inTopping) continue
+            if (inTopping && (lower.startsWith("topping:") || lower == "topping")) {
+                // Expand "Topping: A, B (+ C)" into items
+                val rest = core.substringAfter(":", "").trim()
+                if (rest.isNotBlank()) {
+                    val parts = rest.split(Regex("""\s*,\s*|\s*\+\s*|\s+und\s+"""))
+                        .map { it.replace(Regex("""[()+]"""), "").trim() }
+                        .filter { it.length >= 3 }
+                    for (p in parts) {
+                        val k = foodKey(p)
+                        if (k.isBlank()) continue
+                        if (existingKeys.any { it.contains(k) || k.contains(it) }) continue
+                        if (existingLower.contains(k.take(5))) continue
+                        missing.add("$p nach Bedarf")
+                        existingKeys.add(k)
+                    }
+                }
+                continue
+            }
+            val k = foodKey(core)
+            if (k.isBlank()) continue
+            if (existingKeys.any { it.contains(k) || k.contains(it) }) continue
+            // Grob-Duplikat über Substring
+            if (k.length >= 4 && existingLower.contains(k.take(4))) continue
+            missing.add(core)
+            existingKeys.add(k)
+        }
+
+        if (missing.isEmpty()) return ingredients
+        val base = ingredients.trim().ifBlank { "" }
+        return buildString {
+            if (base.isNotBlank()) append(base)
+            if (missing.isNotEmpty()) {
+                if (isNotEmpty()) append("\n")
+                // Topping-Header wenn wir nachgezogen haben
+                val hasToppingHeader = base.lowercase().contains("topping")
+                val toppingItems = missing.filter {
+                    it.contains("nach Bedarf", true) || it.contains("Haselnussmus", true) ||
+                        it.contains("Schokolade", true) || it.contains("Kokos", true)
+                }
+                val other = missing - toppingItems.toSet()
+                other.forEach { appendLine(if (it.startsWith("•")) it else "• $it") }
+                if (toppingItems.isNotEmpty()) {
+                    if (!hasToppingHeader) appendLine("Topping")
+                    toppingItems.forEach { appendLine(if (it.startsWith("•")) it else "• $it") }
+                }
+            }
+        }.trim()
+    }
+
     // ── LLM call ──────────────────────────────────────────────────────────────
 
     private val recipeSystemPrompt = """
