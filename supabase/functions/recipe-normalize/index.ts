@@ -282,12 +282,17 @@ function cleanFetchedText(raw: string): string {
     "Zubereitung:",
     "Method",
     "INGREDIENTS",
+    "Pour la",
+    "c. à soupe",
+    "c. à café",
+    "recette",
+    "Topping",
   ];
-  // Prefer keeping full text if it looks like a recipe
   const lower = t.toLowerCase();
   const hasRecipe = markers.some((m) => lower.includes(m.toLowerCase())) ||
     /\d+\s*g\b/i.test(t) ||
-    /\d+\s*el\b/i.test(t);
+    /\d+\s*el\b/i.test(t) ||
+    /\d+\s*c\.\s*à/i.test(t);
   if (!hasRecipe && t.length > 4000) t = t.slice(0, 4000);
   return t.slice(0, 12000);
 }

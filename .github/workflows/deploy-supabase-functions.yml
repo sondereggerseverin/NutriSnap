@@ -15,7 +15,8 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pin: "latest" trifft GitHub-API-Rate-Limits und bricht Deploy ab
+          version: "2.20.5"
 
       - name: Link project
         run: supabase link --project-ref "$SUPABASE_PROJECT_REF"

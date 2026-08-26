@@ -141,23 +141,39 @@ object RecipeNormalizeServer {
             }
         }
 
+        // AMM-Pfad: Server-Ergebnis ist Wahrheit.
+        // Kein formatIngredientText – der hat FR-Einheiten und Abschnitte zerstört.
         val cleanTitle = RecipeAiParser.cleanDishTitle(title, ingredients)
-        // Server-Zutaten nur leicht säubern – formatIngredientText darf nichts Wichtiges killen
-        val cleanedServerIng = ingredients.lines()
+        val cleanIng = ingredients.lines()
             .map { it.trim() }
             .filter { it.isNotBlank() && !RecipeAiParser.isJunkIngredientLine(it) }
+            .map { line ->
+                // Nur Einheiten-Fix (c. à soupe → EL), keine Struktur-Zerstörung
+                if (line.startsWith("•") || line.startsWith("-")) {
+                    val body = line.trimStart('•', '-', '*', ' ')
+                    "• ${normalizeCulinaryUnits(body)}"
+                } else if (RecipeAiParser.isSectionHeaderLine(line)) {
+                    line
+                } else {
+                    normalizeCulinaryUnits(line)
+                }
+            }
             .joinToString("\n")
-        val formatted = RecipeAiParser.formatIngredientText(ingredients)
-        // Wenn Formatter zu aggressiv war (Zeilen verloren), Server-Rohfassung behalten
-        val serverLines = cleanedServerIng.lines().count { it.isNotBlank() }
-        val formattedLines = formatted.lines().count { it.isNotBlank() }
-        val cleanIng = when {
-            formattedLines >= serverLines && formatted.length >= 8 -> formatted
-            cleanedServerIng.length >= 8 -> cleanedServerIng
-            else -> ingredients
+            .ifBlank { ingredients }
+
+        val cleanInstr = instructions.trim().ifBlank { "" }
+
+        val mealCat = when {
+            j.optString("tags").contains("dessert", true) ||
+                cleanTitle.contains("Tiramisu", true) ||
+                cleanTitle.contains("Kuchen", true) ||
+                cleanTitle.contains("Brownie", true) -> "DESSERT"
+            j.optString("tags").contains("breakfast", true) ||
+                j.optString("tags").contains("frühstück", true) ||
+                cleanTitle.contains("Overnight", true) ||
+                cleanTitle.contains("Hafer", true) -> "BREAKFAST"
+            else -> ""
         }
-        val cleanInstr = RecipeAiParser.formatInstructionsText(instructions)
-            .ifBlank { instructions }
 
         return Recipe(
             title = cleanTitle,
@@ -173,7 +189,8 @@ object RecipeNormalizeServer {
             sourceUrl = sourceUrl ?: j.optString("sourceUrl").ifBlank { null },
             platform = platform,
             imageUrl = imageUrl ?: j.optString("imageUrl").ifBlank { null },
-            tags = j.optString("tags", platform).take(200)
+            tags = j.optString("tags", platform).take(200),
+            mealCategory = mealCat
         )
     }
 }

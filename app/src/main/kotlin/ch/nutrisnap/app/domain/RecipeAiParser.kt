@@ -761,7 +761,7 @@ object RecipeAiParser {
         return junk >= 2
     }
 
-    private fun isSectionHeaderLine(line: String): Boolean {
+    fun isSectionHeaderLine(line: String): Boolean {
         val d = line.trim()
             .replace(Regex("""^[\p{So}\p{Cn}\p{Sk}]+"""), "")
             .trimStart('•', '-', '*', ' ')
