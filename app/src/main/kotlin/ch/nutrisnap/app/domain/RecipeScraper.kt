@@ -331,11 +331,18 @@ class RecipeScraper(private val context: Context) {
         var workingCaption = caption
 
         // Caption-basiert normalisieren (inkl. mergeIngredientsFromCaption)
+        progress("Struktur auswerten…")
         var parsed = parseCaptionToRecipe(workingCaption, url, "instagram", thumbnail, fastAi)
         var pathUsed = "caption+normalize"
 
-        // Server-URL-Ergebnis nur behalten wenn nach Caption-Merge besser
-        val serverUrlRecipe = withTimeoutOrNull(8_000L) { serverUrlJob?.await() }
+        // Server-URL nur nutzen wenn schon fertig (nicht extra warten)
+        val serverUrlRecipe = serverUrlJob?.let { job ->
+            if (job.isCompleted) runCatching { job.getCompleted() }.getOrNull()
+            else {
+                job.cancel()
+                null
+            }
+        }
         val serverUrlMerged = serverUrlRecipe?.let {
             it.copy(
                 ingredients = RecipeAiParser.mergeIngredientsFromCaption(
@@ -460,28 +467,42 @@ class RecipeScraper(private val context: Context) {
             )
         }
 
-        // 1) Server-Normalisierung mit voller Caption
+        // 1) Sofort: Regex-Fallback + Caption-Merge (0s Netzwerk)
+        progress("Struktur aus Caption…")
+        val fallback = finalize(
+            RecipeAiParser.fallbackParse(caption, url, platform, thumbnail)
+        )
+        if (ingredientQualityScore(fallback) >= 70) {
+            return fallback
+        }
+
+        // 2) Server-Normalisierung (max 10s) — oft besser als lokal, aber nicht ewig warten
         val server = if (RecipeNormalizeServer.isConfigured()) {
             progress("Server-Normalisierung…")
-            RecipeNormalizeServer.normalize(caption, url, platform, thumbnail)
+            withTimeoutOrNull(10_000L) {
+                RecipeNormalizeServer.normalize(caption, url, platform, thumbnail)
+            }
         } else null
+        val serverFin = server?.let { finalize(it) }
+        if (serverFin != null && ingredientQualityScore(serverFin) >= 55) {
+            return if (ingredientQualityScore(serverFin) >= ingredientQualityScore(fallback)) {
+                serverFin
+            } else fallback
+        }
 
-        // 2) Lokal: Gemini/Groq oder Regex-Fallback
+        // 3) Nur wenn noch schwach: lokale KI (optional, teuer)
         progress("Rezept extrahieren…")
         val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
         val local = if (apiKey.isNotBlank()) {
-            RecipeAiParser.parse(caption, url, platform, thumbnail, apiKey, fastModel = fastAi)
-        } else {
-            RecipeAiParser.fallbackParse(caption, url, platform, thumbnail)
-        }
-        val fallback = RecipeAiParser.fallbackParse(caption, url, platform, thumbnail)
+            withTimeoutOrNull(12_000L) {
+                RecipeAiParser.parse(caption, url, platform, thumbnail, apiKey, fastModel = true)
+            }
+        } else null
+        val localFin = local?.let { finalize(it) }
 
-        // Bestes Ergebnis nach Score, dann Caption-Zeilen nachziehen
-        val candidates = listOfNotNull(server, local, fallback)
-            .map { finalize(it) }
-        val best = candidates.maxByOrNull { ingredientQualityScore(it) }
-            ?: finalize(fallback)
-        return best
+        return listOfNotNull(serverFin, localFin, fallback)
+            .maxByOrNull { ingredientQualityScore(it) }
+            ?: fallback
     }
 
     /**
@@ -507,8 +528,8 @@ class RecipeScraper(private val context: Context) {
 
             val desktopUa =
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-            // Fast: 10s, Standard: 22s — deckt reale IG-Ladezeit + React-Render ab.
-            val raceTimeoutMs = if (fastScrape) 10_000L else 22_000L
+            // Fast: 8s, Standard: 12s — WebView meldet oft ~8–12s; 22s fühlte sich wie Hänger an.
+            val raceTimeoutMs = if (fastScrape) 8_000L else 12_000L
 
             suspend fun awaitFirstGood(
                 jobs: MutableList<kotlinx.coroutines.Deferred<Cap?>>,
