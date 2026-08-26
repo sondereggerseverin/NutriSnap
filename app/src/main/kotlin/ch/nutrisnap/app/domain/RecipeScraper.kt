@@ -1,6 +1,7 @@
 package ch.nutrisnap.app.domain
 
 import android.content.Context
+import android.util.Log
 import ch.nutrisnap.app.BuildConfig
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeScrapeResult
@@ -22,9 +23,24 @@ class RecipeScraper(private val context: Context) {
     class InstagramBlockedException(url: String) : Exception("INSTAGRAM_BLOCKED:$url")
 
     companion object {
+        private const val TAG = "NutriSnapImport"
+
         /** Caption-Cache pro normalisierter URL (Prozess-Lebensdauer). */
         private val captionCache = ConcurrentHashMap<String, String>()
         private fun cacheKey(url: String) = url.trim().lowercase().substringBefore("?").trimEnd('/')
+
+        /**
+         * Letzter Import-Diagnosebericht (Logcat + kopierbar).
+         * Bei schlechter Qualität: adb logcat -s NutriSnapImport
+         */
+        @Volatile
+        var lastImportReport: String = ""
+            private set
+
+        private fun publishReport(report: String) {
+            lastImportReport = report
+            Log.i(TAG, report)
+        }
     }
 
     private val persistentStore by lazy { RecipeCaptionStore(context) }
@@ -69,6 +85,51 @@ class RecipeScraper(private val context: Context) {
             ).containsMatchIn(it)
         }
         return hasQty || lines.size >= 3
+    }
+
+    /**
+     * Qualitäts-Score 0–100 für Zutatenliste.
+     * Wenige Zeilen / kein Topping / Promo-Titel → niedriger Score → Caption nachladen.
+     */
+    private fun ingredientQualityScore(recipe: Recipe): Int {
+        val lines = recipe.ingredients.lines().map { it.trim() }.filter { it.isNotBlank() }
+        if (lines.isEmpty()) return 0
+        var score = 0
+        val qtyLines = lines.count {
+            Regex(
+                """(\d+/\d+|\d+[–\-]\d+[.,]?\d*|\d+[.,]?\d*)\s*(g|kg|ml|l|el|tl|tsp|tbsp|cups?|oz)\b""",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(it) ||
+                it.contains("nach wahl", true) || it.contains("nach bedarf", true)
+        }
+        score += (qtyLines * 12).coerceAtMost(60)
+        score += (lines.size * 4).coerceAtMost(20)
+        val blob = recipe.ingredients.lowercase()
+        // Typische DE-Overnight-Oats-Signale
+        if ("chia" in blob) score += 8
+        if ("agave" in blob || "ahorn" in blob) score += 6
+        if ("milch" in blob) score += 6
+        if ("topping" in blob || "haselnussmus" in blob || "schokolade" in blob) score += 8
+        if (RecipeAiParser.isPromoTitle(recipe.title) ||
+            Regex("""^\d+\s*g\b""", RegexOption.IGNORE_CASE).containsMatchIn(recipe.title)
+        ) score -= 25
+        // Einzeiler-Zubereitung + wenig Zutaten = oft unvollständig
+        if (lines.size <= 4 && recipe.instructions.lines().size <= 1) score -= 10
+        return score.coerceIn(0, 100)
+    }
+
+    private fun isWeakImport(recipe: Recipe): Boolean =
+        !hasUsableIngredients(recipe) || ingredientQualityScore(recipe) < 45
+
+    private fun looksLikeIngredientAsTitle(title: String): Boolean {
+        val t = title.trim()
+        if (Regex("""^\d+([.,]\d+)?\s*(g|kg|ml|l|el|tl)\b""", RegexOption.IGNORE_CASE).containsMatchIn(t))
+            return true
+        if (t.length < 40 && Regex(
+                """(?i)\b(hafermehl|mehl|joghurt|milch|ei|eier|zucker|salz|öl|oel)\b"""
+            ).containsMatchIn(t) && Regex("""\d""").containsMatchIn(t)
+        ) return true
+        return false
     }
 
     /** DOCTYPE, script, Cloudflare-Challenge usw. → kein Rezepttext. */
@@ -205,16 +266,33 @@ class RecipeScraper(private val context: Context) {
         val canonicalUrls = instagramCanonicalUrls(url, shortcode)
         val key = shortcode?.let { "ig:$it" } ?: cacheKey(url)
 
-        // ── AMM-Pfad: Server holt Caption + strukturiert (typ. 2–5 s) ──────────
+        // ── Server zuerst; nur bei schwachem Score Caption nachladen ───────────
+        // Früher: jeder Server-Treffer sofort return → oft Lücken (keine Chia/Agave).
+        // Jetzt: Score ≥ 70 → fertig in ~4s; sonst Caption + Nachnormalisierung.
+        var earlyServer: Recipe? = null
         if (RecipeNormalizeServer.isConfigured()) {
             progress("Server-Import…")
             val serverRecipe = RecipeNormalizeServer.importFromUrl(url, "instagram")
             if (serverRecipe != null && hasUsableIngredients(serverRecipe)) {
-                return@coroutineScope serverRecipe.copy(
-                    sourceUrl = url,
-                    platform = "instagram",
-                    tags = serverRecipe.tags.ifBlank { "instagram" }
-                )
+                val sc = ingredientQualityScore(serverRecipe)
+                if (sc >= 70 && !looksLikeIngredientAsTitle(serverRecipe.title) &&
+                    !RecipeAiParser.isPromoTitle(serverRecipe.title)
+                ) {
+                    val title = RecipeAiParser.cleanDishTitle(
+                        serverRecipe.title, serverRecipe.ingredients
+                    )
+                    publishReport(
+                        "path=server-url-strong score=$sc title=$title " +
+                            "ingLines=${serverRecipe.ingredients.lines().count { it.isNotBlank() }} url=$url"
+                    )
+                    return@coroutineScope serverRecipe.copy(
+                        title = title,
+                        sourceUrl = url,
+                        platform = "instagram",
+                        tags = serverRecipe.tags.ifBlank { "instagram" }
+                    )
+                }
+                earlyServer = serverRecipe
             }
         }
 
@@ -272,19 +350,26 @@ class RecipeScraper(private val context: Context) {
 
         progress("Rezept extrahieren…")
         var workingCaption = caption
-        var parsed = parseCaptionToRecipe(workingCaption, url, "instagram", thumbnail, fastAi)
 
-        // Qualitäts-Gate (AMM-ähnlich): leere/schwache Zutaten → Fallback erzwingen,
-        // ggf. Transkript nachladen und nochmal parsen.
-        if (!hasUsableIngredients(parsed)) {
+        // Mit voller Client-Caption normalisieren; mit earlyServer vergleichen
+        var parsed = parseCaptionToRecipe(workingCaption, url, "instagram", thumbnail, fastAi)
+        var pathUsed = "caption+normalize"
+        val serverUrlScore = earlyServer?.let { ingredientQualityScore(it) } ?: -1
+        if (earlyServer != null && serverUrlScore > ingredientQualityScore(parsed)) {
+            parsed = earlyServer
+            pathUsed = "server-url-kept"
+        }
+
+        // Qualitäts-Gate: schwache Zutaten → Fallback / Transkript
+        if (isWeakImport(parsed)) {
             progress("Struktur nachbessern…")
             val fallback = RecipeAiParser.fallbackParse(workingCaption, url, "instagram", thumbnail)
-            if (hasUsableIngredients(fallback)) {
+            if (ingredientQualityScore(fallback) > ingredientQualityScore(parsed)) {
                 parsed = fallback
+                pathUsed = "fallbackParse"
             }
         }
-        if (!hasUsableIngredients(parsed)) {
-            // Auch ohne User-Toggle: einmal Transkript versuchen (kurzes Budget)
+        if (isWeakImport(parsed)) {
             val prevToggle = useVideoTranscript
             useVideoTranscript = true
             val enriched = enrichWithTranscript("instagram", url, shortcode, workingCaption)
@@ -292,38 +377,61 @@ class RecipeScraper(private val context: Context) {
             if (enriched != workingCaption && isGoodCaption(enriched)) {
                 workingCaption = enriched
                 progress("Rezept aus Transkript…")
-                parsed = parseCaptionToRecipe(workingCaption, url, "instagram", thumbnail, fastAi = false)
-                if (!hasUsableIngredients(parsed)) {
-                    val fb = RecipeAiParser.fallbackParse(workingCaption, url, "instagram", thumbnail)
-                    if (hasUsableIngredients(fb)) parsed = fb
+                val again = parseCaptionToRecipe(workingCaption, url, "instagram", thumbnail, fastAi = false)
+                if (ingredientQualityScore(again) > ingredientQualityScore(parsed)) {
+                    parsed = again
+                    pathUsed = "transcript"
                 }
             }
         }
 
-        // Titel nachbessern, wenn Parser nur „Rezept“ liefert
-        val betterTitle = when {
-            parsed.title.isNotBlank() &&
-                !parsed.title.equals("Rezept", true) &&
-                !parsed.title.equals("Instagram Rezept", true) &&
-                !parsed.title.equals("null", true) &&
-                !parsed.title.startsWith("\"") -> parsed.title
-            oEmbedTitle.isNotBlank() -> {
-                RecipeAiParser.extractTitle(oEmbedTitle, fallback = "")
-                    .ifBlank {
-                        oEmbedTitle.lineSequence().map { it.trim() }
-                            .firstOrNull { it.length in 4..80 && it.any(Char::isLetter) }
-                            .orEmpty()
-                    }
-            }
-            else -> RecipeAiParser.extractTitle(workingCaption, fallback = "Rezept")
-        }.ifBlank { "Rezept" }.let { RecipeAiParser.extractTitle(it, fallback = it) }
+        // Titel: nie Mengen-Zeile / Promo
+        var betterTitle = RecipeAiParser.cleanDishTitle(
+            when {
+                parsed.title.isNotBlank() &&
+                    !parsed.title.equals("Rezept", true) &&
+                    !looksLikeIngredientAsTitle(parsed.title) &&
+                    !RecipeAiParser.isPromoTitle(parsed.title) -> parsed.title
+                oEmbedTitle.isNotBlank() -> oEmbedTitle
+                else -> workingCaption
+            },
+            ingredients = parsed.ingredients
+        )
+        if (looksLikeIngredientAsTitle(betterTitle) || RecipeAiParser.isPromoTitle(betterTitle)) {
+            betterTitle = RecipeAiParser.inventTitleFromIngredients(
+                parsed.ingredients,
+                fallback = "Overnight Oats"
+            )
+        }
+
+        val score = ingredientQualityScore(parsed.copy(title = betterTitle))
+        val report = buildString {
+            appendLine("path=$pathUsed score=$score")
+            appendLine("title=${betterTitle.take(80)}")
+            appendLine("captionChars=${workingCaption.length}")
+            appendLine("serverUrlScore=$serverUrlScore")
+            appendLine("ingLines=${parsed.ingredients.lines().count { it.isNotBlank() }}")
+            appendLine("ingredientsPreview=${parsed.ingredients.take(280).replace("\n", " | ")}")
+            appendLine("url=$url")
+        }
+        publishReport(report)
+
+        // Bei schwachem Import kurze Diagnose in Beschreibung (Screenshot-tauglich)
+        val desc = if (score < 50) {
+            listOfNotNull(
+                parsed.description.takeIf { it.isNotBlank() },
+                "⚠️ Import unvollständig (Score $score). Log: NutriSnapImport"
+            ).joinToString("\n\n")
+        } else parsed.description
 
         parsed.copy(
-            title     = betterTitle,
-            imageUrl  = thumbnail ?: parsed.imageUrl,
-            sourceUrl = url,
-            platform  = "instagram",
-            tags      = listOfNotNull(parsed.tags.ifBlank { null }, author?.let { "@$it" }).joinToString(",").take(200)
+            title       = betterTitle,
+            description = desc,
+            imageUrl    = thumbnail ?: parsed.imageUrl,
+            sourceUrl   = url,
+            platform    = "instagram",
+            tags        = listOfNotNull(parsed.tags.ifBlank { null }, author?.let { "@$it" })
+                .joinToString(",").take(200)
         )
     }
 
