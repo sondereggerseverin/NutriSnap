@@ -141,14 +141,21 @@ object RecipeNormalizeServer {
             }
         }
 
-        val cleanTitle = RecipeAiParser.extractTitle(title, fallback = title)
-            .let { t ->
-                if (RecipeAiParser.isPromoTitle(t)) {
-                    RecipeAiParser.inventTitleFromIngredients(ingredients, fallback = t)
-                } else t
-            }
-        val cleanIng = RecipeAiParser.formatIngredientText(ingredients)
-            .ifBlank { ingredients }
+        val cleanTitle = RecipeAiParser.cleanDishTitle(title, ingredients)
+        // Server-Zutaten nur leicht säubern – formatIngredientText darf nichts Wichtiges killen
+        val cleanedServerIng = ingredients.lines()
+            .map { it.trim() }
+            .filter { it.isNotBlank() && !RecipeAiParser.isJunkIngredientLine(it) }
+            .joinToString("\n")
+        val formatted = RecipeAiParser.formatIngredientText(ingredients)
+        // Wenn Formatter zu aggressiv war (Zeilen verloren), Server-Rohfassung behalten
+        val serverLines = cleanedServerIng.lines().count { it.isNotBlank() }
+        val formattedLines = formatted.lines().count { it.isNotBlank() }
+        val cleanIng = when {
+            formattedLines >= serverLines && formatted.length >= 8 -> formatted
+            cleanedServerIng.length >= 8 -> cleanedServerIng
+            else -> ingredients
+        }
         val cleanInstr = RecipeAiParser.formatInstructionsText(instructions)
             .ifBlank { instructions }
 

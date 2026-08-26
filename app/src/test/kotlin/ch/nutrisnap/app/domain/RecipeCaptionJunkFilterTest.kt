@@ -399,4 +399,24 @@ class RecipeCaptionJunkFilterTest {
         assertFalse("no 1. alle:\n$out", Regex("""(?i)1\.?\s*alle""").containsMatchIn(out))
         assertTrue("cookie teig header:\n$out", lower.contains("cookie") || lower.contains("teig"))
     }
+
+
+    @Test
+    fun keepsHalfElAndNachWahl() {
+        assertFalse(RecipeAiParser.isJunkIngredientLine("1/2 EL Chiasamen"))
+        assertFalse(RecipeAiParser.isJunkIngredientLine("1-1,5 EL Agavendicksaft"))
+        assertFalse(RecipeAiParser.isJunkIngredientLine("Milch nach Wahl"))
+        assertFalse(RecipeAiParser.isJunkIngredientLine("Haselnussmus nach Bedarf"))
+    }
+
+    @Test
+    fun cleansTagSeriesTitle() {
+        val raw = "Tag 12/30: Rezepte unter 2€ - Bueno Overnight Oats"
+        assertTrue(RecipeAiParser.isPromoTitle(raw))
+        val cleaned = RecipeAiParser.cleanDishTitle(raw, "60g Hafermehl\nHaselnussmus")
+        assertFalse("still promo: $cleaned", RecipeAiParser.isPromoTitle(cleaned))
+        assertTrue("expected Bueno/Oats in $cleaned",
+            cleaned.lowercase().contains("bueno") || cleaned.lowercase().contains("oats") ||
+                cleaned.lowercase().contains("haselnuss"))
+    }
 }

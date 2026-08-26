@@ -402,8 +402,9 @@ object RecipeAiParser {
         // Reine Hashtag-Zeile
         if (d.trim().startsWith("#") || Regex("""^(#\w+\s*)+$""").matches(d.trim())) return true
         // Marketing-/Subtitle ohne Mengenangabe (Caption-Intro, nicht Zutat)
+        // Auch Brüche "1/2 EL", Bereiche "1-1,5 EL", "nach Wahl/Bedarf"
         val hasQuantity = Regex(
-            """(?i)((\d+[.,]?\d*|½|¼|¾|⅓|⅔)\s*(g|kg|ml|l|tl|el|tsp|tbsp|cup|cups|oz|lb|stück|stk|prise|bund|dose|pack|päckchen|paeckchen|scheibe|scheiben|packet|packets)\b|(½|¼|¾|⅓|⅔)\s+\p{L})"""
+            """(?i)((\d+/\d+|\d+[–\-]\d+[.,]?\d*|\d+[.,]?\d*|½|¼|¾|⅓|⅔)\s*(g|kg|ml|l|tl|el|tsp|tbsp|cup|cups|oz|lb|stück|stk|prise|bund|dose|pack|päckchen|paeckchen|scheibe|scheiben|packet|packets)\b|(½|¼|¾|⅓|⅔)\s+\p{L}|nach\s+(wahl|bedarf))"""
         ).containsMatchIn(d)
         if (!hasQuantity && !isSectionHeaderLine(d)) {
             val marketingHits = listOf(
@@ -947,7 +948,11 @@ object RecipeAiParser {
             lower.contains("link in bio") ||
             (lower.contains("full recipe") && (lower.contains("comment") || lower.contains("dm"))) ||
             lower.startsWith("liked by") ||
-            (lower.contains("viral protein") && lower.length > 40)
+            (lower.contains("viral protein") && lower.length > 40) ||
+            // Serien-/Challenge-Titel: "Tag 12/30: Rezepte unter 2€ - …"
+            Regex("""^tag\s*\d+\s*/\s*\d+""").containsMatchIn(lower) ||
+            lower.contains("rezepte unter") || lower.contains("unter 2€") ||
+            lower.contains("unter 2 €") || lower.startsWith("folgt mir")
         ) return true
         if (title.length > 90 && (lower.contains("!") || lower.contains("?"))) return true
         if (lower.startsWith("this ") && (lower.contains("amazing") || lower.contains("slaps") ||
@@ -956,27 +961,50 @@ object RecipeAiParser {
         return false
     }
 
+    /** "Tag 12/30: … - Bueno Overnight Oats" → "Bueno Overnight Oats" */
+    fun cleanDishTitle(title: String, ingredients: String = ""): String {
+        var t = title.trim()
+        // Serien-Prefix weg
+        t = t.replace(Regex("""(?i)^tag\s*\d+\s*/\s*\d+\s*:\s*"""), "")
+        t = t.replace(Regex("""(?i)^rezepte\s+unter\s+2\s*€?\s*-?\s*"""), "")
+        // Nach letztem " - " den Gerichtnamen behalten wenn sinnvoll
+        if (" - " in t || " – " in t) {
+            val parts = t.split(Regex("""\s[-–]\s"""))
+            val last = parts.lastOrNull()?.trim().orEmpty()
+            if (last.length in 4..50 && last.any { it.isLetter() } && !isPromoTitle(last)) {
+                t = last
+            }
+        }
+        t = t.trim().trimEnd('😋', '🥜', '❤', '️', ' ', '-')
+        if (isPromoTitle(t) || t.length < 3) {
+            return inventTitleFromIngredients(ingredients, fallback = t.ifBlank { "Rezept" })
+        }
+        return t.take(60)
+    }
+
     /**
      * Baut einen kurzen Gerichtnamen aus Zutaten, wenn der Caption-Titel Promo ist.
      */
     fun inventTitleFromIngredients(ingredients: String, fallback: String = "Rezept"): String {
         val blob = ingredients.lowercase()
         val hits = listOf(
-            "pizza" to "Pizza", "pasta" to "Pasta", "pide" to "Pide",
-            "burrito" to "Burrito", "quesadilla" to "Quesadilla", "bowl" to "Bowl",
-            "salad" to "Salat", "salat" to "Salat", "wrap" to "Wrap",
+            "overnight" to "Overnight Oats", "haferflocken" to "Overnight Oats",
+            "hafermehl" to "Overnight Oats", "pizza" to "Pizza", "pasta" to "Pasta",
+            "pide" to "Pide", "burrito" to "Burrito", "quesadilla" to "Quesadilla",
+            "bowl" to "Bowl", "salad" to "Salat", "salat" to "Salat", "wrap" to "Wrap",
             "taco" to "Taco", "soup" to "Suppe", "suppe" to "Suppe",
             "brownie" to "Brownie", "pancake" to "Pancakes", "oats" to "Oats"
         )
         val dish = hits.firstOrNull { it.first in blob }?.second
-        val protein = when {
-            "cottage cheese" in blob || "hüttenkäse" in blob || "huettenkaese" in blob -> "Cottage-Cheese"
+        val flavor = when {
+            "bueno" in blob -> "Bueno"
+            "haselnuss" in blob || "hazelnut" in blob -> "Haselnuss"
+            "cinnamon" in blob || "zimt" in blob -> "Zimt"
+            "cottage cheese" in blob || "hüttenkäse" in blob -> "Cottage-Cheese"
             "hähnchen" in blob || "haehnchen" in blob || "chicken" in blob -> "Hähnchen"
-            "lachs" in blob || "salmon" in blob -> "Lachs"
-            "tofu" in blob -> "Tofu"
             else -> null
         }
-        return listOfNotNull(protein, dish).joinToString(" ").ifBlank { fallback }.take(60)
+        return listOfNotNull(flavor, dish).joinToString(" ").ifBlank { fallback }.take(60)
     }
 
     // ── LLM call ──────────────────────────────────────────────────────────────

@@ -39,19 +39,27 @@ Schema:
 }
 
 Rules:
-- title: DISH NAME only. NEVER promotional text ("Folgt mir", "Tag 12/30", "Comment recipe",
-  "Kommentiere", "DM me", "unter 2€ Reihe"). Prefer names near ingredients or first food line.
-  If only promo exists, invent short name from main ingredients (e.g. "Bueno Overnight Oats").
-- ingredient_sections: group by headers (Zutaten, Basis, Topping, The crust, Sauce, Icing).
-  Each item ONE ingredient as "quantity unit name". Keep metric (g, ml, EL, TL) when present.
-  Include optional lines as normal items with "optional:" prefix if marked.
-  "Milch nach Wahl" / "nach Bedarf" are valid ingredients — keep them.
-- NEVER put cooking steps into items (no "Preheat", "Mix", "vermischen", "1.) ...").
-- NEVER put engagement bait, hashtags, music credits, "Save this" into items or title.
-- instructions: numbered cooking steps only. Split long blobs into 1. 2. 3. when possible.
-- servings: from "Makes N", "N Portionen", "serves N", "für eine Portion". Default 1.
-- calories_per_serving / protein_g / carbs_g / fat_g: per serving if stated, else null.
-- Ignore: "Folgt mir", "Tag X/30", hashtags, ads, outfit credits.
+- title: DISH NAME only (max ~40 chars). NEVER "Tag 12/30", "Rezepte unter 2€", "Folgt mir",
+  "Comment recipe", "Kommentiere", "DM me". Strip series prefixes. Keep food name only
+  (e.g. "Bueno Overnight Oats", not "Tag 12/30: Rezepte unter 2€ - Bueno Overnight Oats").
+- CRITICAL: Extract EVERY ingredient line under Zutaten/Ingredients/Topping. Do NOT skip
+  fractional amounts (1/2 EL, ½ EL), ranges (1-1,5 EL), or "nach Wahl" / "nach Bedarf" lines.
+- ingredient_sections: use "Basis" (or "") for main list and "Topping" when caption has Topping.
+  Each item ONE ingredient. Keep EL/TL/g/ml. Optional lines: "optional: 1 EL veganes Proteinpulver"
+  as a single item — do NOT create a section named only "Optional".
+- "Milch nach Wahl", "Joghurt nach Wahl", toppings without grams are VALID — always include.
+- NEVER put cooking steps into items.
+- NEVER put engagement bait, hashtags, music credits into items or title.
+- instructions: numbered steps only. Split long German blobs into 1. 2. 3.
+- servings: default 1 for "eine Portion" / single-serve overnight oats.
+- Ignore: "Folgt mir", "Tag X/30", "unter 2€ Reihe", hashtags, ads.
+
+Example (must not drop Chia/Agave/Milch/Topping):
+Caption: "Zutaten: 60g Hafermehl / 1/2 EL Chiasamen / 1 EL gemahlene Haselnüsse /
+1-1,5 EL Agavendicksaft / 50g Joghurt nach Wahl / Milch nach Wahl /
+Optional: 1 EL veganes Proteinpulver / Topping: Haselnussmus, Schokolade (+ etwas Kokosöl)"
+→ title "Bueno Overnight Oats"
+→ Basis items: all six + optional protein; Topping: Haselnussmus, Schokolade, Kokosöl nach Bedarf
 `;
 
 const cors = {
