@@ -374,6 +374,22 @@ object RecipeAiParser {
                 RegexOption.IGNORE_CASE
             ).matches(lower)
         ) return true
+        // "1 Portion" / "2 Portionen" / "für 1 Portion" – Meta, keine Zutat
+        // (sonst wird daraus fälschlich "1 g Portion")
+        if (Regex(
+                """^(?:für\s+|fuer\s+)?\d+\s*portion(?:en)?\s*$""",
+                RegexOption.IGNORE_CASE
+            ).matches(lower)
+        ) return true
+        if (Regex(
+                """^(?:zutaten\s+)?(?:für|fuer)\s+\d+\s*portion""",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(lower)
+        ) return true
+        // Reiner Name "Portion" / "Serving" nach Mengen-Strip
+        if (lower == "portion" || lower == "portionen" || lower == "serving" || lower == "servings") {
+            return true
+        }
         // Caption-Footer / Makro-Blöcke (nie Zutaten)
         if (lower.startsWith("entire recipe") || lower.startsWith("approx macros") ||
             lower.startsWith("macros per") || lower.startsWith("per serving") ||
@@ -1023,10 +1039,14 @@ object RecipeAiParser {
             line.replace(Regex("""^[\p{So}\p{Cn}\p{Sk}\p{Sm}•\-*]+\s*"""), "").trim()
 
         fun isQtyOrNeedLine(line: String): Boolean {
-            val core = stripDecor(line)
-            if (core.isBlank() || isJunkIngredientLine(core)) return false
-            if (isSectionHeaderLine(core)) return false
-            val lower = core.lowercase()
+            val core0 = stripDecor(line)
+            if (core0.isBlank() || isJunkIngredientLine(core0)) return false
+            if (isSectionHeaderLine(core0)) return false
+            val core = core0.replace(
+                Regex("""^(?i)(ca\.?|approx\.?|approximately|about|circa)\s+"""),
+                ""
+            )
+            val lower = core0.lowercase()
             // Zubereitung / Promo stoppen
             if (lower.startsWith("zubereitung") || lower.startsWith("method") ||
                 lower.startsWith("folgt mir") || lower.startsWith("tag ")
@@ -1039,6 +1059,10 @@ object RecipeAiParser {
             if (lower.startsWith("optional:") || lower.startsWith("optional ")) return true
             // Topping-Inline: "Haselnussmus, Schokolade (+ etwas Kokosöl)"
             if (lower.startsWith("topping:") || lower.startsWith("topping ")) return true
+            // Flüssigkeiten / Milch oft mit "ca."
+            if (Regex("""(?i)\d+[.,]?\d*\s*ml\b""").containsMatchIn(core0) &&
+                Regex("""(?i)(milch|milk|wasser|water|saft|juice|joghurt|yogurt)""").containsMatchIn(core0)
+            ) return true
             return false
         }
 
@@ -1461,7 +1485,9 @@ Rules:
         // Früher nur qty-Zeilen → Header ohne Zahl (DOUGH, FROSTING) gingen verloren.
         // Wichtig: Emoji-Bullets (🔹 380g Dinkelmehl) müssen nach Strip als Qty gelten.
         fun isQtyIngredientLine(line: String): Boolean {
+            // "ca. 150 ml Mandelmilch" / "approx. 2 tbsp" – ca./about vor der Zahl
             val core = stripLeadingDecor(line)
+                .replace(Regex("""^(?i)(ca\.?|approx\.?|approximately|about|circa)\s+"""), "")
             if (core.isBlank()) return false
             // EN: "1/4 cup cottage cheese", "1.5 tbsp coconut flour"
             val usVolume = Regex(

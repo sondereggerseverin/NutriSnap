@@ -41,10 +41,13 @@ Rules:
   IT: cucchiaio/i → EL; cucchiaino/i → TL; "di" after unit → drop.
   FR: c. à soupe → EL; c. à café → TL; galettes → Stück.
   EN: tbsp→EL, tsp→TL.
-- Extract EVERY ingredient line (including baking powder / lievito).
+- Extract EVERY ingredient line (including baking powder / lievito AND fluids):
+  "ca. 150 ml ungesüßte Mandelmilch" MUST appear — never drop milk/water/ml lines.
+- NEVER output "1 Portion" / "1 g Portion" as an ingredient. Headers like
+  "Zutaten für 1 Portion:" set servings only.
 - If caption has steps (Procedimento/Verfahren/Method): translate to numbered German steps.
   If no steps: GENERATE 5–8 realistic German steps.
-- servings: "teilen in 8 Kugeln" / "8 palline" / "makes 8" → 8.
+- servings: "Zutaten für 1 Portion" → 1; "teilen in 8 Kugeln" / "8 palline" / "makes 8" → 8;
   "pour 2 individuels" / "für 2" → 2. Default 1 only if unclear.
 - meal_category: BREAKFAST | MAIN | SIDE_SNACK | DESSERT | DRINK | SAUCE | OTHER.
   Piadina/Wrap/Brot/herzhaft → MAIN. Overnight oats → BREAKFAST. Tiramisu → DESSERT.

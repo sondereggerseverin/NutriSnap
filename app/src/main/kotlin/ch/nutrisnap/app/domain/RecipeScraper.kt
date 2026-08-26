@@ -279,33 +279,47 @@ class RecipeScraper(private val context: Context) {
         val canonicalUrls = instagramCanonicalUrls(url, shortcode)
         val key = shortcode?.let { "ig:$it" } ?: cacheKey(url)
 
-        // ── AMM-Pfad: Server = Wahrheit ──────────────────────────────────────
-        // Nur URL an Server. Bei brauchbarem Ergebnis sofort zurück – kein lokales
-        // Nach-Parsen, das Einheiten/Abschnitte zerstört.
+        // Caption parallel zum Server starten (für Merge fehlender Zeilen wie "ca. 150 ml Milch")
+        val captionJob = async {
+            val cached = loadCachedCaption(key)
+            if (isGoodCaption(cached)) cached
+            else {
+                val c = raceInstagramCaption(canonicalUrls.first(), shortcode, fastScrape)
+                if (isGoodCaption(c)) saveCachedCaption(key, c)
+                c
+            }
+        }
+
+        // ── AMM-Pfad: Server + Caption-Merge ─────────────────────────────────
         if (RecipeNormalizeServer.isConfigured()) {
             progress("Server-Import…")
             val serverRecipe = RecipeNormalizeServer.importFromUrl(url, "instagram")
-            if (serverRecipe != null && isAmmQuality(serverRecipe)) {
-                publishReport(
-                    "path=amm-server-url score=${ingredientQualityScore(serverRecipe)} " +
-                        "ing=${serverRecipe.ingredients.lines().count { it.isNotBlank() }} " +
-                        "instrChars=${serverRecipe.instructions.length} url=$url"
-                )
-                return@coroutineScope serverRecipe.copy(
-                    sourceUrl = url,
-                    platform = "instagram",
-                    tags = serverRecipe.tags.ifBlank { "instagram" }
-                )
+            if (serverRecipe != null) {
+                // Caption max. 6s mitnehmen, dann fehlende Qty-Zeilen (Milch, ca. ml) nachziehen
+                val capForMerge = withTimeoutOrNull(6_000L) { captionJob.await() }.orEmpty()
+                val merged = if (isGoodCaption(capForMerge)) {
+                    serverRecipe.copy(
+                        ingredients = RecipeAiParser.mergeIngredientsFromCaption(
+                            serverRecipe.ingredients, capForMerge
+                        )
+                    )
+                } else serverRecipe
+                if (isAmmQuality(merged)) {
+                    publishReport(
+                        "path=amm-server+merge score=${ingredientQualityScore(merged)} " +
+                            "ing=${merged.ingredients.lines().count { it.isNotBlank() }} " +
+                            "captionChars=${capForMerge.length} url=$url"
+                    )
+                    return@coroutineScope merged.copy(
+                        sourceUrl = url,
+                        platform = "instagram",
+                        tags = merged.tags.ifBlank { "instagram" }
+                    )
+                }
             }
         }
 
         progress("Metadaten laden…")
-        // oEmbed lief früher SEQUENZIELL über alle canonicalUrls, jede Anfrage mit bis zu
-        // 8s Connect- + 12s Read-Timeout — bei blockiertem/hängendem oEmbed-Endpoint allein
-        // schon bis zu ~20s PRO URL. Das war die Hauptursache für die ~35s Wartezeit bis
-        // zum "Instagram blockiert"-Fallback. Jetzt parallel gestartet und NEBEN der
-        // ohnehin nötigen Caption-Race gefahren, mit hartem Extra-Timeout danach —
-        // Thumbnail/Autor sind nur "nice to have" und dürfen die Caption nie ausbremsen.
         val oEmbedJobs = canonicalUrls.map { u ->
             async {
                 runCatching {
@@ -314,14 +328,13 @@ class RecipeScraper(private val context: Context) {
             }
         }
 
-        // Cache: Prozess + optional persistent
-        var caption = loadCachedCaption(key)
-        if (isGoodCaption(caption)) {
-            progress("Aus Cache…")
-        } else {
+        var caption = withTimeoutOrNull(12_000L) { captionJob.await() }.orEmpty()
+        if (!isGoodCaption(caption)) {
             progress("Caption holen…")
             caption = raceInstagramCaption(canonicalUrls.first(), shortcode, fastScrape)
             if (isGoodCaption(caption)) saveCachedCaption(key, caption)
+        } else {
+            progress("Caption bereit…")
         }
 
         // oEmbed ist an dieser Stelle praktisch immer schon fertig (lief parallel zur

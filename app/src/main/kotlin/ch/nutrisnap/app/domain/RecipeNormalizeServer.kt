@@ -133,6 +133,11 @@ object RecipeNormalizeServer {
         val cleanIng = ingredients.lines()
             .map { it.trim() }
             .filter { it.isNotBlank() && !RecipeAiParser.isJunkIngredientLine(it) }
+            // "• 1 Portion" / "1 g Portion" nie behalten (Meta aus Header)
+            .filter { line ->
+                val core = line.trimStart('•', '-', '*', ' ').trim()
+                !Regex("""^(?i)\d+\s*(g\s+)?portion(?:en)?\s*$""").matches(core)
+            }
             .map { line ->
                 if (line.startsWith("•") || line.startsWith("-")) {
                     val body = line.trimStart('•', '-', '*', ' ')

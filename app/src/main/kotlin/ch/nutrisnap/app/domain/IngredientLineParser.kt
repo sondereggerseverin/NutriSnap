@@ -209,10 +209,20 @@ private fun formatAmount(value: Float): String =
     if (value == value.toLong().toFloat()) value.toLong().toString() else "%.2f".format(value)
 
 fun parseIngredientLine(line: String): ParsedIngredient {
-    val trimmed = normalizeCulinaryUnits(
+    var trimmed = normalizeCulinaryUnits(
         stripSectionPrefix(line.trimStart('•', '-', ' ', '*'))
     )
+    // "ca. 150 ml Mandelmilch" → Zahl muss am Anfang stehen
+    trimmed = trimmed.replace(
+        Regex("""^(?i)(ca\.?|approx\.?|approximately|about|circa)\s+"""),
+        ""
+    )
     if (trimmed.isBlank()) return ParsedIngredient(amount = "", unit = "g", name = "")
+
+    // Meta "1 Portion" nie als Zutat (sonst → 1 g Portion)
+    if (Regex("""^(?i)\d+\s*portion(?:en)?\s*$""").matches(trimmed)) {
+        return ParsedIngredient(amount = "", unit = "", name = "")
+    }
 
     val rangeMatch = INGREDIENT_RANGE_REGEX.find(trimmed)
     if (rangeMatch != null) {
