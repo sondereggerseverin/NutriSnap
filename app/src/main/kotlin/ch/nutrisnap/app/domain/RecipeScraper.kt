@@ -266,42 +266,14 @@ class RecipeScraper(private val context: Context) {
         val canonicalUrls = instagramCanonicalUrls(url, shortcode)
         val key = shortcode?.let { "ig:$it" } ?: cacheKey(url)
 
-        // ── Server zuerst; nur bei schwachem Score Caption nachladen ───────────
-        // Früher: jeder Server-Treffer sofort return → oft Lücken (keine Chia/Agave).
-        // Jetzt: Score ≥ 70 → fertig in ~4s; sonst Caption + Nachnormalisierung.
-        var earlyServer: Recipe? = null
-        if (RecipeNormalizeServer.isConfigured()) {
-            progress("Server-Import…")
-            val serverRecipe = RecipeNormalizeServer.importFromUrl(url, "instagram")
-            if (serverRecipe != null && hasUsableIngredients(serverRecipe)) {
-                val sc = ingredientQualityScore(serverRecipe)
-                // Nur bei sehr starkem Ergebnis sofort return (≥6 Mengenzeilen, Score ≥85)
-                val qtyLines = serverRecipe.ingredients.lines().count {
-                    Regex(
-                        """(\d+/\d+|\d+[.,]?\d*)\s*(g|ml|el|tl|kg)\b""",
-                        RegexOption.IGNORE_CASE
-                    ).containsMatchIn(it)
-                }
-                if (sc >= 85 && qtyLines >= 6 &&
-                    !looksLikeIngredientAsTitle(serverRecipe.title) &&
-                    !RecipeAiParser.isPromoTitle(serverRecipe.title)
-                ) {
-                    val title = RecipeAiParser.cleanDishTitle(
-                        serverRecipe.title, serverRecipe.ingredients
-                    )
-                    publishReport(
-                        "path=server-url-strong score=$sc qty=$qtyLines title=$title url=$url"
-                    )
-                    return@coroutineScope serverRecipe.copy(
-                        title = title,
-                        sourceUrl = url,
-                        platform = "instagram",
-                        tags = serverRecipe.tags.ifBlank { "instagram" }
-                    )
-                }
-                earlyServer = serverRecipe
+        // Server-URL parallel — KEIN Early-Return. Unvollständige Server-Captions
+        // (fehlende Chia/Agave) wurden sonst als fertig akzeptiert.
+        val serverUrlJob = if (RecipeNormalizeServer.isConfigured()) {
+            async {
+                progress("Server-Import…")
+                RecipeNormalizeServer.importFromUrl(url, "instagram")
             }
-        }
+        } else null
 
         progress("Metadaten laden…")
         // oEmbed lief früher SEQUENZIELL über alle canonicalUrls, jede Anfrage mit bis zu
@@ -358,22 +330,37 @@ class RecipeScraper(private val context: Context) {
         progress("Rezept extrahieren…")
         var workingCaption = caption
 
-        // Mit voller Client-Caption normalisieren; mit earlyServer vergleichen
+        // Caption-basiert normalisieren (inkl. mergeIngredientsFromCaption)
         var parsed = parseCaptionToRecipe(workingCaption, url, "instagram", thumbnail, fastAi)
         var pathUsed = "caption+normalize"
-        val serverUrlScore = earlyServer?.let { ingredientQualityScore(it) } ?: -1
-        if (earlyServer != null && serverUrlScore > ingredientQualityScore(parsed)) {
-            parsed = earlyServer
-            pathUsed = "server-url-kept"
+
+        // Server-URL-Ergebnis nur behalten wenn nach Caption-Merge besser
+        val serverUrlRecipe = withTimeoutOrNull(8_000L) { serverUrlJob?.await() }
+        val serverUrlMerged = serverUrlRecipe?.let {
+            it.copy(
+                ingredients = RecipeAiParser.mergeIngredientsFromCaption(
+                    it.ingredients, workingCaption
+                )
+            )
+        }
+        val serverUrlScore = serverUrlMerged?.let { ingredientQualityScore(it) } ?: -1
+        if (serverUrlMerged != null && serverUrlScore > ingredientQualityScore(parsed)) {
+            parsed = serverUrlMerged
+            pathUsed = "server-url+caption-merge"
         }
 
         // Qualitäts-Gate: schwache Zutaten → Fallback / Transkript
         if (isWeakImport(parsed)) {
             progress("Struktur nachbessern…")
             val fallback = RecipeAiParser.fallbackParse(workingCaption, url, "instagram", thumbnail)
-            if (ingredientQualityScore(fallback) > ingredientQualityScore(parsed)) {
-                parsed = fallback
-                pathUsed = "fallbackParse"
+            val fbMerged = fallback.copy(
+                ingredients = RecipeAiParser.mergeIngredientsFromCaption(
+                    fallback.ingredients, workingCaption
+                )
+            )
+            if (ingredientQualityScore(fbMerged) > ingredientQualityScore(parsed)) {
+                parsed = fbMerged
+                pathUsed = "fallbackParse+merge"
             }
         }
         if (isWeakImport(parsed)) {
@@ -391,6 +378,13 @@ class RecipeScraper(private val context: Context) {
                 }
             }
         }
+
+        // Finaler Caption-Merge (falls Caption mehr enthält als Parser)
+        parsed = parsed.copy(
+            ingredients = RecipeAiParser.mergeIngredientsFromCaption(
+                parsed.ingredients, workingCaption
+            )
+        )
 
         // Titel: nie Mengen-Zeile / Promo
         var betterTitle = RecipeAiParser.cleanDishTitle(
@@ -416,6 +410,8 @@ class RecipeScraper(private val context: Context) {
             appendLine("path=$pathUsed score=$score")
             appendLine("title=${betterTitle.take(80)}")
             appendLine("captionChars=${workingCaption.length}")
+            appendLine("captionHasChia=${workingCaption.contains("chia", true)}")
+            appendLine("captionHasAgave=${workingCaption.contains("agave", true)}")
             appendLine("serverUrlScore=$serverUrlScore")
             appendLine("ingLines=${parsed.ingredients.lines().count { it.isNotBlank() }}")
             appendLine("ingredientsPreview=${parsed.ingredients.take(280).replace("\n", " | ")}")
