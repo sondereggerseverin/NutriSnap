@@ -975,7 +975,9 @@ object RecipeAiParser {
                 t = last
             }
         }
-        t = t.trim().trimEnd('😋', '🥜', '❤', '️', ' ', '-')
+        t = t.trim()
+            .replace(Regex("""[\p{So}\p{Cn}\p{Sk}]+$"""), "")
+            .trimEnd(' ', '-', '–', '—')
         if (isPromoTitle(t) || t.length < 3) {
             return inventTitleFromIngredients(ingredients, fallback = t.ifBlank { "Rezept" })
         }
