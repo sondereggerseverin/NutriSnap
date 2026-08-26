@@ -205,6 +205,19 @@ class RecipeScraper(private val context: Context) {
         val canonicalUrls = instagramCanonicalUrls(url, shortcode)
         val key = shortcode?.let { "ig:$it" } ?: cacheKey(url)
 
+        // ── AMM-Pfad: Server holt Caption + strukturiert (typ. 2–5 s) ──────────
+        if (RecipeNormalizeServer.isConfigured()) {
+            progress("Server-Import…")
+            val serverRecipe = RecipeNormalizeServer.importFromUrl(url, "instagram")
+            if (serverRecipe != null && hasUsableIngredients(serverRecipe)) {
+                return@coroutineScope serverRecipe.copy(
+                    sourceUrl = url,
+                    platform = "instagram",
+                    tags = serverRecipe.tags.ifBlank { "instagram" }
+                )
+            }
+        }
+
         progress("Metadaten laden…")
         // oEmbed lief früher SEQUENZIELL über alle canonicalUrls, jede Anfrage mit bis zu
         // 8s Connect- + 12s Read-Timeout — bei blockiertem/hängendem oEmbed-Endpoint allein
@@ -734,6 +747,19 @@ class RecipeScraper(private val context: Context) {
             } else url
         }.getOrDefault(url)
         val key = cacheKey(expandedUrl)
+
+        // AMM-Pfad: Server zuerst
+        if (RecipeNormalizeServer.isConfigured()) {
+            progress("Server-Import…")
+            val serverRecipe = RecipeNormalizeServer.importFromUrl(expandedUrl, "tiktok")
+            if (serverRecipe != null && hasUsableIngredients(serverRecipe)) {
+                return serverRecipe.copy(
+                    sourceUrl = url,
+                    platform = "tiktok",
+                    tags = serverRecipe.tags.ifBlank { "tiktok" }
+                )
+            }
+        }
 
         var caption: String? = loadCachedCaption(key).ifBlank { null }
         var thumbnail: String? = null

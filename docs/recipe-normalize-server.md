@@ -1,16 +1,17 @@
-# Server-Normalisierung (kostenlos)
+# Server-Import wie All My Meals (kostenlos)
 
-AMM-ähnliche Pipeline: Caption wird **serverseitig** mit Groq (Free-Tier) in ein festes Rezept-Schema überführt.
+AMM-ähnliche Pipeline: **nur der Link** geht an den Server. Caption-Fetch + Strukturierung laufen serverseitig (Groq Free-Tier). Die App zeigt das fertige Rezept – typisch in wenigen Sekunden statt 25–30 s WebView-Race.
 
 ## Architektur
 
 ```
-App (Caption via WebView/HTTP)
-  → POST /functions/v1/recipe-normalize
-  → Supabase Edge Function (Deno)
-  → Groq llama-3.3-70b-versatile
-  → strukturiertes JSON
-  → App (Fallback: lokaler Parser)
+App
+  → POST /functions/v1/recipe-normalize  { sourceUrl, platform }
+  → Supabase Edge Function
+       1) Caption holen (Jina, oEmbed, Mirrors) parallel
+       2) Groq llama-3.3-70b → festes JSON-Schema
+  → strukturiertes Rezept
+  → bei Fehler: App fällt auf lokalen WebView-Parser zurück
 ```
 
 ## Einmalig deployen
@@ -29,8 +30,11 @@ supabase secrets set GROQ_API_KEY=gsk_...
 supabase functions deploy recipe-normalize
 ```
 
-Die App nutzt bereits `SUPABASE_URL` + `SUPABASE_ANON_KEY` aus dem Build.
-Ohne deployed Function fällt der Import still auf den lokalen Parser zurück.
+Die App nutzt bereits `SUPABASE_URL` + `SUPABASE_ANON_KEY` aus dem Build
+(`local.properties` / CI-Secrets).
+
+Ohne deployed Function fällt der Import still auf den lokalen Parser zurück
+(WebView + Geräte-Groq) – dann wieder ~20–30 s möglich.
 
 ## Kosten
 
@@ -38,14 +42,26 @@ Ohne deployed Function fällt der Import still auf den lokalen Parser zurück.
 |---|---|
 | Supabase Edge Functions | Free-Tier (500k Invocations/Monat) |
 | Groq llama-3.3-70b | Free-Tier (RPM-Limits) |
-| App-seitig | nur Caption-Fetch wie bisher |
+| Jina / oEmbed Caption-Fetch | kostenlos |
 
 ## Test
+
+Nur URL (AMM-Pfad):
 
 ```bash
 curl -X POST "$SUPABASE_URL/functions/v1/recipe-normalize" \
   -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
   -H "apikey: $SUPABASE_ANON_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"caption":"INGREDIENTS:\n1/4 cup cottage cheese\n1/3 cup egg whites\n1.) Preheat oven to 350...","platform":"instagram"}'
+  -d '{"sourceUrl":"https://www.instagram.com/reel/DceOJSCSuks/","platform":"instagram"}'
+```
+
+Mit Caption (Fallback):
+
+```bash
+curl -X POST "$SUPABASE_URL/functions/v1/recipe-normalize" \
+  -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+  -H "apikey: $SUPABASE_ANON_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"caption":"Zutaten:\n60g Hafermehl\n50g Joghurt\n…","platform":"instagram"}'
 ```

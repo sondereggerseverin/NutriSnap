@@ -12,20 +12,20 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
- * Kostenlose Server-Normalisierung über Supabase Edge Function `recipe-normalize`.
+ * AMM-ähnlicher Server-Import über Supabase Edge Function `recipe-normalize`.
  *
- * Flow (AMM-ähnlich):
- *   Client holt Caption → Server (Groq) strukturiert → Client zeigt Ergebnis.
- * Bei Fehler / fehlender Config → null (Caller nutzt lokalen Parser).
+ * Flow:
+ *   1) [importFromUrl] – nur Link → Server holt Caption + strukturiert (schnell)
+ *   2) [normalize] – Client-Caption → Server strukturiert (Fallback)
  *
- * Deploy: siehe supabase/functions/recipe-normalize/
- * Secret:  supabase secrets set GROQ_API_KEY=...
+ * Deploy: docs/recipe-normalize-server.md
+ * Secret: supabase secrets set GROQ_API_KEY=...
  */
 object RecipeNormalizeServer {
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(12, TimeUnit.SECONDS)
-        .readTimeout(35, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(28, TimeUnit.SECONDS)
         .build()
 
     fun isConfigured(): Boolean =
@@ -33,7 +33,25 @@ object RecipeNormalizeServer {
             BuildConfig.SUPABASE_ANON_KEY.isNotBlank()
 
     /**
-     * @return strukturiertes [Recipe] oder null bei Fehler/Timeout/nicht konfiguriert
+     * AMM-Pfad: nur URL schicken. Server fetched Caption und liefert Rezept.
+     */
+    suspend fun importFromUrl(
+        sourceUrl: String,
+        platform: String,
+        imageUrl: String? = null
+    ): Recipe? = withContext(Dispatchers.IO) {
+        if (!isConfigured()) return@withContext null
+        if (sourceUrl.isBlank()) return@withContext null
+        postNormalize(
+            caption = null,
+            sourceUrl = sourceUrl,
+            platform = platform,
+            imageUrl = imageUrl
+        )
+    }
+
+    /**
+     * Caption schon vorhanden → nur normalisieren.
      */
     suspend fun normalize(
         caption: String,
@@ -43,33 +61,44 @@ object RecipeNormalizeServer {
     ): Recipe? = withContext(Dispatchers.IO) {
         if (!isConfigured()) return@withContext null
         if (caption.trim().length < 20) return@withContext null
-
-        runCatching {
-            val base = BuildConfig.SUPABASE_URL.trimEnd('/')
-            val url = "$base/functions/v1/recipe-normalize"
-
-            val body = JSONObject().apply {
-                put("caption", caption.take(12000))
-                put("platform", platform)
-                if (!sourceUrl.isNullOrBlank()) put("sourceUrl", sourceUrl)
-                if (!imageUrl.isNullOrBlank()) put("imageUrl", imageUrl)
-            }.toString()
-
-            val req = Request.Builder()
-                .url(url)
-                .post(body.toRequestBody("application/json".toMediaType()))
-                .header("Authorization", "Bearer ${BuildConfig.SUPABASE_ANON_KEY}")
-                .header("apikey", BuildConfig.SUPABASE_ANON_KEY)
-                .header("Content-Type", "application/json")
-                .build()
-
-            client.newCall(req).execute().use { resp ->
-                val text = resp.body?.string().orEmpty()
-                if (!resp.isSuccessful) return@runCatching null
-                parseResponse(text, sourceUrl, platform, imageUrl)
-            }
-        }.getOrNull()
+        postNormalize(
+            caption = caption,
+            sourceUrl = sourceUrl,
+            platform = platform,
+            imageUrl = imageUrl
+        )
     }
+
+    private fun postNormalize(
+        caption: String?,
+        sourceUrl: String?,
+        platform: String,
+        imageUrl: String?
+    ): Recipe? = runCatching {
+        val base = BuildConfig.SUPABASE_URL.trimEnd('/')
+        val endpoint = "$base/functions/v1/recipe-normalize"
+
+        val body = JSONObject().apply {
+            put("platform", platform)
+            if (!caption.isNullOrBlank()) put("caption", caption.take(12000))
+            if (!sourceUrl.isNullOrBlank()) put("sourceUrl", sourceUrl)
+            if (!imageUrl.isNullOrBlank()) put("imageUrl", imageUrl)
+        }.toString()
+
+        val req = Request.Builder()
+            .url(endpoint)
+            .post(body.toRequestBody("application/json".toMediaType()))
+            .header("Authorization", "Bearer ${BuildConfig.SUPABASE_ANON_KEY}")
+            .header("apikey", BuildConfig.SUPABASE_ANON_KEY)
+            .header("Content-Type", "application/json")
+            .build()
+
+        client.newCall(req).execute().use { resp ->
+            val text = resp.body?.string().orEmpty()
+            if (!resp.isSuccessful) return@runCatching null
+            parseResponse(text, sourceUrl, platform, imageUrl)
+        }
+    }.getOrNull()
 
     private fun parseResponse(
         text: String,
@@ -89,11 +118,16 @@ object RecipeNormalizeServer {
         if (ingredients.length < 8 && instructions.length < 8) return null
 
         val servings = j.optInt("servings", 1).coerceAtLeast(1)
-        val cals = j.optDouble("calories_per_serving").takeIf { !j.isNull("calories_per_serving") && it > 0 }?.toFloat()
-        val protein = j.optDouble("protein_g").takeIf { !j.isNull("protein_g") && it > 0 }?.toFloat()
-        val carbs = j.optDouble("carbs_g").takeIf { !j.isNull("carbs_g") && it > 0 }?.toFloat()
-        val fat = j.optDouble("fat_g").takeIf { !j.isNull("fat_g") && it > 0 }?.toFloat()
-        val prep = j.optInt("prep_time_minutes").takeIf { !j.isNull("prep_time_minutes") && it > 0 }
+        val cals = j.optDouble("calories_per_serving")
+            .takeIf { !j.isNull("calories_per_serving") && it > 0 }?.toFloat()
+        val protein = j.optDouble("protein_g")
+            .takeIf { !j.isNull("protein_g") && it > 0 }?.toFloat()
+        val carbs = j.optDouble("carbs_g")
+            .takeIf { !j.isNull("carbs_g") && it > 0 }?.toFloat()
+        val fat = j.optDouble("fat_g")
+            .takeIf { !j.isNull("fat_g") && it > 0 }?.toFloat()
+        val prep = j.optInt("prep_time_minutes")
+            .takeIf { !j.isNull("prep_time_minutes") && it > 0 }
 
         val desc = buildString {
             val d = j.optString("description", "").trim()
@@ -107,8 +141,12 @@ object RecipeNormalizeServer {
             }
         }
 
-        // Client-seitige Nachbereinigung (Bait/Schritte)
         val cleanTitle = RecipeAiParser.extractTitle(title, fallback = title)
+            .let { t ->
+                if (RecipeAiParser.isPromoTitle(t)) {
+                    RecipeAiParser.inventTitleFromIngredients(ingredients, fallback = t)
+                } else t
+            }
         val cleanIng = RecipeAiParser.formatIngredientText(ingredients)
             .ifBlank { ingredients }
         val cleanInstr = RecipeAiParser.formatInstructionsText(instructions)
