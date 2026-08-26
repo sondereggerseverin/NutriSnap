@@ -266,12 +266,17 @@ enum class RecipeCategory(val label: String, val emoji: String) {
                 "oreo", "cremefüllung", "cremefuellung", "quarkdessert", "protein pudding",
                 "proteinpudding"
             )
-            val breakfast = listOf(
-                "frühstück", "fruehstueck", "breakfast", "overnight", "chia", "porridge",
+            // Eindeutige Frühstücks-Gerichtsnamen — schlagen Dessert-Zutaten im Topping/Rezept
+            // (z.B. "Bueno Overnight Oats" mit Schokolade-Topping darf nicht als Dessert landen).
+            val breakfastStrong = listOf(
+                "frühstück", "fruehstueck", "breakfast", "overnight", "overnight oats", "porridge",
                 "oats", "haferflocken", "müsli", "muesli", "granola", "pancake", "pfannkuchen",
                 "french toast", "smoothie bowl", "joghurt bowl", "yogurt bowl",
-                "magerquark", "skyr", "overnight oats", "haferbrei"
+                "magerquark", "skyr", "haferbrei"
             )
+            // Schwaches Signal (nur Zutat, kein Gerichtsname) — Dessert-Treffer geht vor
+            // (z.B. "Schoko-Chia-Pudding" bleibt Dessert).
+            val breakfastWeak = listOf("chia")
             val drink = listOf("smoothie", "shake", "saft", "juice", "latte", "matcha drink", "protein shake")
             val sauce = listOf("sauce", "soße", "sosse", "dressing", "dip ", "mayo", "pesto")
             val snack = listOf("snack", "beilage", "side dish", "energy ball", "proteinriegel")
@@ -279,8 +284,9 @@ enum class RecipeCategory(val label: String, val emoji: String) {
             // Herzhaftes Gericht schlägt Dessert/Frühstück (z.B. Süßkartoffel-Hack-Pfanne)
             if (savoryMain.any { it in t }) return MAIN
             when {
+                breakfastStrong.any { it in t } -> return BREAKFAST
                 dessert.any { it in t } -> return DESSERT
-                breakfast.any { it in t } -> return BREAKFAST
+                breakfastWeak.any { it in t } -> return BREAKFAST
                 drink.any { it in t } && "bowl" !in t -> return DRINK
                 sauce.any { it in t } && "pasta" !in t && "nudeln" !in t -> return SAUCE
                 snack.any { it in t } -> return SIDE_SNACK

@@ -58,11 +58,12 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                     val guessed = ch.nutrisnap.app.data.model.RecipeCategory.guess(
                         r.title, r.ingredients, r.description
                     )
-                    // Leer ODER fälschlich Dessert bei herzhaftem Gericht neu setzen
+                    // Leer ODER fälschlich Dessert bei herzhaftem/Frühstücks-Gericht neu setzen
                     val needs =
                         r.mealCategory.isBlank() ||
                         (r.category() == ch.nutrisnap.app.data.model.RecipeCategory.DESSERT &&
-                            guessed == ch.nutrisnap.app.data.model.RecipeCategory.MAIN)
+                            (guessed == ch.nutrisnap.app.data.model.RecipeCategory.MAIN ||
+                                guessed == ch.nutrisnap.app.data.model.RecipeCategory.BREAKFAST))
                     if (needs && guessed.name != r.mealCategory) {
                         repo.updateRecipe(r.copy(mealCategory = guessed.name))
                         n++
