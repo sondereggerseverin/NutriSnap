@@ -257,7 +257,8 @@ enum class RecipeCategory(val label: String, val emoji: String) {
                 "hackfleisch", "hähnchen", "haehnchen", "hühner", "huehner", "chicken",
                 "rind", "schwein", "lachs", "fisch", "garnele", "tofu", "curry",
                 "pfanne", "pfannen", "bowl", "pasta", "nudeln", "risotto", "eintopf",
-                "suppe", "gulasch", "braten", "steak", "masala", "chili", "taco", "wrap"
+                "suppe", "gulasch", "braten", "steak", "masala", "chili", "taco", "wrap",
+                "piadina", "piadine", "fladen", "fladenbrot", "quesadilla"
             )
             val dessert = listOf(
                 "dessert", "nachtisch", "kuchen", "brownie", "cookie", "keks", "pudding",
