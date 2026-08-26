@@ -86,4 +86,36 @@ class IngredientLineParserTest {
         assertEquals("TL", p.unit)
         assertTrue(p.name.contains("biscoff", ignoreCase = true))
     }
+
+    @Test
+    fun `2 rote Paprika without unit becomes Stuck`() {
+        val p = parseIngredientLine("2 rote Paprika")
+        assertEquals("2", p.amount)
+        assertEquals("Stück", p.unit)
+        assertTrue(p.name.contains("Paprika", ignoreCase = true))
+    }
+
+    @Test
+    fun `2 Karotten mittelgroß without unit becomes Stuck`() {
+        val p = parseIngredientLine("2 Karotten mittelgroß")
+        assertEquals("2", p.amount)
+        assertEquals("Stück", p.unit)
+        assertTrue(p.name.contains("Karotten", ignoreCase = true))
+    }
+
+    @Test
+    fun `3 Lauchziebeln without unit becomes Stuck`() {
+        val p = parseIngredientLine("3 Lauchziebeln")
+        assertEquals("3", p.amount)
+        assertEquals("Stück", p.unit)
+        assertTrue(p.name.contains("Lauch", ignoreCase = true) || p.name.contains("zwiebel", ignoreCase = true))
+    }
+
+    @Test
+    fun `paprika with TL stays TL not Stuck`() {
+        val p = parseIngredientLine("2 TL Curry")
+        assertEquals("2", p.amount)
+        assertEquals("TL", p.unit)
+        assertTrue(p.name.contains("Curry", ignoreCase = true))
+    }
 }

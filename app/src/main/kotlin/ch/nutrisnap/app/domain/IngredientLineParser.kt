@@ -73,6 +73,12 @@ private val COUNTABLE_NAME_HINTS = listOf(
     "clove", "cloves", "zehe", "zehen", "garlic", "knoblauch",
     "tomato", "tomate", "potato", "kartoffel", "avocado",
     "banana", "banane", "apple", "apfel", "lime", "lemon", "zitrone",
+    // Gemüse/Obst oft ohne Einheit in IG-Captions ("2 rote Paprika", "2 Karotten")
+    "paprika", "peperoni", "pepper", "bell pepper",
+    "karotte", "karotten", "carrot", "carrots", "rüebli", "ruebli", "möhre", "moehre",
+    "gurke", "cucumber", "zucchini", "aubergine", "eggplant",
+    "brokkoli", "broccoli", "blumenkohl", "cauliflower",
+    "lauch", "leek", "fenchel", "sellerie", "celery",
     "piece", "pieces", "stück", "stueck", "stange", "scheibe", "slice",
     // Frühstücks-/Keks-Produkte (häufig in IG-Meal-Prep ohne Einheit)
     "weetbix", "weetabix", "weet-bix", "weet bix",
