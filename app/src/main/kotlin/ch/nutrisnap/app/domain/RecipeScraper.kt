@@ -89,6 +89,25 @@ class RecipeScraper(private val context: Context) {
     }
 
     /**
+     * Reines Mengen+Einheit-Match ohne jeglichen Namen danach (z.B. "300ml",
+     * "- 200 ml") ist kein Zeichen einer guten Zutat, sondern ein Parse-Artefakt
+     * (Menge und Name wurden getrennt und nie wieder zusammengeführt).
+     */
+    private val QTY_UNIT_REGEX = Regex(
+        """(\d+/\d+|\d+[–\-]\d+[.,]?\d*|\d+[.,]?\d*)\s*(g|kg|ml|l|el|tl|tsp|tbsp|cups?|oz)\b""",
+        RegexOption.IGNORE_CASE
+    )
+
+    /**
+     * Wörter, die in einer eigentlich deutschen Zutaten-/Zubereitungsliste nichts
+     * verloren haben - deuten auf einen Import hin, der nur teilweise/gar nicht
+     * durch die Server-Übersetzung (Groq) lief, sondern roh aus der Caption kam.
+     */
+    private val ENGLISH_LEAKAGE_REGEX = Regex(
+        """\b(the|and|with|pour|add|stir|cook|bake|mix|remove|check|until|through|minutes?|cream|granules|cornflour|courgette|drained|diced|single|foil|dish)\b"""
+    )
+
+    /**
      * Qualitäts-Score 0–100 für Zutatenliste.
      * Wenige Zeilen / kein Topping / Promo-Titel → niedriger Score → Caption nachladen.
      */
@@ -96,15 +115,21 @@ class RecipeScraper(private val context: Context) {
         val lines = recipe.ingredients.lines().map { it.trim() }.filter { it.isNotBlank() }
         if (lines.isEmpty()) return 0
         var score = 0
-        val qtyLines = lines.count {
-            Regex(
-                """(\d+/\d+|\d+[–\-]\d+[.,]?\d*|\d+[.,]?\d*)\s*(g|kg|ml|l|el|tl|tsp|tbsp|cups?|oz)\b""",
-                RegexOption.IGNORE_CASE
-            ).containsMatchIn(it) ||
-                it.contains("nach wahl", true) || it.contains("nach bedarf", true)
+        // Zeilen mit Menge+Einheit UND einem verbleibenden Namen danach zählen positiv;
+        // reine "300ml"-Artefaktzeilen (nichts als Zahl+Einheit) zählen NICHT mehr mit
+        // und werden separat bestraft, statt fälschlich den Score zu heben.
+        val qtyLines = lines.count { line ->
+            val hasQtyMatch = QTY_UNIT_REGEX.containsMatchIn(line)
+            val nameRemaining = QTY_UNIT_REGEX.replace(line, "").trim(' ', '•', '-', '*', ',', '.').length >= 2
+            (hasQtyMatch && nameRemaining) || line.contains("nach wahl", true) || line.contains("nach bedarf", true)
+        }
+        val orphanedQtyLines = lines.count { line ->
+            QTY_UNIT_REGEX.containsMatchIn(line) &&
+                QTY_UNIT_REGEX.replace(line, "").trim(' ', '•', '-', '*', ',', '.').length < 2
         }
         score += (qtyLines * 12).coerceAtMost(60)
         score += (lines.size * 4).coerceAtMost(20)
+        score -= (orphanedQtyLines * 15).coerceAtMost(60)
         val blob = recipe.ingredients.lowercase()
         // Typische DE-Overnight-Oats-Signale
         if ("chia" in blob) score += 8
@@ -116,6 +141,12 @@ class RecipeScraper(private val context: Context) {
         ) score -= 25
         // Einzeiler-Zubereitung + wenig Zutaten = oft unvollständig
         if (lines.size <= 4 && recipe.instructions.lines().size <= 1) score -= 10
+        // Halb übersetzter/roher Import: englische Wörter mitten in DE-Text
+        val englishHits = ENGLISH_LEAKAGE_REGEX.findAll(
+            "$blob\n${recipe.instructions.lowercase()}"
+        ).count()
+        if (englishHits >= 3) score -= 30
+        else if (englishHits >= 1) score -= 12
         return score.coerceIn(0, 100)
     }
 
