@@ -711,12 +711,15 @@ fun RecipesScreen(
                 }
                 val hPad = if (window.isTablet) 16.dp else 10.dp
                 val topPad = 2.dp
-                val bottomPad = 80.dp
+                // Reserve für den 4-teiligen FAB-Stapel (3× SmallFAB 40dp + 1× FAB 56dp
+                // + 3× 8dp Abstand + Scaffold-Rand) – vorher 80dp war zu knapp, sobald
+                // die Kacheln dichter wurden, und die letzte Zeile überlappte die FABs.
+                val bottomPad = 216.dp
                 val targetRows = if (gridDensity >= 8) 4 else 3
                 // Textbereich unter dem Bild (1-zeiliger Titel + kcal). Bewusst leicht
                 // großzügig geschätzt, damit die Zielzeilenzahl auch bei größerer
                 // Systemschrift sicher passt statt eine Zeile zu verlieren.
-                val textAreaHeight = if (gridDensity >= 8) 36.dp else 42.dp
+                val textAreaHeight = if (gridDensity >= 8) 40.dp else 46.dp
 
                 // Statt eines geratenen Aspect-Ratios (das je nach Displaygröße daneben-
                 // liegt, siehe vorheriger Versuch) wird die Kartenhöhe direkt aus der
