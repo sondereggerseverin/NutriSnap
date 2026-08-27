@@ -8,6 +8,7 @@ import ch.nutrisnap.app.data.model.RecipeScrapeResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -195,8 +196,12 @@ class RecipeScraper(private val context: Context) {
             val platform = detectPlatform(url)
             progress("Link erkennen…")
             val recipe   = when (platform) {
-                "instagram" -> scrapeInstagram(url, fastScrape, fastAi)
-                "tiktok"    -> scrapeTikTok(url, fastAi)
+                "instagram" -> scrapeWithRetry { forceRefresh ->
+                    scrapeInstagram(url, fastScrape, fastAi, forceRefresh)
+                }
+                "tiktok"    -> scrapeWithRetry { forceRefresh ->
+                    scrapeTikTok(url, fastAi, forceRefresh)
+                }
                 else        -> {
                     progress("Seite laden…")
                     scrapeWeb(url, platform, fastAi)
@@ -210,6 +215,35 @@ class RecipeScraper(private val context: Context) {
                 else ->
                     RecipeScrapeResult(success = false, error = "Fehler: ${e.message}")
             }
+        }
+    }
+
+    /**
+     * Instagram/TikTok blocken Scraper gelegentlich nur kurzzeitig (Rate-Limit).
+     * Ein schwaches Ergebnis (Score < 50, inkl. leerer Caption/Exception) heisst
+     * oft nicht "kaputt", sondern "gerade blockiert". Ein einziger Retry nach
+     * kurzer Pause – mit erzwungenem Cache-Bypass, damit nicht dieselbe dünne
+     * Caption nochmal verwendet wird – bringt in der Praxis meist das gleiche
+     * saubere Ergebnis wie eine manuelle Struktur (siehe Reel-Retest 09:53→10:17).
+     */
+    private suspend fun scrapeWithRetry(block: suspend (forceRefresh: Boolean) -> Recipe): Recipe {
+        val firstAttempt = runCatching { block(false) }
+        val first = firstAttempt.getOrNull()
+        val firstScore = first?.let { ingredientQualityScore(it) } ?: -1
+
+        if (first != null && firstScore >= 50) return first
+
+        progress("Kurze Pause, erneuter Versuch…")
+        delay(3_500L)
+
+        val retryAttempt = runCatching { block(true) }
+        val retry = retryAttempt.getOrNull()
+        val retryScore = retry?.let { ingredientQualityScore(it) } ?: -1
+
+        return when {
+            retry != null && retryScore >= firstScore -> retry
+            first != null -> first
+            else -> throw (retryAttempt.exceptionOrNull() ?: firstAttempt.exceptionOrNull()!!)
         }
     }
 
@@ -272,7 +306,12 @@ class RecipeScraper(private val context: Context) {
 
     // ── INSTAGRAM ──────────────────────────────────────────────────────────────
 
-    private suspend fun scrapeInstagram(url: String, fastScrape: Boolean = false, fastAi: Boolean = false): Recipe = coroutineScope {
+    private suspend fun scrapeInstagram(
+        url: String,
+        fastScrape: Boolean = false,
+        fastAi: Boolean = false,
+        forceRefresh: Boolean = false
+    ): Recipe = coroutineScope {
         val shortcode = extractInstagramShortcode(url)
         // Collection-/F12-Links sind oft /p/SHORTCODE auch bei Reels.
         // Share-Link aus der App ist korrekt /reel/… — beide Varianten versuchen.
@@ -281,7 +320,7 @@ class RecipeScraper(private val context: Context) {
 
         // Caption parallel zum Server starten (für Merge fehlender Zeilen wie "ca. 150 ml Milch")
         val captionJob = async {
-            val cached = loadCachedCaption(key)
+            val cached = if (forceRefresh) "" else loadCachedCaption(key)
             if (isGoodCaption(cached)) cached
             else {
                 val c = raceInstagramCaption(canonicalUrls.first(), shortcode, fastScrape)
@@ -903,7 +942,7 @@ class RecipeScraper(private val context: Context) {
     //  4. Generic og:description via Jsoup
     //  5. oEmbed title (lowest quality, no body text)
 
-    private suspend fun scrapeTikTok(url: String, fastAi: Boolean = false): Recipe {
+    private suspend fun scrapeTikTok(url: String, fastAi: Boolean = false, forceRefresh: Boolean = false): Recipe {
         progress("Link auflösen…")
         val expandedUrl = runCatching {
             if ("vm.tiktok.com" in url || "vt.tiktok.com" in url) {
@@ -926,7 +965,7 @@ class RecipeScraper(private val context: Context) {
             }
         }
 
-        var caption: String? = loadCachedCaption(key).ifBlank { null }
+        var caption: String? = if (forceRefresh) null else loadCachedCaption(key).ifBlank { null }
         var thumbnail: String? = null
         var author: String? = null
 
