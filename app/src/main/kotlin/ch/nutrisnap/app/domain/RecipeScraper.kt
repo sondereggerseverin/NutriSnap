@@ -330,6 +330,11 @@ class RecipeScraper(private val context: Context) {
         }
 
         // ── AMM-Pfad: Server + Caption-Merge ─────────────────────────────────
+        // Bestes Server-Ergebnis wird gemerkt, auch wenn es die strenge
+        // AMM-Schwelle knapp verfehlt – ein sauber übersetztes, aber leicht
+        // unvollständiges Groq-Ergebnis ist einem rohen Regex-Fallback fast
+        // immer vorzuziehen (siehe finaler Vergleich unten).
+        var bestServerCandidate: Recipe? = null
         if (RecipeNormalizeServer.isConfigured()) {
             progress("Server-Import…")
             val serverRecipe = RecipeNormalizeServer.importFromUrl(url, "instagram")
@@ -355,6 +360,7 @@ class RecipeScraper(private val context: Context) {
                         tags = merged.tags.ifBlank { "instagram" }
                     )
                 }
+                if (hasUsableIngredients(merged)) bestServerCandidate = merged
             }
         }
 
@@ -426,6 +432,12 @@ class RecipeScraper(private val context: Context) {
                     ).joinToString(",").take(200)
                 )
             }
+            if (serverCap != null && hasUsableIngredients(serverCap) &&
+                (bestServerCandidate == null ||
+                    ingredientQualityScore(serverCap) > ingredientQualityScore(bestServerCandidate!!))
+            ) {
+                bestServerCandidate = serverCap
+            }
         }
 
         // Nur wenn Server ausfällt: lokaler Parser + Caption-Merge
@@ -453,6 +465,24 @@ class RecipeScraper(private val context: Context) {
                 parsed.ingredients, workingCaption
             )
         )
+
+        // Letzter Vergleich: ein Server-Ergebnis, das die strenge AMM-Schwelle
+        // knapp verfehlt hat, ist einem rohen Regex-/lokalen Fallback fast immer
+        // sprachlich/inhaltlich überlegen (echte Groq-Übersetzung vs. Wort-für-
+        // Wort-Heuristik). Nur übernehmen, wenn es wirklich besser bewertet ist.
+        bestServerCandidate?.let { candidate ->
+            val candidateMerged = candidate.copy(
+                ingredients = RecipeAiParser.mergeIngredientsFromCaption(
+                    candidate.ingredients, workingCaption
+                )
+            )
+            if (ingredientQualityScore(candidateMerged) > ingredientQualityScore(parsed)) {
+                parsed = candidateMerged.copy(
+                    imageUrl = thumbnail ?: candidateMerged.imageUrl
+                )
+                pathUsed = "server-candidate-below-amm"
+            }
+        }
 
         // Titel: nie Mengen-Zeile / Promo
         var betterTitle = RecipeAiParser.cleanDishTitle(
