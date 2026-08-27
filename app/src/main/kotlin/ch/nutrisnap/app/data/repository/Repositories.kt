@@ -770,16 +770,36 @@ class RecipeRepository(db: NutriDatabase, private val context: Context) {
         val fastScrape = prefs?.get(KEY_RECIPE_FAST_SCRAPE) ?: false
         val persistentCache = prefs?.get(KEY_RECIPE_PERSISTENT_CACHE) ?: true
         val videoTranscript = prefs?.get(KEY_RECIPE_VIDEO_TRANSCRIPT) ?: false
+        // highQuality-Reimport: Video-Transcript mitnutzen, wenn User es global an hat
+        // oder explizit gründlicher Import (mehr Signal bei dünner Caption).
+        val useTranscript = videoTranscript || highQuality
         val result = scraper.scrape(
             url,
             onProgress,
             fastScrape = fastScrape,
             fastAi = fastAi,
-            persistentCache = persistentCache,
-            videoTranscript = videoTranscript,
+            persistentCache = persistentCache && !highQuality,
+            videoTranscript = useTranscript,
             highQuality = highQuality
         )
         if (result.success && result.recipe != null) {
+            if (allowOverwrite) {
+                // Bewusstes Überschreiben: bestehende ID behalten, Inhalt ersetzen.
+                val existing = findBySourceUrl(url)
+                if (existing != null) {
+                    val merged = result.recipe.copy(
+                        id = existing.id,
+                        isFavorite = existing.isFavorite,
+                        mealCategory = existing.mealCategory.ifBlank { result.recipe.mealCategory },
+                        // Matches/Komponenten bleiben in eigenen Tabellen; Zutaten-Text neu
+                        cookedWeightG = existing.cookedWeightG,
+                        totalIngredientWeightG = existing.totalIngredientWeightG
+                    )
+                    updateRecipe(merged)
+                    val saved = dao.getById(existing.id) ?: merged
+                    return result.copy(recipe = saved)
+                }
+            }
             val id = saveRecipe(result.recipe)
             // Falls per Fingerprint ein bestehendes Rezept matchte: DB-Stand zurück
             val saved = dao.getById(id) ?: result.recipe.copy(id = id)
