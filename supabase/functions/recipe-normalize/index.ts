@@ -2,9 +2,11 @@
  * NutriSnap – AMM-ähnlicher Server-Import (kostenlos).
  *
  * Input:
- *   { sourceUrl, platform?, caption?, imageUrl? }
+ *   { sourceUrl, platform?, caption?, imageUrl?, transcript? }
  *   – sourceUrl allein reicht: Server holt Caption selbst
  *   – caption optional (Client-Fallback / Cache)
+ *   – transcript optional: gesprochenes Audio aus dem Video (Whisper o.ä.)
+ *     → wird bevorzugt, wenn Caption schwach/kurz ist (Score 0 wie bei vielen Reels)
  *
  * Output: strukturiertes Rezept-JSON
  *
@@ -17,8 +19,13 @@ const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const MODEL = "llama-3.3-70b-versatile";
 
 const SYSTEM = `You are a recipe extraction assistant for a German nutrition app (NutriSnap).
-Convert ANY social-media caption (German, English, French, OR Italian; emoji bullets)
+Convert ANY social-media caption OR spoken video transcript (German, English, French, OR Italian; emoji bullets)
 into ONE strict JSON object. Respond ONLY with valid JSON — no markdown.
+
+The input may be:
+- a written caption, OR
+- a speech-to-text transcript from a cooking video (spoken quantities, steps, filler words).
+Treat both the same: extract ingredients and steps.
 
 Schema:
 {
@@ -45,7 +52,7 @@ Rules:
   "ca. 150 ml ungesüßte Mandelmilch" MUST appear — never drop milk/water/ml lines.
 - NEVER output "1 Portion" / "1 g Portion" as an ingredient. Headers like
   "Zutaten für 1 Portion:" set servings only.
-- If caption has steps (Procedimento/Verfahren/Method): translate to numbered German steps.
+- If text has steps (Procedimento/Verfahren/Method or spoken "dann …"): translate to numbered German steps.
   If no steps: GENERATE 5–8 realistic German steps.
 - servings: "Zutaten für 1 Portion" → 1; "teilen in 8 Kugeln" / "8 palline" / "makes 8" → 8;
   "pour 2 individuels" / "für 2" → 2. Default 1 only if unclear.
@@ -53,6 +60,7 @@ Rules:
   Piadina/Wrap/Brot/herzhaft → MAIN. Overnight oats → BREAKFAST. Tiramisu → DESSERT.
 - title: dish only in German ("Protein-Piadina", not promo / gym speech).
 - Do NOT invent nutrition numbers. No hashtags/@mentions in ingredients.
+- From transcripts: ignore filler ("ähm", "so", "yeah") and keep only recipe content.
 
 Italian example:
 "Ingredienti: 400 g farina 00, 400 g yogurt greco, 3 cucchiaini di sale,
@@ -84,27 +92,47 @@ serve(async (req) => {
     const sourceUrl = body.sourceUrl ? String(body.sourceUrl).trim() : "";
     const imageUrlIn = body.imageUrl ? String(body.imageUrl) : null;
     let caption = String(body.caption ?? "").trim();
+    const transcript = String(body.transcript ?? body.audio_text ?? "").trim();
     let imageUrl = imageUrlIn;
+    let textSource: "transcript" | "caption" | "fetched" = "caption";
 
-    // AMM-Flow: nur URL → Server holt Caption
-    if (caption.length < 40 && sourceUrl) {
+    // AMM-Flow: nur URL → Server holt Caption (wenn noch schwach)
+    if (caption.length < 40 && sourceUrl && transcript.length < 40) {
       const fetched = await fetchCaptionFromUrl(sourceUrl, platform);
-      if (fetched.caption.length > caption.length) caption = fetched.caption;
+      if (fetched.caption.length > caption.length) {
+        caption = fetched.caption;
+        textSource = "fetched";
+      }
       if (!imageUrl && fetched.imageUrl) imageUrl = fetched.imageUrl;
     }
 
-    if (caption.length < 20) {
+    // Transkript (Audio aus Video) hat Vorrang, wenn Caption schwach ist
+    // → deckt Reels mit Score 0 / kurzer Caption ab (AMM-ähnlich)
+    let recipeText = caption;
+    if (transcript.length >= 40 && scoreCaption(transcript) >= scoreCaption(caption)) {
+      recipeText = transcript;
+      textSource = "transcript";
+    } else if (transcript.length >= 80 && caption.length < 60) {
+      // Caption nur Titel/Emoji → Transkript trotzdem nutzen
+      recipeText = [caption, transcript].filter(Boolean).join("\n\n");
+      textSource = "transcript";
+    }
+
+    if (recipeText.length < 20) {
       return json({
         error: "caption too short",
         detail: sourceUrl
-          ? "Could not fetch caption from URL; client should retry with local caption"
-          : "Provide caption or sourceUrl",
+          ? "Could not fetch caption from URL; client should retry with local caption or transcript"
+          : "Provide caption, transcript, or sourceUrl",
       }, 400);
     }
 
-    const clipped = caption.slice(0, 12000);
+    const clipped = recipeText.slice(0, 12000);
+    const sourceLabel = textSource === "transcript"
+      ? "spoken video transcript (and caption if present)"
+      : "caption";
     const userMsg =
-      `Platform: ${platform}\nSource: ${sourceUrl || "n/a"}\nExtract recipe from this caption:\n\n${clipped}`;
+      `Platform: ${platform}\nSource: ${sourceUrl || "n/a"}\nExtract recipe from this ${sourceLabel}:\n\n${clipped}`;
 
     const groqResp = await fetch(GROQ_URL, {
       method: "POST",
@@ -185,7 +213,11 @@ serve(async (req) => {
       imageUrl,
       caption_chars: caption.length,
       caption_score: scoreCaption(caption),
-      normalized_by: "recipe-normalize@groq+fetch",
+      transcript_chars: transcript.length,
+      text_source: textSource,
+      normalized_by: textSource === "transcript"
+        ? "recipe-normalize@groq+transcript"
+        : "recipe-normalize@groq+fetch",
     });
   } catch (e) {
     return json(

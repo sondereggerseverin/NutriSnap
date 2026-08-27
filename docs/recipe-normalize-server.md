@@ -2,14 +2,17 @@
 
 AMM-ähnliche Pipeline: **nur der Link** geht an den Server. Caption-Fetch + Strukturierung laufen serverseitig (Groq Free-Tier). Die App zeigt das fertige Rezept – typisch in wenigen Sekunden statt 25–30 s WebView-Race.
 
+Optional kann der Client ein **Transkript** (gesprochener Text aus dem Video, z. B. via Whisper) mitschicken. Bei kurzer/schwacher Caption (viele Reels, Score 0) wird das Transkript bevorzugt – gleicher Weg wie All My Meals „audio analysis“.
+
 ## Architektur
 
 ```
 App
-  → POST /functions/v1/recipe-normalize  { sourceUrl, platform }
+  → POST /functions/v1/recipe-normalize  { sourceUrl, platform, transcript? }
   → Supabase Edge Function
-       1) Caption holen (Jina, oEmbed, Mirrors) parallel
-       2) Groq llama-3.3-70b → festes JSON-Schema
+       1) Caption holen (Jina, oEmbed, Mirrors) parallel – falls nötig
+       2) Transkript (falls vorhanden) vs. Caption wählen
+       3) Groq llama-3.3-70b → festes JSON-Schema
   → strukturiertes Rezept
   → bei Fehler: App fällt auf lokalen WebView-Parser zurück
 ```
@@ -64,4 +67,14 @@ curl -X POST "$SUPABASE_URL/functions/v1/recipe-normalize" \
   -H "apikey: $SUPABASE_ANON_KEY" \
   -H "Content-Type: application/json" \
   -d '{"caption":"Zutaten:\n60g Hafermehl\n50g Joghurt\n…","platform":"instagram"}'
+```
+
+Mit Transkript (Audio aus Video, z. B. Whisper – bevorzugt bei schwacher Caption):
+
+```bash
+curl -X POST "$SUPABASE_URL/functions/v1/recipe-normalize" \
+  -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+  -H "apikey: $SUPABASE_ANON_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sourceUrl":"https://www.instagram.com/reel/DcgiqOAtyEP/","platform":"instagram","transcript":"Heute machen wir einen gesunden Karotten-Wrap. Vierhundertfünfundzwanzig Gramm Karotten reiben, Flüssigkeit ausdrücken, zwei Eier, hundertfünfundzwanzig Gramm Mozzarella…"}'
 ```
