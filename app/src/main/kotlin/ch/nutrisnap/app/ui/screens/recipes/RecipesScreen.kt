@@ -703,35 +703,57 @@ fun RecipesScreen(
                     sub = if (hideIncomplete) "Schalte den Filter aus, um alle zu sehen" else "Tippe auf + und füge einen Link ein"
                 )
             } else if (useGrid) {
-                // Grid: Phone 2, Tablet 3–4 Spalten; Dichte 6/8 steuert Kachelhöhe
+                // Grid: Phone 2, Tablet 3–4 Spalten; Dichte 6/8 steuert Ziel-Zeilenzahl (3/4).
                 val gap = when {
                     window.isTablet -> 12.dp
                     gridDensity >= 8 -> 6.dp
                     else -> 8.dp
                 }
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(gridColumns),
-                    contentPadding = PaddingValues(
-                        start = if (window.isTablet) 16.dp else 10.dp,
-                        end = if (window.isTablet) 16.dp else 10.dp,
-                        top = 2.dp,
-                        bottom = 80.dp
-                    ),
-                    horizontalArrangement = Arrangement.spacedBy(gap),
-                    verticalArrangement = Arrangement.spacedBy(gap),
-                    modifier = Modifier.weight(1f).fillMaxWidth()
-                ) {
-                    gridItems(displayedRecipes, key = { it.id }) { recipe ->
-                        RecipeGridCard(
-                            recipe = recipe,
-                            onClick = { selectedRecipe = recipe },
-                            onAddToDiary = { addToDiaryRecipe = recipe },
-                            onEdit = { editRecipe = recipe },
-                            onDelete = { vm.deleteRecipe(recipe) },
-                            onDuplicate = { vm.duplicateRecipe(recipe) },
-                            onToggleFavorite = { vm.toggleFavorite(recipe) },
-                            density = gridDensity
-                        )
+                val hPad = if (window.isTablet) 16.dp else 10.dp
+                val topPad = 2.dp
+                val bottomPad = 80.dp
+                val targetRows = if (gridDensity >= 8) 4 else 3
+                // Textbereich unter dem Bild (1-zeiliger Titel + kcal). Bewusst leicht
+                // großzügig geschätzt, damit die Zielzeilenzahl auch bei größerer
+                // Systemschrift sicher passt statt eine Zeile zu verlieren.
+                val textAreaHeight = if (gridDensity >= 8) 36.dp else 42.dp
+
+                // Statt eines geratenen Aspect-Ratios (das je nach Displaygröße daneben-
+                // liegt, siehe vorheriger Versuch) wird die Kartenhöhe direkt aus der
+                // tatsächlich gemessenen Grid-Fläche berechnet – so passen 6/8 Kacheln
+                // garantiert, unabhängig von Displaygröße oder Schrifteinstellung.
+                BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    val availableHeight = (maxHeight - topPad - bottomPad).coerceAtLeast(200.dp)
+                    val cardHeight = ((availableHeight - gap * (targetRows - 1)) / targetRows)
+                        .coerceAtLeast(90.dp)
+                    val availableWidth = (maxWidth - hPad * 2).coerceAtLeast(120.dp)
+                    val cardWidth = ((availableWidth - gap * (gridColumns - 1)) / gridColumns)
+                        .coerceAtLeast(80.dp)
+                    val imageHeight = (cardHeight - textAreaHeight).coerceAtLeast(50.dp)
+                    val computedAspect = (cardWidth / imageHeight).coerceIn(0.35f, 1.3f)
+
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(gridColumns),
+                        contentPadding = PaddingValues(
+                            start = hPad, end = hPad, top = topPad, bottom = bottomPad
+                        ),
+                        horizontalArrangement = Arrangement.spacedBy(gap),
+                        verticalArrangement = Arrangement.spacedBy(gap),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        gridItems(displayedRecipes, key = { it.id }) { recipe ->
+                            RecipeGridCard(
+                                recipe = recipe,
+                                onClick = { selectedRecipe = recipe },
+                                onAddToDiary = { addToDiaryRecipe = recipe },
+                                onEdit = { editRecipe = recipe },
+                                onDelete = { vm.deleteRecipe(recipe) },
+                                onDuplicate = { vm.duplicateRecipe(recipe) },
+                                onToggleFavorite = { vm.toggleFavorite(recipe) },
+                                density = gridDensity,
+                                imageAspect = computedAspect
+                            )
+                        }
                     }
                 }
             } else {

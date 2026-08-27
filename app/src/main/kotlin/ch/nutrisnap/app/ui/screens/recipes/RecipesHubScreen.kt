@@ -63,7 +63,9 @@ fun RecipesHubScreen(
             onSelect = { tab = it },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs)
+                // Gleiches horizontales Padding wie Suchleiste/Filter darunter (12dp),
+                // damit der Hub-Header sauber mit dem restlichen Content fluchtet.
+                .padding(horizontal = NutriSpacing.md, vertical = NutriSpacing.xs)
         )
         when (tab) {
             RecipeTab.SAVED -> RecipesScreen(

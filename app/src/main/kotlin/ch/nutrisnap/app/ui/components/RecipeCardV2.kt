@@ -297,6 +297,11 @@ fun RecipeGridCard(
     onToggleFavorite: () -> Unit = {},
     /** Ziel sichtbare Kacheln pro Bildschirm: 6 (3 Zeilen) oder 8 (4 Zeilen). */
     density: Int = 6,
+    /**
+     * Exakt aus der verfügbaren Grid-Fläche berechnetes Bild-Seitenverhältnis
+     * (siehe RecipesScreen). Falls null, wird ein geschätzter Fallback verwendet.
+     */
+    imageAspect: Float? = null,
     modifier: Modifier = Modifier
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -305,9 +310,7 @@ fun RecipeGridCard(
     val baseServings = recipe.servings.coerceAtLeast(1)
     val kcalPer = recipe.totalCalories?.div(baseServings)
     val ultraCompact = density >= 8
-    // Ziel: 6 ≈ 3 Zeilen, 8 ≈ 4 Zeilen auf typischem Phone (2 Spalten).
-    // Bildbreite ~166dp → Aspect muss deutlich unter 1.0, sonst passen nur 4 Kacheln.
-    val imageAspect = if (ultraCompact) 0.55f else 0.68f
+    val resolvedImageAspect = imageAspect ?: if (ultraCompact) 0.55f else 0.68f
     val titleMaxLines = 1
     val titleSize = if (ultraCompact) 11.sp else 12.sp
     val titleLineHeight = if (ultraCompact) 13.sp else 14.sp
@@ -329,7 +332,7 @@ fun RecipeGridCard(
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .aspectRatio(imageAspect)
+                    .aspectRatio(resolvedImageAspect)
             ) {
                 RecipeCardImage(
                     recipe = recipe,
