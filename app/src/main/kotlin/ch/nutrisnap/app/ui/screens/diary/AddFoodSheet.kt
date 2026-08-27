@@ -708,8 +708,9 @@ private fun AiEstimateTab(
         }
     }
 
+    // Kein eigenes verticalScroll: Parent-Column in AddFoodSheet scrollt bereits
+    // (nested verticalScroll → IllegalStateException: infinity max height).
     Column(
-        Modifier.verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(NutriSpacing.md)
     ) {
         Text(
