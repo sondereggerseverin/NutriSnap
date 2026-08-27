@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.domain
 
+import android.util.Log
 import ch.nutrisnap.app.BuildConfig
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeCategory
@@ -21,8 +22,23 @@ import java.util.concurrent.TimeUnit
  *
  * Deploy: docs/recipe-normalize-server.md
  * Secret: supabase secrets set GROQ_API_KEY=...
+ *
+ * Diagnose: bisher schluckte jeder Fehler (Netzwerk, Timeout, HTTP-Fehler,
+ * kaputtes JSON) den Server-Pfad komplett still (runCatching { }.getOrNull()
+ * ohne jegliches Log) - im Fehlerfall liess sich nie unterscheiden, ob der
+ * Server nie erreicht wurde oder nur ein schwaches Ergebnis lieferte.
+ * Alle Fehlerpfade loggen jetzt unter dem Tag "NutriSnapImport"
+ * (adb logcat -s NutriSnapImport), und [lastError] hält den letzten Grund
+ * für den Aufrufer (RecipeScraper) zum Einbauen in den Report-String.
  */
 object RecipeNormalizeServer {
+
+    private const val TAG = "NutriSnapImport"
+
+    /** Letzter Fehlgrund von [importFromUrl]/[normalize] (HTTP-Code, Exception-Typ, Validierung). */
+    @Volatile
+    var lastError: String? = null
+        private set
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -41,7 +57,11 @@ object RecipeNormalizeServer {
         platform: String,
         imageUrl: String? = null
     ): Recipe? = withContext(Dispatchers.IO) {
-        if (!isConfigured()) return@withContext null
+        if (!isConfigured()) {
+            lastError = "not_configured"
+            Log.w(TAG, "importFromUrl: SUPABASE_URL/ANON_KEY leer (BuildConfig) - Server-Pfad übersprungen")
+            return@withContext null
+        }
         if (sourceUrl.isBlank()) return@withContext null
         postNormalize(
             caption = null,
@@ -60,8 +80,15 @@ object RecipeNormalizeServer {
         platform: String,
         imageUrl: String?
     ): Recipe? = withContext(Dispatchers.IO) {
-        if (!isConfigured()) return@withContext null
-        if (caption.trim().length < 20) return@withContext null
+        if (!isConfigured()) {
+            lastError = "not_configured"
+            Log.w(TAG, "normalize: SUPABASE_URL/ANON_KEY leer (BuildConfig) - Server-Pfad übersprungen")
+            return@withContext null
+        }
+        if (caption.trim().length < 20) {
+            lastError = "caption_too_short"
+            return@withContext null
+        }
         postNormalize(
             caption = caption,
             sourceUrl = sourceUrl,
@@ -75,31 +102,50 @@ object RecipeNormalizeServer {
         sourceUrl: String?,
         platform: String,
         imageUrl: String?
-    ): Recipe? = runCatching {
+    ): Recipe? {
+        lastError = null
         val base = BuildConfig.SUPABASE_URL.trimEnd('/')
         val endpoint = "$base/functions/v1/recipe-normalize"
+        val mode = if (caption == null) "url" else "caption"
 
-        val body = JSONObject().apply {
-            put("platform", platform)
-            if (!caption.isNullOrBlank()) put("caption", caption.take(12000))
-            if (!sourceUrl.isNullOrBlank()) put("sourceUrl", sourceUrl)
-            if (!imageUrl.isNullOrBlank()) put("imageUrl", imageUrl)
-        }.toString()
+        return runCatching {
+            val body = JSONObject().apply {
+                put("platform", platform)
+                if (!caption.isNullOrBlank()) put("caption", caption.take(12000))
+                if (!sourceUrl.isNullOrBlank()) put("sourceUrl", sourceUrl)
+                if (!imageUrl.isNullOrBlank()) put("imageUrl", imageUrl)
+            }.toString()
 
-        val req = Request.Builder()
-            .url(endpoint)
-            .post(body.toRequestBody("application/json".toMediaType()))
-            .header("Authorization", "Bearer ${BuildConfig.SUPABASE_ANON_KEY}")
-            .header("apikey", BuildConfig.SUPABASE_ANON_KEY)
-            .header("Content-Type", "application/json")
-            .build()
+            val req = Request.Builder()
+                .url(endpoint)
+                .post(body.toRequestBody("application/json".toMediaType()))
+                .header("Authorization", "Bearer ${BuildConfig.SUPABASE_ANON_KEY}")
+                .header("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .header("Content-Type", "application/json")
+                .build()
 
-        client.newCall(req).execute().use { resp ->
-            val text = resp.body?.string().orEmpty()
-            if (!resp.isSuccessful) return@runCatching null
-            parseResponse(text, sourceUrl, platform, imageUrl)
-        }
-    }.getOrNull()
+            client.newCall(req).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) {
+                    lastError = "http_${resp.code}"
+                    Log.w(
+                        TAG,
+                        "recipe-normalize[$mode] HTTP ${resp.code}: ${text.take(300)}"
+                    )
+                    return@runCatching null
+                }
+                val recipe = parseResponse(text, sourceUrl, platform, imageUrl)
+                if (recipe == null && lastError == null) {
+                    // parseResponse hat bereits selbst geloggt, wieso - hier nur Kontext ergänzen
+                    lastError = "parse_rejected"
+                }
+                recipe
+            }
+        }.onFailure { e ->
+            lastError = "exception_${e.javaClass.simpleName}"
+            Log.e(TAG, "recipe-normalize[$mode] Aufruf fehlgeschlagen (${e.javaClass.simpleName}): ${e.message}", e)
+        }.getOrNull()
+    }
 
     private fun parseResponse(
         text: String,
@@ -107,16 +153,35 @@ object RecipeNormalizeServer {
         platform: String,
         imageUrl: String?
     ): Recipe? {
-        val j = JSONObject(text)
-        if (j.has("error")) return null
+        val j = runCatching { JSONObject(text) }.getOrElse {
+            lastError = "invalid_json"
+            Log.w(TAG, "recipe-normalize: Antwort ist kein valides JSON (${it.message}): ${text.take(300)}")
+            return null
+        }
+        if (j.has("error")) {
+            lastError = "server_error"
+            Log.w(TAG, "recipe-normalize: Server meldet error=${j.optString("error").take(200)}")
+            return null
+        }
 
         val title = j.optString("title", "").trim()
             .takeIf { it.isNotBlank() && !it.equals("null", true) }
-            ?: return null
+        if (title == null) {
+            lastError = "no_title"
+            Log.w(TAG, "recipe-normalize: kein/leerer title im Response: ${text.take(300)}")
+            return null
+        }
 
         val ingredients = j.optString("ingredients", "").trim()
         val instructions = j.optString("instructions", "").trim()
-        if (ingredients.length < 8 && instructions.length < 8) return null
+        if (ingredients.length < 8 && instructions.length < 8) {
+            lastError = "empty_body"
+            Log.w(
+                TAG,
+                "recipe-normalize: ingredients+instructions zu kurz (ing=${ingredients.length} instr=${instructions.length})"
+            )
+            return null
+        }
 
         val servings = j.optInt("servings", 1).coerceIn(1, 24)
         val prep = j.optInt("prep_time_minutes")

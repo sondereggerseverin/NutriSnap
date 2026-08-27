@@ -335,9 +335,12 @@ class RecipeScraper(private val context: Context) {
         // unvollständiges Groq-Ergebnis ist einem rohen Regex-Fallback fast
         // immer vorzuziehen (siehe finaler Vergleich unten).
         var bestServerCandidate: Recipe? = null
+        var serverUrlError: String? = null
+        var serverCapError: String? = null
         if (RecipeNormalizeServer.isConfigured()) {
             progress("Server-Import…")
             val serverRecipe = RecipeNormalizeServer.importFromUrl(url, "instagram")
+            serverUrlError = RecipeNormalizeServer.lastError
             if (serverRecipe != null) {
                 // Caption max. 6s mitnehmen, dann fehlende Qty-Zeilen (Milch, ca. ml) nachziehen
                 val capForMerge = withTimeoutOrNull(6_000L) { captionJob.await() }.orEmpty()
@@ -417,6 +420,7 @@ class RecipeScraper(private val context: Context) {
             val serverCap = RecipeNormalizeServer.normalize(
                 workingCaption, url, "instagram", thumbnail
             )
+            serverCapError = RecipeNormalizeServer.lastError
             if (serverCap != null && isAmmQuality(serverCap)) {
                 publishReport(
                     "path=amm-server-caption score=${ingredientQualityScore(serverCap)} " +
@@ -511,6 +515,9 @@ class RecipeScraper(private val context: Context) {
             appendLine("captionHasChia=${workingCaption.contains("chia", true)}")
             appendLine("captionHasAgave=${workingCaption.contains("agave", true)}")
             appendLine("serverUrlScore=$serverUrlScore")
+            appendLine("serverUrlError=$serverUrlError")
+            appendLine("serverCapError=$serverCapError")
+            appendLine("bestServerCandidateScore=${bestServerCandidate?.let { ingredientQualityScore(it) } ?: -1}")
             appendLine("ingLines=${parsed.ingredients.lines().count { it.isNotBlank() }}")
             appendLine("ingredientsPreview=${parsed.ingredients.take(280).replace("\n", " | ")}")
             appendLine("url=$url")
