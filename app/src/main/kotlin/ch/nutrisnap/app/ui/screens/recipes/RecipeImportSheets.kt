@@ -41,6 +41,8 @@ fun ImportSheet(
     error: String?,
     importPhase: String? = null,
     openAtManualCaption: Boolean = false,
+    /** Optional: gründlicherer Re-Import (Score-Retry) statt nur Screenshot. */
+    onImproveImport: ((String) -> Unit)? = null,
     onImport: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -288,6 +290,24 @@ fun ImportSheet(
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+                if (onImproveImport != null && isSocial && url.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { onImproveImport(url.trim()) },
+                        enabled = !isLoading,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Gründlicher neu importieren")
+                    }
+                    Text(
+                        "Längerer Versuch mit Qualitäts-Retry – oft bessere Zutaten ohne Screenshot.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp)
                     )
                 }
                 if (isInstagram) {
