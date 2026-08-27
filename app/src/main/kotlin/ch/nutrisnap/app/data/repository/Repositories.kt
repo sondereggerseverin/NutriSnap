@@ -744,12 +744,13 @@ class RecipeRepository(db: NutriDatabase, private val context: Context) {
      *                    false = einmaliger schneller Versuch (Default).
      * @param allowOverwrite true = bestehendes Rezept unter derselben URL erneut scrapen
      *                       und überschreiben (für „Besser importieren“-Button).
+     * onProgress bleibt letzter Parameter, damit Trailing-Lambda an Call-Sites weiter funktioniert.
      */
     suspend fun importFromUrl(
         url: String,
-        onProgress: (String) -> Unit = {},
         highQuality: Boolean = false,
-        allowOverwrite: Boolean = false
+        allowOverwrite: Boolean = false,
+        onProgress: (String) -> Unit = {}
     ): RecipeScrapeResult {
         // Bereits vorhanden? → kein erneutes Scrapen/Extrahieren (spart API-Kosten,
         // verhindert stilles Überschreiben von Zutaten/Matches/Komponenten).
