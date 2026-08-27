@@ -39,7 +39,10 @@ fun HomeScreen(
     vm: HomeViewModel = viewModel(),
     hcVm: HealthConnectViewModel = viewModel(),
     onNavigateToDiary: (meal: MealType?, autoOpenAdd: Boolean) -> Unit = { _, _ -> },
-    onNavigateToHealth: () -> Unit = {}
+    onNavigateToHealth: () -> Unit = {},
+    onNavigateToFoodScan: () -> Unit = {},
+    onNavigateToBarcode: () -> Unit = {},
+    onNavigateToLabelScan: () -> Unit = {}
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val hcState by hcVm.uiState.collectAsStateWithLifecycle()
@@ -72,6 +75,13 @@ fun HomeScreen(
                     isViewingToday = state.isViewingToday,
                     onClick = { meal -> onNavigateToDiary(meal.type, meal.count == 0) },
                     onQuickAdd = { meal -> onNavigateToDiary(meal.type, true) }
+                )
+            }
+            item {
+                HomeScanQuickAccess(
+                    onFoodScan = onNavigateToFoodScan,
+                    onBarcode = onNavigateToBarcode,
+                    onLabelScan = onNavigateToLabelScan
                 )
             }
             if (macroSuggestions.isNotEmpty() && state.isViewingToday) {

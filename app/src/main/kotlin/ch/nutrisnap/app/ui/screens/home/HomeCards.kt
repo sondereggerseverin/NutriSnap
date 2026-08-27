@@ -684,6 +684,92 @@ internal fun MealTile(
     }
 }
 
+/** Direkter Scan-Zugriff auf der Startseite (Essen, Barcode, Nährwerttabelle). */
+@Composable
+internal fun HomeScanQuickAccess(
+    onFoodScan: () -> Unit,
+    onBarcode: () -> Unit,
+    onLabelScan: () -> Unit
+) {
+    Card(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs),
+        shape = RoundedCornerShape(NutriRadius.lg),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(1.dp)
+    ) {
+        Column(Modifier.padding(NutriSpacing.md)) {
+            Text(
+                "Scannen",
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = NutriSpacing.sm)
+            )
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
+            ) {
+                HomeScanChip(
+                    icon = Icons.Default.PhotoCamera,
+                    label = "Essen",
+                    color = MacroColors.calories,
+                    onClick = onFoodScan,
+                    modifier = Modifier.weight(1f)
+                )
+                HomeScanChip(
+                    icon = Icons.Default.QrCodeScanner,
+                    label = "Barcode",
+                    color = MacroColors.protein,
+                    onClick = onBarcode,
+                    modifier = Modifier.weight(1f)
+                )
+                HomeScanChip(
+                    icon = Icons.Default.CameraAlt,
+                    label = "Nährwert",
+                    color = MacroColors.carbs,
+                    onClick = onLabelScan,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeScanChip(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    color: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(NutriRadius.md),
+        color = color.copy(alpha = 0.12f)
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp, horizontal = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(icon, contentDescription = label, Modifier.size(22.dp), tint = color)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                label,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1
+            )
+        }
+    }
+}
+
 @Composable
 internal fun StreakCard(streak: Int) {
     if (streak <= 0) return

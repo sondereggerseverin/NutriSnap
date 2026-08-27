@@ -357,7 +357,10 @@ fun MainScaffold(
                             restoreState = !autoOpenAdd
                         }
                     },
-                    onNavigateToHealth = { navController.navigate("health") }
+                    onNavigateToHealth = { navController.navigate("health") },
+                    onNavigateToFoodScan = { navController.navigate("food_scan") },
+                    onNavigateToBarcode = { navController.navigate("diary?open=true&scan=true") },
+                    onNavigateToLabelScan = { navController.navigate("nutrition_label_scan") }
                 )
             }
             composable(
