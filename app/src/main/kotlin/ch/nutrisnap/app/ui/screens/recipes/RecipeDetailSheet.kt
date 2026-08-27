@@ -74,7 +74,9 @@ fun RecipeDetailSheet(
     onRetryImage: (() -> Unit)? = null,
     imageRefreshStatus: String? = null,
     /** Persistierte Matches – wenn componentGroup gesetzt, Zutaten gruppiert anzeigen. */
-    ingredientMatches: List<ch.nutrisnap.app.data.model.IngredientMatch> = emptyList()
+    ingredientMatches: List<ch.nutrisnap.app.data.model.IngredientMatch> = emptyList(),
+    /** Social-URL → gründlicherer Re-Import (Score-Retry). null = Button ausblenden. */
+    onReimportHighQuality: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
@@ -785,8 +787,38 @@ fun RecipeDetailSheet(
 
             recipe.sourceUrl?.let { link ->
                 item {
-                    OutlinedButton(onClick={ runCatching{context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(link)).apply{flags=Intent.FLAG_ACTIVITY_NEW_TASK})}}, modifier=Modifier.fillMaxWidth()) {
-                        Icon(Icons.Default.OpenInNew,null); Spacer(Modifier.width(6.dp)); Text("Original-Link öffnen")
+                    OutlinedButton(
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse(link)).apply {
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    }
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.OpenInNew, null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Original-Link öffnen")
+                    }
+                    if (onReimportHighQuality != null) {
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = onReimportHighQuality,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.AutoAwesome, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Gründlicher neu importieren")
+                        }
+                        Text(
+                            "Längerer Import mit Qualitäts-Retry – überschreibt Zutaten und Schritte.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
                     }
                 }
             }

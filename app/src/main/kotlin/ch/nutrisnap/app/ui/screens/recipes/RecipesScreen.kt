@@ -1051,7 +1051,19 @@ fun RecipesScreen(
             },
             onRetryImage = { vm.refreshRecipeImage(live) },
             imageRefreshStatus = imageRefresh.takeIf { it.first == live.id }?.second,
-            ingredientMatches = liveMatches
+            ingredientMatches = liveMatches,
+            onReimportHighQuality = live.sourceUrl?.takeIf { url ->
+                val u = url.lowercase()
+                val p = (live.platform ?: "").lowercase()
+                p in setOf("instagram", "tiktok") ||
+                    "instagram.com" in u || "instagr.am" in u ||
+                    "tiktok.com" in u || "vm.tiktok.com" in u
+            }?.let { url ->
+                {
+                    selectedRecipe = null
+                    vm.reimportHighQuality(url)
+                }
+            }
         )
     }
 

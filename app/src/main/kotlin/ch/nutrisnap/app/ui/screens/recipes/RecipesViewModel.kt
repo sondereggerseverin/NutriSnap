@@ -307,8 +307,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                         // Caption/Scrape zu dünn → Screenshot nachladen anbieten
                         needsScreenshot = weak && social,
                         blockedUrl = if (weak && social) url else it.blockedUrl,
-                        // Social-Import war schnell → Button „Gründlicher importieren“ anbieten
-                        canImproveImport = social && !weak
+                        // Social-Import war schnell → jederzeit gründlicher nachziehbar
+                        canImproveImport = social
                     )
                 }
                 return@launch
@@ -532,7 +532,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                     importPhase = "Link laden…",
                     importError = null,
                     instagramBlocked = false,
-                    needsScreenshot = false
+                    needsScreenshot = false,
+                    canImproveImport = false
                 )
             }
             try {
@@ -698,7 +699,9 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                         importPhase = null,
                         lastImport = base,
                         needsScreenshot = stillWeak && shots.isEmpty(),
-                        blockedUrl = if (stillWeak && shots.isEmpty()) trimmedUrl else it.blockedUrl
+                        blockedUrl = if (stillWeak && shots.isEmpty()) trimmedUrl else it.blockedUrl,
+                        // Hybrid ohne Screenshot war schneller Pfad → gründlicher anbieten
+                        canImproveImport = shots.isEmpty() && isSocialRecipeUrl(trimmedUrl)
                     )
                 }
             } catch (e: Exception) {
