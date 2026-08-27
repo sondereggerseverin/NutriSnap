@@ -127,7 +127,17 @@ object RecipeNormalizeServer {
             client.newCall(req).execute().use { resp ->
                 val text = resp.body?.string().orEmpty()
                 if (!resp.isSuccessful) {
-                    lastError = "http_${resp.code}"
+                    // Die Edge Function reicht bei einem Groq-Fehler {error, detail} durch
+                    // (z.B. Rate-Limit, ungueltiger/abgelaufener GROQ_API_KEY, dekommissioniertes
+                    // Modell). Bisher ging dieser Grund verloren - nur "http_502" half niemandem.
+                    val bodyJson = runCatching { JSONObject(text) }.getOrNull()
+                    val serverError = bodyJson?.optString("error")?.takeIf { it.isNotBlank() }
+                    val serverDetail = bodyJson?.optString("detail")?.takeIf { it.isNotBlank() }
+                    lastError = buildString {
+                        append("http_${resp.code}")
+                        if (serverError != null) append(":${serverError.take(80)}")
+                        if (serverDetail != null) append(" – ${serverDetail.take(200)}")
+                    }
                     Log.w(
                         TAG,
                         "recipe-normalize[$mode] HTTP ${resp.code}: ${text.take(300)}"
