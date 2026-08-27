@@ -13,7 +13,12 @@ internal data class ImportState(
     val instagramBlocked: Boolean = false,
     /** Caption/Link zu dünn – Nutzer soll Screenshot(s) anhängen. */
     val needsScreenshot:  Boolean = false,
-    val blockedUrl:       String  = ""
+    val blockedUrl:       String  = "",
+    /**
+     * true nach schnellem Social-Import → UI zeigt „Gründlicher importieren“.
+     * Wird bei highQuality-Reimport wieder false.
+     */
+    val canImproveImport: Boolean = false
 )
 
 data class NutritionState(
@@ -59,6 +64,8 @@ data class RecipesUiState(
     val instagramBlocked: Boolean      = false,
     val needsScreenshot:  Boolean      = false,
     val blockedUrl:       String       = "",
+    /** Nach schnellem Social-Import: „Gründlicher importieren“ anbieten. */
+    val canImproveImport: Boolean      = false,
     val nutritionState:   NutritionState = NutritionState(),
     val isTranslating:    Boolean      = false
 )

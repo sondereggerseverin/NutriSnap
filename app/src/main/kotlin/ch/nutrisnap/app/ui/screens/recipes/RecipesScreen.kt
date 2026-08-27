@@ -826,9 +826,38 @@ fun RecipesScreen(
             onDismissRequest = vm::clearLastImport,
             icon = { Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary) },
             title = { Text("Rezept importiert!") },
-            text = { Text(recipe.displayTitle()) },
-            confirmButton = { TextButton(onClick = { selectedRecipe = recipe; vm.clearLastImport() }) { Text("Ansehen") } },
-            dismissButton = { TextButton(onClick = vm::clearLastImport) { Text("OK") } }
+            text = {
+                Column {
+                    Text(recipe.displayTitle())
+                    if (state.canImproveImport) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Unzufrieden mit dem Ergebnis? Gründlicherer Import dauert länger, liefert aber oft bessere Zutaten.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedRecipe = recipe; vm.clearLastImport() }) {
+                    Text("Ansehen")
+                }
+            },
+            dismissButton = {
+                Row {
+                    if (state.canImproveImport) {
+                        val improveUrl = recipe.sourceUrl.orEmpty()
+                        TextButton(
+                            onClick = {
+                                vm.clearLastImport()
+                                vm.reimportHighQuality(improveUrl)
+                            }
+                        ) { Text("Gründlicher") }
+                    }
+                    TextButton(onClick = vm::clearLastImport) { Text("OK") }
+                }
+            }
         )
     }
 

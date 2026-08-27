@@ -222,6 +222,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             instagramBlocked  = imp.instagramBlocked,
             needsScreenshot   = imp.needsScreenshot,
             blockedUrl        = imp.blockedUrl,
+            canImproveImport  = imp.canImproveImport,
             nutritionState    = nut,
             isTranslating     = translating
         )
@@ -261,7 +262,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun setSort(s: RecipeSort) { _sort.value = s }
     fun clearError()        { _importState.update { it.copy(importError = null) } }
-    fun clearLastImport()   { _importState.update { it.copy(lastImport = null) } }
+    fun clearLastImport()   { _importState.update { it.copy(lastImport = null, canImproveImport = false) } }
     fun clearInstagramBlocked() { _importState.update { it.copy(instagramBlocked = false, blockedUrl = "") } }
     fun clearNutrition()    { _nutritionState.value = NutritionState() }
 
@@ -273,7 +274,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                     importPhase = "Starte…",
                     importError = null,
                     instagramBlocked = false,
-                    needsScreenshot = false
+                    needsScreenshot = false,
+                    canImproveImport = false
                 )
             }
             // Bestehendes Rezept unter dieser URL nicht neu scrapen/übersetzen/überschreiben
@@ -284,7 +286,8 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 return@launch
             }
-            val result: RecipeScrapeResult = repo.importFromUrl(url) { phase ->
+            // Schneller Default-Pfad (kein Score-Retry)
+            val result: RecipeScrapeResult = repo.importFromUrl(url, highQuality = false) { phase ->
                 _importState.update { s -> s.copy(importPhase = phase) }
             }
             if (result.success && result.recipe != null) {
@@ -303,7 +306,9 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                         lastImport = updated,
                         // Caption/Scrape zu dünn → Screenshot nachladen anbieten
                         needsScreenshot = weak && social,
-                        blockedUrl = if (weak && social) url else it.blockedUrl
+                        blockedUrl = if (weak && social) url else it.blockedUrl,
+                        // Social-Import war schnell → Button „Gründlicher importieren“ anbieten
+                        canImproveImport = social && !weak
                     )
                 }
                 return@launch
@@ -324,6 +329,59 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                             importPhase = null,
                             importError = result.error ?: "Fehler beim Importieren"
                         )
+                }
+            }
+        }
+    }
+
+    /**
+     * Gründlicher Re-Import (Score-Retry + 3,5 s Pause).
+     * Überschreibt das bestehende Rezept unter derselben URL.
+     * Wird vom „Gründlicher importieren“-Button nach dem schnellen Import ausgelöst.
+     */
+    fun reimportHighQuality(url: String) {
+        if (url.isBlank()) return
+        viewModelScope.launch {
+            _importState.update {
+                it.copy(
+                    isImporting = true,
+                    importPhase = "Gründlicher Import…",
+                    importError = null,
+                    canImproveImport = false,
+                    needsScreenshot = false
+                )
+            }
+            val result = repo.importFromUrl(
+                url,
+                highQuality = true,
+                allowOverwrite = true
+            ) { phase ->
+                _importState.update { s -> s.copy(importPhase = phase) }
+            }
+            if (result.success && result.recipe != null) {
+                val r = result.recipe
+                val platform = (r.platform ?: "").lowercase()
+                val forceGerman = platform in setOf("instagram", "tiktok", "bild")
+                val updated = repo.applyGermanMetricIfNeeded(
+                    r, enabled = shouldAutoGermanMetric(), force = forceGerman
+                )
+                _importState.update {
+                    it.copy(
+                        isImporting = false,
+                        importPhase = null,
+                        lastImport = updated,
+                        canImproveImport = false
+                    )
+                }
+            } else {
+                _importState.update {
+                    it.copy(
+                        isImporting = false,
+                        importPhase = null,
+                        importError = result.error ?: "Gründlicher Import fehlgeschlagen",
+                        // Button wieder anbieten, falls man es nochmal versuchen will
+                        canImproveImport = true
+                    )
                 }
             }
         }
