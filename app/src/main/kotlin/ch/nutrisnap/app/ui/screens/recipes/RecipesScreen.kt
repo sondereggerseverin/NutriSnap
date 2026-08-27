@@ -352,8 +352,8 @@ fun RecipesScreen(
                             collectionFilterId = null
                             hideIncomplete = false
                         },
-                        label = { Text("Alle", fontSize = 12.sp) },
-                        modifier = Modifier.height(32.dp)
+                        label = { Text("Alle", fontSize = 11.sp) },
+                        modifier = Modifier.height(28.dp)
                     )
                     FilterChip(
                         selected = favoritesOnly,
@@ -364,10 +364,10 @@ fun RecipesScreen(
                         label = {
                             Text(
                                 if (favCount > 0) "★ $favCount" else "★ Favoriten",
-                                fontSize = 12.sp
+                                fontSize = 11.sp
                             )
                         },
-                        modifier = Modifier.height(32.dp)
+                        modifier = Modifier.height(28.dp)
                     )
                     FilterChip(
                         selected = hasActiveFilters,
@@ -375,7 +375,7 @@ fun RecipesScreen(
                         label = {
                             Text(
                                 if (activeFilterCount > 0) "Filter · $activeFilterCount" else "Filter",
-                                fontSize = 12.sp
+                                fontSize = 11.sp
                             )
                         },
                         leadingIcon = if (hasActiveFilters) {
@@ -383,7 +383,7 @@ fun RecipesScreen(
                                 Icon(
                                     Icons.Default.FilterList,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(14.dp)
                                 )
                             }
                         } else {
@@ -391,11 +391,11 @@ fun RecipesScreen(
                                 Icon(
                                     Icons.Default.Tune,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(14.dp)
                                 )
                             }
                         },
-                        modifier = Modifier.height(32.dp)
+                        modifier = Modifier.height(28.dp)
                     )
                 }
                 IconButton(

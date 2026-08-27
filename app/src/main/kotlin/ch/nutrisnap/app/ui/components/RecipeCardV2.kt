@@ -305,16 +305,17 @@ fun RecipeGridCard(
     val baseServings = recipe.servings.coerceAtLeast(1)
     val kcalPer = recipe.totalCalories?.div(baseServings)
     val ultraCompact = density >= 8
-    // 6 → ~3 Zeilen, 8 → ~4 Zeilen auf typischem Phone (2 Spalten)
-    val imageAspect = if (ultraCompact) 0.72f else 0.88f
-    val titleMaxLines = if (ultraCompact) 1 else 2
-    val titleSize = if (ultraCompact) 11.sp else 13.sp
-    val titleLineHeight = if (ultraCompact) 13.sp else 16.sp
-    val kcalSize = if (ultraCompact) 11.sp else 12.sp
-    val textPadV = if (ultraCompact) 4.dp else 6.dp
-    val textPadH = if (ultraCompact) 6.dp else 8.dp
-    val btnSize = if (ultraCompact) 26.dp else 30.dp
-    val btnIconSize = if (ultraCompact) 14.dp else 16.dp
+    // Ziel: 6 ≈ 3 Zeilen, 8 ≈ 4 Zeilen auf typischem Phone (2 Spalten).
+    // Bildbreite ~166dp → Aspect muss deutlich unter 1.0, sonst passen nur 4 Kacheln.
+    val imageAspect = if (ultraCompact) 0.55f else 0.68f
+    val titleMaxLines = 1
+    val titleSize = if (ultraCompact) 11.sp else 12.sp
+    val titleLineHeight = if (ultraCompact) 13.sp else 14.sp
+    val kcalSize = if (ultraCompact) 10.sp else 11.sp
+    val textPadV = if (ultraCompact) 3.dp else 4.dp
+    val textPadH = if (ultraCompact) 6.dp else 7.dp
+    val btnSize = if (ultraCompact) 24.dp else 28.dp
+    val btnIconSize = if (ultraCompact) 13.dp else 15.dp
 
     Card(
         modifier = modifier
@@ -463,17 +464,6 @@ fun RecipeGridCard(
                             fontSize = kcalSize,
                             color = MacroColors.calories
                         )
-                    }
-                    if (!ultraCompact) {
-                        recipe.platform?.takeIf { it.isNotBlank() }?.let { platform ->
-                            Text(
-                                platform.replaceFirstChar { c -> c.uppercase() },
-                                fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
                     }
                 }
             }
