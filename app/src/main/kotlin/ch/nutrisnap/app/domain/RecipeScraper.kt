@@ -524,11 +524,24 @@ class RecipeScraper(private val context: Context) {
         }
         publishReport(report)
 
-        // Bei schwachem Import kurze Diagnose in Beschreibung (Screenshot-tauglich)
+        // Bei schwachem Import: volle Diagnose direkt sichtbar in die Beschreibung
+        // (statt nur "Log: NutriSnapImport" - das war ohne adb wertlos). So kann
+        // der Grund per Screenshot/Copy-Paste weitergegeben werden, ganz ohne Logcat.
         val desc = if (score < 50) {
+            val diagnosis = buildString {
+                appendLine("⚠️ Import unvollständig (Score $score)")
+                appendLine("Pfad: $pathUsed")
+                appendLine("Server-Fehler (Link-Import): ${serverUrlError ?: "keiner / nicht versucht"}")
+                appendLine("Server-Fehler (Caption-Import): ${serverCapError ?: "keiner / nicht versucht"}")
+                appendLine(
+                    "Bestes Server-Ergebnis (Score): " +
+                        (bestServerCandidate?.let { ingredientQualityScore(it) }?.toString() ?: "kein Kandidat")
+                )
+                append("Caption-Länge: ${workingCaption.length} Zeichen")
+            }
             listOfNotNull(
                 parsed.description.takeIf { it.isNotBlank() },
-                "⚠️ Import unvollständig (Score $score). Log: NutriSnapImport"
+                diagnosis
             ).joinToString("\n\n")
         } else parsed.description
 
