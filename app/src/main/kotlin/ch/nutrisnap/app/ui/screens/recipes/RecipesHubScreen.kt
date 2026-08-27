@@ -63,9 +63,8 @@ fun RecipesHubScreen(
             onSelect = { tab = it },
             modifier = Modifier
                 .fillMaxWidth()
-                // Gleiches horizontales Padding wie Suchleiste/Filter darunter (12dp),
-                // damit der Hub-Header sauber mit dem restlichen Content fluchtet.
-                .padding(horizontal = NutriSpacing.md, vertical = NutriSpacing.xs)
+                // Eng am Status/Scaffold – kein toter Streifen über/unter dem Segment
+                .padding(horizontal = NutriSpacing.md, vertical = 2.dp)
         )
         when (tab) {
             RecipeTab.SAVED -> RecipesScreen(
@@ -90,10 +89,10 @@ private fun RecipeHubSegmentedControl(
 
     Row(
         modifier = modifier
-            .height(44.dp)
+            .height(40.dp)
             .clip(trackShape)
             .background(scheme.surfaceVariant.copy(alpha = 0.55f))
-            .padding(3.dp),
+            .padding(2.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         RecipeTab.entries.forEach { item ->

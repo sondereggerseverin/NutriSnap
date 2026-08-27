@@ -269,11 +269,11 @@ fun RecipesScreen(
         // fillMaxSize + weight(1f) am Grid/List: sonst misst Column die Lazy-Liste
         // mit unbounded height → alle 251 Items werden gemessen → ANR in RectList/MeasureAndLayout.
         Column(Modifier.fillMaxSize().padding(padding)) {
-            // Suche knapp unter dem Hub-Segment, mit etwas Luft für sauberes Layout
+            // Suche eng unter dem Hub – kein toter Zwischenraum
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                    .padding(horizontal = 12.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
@@ -282,12 +282,12 @@ fun RecipesScreen(
                         vm.setQuery(it)
                         if (it.isNotBlank()) vm.clearCookFilters()
                     },
-                    placeholder = { Text("Suchen…", fontSize = 14.sp) },
-                    leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(20.dp)) },
-                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Suchen…", fontSize = 13.sp) },
+                    leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(18.dp)) },
+                    modifier = Modifier.weight(1f).heightIn(max = 48.dp),
                     singleLine = true,
                     shape = RoundedCornerShape(10.dp),
-                    textStyle = LocalTextStyle.current.copy(fontSize = 14.sp)
+                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp)
                 )
                 IconButton(
                     onClick = { showCollections = true },
@@ -692,7 +692,7 @@ fun RecipesScreen(
                             RecipeSort.CALORIES -> "kcal"
                         },
                     fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp)
                 )
             }
 
@@ -703,37 +703,27 @@ fun RecipesScreen(
                     sub = if (hideIncomplete) "Schalte den Filter aus, um alle zu sehen" else "Tippe auf + und füge einen Link ein"
                 )
             } else if (useGrid) {
-                // Grid: Phone 2, Tablet 3–4 Spalten; Dichte 4/6 → 2 bzw. 3 Ziel-Zeilen.
+                // Exakt targetRows Zeilen in die sichtbare Grid-Fläche (Scroll-Top).
+                // FABs überlagern rechts – kein riesiges bottomPad in der Höhenrechnung.
                 val gap = when {
                     window.isTablet -> 12.dp
                     gridDensity <= 4 -> 8.dp
-                    else -> 7.dp
+                    else -> 6.dp
                 }
                 val hPad = if (window.isTablet) 16.dp else 10.dp
-                val topPad = 2.dp
-                // Reserve für den 4-teiligen FAB-Stapel (3× SmallFAB 40dp + 1× FAB 56dp
-                // + 3× 8dp Abstand + Scaffold-Rand) – vorher 80dp war zu knapp, sobald
-                // die Kacheln dichter wurden, und die letzte Zeile überlappte die FABs.
-                val bottomPad = 216.dp
                 val targetRows = if (gridDensity <= 4) 2 else 3
-                // Textbereich unter dem Bild. Bei 4 (große Kacheln) 2 Titelzeilen möglich.
-                val textAreaHeight = if (gridDensity <= 4) 52.dp else 44.dp
 
-                // Kartenhöhe aus gemessener Grid-Fläche → 4 bzw. 6 Kacheln sicher sichtbar.
                 BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    val availableHeight = (maxHeight - topPad - bottomPad).coerceAtLeast(200.dp)
-                    val cardHeight = ((availableHeight - gap * (targetRows - 1)) / targetRows)
-                        .coerceAtLeast(90.dp)
-                    val availableWidth = (maxWidth - hPad * 2).coerceAtLeast(120.dp)
-                    val cardWidth = ((availableWidth - gap * (gridColumns - 1)) / gridColumns)
-                        .coerceAtLeast(80.dp)
-                    val imageHeight = (cardHeight - textAreaHeight).coerceAtLeast(50.dp)
-                    val computedAspect = (cardWidth / imageHeight).coerceIn(0.35f, 1.3f)
+                    // 3 (bzw. 2) Kartenhöhen + Gaps = volle maxHeight → exakt 6/4 sichtbar
+                    val cardHeight = ((maxHeight - gap * (targetRows - 1)) / targetRows)
+                        .coerceAtLeast(96.dp)
 
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(gridColumns),
                         contentPadding = PaddingValues(
-                            start = hPad, end = hPad, top = topPad, bottom = bottomPad
+                            start = hPad, end = hPad, top = 0.dp,
+                            // Nur beim Weiter-Scrollen Platz unter der letzten Zeile
+                            bottom = 88.dp
                         ),
                         horizontalArrangement = Arrangement.spacedBy(gap),
                         verticalArrangement = Arrangement.spacedBy(gap),
@@ -749,7 +739,7 @@ fun RecipesScreen(
                                 onDuplicate = { vm.duplicateRecipe(recipe) },
                                 onToggleFavorite = { vm.toggleFavorite(recipe) },
                                 density = gridDensity,
-                                imageAspect = computedAspect
+                                cardHeight = cardHeight
                             )
                         }
                     }

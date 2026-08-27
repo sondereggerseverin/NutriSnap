@@ -295,13 +295,13 @@ fun RecipeGridCard(
     onDelete: () -> Unit,
     onDuplicate: () -> Unit = {},
     onToggleFavorite: () -> Unit = {},
-    /** Ziel sichtbare Kacheln pro Bildschirm: 6 (3 Zeilen) oder 8 (4 Zeilen). */
+    /** Ziel sichtbare Kacheln pro Bildschirm: 6 (3 Zeilen) oder 4 (2 Zeilen). */
     density: Int = 6,
     /**
-     * Exakt aus der verfügbaren Grid-Fläche berechnetes Bild-Seitenverhältnis
-     * (siehe RecipesScreen). Falls null, wird ein geschätzter Fallback verwendet.
+     * Feste Kartenhöhe aus RecipesScreen (Grid-Fläche / Zielzeilen).
+     * Garantiert exakt 6 bzw. 4 Kacheln im sichtbaren Bereich.
      */
-    imageAspect: Float? = null,
+    cardHeight: androidx.compose.ui.unit.Dp? = null,
     modifier: Modifier = Modifier
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -311,29 +311,33 @@ fun RecipeGridCard(
     val kcalPer = recipe.totalCalories?.div(baseServings)
     // 4 = große Kacheln (wie früher), 6 = kompakt (~3 Zeilen)
     val largeTiles = density <= 4
-    val resolvedImageAspect = imageAspect ?: if (largeTiles) 1.15f else 0.68f
     val titleMaxLines = if (largeTiles) 2 else 1
     val titleSize = if (largeTiles) 13.sp else 12.sp
     val titleLineHeight = if (largeTiles) 16.sp else 14.sp
     val kcalSize = if (largeTiles) 12.sp else 11.sp
-    val textPadV = if (largeTiles) 6.dp else 4.dp
-    val textPadH = if (largeTiles) 8.dp else 7.dp
+    val textPadV = if (largeTiles) 6.dp else 3.dp
+    val textPadH = if (largeTiles) 8.dp else 6.dp
     val btnSize = if (largeTiles) 30.dp else 26.dp
     val btnIconSize = if (largeTiles) 16.dp else 14.dp
 
+    val cardMod = if (cardHeight != null) {
+        modifier.fillMaxWidth().height(cardHeight).clickable(onClick = onClick)
+    } else {
+        modifier.fillMaxWidth().clickable(onClick = onClick)
+    }
+
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        modifier = cardMod,
         shape = RoundedCornerShape(NutriRadius.md),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(1.dp)
     ) {
-        Column {
+        Column(Modifier.fillMaxSize()) {
+            // Bild füllt den Rest über dem Textblock
             Box(
                 Modifier
+                    .weight(1f)
                     .fillMaxWidth()
-                    .aspectRatio(resolvedImageAspect)
             ) {
                 RecipeCardImage(
                     recipe = recipe,
