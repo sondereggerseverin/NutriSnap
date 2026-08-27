@@ -711,8 +711,10 @@ Antworte NUR mit JSON:
 
     private fun callGroq(prompt: String, apiKey: String): Result<String> {
         return try {
+            // llama-3.3-70b-versatile von Groq am 17.06.2026 deprecated (model_not_found).
+            // Ersatz laut Groq: https://console.groq.com/docs/deprecations
             val requestJson = JSONObject().apply {
-                put("model", "llama-3.3-70b-versatile")
+                put("model", "openai/gpt-oss-120b")
                 put("temperature", 0.2)
                 put("max_tokens", 3000)
                 put("messages", JSONArray().apply {

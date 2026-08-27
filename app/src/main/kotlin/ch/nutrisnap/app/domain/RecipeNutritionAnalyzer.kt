@@ -857,8 +857,10 @@ object RecipeNutritionAnalyzer {
         val userMessage = "Ingredients:\n$listText"
 
         fun callGroq(): Map<String, AiNutritionEntry>? {
+            // llama-3.1-8b-instant von Groq am 17.06.2026 deprecated (model_not_found).
+            // Ersatz laut Groq: https://console.groq.com/docs/deprecations
             val payload = JSONObject().apply {
-                put("model", "llama-3.1-8b-instant")
+                put("model", "openai/gpt-oss-20b")
                 put("temperature", 0.2)
                 put("max_tokens", 1200)
                 put("messages", JSONArray().apply {

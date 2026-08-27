@@ -16,7 +16,7 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
- * Uses the Groq API (llama-3.1-8b-instant, free tier) to parse a raw
+ * Uses the Groq API (openai/gpt-oss-20b, free tier) to parse a raw
  * Instagram/TikTok caption into a structured Recipe.
  *
  * Why Groq: free, fast (~1s), no new dependency (OkHttp already in project).
@@ -44,8 +44,8 @@ object RecipeAiParser {
      * @param apiKey    Groq API key from BuildConfig
      */
     /**
-     * @param fastModel true → Groq llama-3.1-8b-instant (schneller, etwas weniger präzise).
-     *                  false → llama-3.3-70b-versatile (Default).
+     * @param fastModel true → Groq openai/gpt-oss-20b (schneller, etwas weniger präzise).
+     *                  false → openai/gpt-oss-120b (Default).
      */
     suspend fun parse(
         caption:  String,
@@ -1251,8 +1251,11 @@ Rules:
 
     private fun callGroq(caption: String, apiKey: String, fastModel: Boolean = false): Recipe {
         val userMessage = "Extract recipe from this caption:\n\n$caption"
-        // 8B Instant: deutlich niedrigere Latenz auf Groq Free-Tier; 70B: bessere Struktur.
-        val modelId = if (fastModel) "llama-3.1-8b-instant" else "llama-3.3-70b-versatile"
+        // llama-3.1-8b-instant/llama-3.3-70b-versatile von Groq am 17.06.2026 deprecated
+        // (model_not_found seit Shutdown). Offizielle Ersatzmodelle:
+        // https://console.groq.com/docs/deprecations
+        // gpt-oss-20b: niedrigere Latenz (Free-Tier); gpt-oss-120b: bessere Struktur.
+        val modelId = if (fastModel) "openai/gpt-oss-20b" else "openai/gpt-oss-120b"
 
         val body = JSONObject().apply {
             put("model", modelId)

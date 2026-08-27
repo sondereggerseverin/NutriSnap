@@ -16,7 +16,11 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const MODEL = "llama-3.3-70b-versatile";
+// llama-3.3-70b-versatile wurde von Groq am 17.06.2026 deprecated und ist seit
+// dem Shutdown nicht mehr erreichbar (model_not_found) - offizielle Empfehlung
+// von Groq: openai/gpt-oss-120b (Alternative: qwen/qwen3.6-27b).
+// https://console.groq.com/docs/deprecations
+const MODEL = "openai/gpt-oss-120b";
 
 const SYSTEM = `You are a recipe extraction assistant for a German nutrition app (NutriSnap).
 Convert ANY social-media caption OR spoken video transcript (German, English, French, OR Italian; emoji bullets)

@@ -265,7 +265,7 @@ val KEY_CLASSIC_RECIPE_LIST = androidx.datastore.preferences.core.booleanPrefere
 
 /**
  * Rezept-Import-Experimente (default aus = bisheriges Verhalten).
- * Fast AI: Groq llama-3.1-8b-instant statt llama-3.3-70b-versatile.
+ * Fast AI: Groq openai/gpt-oss-20b statt openai/gpt-oss-120b.
  * Fast Scrape: kürzerer Instagram-Race-Timeout, weniger Late-Mirrors.
  */
 val KEY_RECIPE_FAST_AI_PARSE = androidx.datastore.preferences.core.booleanPreferencesKey("recipe_fast_ai_parse")
