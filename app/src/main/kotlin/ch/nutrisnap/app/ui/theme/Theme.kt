@@ -12,6 +12,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import androidx.compose.ui.platform.LocalContext
@@ -262,6 +263,11 @@ val KEY_FRESH_HOME = androidx.datastore.preferences.core.booleanPreferencesKey("
 val KEY_FRESH_RECIPE_DETAIL = androidx.datastore.preferences.core.booleanPreferencesKey("fresh_recipe_detail")
 /** true = klassische 1-Spalten-Liste (bisheriges Design), false/absent = kompakte 2-Spalten-Grid-Übersicht */
 val KEY_CLASSIC_RECIPE_LIST = androidx.datastore.preferences.core.booleanPreferencesKey("classic_recipe_list")
+/**
+ * Ziel-Anzahl sichtbarer Rezept-Kacheln auf einem Phone-Bildschirm (Grid).
+ * Erlaubt: 6 (Standard, 3 Zeilen) oder 8 (sehr kompakt, 4 Zeilen).
+ */
+val KEY_RECIPE_GRID_DENSITY = intPreferencesKey("recipe_grid_density")
 
 /**
  * Rezept-Import-Experimente (default aus = bisheriges Verhalten).

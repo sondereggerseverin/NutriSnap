@@ -63,6 +63,7 @@ import ch.nutrisnap.app.ui.theme.KEY_FRESH_UI
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_CARDS
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_DETAIL
 import ch.nutrisnap.app.ui.theme.KEY_CLASSIC_RECIPE_LIST
+import ch.nutrisnap.app.ui.theme.KEY_RECIPE_GRID_DENSITY
 import ch.nutrisnap.app.ui.components.RecipeGridCard
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import androidx.datastore.preferences.core.edit
@@ -181,6 +182,11 @@ fun RecipesScreen(
     val useGrid = !classicList
     val window = ch.nutrisnap.app.ui.rememberWindowInfo()
     val gridColumns = window.recipeGridColumns(classicList = false)
+    // 6 (Standard, ~3 Zeilen) oder 8 (~4 Zeilen) – aus Einstellungen
+    val gridDensity = when (val d = prefs?.get(KEY_RECIPE_GRID_DENSITY)) {
+        8 -> 8
+        else -> 6
+    }
 
     // Ziel-kcal aus „Was koche ich?“ einmalig anwenden, sobald ein Rezept geöffnet wird
     LaunchedEffect(selectedRecipe?.id, pendingTargetKcal) {
@@ -263,11 +269,11 @@ fun RecipesScreen(
         // fillMaxSize + weight(1f) am Grid/List: sonst misst Column die Lazy-Liste
         // mit unbounded height → alle 251 Items werden gemessen → ANR in RectList/MeasureAndLayout.
         Column(Modifier.fillMaxSize().padding(padding)) {
-            // Kompakte Suche (ohne Label → weniger Höhe)
+            // Suche möglichst nah unter dem Hub-Segment (wenig vertikaler Abstand)
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                    .padding(horizontal = 12.dp, vertical = 0.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
@@ -276,12 +282,12 @@ fun RecipesScreen(
                         vm.setQuery(it)
                         if (it.isNotBlank()) vm.clearCookFilters()
                     },
-                    placeholder = { Text("Suchen…", fontSize = 14.sp) },
-                    leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(20.dp)) },
-                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Suchen…", fontSize = 13.sp) },
+                    leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(18.dp)) },
+                    modifier = Modifier.weight(1f).heightIn(max = 48.dp),
                     singleLine = true,
                     shape = RoundedCornerShape(10.dp),
-                    textStyle = LocalTextStyle.current.copy(fontSize = 14.sp)
+                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp)
                 )
                 IconButton(
                     onClick = { showCollections = true },
@@ -697,17 +703,22 @@ fun RecipesScreen(
                     sub = if (hideIncomplete) "Schalte den Filter aus, um alle zu sehen" else "Tippe auf + und füge einen Link ein"
                 )
             } else if (useGrid) {
-                // Grid: Phone 2, Tablet 3–4 Spalten
+                // Grid: Phone 2, Tablet 3–4 Spalten; Dichte 6/8 steuert Kachelhöhe
+                val gap = when {
+                    window.isTablet -> 12.dp
+                    gridDensity >= 8 -> 6.dp
+                    else -> 8.dp
+                }
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(gridColumns),
                     contentPadding = PaddingValues(
                         start = if (window.isTablet) 16.dp else 10.dp,
                         end = if (window.isTablet) 16.dp else 10.dp,
-                        top = 4.dp,
+                        top = 2.dp,
                         bottom = 80.dp
                     ),
-                    horizontalArrangement = Arrangement.spacedBy(if (window.isTablet) 12.dp else 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(if (window.isTablet) 12.dp else 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(gap),
+                    verticalArrangement = Arrangement.spacedBy(gap),
                     modifier = Modifier.weight(1f).fillMaxWidth()
                 ) {
                     gridItems(displayedRecipes, key = { it.id }) { recipe ->
@@ -718,7 +729,8 @@ fun RecipesScreen(
                             onEdit = { editRecipe = recipe },
                             onDelete = { vm.deleteRecipe(recipe) },
                             onDuplicate = { vm.duplicateRecipe(recipe) },
-                            onToggleFavorite = { vm.toggleFavorite(recipe) }
+                            onToggleFavorite = { vm.toggleFavorite(recipe) },
+                            density = gridDensity
                         )
                     }
                 }

@@ -63,7 +63,7 @@ fun RecipesHubScreen(
             onSelect = { tab = it },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.sm)
+                .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs)
         )
         when (tab) {
             RecipeTab.SAVED -> RecipesScreen(

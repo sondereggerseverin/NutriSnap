@@ -295,6 +295,8 @@ fun RecipeGridCard(
     onDelete: () -> Unit,
     onDuplicate: () -> Unit = {},
     onToggleFavorite: () -> Unit = {},
+    /** Ziel sichtbare Kacheln pro Bildschirm: 6 (3 Zeilen) oder 8 (4 Zeilen). */
+    density: Int = 6,
     modifier: Modifier = Modifier
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -302,6 +304,17 @@ fun RecipeGridCard(
 
     val baseServings = recipe.servings.coerceAtLeast(1)
     val kcalPer = recipe.totalCalories?.div(baseServings)
+    val ultraCompact = density >= 8
+    // 6 → ~3 Zeilen, 8 → ~4 Zeilen auf typischem Phone (2 Spalten)
+    val imageAspect = if (ultraCompact) 0.72f else 0.88f
+    val titleMaxLines = if (ultraCompact) 1 else 2
+    val titleSize = if (ultraCompact) 11.sp else 13.sp
+    val titleLineHeight = if (ultraCompact) 13.sp else 16.sp
+    val kcalSize = if (ultraCompact) 11.sp else 12.sp
+    val textPadV = if (ultraCompact) 4.dp else 6.dp
+    val textPadH = if (ultraCompact) 6.dp else 8.dp
+    val btnSize = if (ultraCompact) 26.dp else 30.dp
+    val btnIconSize = if (ultraCompact) 14.dp else 16.dp
 
     Card(
         modifier = modifier
@@ -315,7 +328,7 @@ fun RecipeGridCard(
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .aspectRatio(1.15f)
+                    .aspectRatio(imageAspect)
             ) {
                 RecipeCardImage(
                     recipe = recipe,
@@ -342,7 +355,7 @@ fun RecipeGridCard(
                 ) {
                     FilledIconButton(
                         onClick = onAddToDiary,
-                        modifier = Modifier.size(30.dp),
+                        modifier = Modifier.size(btnSize),
                         colors = IconButtonDefaults.filledIconButtonColors(
                             containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.92f),
                             contentColor = MaterialTheme.colorScheme.onPrimary
@@ -351,14 +364,14 @@ fun RecipeGridCard(
                         Icon(
                             Icons.Filled.PlaylistAdd,
                             contentDescription = "Ins Tagebuch",
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(btnIconSize),
                             tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                     Box {
                         FilledIconButton(
                             onClick = { menuOpen = true },
-                            modifier = Modifier.size(30.dp),
+                            modifier = Modifier.size(btnSize),
                             colors = IconButtonDefaults.filledIconButtonColors(
                                 containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
                                 contentColor = MaterialTheme.colorScheme.onSurface
@@ -367,7 +380,7 @@ fun RecipeGridCard(
                             Icon(
                                 Icons.Filled.MoreVert,
                                 contentDescription = "Mehr",
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(btnIconSize)
                             )
                         }
                         DropdownMenu(
@@ -429,16 +442,16 @@ fun RecipeGridCard(
                     }
                 }
             }
-            Column(Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
+            Column(Modifier.padding(horizontal = textPadH, vertical = textPadV)) {
                 Text(
                     recipe.displayTitle(),
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp,
-                    maxLines = 2,
+                    fontSize = titleSize,
+                    maxLines = titleMaxLines,
                     overflow = TextOverflow.Ellipsis,
-                    lineHeight = 16.sp
+                    lineHeight = titleLineHeight
                 )
-                Spacer(Modifier.height(2.dp))
+                Spacer(Modifier.height(if (ultraCompact) 1.dp else 2.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -447,18 +460,20 @@ fun RecipeGridCard(
                         Text(
                             "${it.toInt()} kcal",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
+                            fontSize = kcalSize,
                             color = MacroColors.calories
                         )
                     }
-                    recipe.platform?.takeIf { it.isNotBlank() }?.let { platform ->
-                        Text(
-                            platform.replaceFirstChar { c -> c.uppercase() },
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                    if (!ultraCompact) {
+                        recipe.platform?.takeIf { it.isNotBlank() }?.let { platform ->
+                            Text(
+                                platform.replaceFirstChar { c -> c.uppercase() },
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }

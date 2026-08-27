@@ -43,6 +43,7 @@ import ch.nutrisnap.app.ui.theme.KEY_FRESH_UI
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_CARDS
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_DETAIL
 import ch.nutrisnap.app.ui.theme.KEY_CLASSIC_RECIPE_LIST
+import ch.nutrisnap.app.ui.theme.KEY_RECIPE_GRID_DENSITY
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_FAST_AI_PARSE
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_FAST_SCRAPE
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_PERSISTENT_CACHE
@@ -306,6 +307,28 @@ fun SettingsScreen(
                             }
                         }
                     )
+                    if (!classicList) {
+                        val density8 = (prefs?.get(KEY_RECIPE_GRID_DENSITY) ?: 6) >= 8
+                        Spacer(Modifier.height(NutriSpacing.sm))
+                        Text(
+                            "Wie viele Rezept-Kacheln sollen ungefähr auf dem Bildschirm sichtbar sein (2 Spalten)?",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(NutriSpacing.sm))
+                        SettingsSwitchRow(
+                            title = "Sehr kompakt (8 statt 6)",
+                            subtitle = if (density8) "Ca. 8 Kacheln pro Bildschirm" else "Ca. 6 Kacheln pro Bildschirm",
+                            checked = density8,
+                            onCheckedChange = { checked ->
+                                scope.launch {
+                                    context.notifDataStore.edit {
+                                        it[KEY_RECIPE_GRID_DENSITY] = if (checked) 8 else 6
+                                    }
+                                }
+                            }
+                        )
+                    }
                 }
                 SettingsCard(title = "Rezept-Import (Experiment)", icon = Icons.Default.Bolt) {
                     Text(
