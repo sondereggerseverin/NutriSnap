@@ -210,6 +210,8 @@ class RecipeScraper(private val context: Context) {
      * @param fastAi     Groq 8B Instant statt 70B beim Caption-Parse
      * @param persistentCache Caption über App-Neustart speichern
      * @param videoTranscript bei schwacher Caption Whisper-Transkript holen
+     * @param highQuality true = Score-Retry mit 3,5 s Pause (gründlicher, langsamer).
+     *                    false = einmaliger Versuch (Default, AMM-ähnlich schnell).
      */
     suspend fun scrape(
         rawUrl: String,
@@ -217,7 +219,8 @@ class RecipeScraper(private val context: Context) {
         fastScrape: Boolean = false,
         fastAi: Boolean = false,
         persistentCache: Boolean = true,
-        videoTranscript: Boolean = false
+        videoTranscript: Boolean = false,
+        highQuality: Boolean = false
     ): RecipeScrapeResult = withContext(Dispatchers.IO) {
         progress = onProgress
         usePersistentCache = persistentCache
@@ -227,13 +230,25 @@ class RecipeScraper(private val context: Context) {
             val platform = detectPlatform(url)
             progress("Link erkennen…")
             val recipe   = when (platform) {
-                "instagram" -> scrapeWithRetry { forceRefresh ->
-                    scrapeInstagram(url, fastScrape, fastAi, forceRefresh)
+                "instagram" -> {
+                    if (highQuality) {
+                        scrapeWithRetry { forceRefresh ->
+                            scrapeInstagram(url, fastScrape, fastAi, forceRefresh)
+                        }
+                    } else {
+                        scrapeInstagram(url, fastScrape, fastAi, forceRefresh = false)
+                    }
                 }
-                "tiktok"    -> scrapeWithRetry { forceRefresh ->
-                    scrapeTikTok(url, fastAi, forceRefresh)
+                "tiktok" -> {
+                    if (highQuality) {
+                        scrapeWithRetry { forceRefresh ->
+                            scrapeTikTok(url, fastAi, forceRefresh)
+                        }
+                    } else {
+                        scrapeTikTok(url, fastAi, forceRefresh = false)
+                    }
                 }
-                else        -> {
+                else -> {
                     progress("Seite laden…")
                     scrapeWeb(url, platform, fastAi)
                 }

@@ -739,13 +739,26 @@ class RecipeRepository(db: NutriDatabase, private val context: Context) {
         return toDelete.size
     }
 
-    suspend fun importFromUrl(url: String, onProgress: (String) -> Unit = {}): RecipeScrapeResult {
+    /**
+     * @param highQuality true = Score-Retry + gründlichere Pipeline (langsamer).
+     *                    false = einmaliger schneller Versuch (Default).
+     * @param allowOverwrite true = bestehendes Rezept unter derselben URL erneut scrapen
+     *                       und überschreiben (für „Besser importieren“-Button).
+     */
+    suspend fun importFromUrl(
+        url: String,
+        onProgress: (String) -> Unit = {},
+        highQuality: Boolean = false,
+        allowOverwrite: Boolean = false
+    ): RecipeScrapeResult {
         // Bereits vorhanden? → kein erneutes Scrapen/Extrahieren (spart API-Kosten,
         // verhindert stilles Überschreiben von Zutaten/Matches/Komponenten).
-        val existing = findBySourceUrl(url)
-        if (existing != null) {
-            onProgress("Bereits gespeichert")
-            return RecipeScrapeResult(success = true, recipe = existing)
+        if (!allowOverwrite) {
+            val existing = findBySourceUrl(url)
+            if (existing != null) {
+                onProgress("Bereits gespeichert")
+                return RecipeScrapeResult(success = true, recipe = existing)
+            }
         }
 
         // Experiment-Toggles aus Settings (default = bisheriges Verhalten)
@@ -762,7 +775,8 @@ class RecipeRepository(db: NutriDatabase, private val context: Context) {
             fastScrape = fastScrape,
             fastAi = fastAi,
             persistentCache = persistentCache,
-            videoTranscript = videoTranscript
+            videoTranscript = videoTranscript,
+            highQuality = highQuality
         )
         if (result.success && result.recipe != null) {
             val id = saveRecipe(result.recipe)
