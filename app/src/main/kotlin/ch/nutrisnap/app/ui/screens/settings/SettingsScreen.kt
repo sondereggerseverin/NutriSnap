@@ -308,22 +308,22 @@ fun SettingsScreen(
                         }
                     )
                     if (!classicList) {
-                        val density8 = (prefs?.get(KEY_RECIPE_GRID_DENSITY) ?: 6) >= 8
+                        val density4 = (prefs?.get(KEY_RECIPE_GRID_DENSITY) ?: 6) == 4
                         Spacer(Modifier.height(NutriSpacing.sm))
                         Text(
-                            "Wie viele Rezept-Kacheln sollen ungefähr auf dem Bildschirm sichtbar sein (2 Spalten)?",
+                            "Standard: 6 Kacheln auf einen Blick. Optional wieder größere Kacheln wie früher (4).",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(Modifier.height(NutriSpacing.sm))
                         SettingsSwitchRow(
-                            title = "Sehr kompakt (8 statt 6)",
-                            subtitle = if (density8) "Ca. 8 Kacheln pro Bildschirm" else "Ca. 6 Kacheln pro Bildschirm",
-                            checked = density8,
+                            title = "Größere Kacheln (4)",
+                            subtitle = if (density4) "Ca. 4 Kacheln pro Bildschirm (wie früher)" else "Ca. 6 Kacheln pro Bildschirm",
+                            checked = density4,
                             onCheckedChange = { checked ->
                                 scope.launch {
                                     context.notifDataStore.edit {
-                                        it[KEY_RECIPE_GRID_DENSITY] = if (checked) 8 else 6
+                                        it[KEY_RECIPE_GRID_DENSITY] = if (checked) 4 else 6
                                     }
                                 }
                             }

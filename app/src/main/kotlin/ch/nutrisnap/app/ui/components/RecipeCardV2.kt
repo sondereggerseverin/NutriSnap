@@ -309,16 +309,17 @@ fun RecipeGridCard(
 
     val baseServings = recipe.servings.coerceAtLeast(1)
     val kcalPer = recipe.totalCalories?.div(baseServings)
-    val ultraCompact = density >= 8
-    val resolvedImageAspect = imageAspect ?: if (ultraCompact) 0.55f else 0.68f
-    val titleMaxLines = 1
-    val titleSize = if (ultraCompact) 12.sp else 14.sp
-    val titleLineHeight = if (ultraCompact) 14.sp else 16.sp
-    val kcalSize = if (ultraCompact) 11.sp else 12.sp
-    val textPadV = if (ultraCompact) 4.dp else 5.dp
-    val textPadH = if (ultraCompact) 7.dp else 8.dp
-    val btnSize = if (ultraCompact) 24.dp else 28.dp
-    val btnIconSize = if (ultraCompact) 13.dp else 15.dp
+    // 4 = große Kacheln (wie früher), 6 = kompakt (~3 Zeilen)
+    val largeTiles = density <= 4
+    val resolvedImageAspect = imageAspect ?: if (largeTiles) 1.15f else 0.68f
+    val titleMaxLines = if (largeTiles) 2 else 1
+    val titleSize = if (largeTiles) 13.sp else 12.sp
+    val titleLineHeight = if (largeTiles) 16.sp else 14.sp
+    val kcalSize = if (largeTiles) 12.sp else 11.sp
+    val textPadV = if (largeTiles) 6.dp else 4.dp
+    val textPadH = if (largeTiles) 8.dp else 7.dp
+    val btnSize = if (largeTiles) 30.dp else 26.dp
+    val btnIconSize = if (largeTiles) 16.dp else 14.dp
 
     Card(
         modifier = modifier
@@ -455,7 +456,7 @@ fun RecipeGridCard(
                     overflow = TextOverflow.Ellipsis,
                     lineHeight = titleLineHeight
                 )
-                Spacer(Modifier.height(if (ultraCompact) 1.dp else 2.dp))
+                Spacer(Modifier.height(if (largeTiles) 2.dp else 1.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)

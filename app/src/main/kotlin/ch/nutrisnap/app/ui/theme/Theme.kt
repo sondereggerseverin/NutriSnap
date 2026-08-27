@@ -265,7 +265,7 @@ val KEY_FRESH_RECIPE_DETAIL = androidx.datastore.preferences.core.booleanPrefere
 val KEY_CLASSIC_RECIPE_LIST = androidx.datastore.preferences.core.booleanPreferencesKey("classic_recipe_list")
 /**
  * Ziel-Anzahl sichtbarer Rezept-Kacheln auf einem Phone-Bildschirm (Grid).
- * Erlaubt: 6 (Standard, 3 Zeilen) oder 8 (sehr kompakt, 4 Zeilen).
+ * Erlaubt: 6 (Standard, 3 Zeilen) oder 4 (größere Kacheln wie früher, 2 Zeilen).
  */
 val KEY_RECIPE_GRID_DENSITY = intPreferencesKey("recipe_grid_density")
 

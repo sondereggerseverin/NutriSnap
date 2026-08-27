@@ -182,10 +182,10 @@ fun RecipesScreen(
     val useGrid = !classicList
     val window = ch.nutrisnap.app.ui.rememberWindowInfo()
     val gridColumns = window.recipeGridColumns(classicList = false)
-    // 6 (Standard, ~3 Zeilen) oder 8 (~4 Zeilen) – aus Einstellungen
+    // 6 (Standard, ~3 Zeilen) oder 4 (größere Kacheln wie früher, ~2 Zeilen)
     val gridDensity = when (val d = prefs?.get(KEY_RECIPE_GRID_DENSITY)) {
-        8 -> 8
-        else -> 6
+        4 -> 4
+        else -> 6 // inkl. Migration von altem Wert 8
     }
 
     // Ziel-kcal aus „Was koche ich?“ einmalig anwenden, sobald ein Rezept geöffnet wird
@@ -269,11 +269,11 @@ fun RecipesScreen(
         // fillMaxSize + weight(1f) am Grid/List: sonst misst Column die Lazy-Liste
         // mit unbounded height → alle 251 Items werden gemessen → ANR in RectList/MeasureAndLayout.
         Column(Modifier.fillMaxSize().padding(padding)) {
-            // Suche möglichst nah unter dem Hub-Segment (wenig vertikaler Abstand)
+            // Suche knapp unter dem Hub-Segment, mit etwas Luft für sauberes Layout
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 0.dp),
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
@@ -282,12 +282,12 @@ fun RecipesScreen(
                         vm.setQuery(it)
                         if (it.isNotBlank()) vm.clearCookFilters()
                     },
-                    placeholder = { Text("Suchen…", fontSize = 13.sp) },
-                    leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(18.dp)) },
-                    modifier = Modifier.weight(1f).heightIn(max = 48.dp),
+                    placeholder = { Text("Suchen…", fontSize = 14.sp) },
+                    leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(20.dp)) },
+                    modifier = Modifier.weight(1f),
                     singleLine = true,
                     shape = RoundedCornerShape(10.dp),
-                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp)
+                    textStyle = LocalTextStyle.current.copy(fontSize = 14.sp)
                 )
                 IconButton(
                     onClick = { showCollections = true },
@@ -352,8 +352,8 @@ fun RecipesScreen(
                             collectionFilterId = null
                             hideIncomplete = false
                         },
-                        label = { Text("Alle", fontSize = 11.sp) },
-                        modifier = Modifier.height(28.dp)
+                        label = { Text("Alle", fontSize = 12.sp) },
+                        modifier = Modifier.height(30.dp)
                     )
                     FilterChip(
                         selected = favoritesOnly,
@@ -364,10 +364,10 @@ fun RecipesScreen(
                         label = {
                             Text(
                                 if (favCount > 0) "★ $favCount" else "★ Favoriten",
-                                fontSize = 11.sp
+                                fontSize = 12.sp
                             )
                         },
-                        modifier = Modifier.height(28.dp)
+                        modifier = Modifier.height(30.dp)
                     )
                     FilterChip(
                         selected = hasActiveFilters,
@@ -375,7 +375,7 @@ fun RecipesScreen(
                         label = {
                             Text(
                                 if (activeFilterCount > 0) "Filter · $activeFilterCount" else "Filter",
-                                fontSize = 11.sp
+                                fontSize = 12.sp
                             )
                         },
                         leadingIcon = if (hasActiveFilters) {
@@ -383,7 +383,7 @@ fun RecipesScreen(
                                 Icon(
                                     Icons.Default.FilterList,
                                     contentDescription = null,
-                                    modifier = Modifier.size(14.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         } else {
@@ -391,11 +391,11 @@ fun RecipesScreen(
                                 Icon(
                                     Icons.Default.Tune,
                                     contentDescription = null,
-                                    modifier = Modifier.size(14.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         },
-                        modifier = Modifier.height(28.dp)
+                        modifier = Modifier.height(30.dp)
                     )
                 }
                 IconButton(
@@ -703,11 +703,11 @@ fun RecipesScreen(
                     sub = if (hideIncomplete) "Schalte den Filter aus, um alle zu sehen" else "Tippe auf + und füge einen Link ein"
                 )
             } else if (useGrid) {
-                // Grid: Phone 2, Tablet 3–4 Spalten; Dichte 6/8 steuert Ziel-Zeilenzahl (3/4).
+                // Grid: Phone 2, Tablet 3–4 Spalten; Dichte 4/6 → 2 bzw. 3 Ziel-Zeilen.
                 val gap = when {
                     window.isTablet -> 12.dp
-                    gridDensity >= 8 -> 6.dp
-                    else -> 8.dp
+                    gridDensity <= 4 -> 8.dp
+                    else -> 7.dp
                 }
                 val hPad = if (window.isTablet) 16.dp else 10.dp
                 val topPad = 2.dp
@@ -715,16 +715,11 @@ fun RecipesScreen(
                 // + 3× 8dp Abstand + Scaffold-Rand) – vorher 80dp war zu knapp, sobald
                 // die Kacheln dichter wurden, und die letzte Zeile überlappte die FABs.
                 val bottomPad = 216.dp
-                val targetRows = if (gridDensity >= 8) 4 else 3
-                // Textbereich unter dem Bild (1-zeiliger Titel + kcal). Bewusst leicht
-                // großzügig geschätzt, damit die Zielzeilenzahl auch bei größerer
-                // Systemschrift sicher passt statt eine Zeile zu verlieren.
-                val textAreaHeight = if (gridDensity >= 8) 40.dp else 46.dp
+                val targetRows = if (gridDensity <= 4) 2 else 3
+                // Textbereich unter dem Bild. Bei 4 (große Kacheln) 2 Titelzeilen möglich.
+                val textAreaHeight = if (gridDensity <= 4) 52.dp else 44.dp
 
-                // Statt eines geratenen Aspect-Ratios (das je nach Displaygröße daneben-
-                // liegt, siehe vorheriger Versuch) wird die Kartenhöhe direkt aus der
-                // tatsächlich gemessenen Grid-Fläche berechnet – so passen 6/8 Kacheln
-                // garantiert, unabhängig von Displaygröße oder Schrifteinstellung.
+                // Kartenhöhe aus gemessener Grid-Fläche → 4 bzw. 6 Kacheln sicher sichtbar.
                 BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     val availableHeight = (maxHeight - topPad - bottomPad).coerceAtLeast(200.dp)
                     val cardHeight = ((availableHeight - gap * (targetRows - 1)) / targetRows)
