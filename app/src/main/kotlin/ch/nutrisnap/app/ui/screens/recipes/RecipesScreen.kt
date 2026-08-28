@@ -64,6 +64,7 @@ import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_CARDS
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_DETAIL
 import ch.nutrisnap.app.ui.theme.KEY_CLASSIC_RECIPE_LIST
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_GRID_DENSITY
+import ch.nutrisnap.app.ui.theme.KEY_RECIPE_GRID_COLUMNS
 import ch.nutrisnap.app.ui.components.RecipeGridCard
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import androidx.datastore.preferences.core.edit
@@ -181,11 +182,19 @@ fun RecipesScreen(
     val freshCards = (prefs?.get(KEY_FRESH_RECIPE_CARDS) == true) || (prefs?.get(KEY_FRESH_UI) == true)
     val useGrid = !classicList
     val window = ch.nutrisnap.app.ui.rememberWindowInfo()
-    val gridColumns = window.recipeGridColumns(classicList = false)
     // 6 (Standard, ~3 Zeilen) oder 4 (größere Kacheln wie früher, ~2 Zeilen)
     val gridDensity = when (val d = prefs?.get(KEY_RECIPE_GRID_DENSITY)) {
         4 -> 4
         else -> 6 // inkl. Migration von altem Wert 8
+    }
+    // Phone: 2 oder 3 Spalten aus Settings; Tablet behält Breakpoint-Spalten
+    val gridColumns = if (window.isTablet) {
+        window.recipeGridColumns(classicList = false)
+    } else {
+        when (prefs?.get(KEY_RECIPE_GRID_COLUMNS)) {
+            3 -> 3
+            else -> 2
+        }
     }
 
     // Ziel-kcal aus „Was koche ich?“ einmalig anwenden, sobald ein Rezept geöffnet wird
@@ -269,33 +278,33 @@ fun RecipesScreen(
         // fillMaxSize + weight(1f) am Grid/List: sonst misst Column die Lazy-Liste
         // mit unbounded height → alle 251 Items werden gemessen → ANR in RectList/MeasureAndLayout.
         Column(Modifier.fillMaxSize().padding(padding)) {
-            // Suche eng unter dem Hub – kein toter Zwischenraum
-            Row(
-                Modifier
+            // Suche volle Breite, Ordner als trailingIcon → optisch zentriert
+            OutlinedTextField(
+                value = state.query,
+                onValueChange = {
+                    vm.setQuery(it)
+                    if (it.isNotBlank()) vm.clearCookFilters()
+                },
+                placeholder = { Text("Suchen…", fontSize = 13.sp) },
+                leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(18.dp)) },
+                trailingIcon = {
+                    IconButton(onClick = { showCollections = true }) {
+                        Icon(
+                            Icons.Default.Folder,
+                            "Sammlungen",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                },
+                modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = state.query,
-                    onValueChange = {
-                        vm.setQuery(it)
-                        if (it.isNotBlank()) vm.clearCookFilters()
-                    },
-                    placeholder = { Text("Suchen…", fontSize = 13.sp) },
-                    leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(18.dp)) },
-                    modifier = Modifier.weight(1f).heightIn(max = 48.dp),
-                    singleLine = true,
-                    shape = RoundedCornerShape(10.dp),
-                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp)
-                )
-                IconButton(
-                    onClick = { showCollections = true },
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(Icons.Default.Folder, "Sammlungen", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                }
-            }
+                    .padding(horizontal = 12.dp, vertical = 0.dp)
+                    .heightIn(max = 48.dp),
+                singleLine = true,
+                shape = RoundedCornerShape(10.dp),
+                textStyle = LocalTextStyle.current.copy(fontSize = 13.sp)
+            )
 
             if (state.ingredientNeedles.isNotEmpty()) {
                 Row(
@@ -707,10 +716,11 @@ fun RecipesScreen(
                 // FABs überlagern rechts – kein riesiges bottomPad in der Höhenrechnung.
                 val gap = when {
                     window.isTablet -> 12.dp
+                    gridColumns >= 3 -> 4.dp
                     gridDensity <= 4 -> 8.dp
                     else -> 6.dp
                 }
-                val hPad = if (window.isTablet) 16.dp else 10.dp
+                val hPad = if (window.isTablet) 16.dp else if (gridColumns >= 3) 8.dp else 10.dp
                 val targetRows = if (gridDensity <= 4) 2 else 3
 
                 BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {

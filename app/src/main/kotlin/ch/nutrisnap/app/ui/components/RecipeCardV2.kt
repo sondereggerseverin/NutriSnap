@@ -309,12 +309,16 @@ fun RecipeGridCard(
 
     val baseServings = recipe.servings.coerceAtLeast(1)
     val kcalPer = recipe.totalCalories?.div(baseServings)
+    val protPer = recipe.proteinPerServing
+    val carbsPer = recipe.carbsPerServing
+    val fatPer = recipe.fatPerServing
     // 4 = große Kacheln (wie früher), 6 = kompakt (~3 Zeilen)
     val largeTiles = density <= 4
     val titleMaxLines = if (largeTiles) 2 else 1
     val titleSize = if (largeTiles) 13.sp else 12.sp
     val titleLineHeight = if (largeTiles) 16.sp else 14.sp
     val kcalSize = if (largeTiles) 12.sp else 11.sp
+    val macroSize = if (largeTiles) 11.sp else 10.sp
     val textPadV = if (largeTiles) 6.dp else 3.dp
     val textPadH = if (largeTiles) 8.dp else 6.dp
     val btnSize = if (largeTiles) 30.dp else 26.dp
@@ -451,6 +455,7 @@ fun RecipeGridCard(
                     }
                 }
             }
+            // Name + kcal + farbige Makros (wie Raffaello-Kachel)
             Column(Modifier.padding(horizontal = textPadH, vertical = textPadV)) {
                 Text(
                     recipe.displayTitle(),
@@ -463,7 +468,7 @@ fun RecipeGridCard(
                 Spacer(Modifier.height(if (largeTiles) 2.dp else 1.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(if (largeTiles) 6.dp else 4.dp)
                 ) {
                     kcalPer?.let {
                         Text(
@@ -471,6 +476,30 @@ fun RecipeGridCard(
                             fontWeight = FontWeight.Bold,
                             fontSize = kcalSize,
                             color = MacroColors.calories
+                        )
+                    }
+                    protPer?.takeIf { it > 0f }?.let {
+                        Text(
+                            "${it.toInt()}P",
+                            fontWeight = FontWeight.Medium,
+                            fontSize = macroSize,
+                            color = MacroColors.protein
+                        )
+                    }
+                    carbsPer?.takeIf { it > 0f }?.let {
+                        Text(
+                            "${it.toInt()}KH",
+                            fontWeight = FontWeight.Medium,
+                            fontSize = macroSize,
+                            color = MacroColors.carbs
+                        )
+                    }
+                    fatPer?.takeIf { it > 0f }?.let {
+                        Text(
+                            "${it.toInt()}F",
+                            fontWeight = FontWeight.Medium,
+                            fontSize = macroSize,
+                            color = MacroColors.fat
                         )
                     }
                 }

@@ -44,6 +44,7 @@ import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_CARDS
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_DETAIL
 import ch.nutrisnap.app.ui.theme.KEY_CLASSIC_RECIPE_LIST
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_GRID_DENSITY
+import ch.nutrisnap.app.ui.theme.KEY_RECIPE_GRID_COLUMNS
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_FAST_AI_PARSE
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_FAST_SCRAPE
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_PERSISTENT_CACHE
@@ -309,16 +310,29 @@ fun SettingsScreen(
                     )
                     if (!classicList) {
                         val density4 = (prefs?.get(KEY_RECIPE_GRID_DENSITY) ?: 6) == 4
+                        val cols3 = (prefs?.get(KEY_RECIPE_GRID_COLUMNS) ?: 2) >= 3
                         Spacer(Modifier.height(NutriSpacing.sm))
                         Text(
-                            "Standard: 6 Kacheln auf einen Blick. Optional wieder größere Kacheln wie früher (4).",
+                            "Standard: 2 Spalten × 3 Zeilen (6 Kacheln). Optional 3 Spalten oder größere Kacheln.",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(Modifier.height(NutriSpacing.sm))
                         SettingsSwitchRow(
-                            title = "Größere Kacheln (4)",
-                            subtitle = if (density4) "Ca. 4 Kacheln pro Bildschirm (wie früher)" else "Ca. 6 Kacheln pro Bildschirm",
+                            title = "3 Spalten",
+                            subtitle = if (cols3) "Schmalere Kacheln, mehr pro Zeile" else "2 Spalten (Standard)",
+                            checked = cols3,
+                            onCheckedChange = { checked ->
+                                scope.launch {
+                                    context.notifDataStore.edit {
+                                        it[KEY_RECIPE_GRID_COLUMNS] = if (checked) 3 else 2
+                                    }
+                                }
+                            }
+                        )
+                        SettingsSwitchRow(
+                            title = "Größere Kacheln (2 Zeilen)",
+                            subtitle = if (density4) "Weniger, dafür höher" else "3 Zeilen auf einen Blick",
                             checked = density4,
                             onCheckedChange = { checked ->
                                 scope.launch {

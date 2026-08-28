@@ -264,10 +264,15 @@ val KEY_FRESH_RECIPE_DETAIL = androidx.datastore.preferences.core.booleanPrefere
 /** true = klassische 1-Spalten-Liste (bisheriges Design), false/absent = kompakte 2-Spalten-Grid-Übersicht */
 val KEY_CLASSIC_RECIPE_LIST = androidx.datastore.preferences.core.booleanPreferencesKey("classic_recipe_list")
 /**
- * Ziel-Anzahl sichtbarer Rezept-Kacheln auf einem Phone-Bildschirm (Grid).
+ * Ziel-Zeilen sichtbarer Rezept-Kacheln auf einem Phone-Bildschirm (Grid).
  * Erlaubt: 6 (Standard, 3 Zeilen) oder 4 (größere Kacheln wie früher, 2 Zeilen).
  */
 val KEY_RECIPE_GRID_DENSITY = intPreferencesKey("recipe_grid_density")
+/**
+ * Spaltenanzahl im Rezept-Grid (Phone). 2 (Standard) oder 3.
+ * Tablets nutzen weiter WindowInfo-Breakpoints als Untergrenze.
+ */
+val KEY_RECIPE_GRID_COLUMNS = intPreferencesKey("recipe_grid_columns")
 
 /**
  * Rezept-Import-Experimente (default aus = bisheriges Verhalten).
