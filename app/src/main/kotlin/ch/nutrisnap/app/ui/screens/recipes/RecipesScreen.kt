@@ -278,31 +278,40 @@ fun RecipesScreen(
         // fillMaxSize + weight(1f) am Grid/List: sonst misst Column die Lazy-Liste
         // mit unbounded height → alle 251 Items werden gemessen → ANR in RectList/MeasureAndLayout.
         Column(Modifier.fillMaxSize().padding(padding)) {
-            // Suche volle Breite, Ordner als trailingIcon → optisch zentriert
+            // Suchfeld als Pill: Platzhalter mittig zentriert, Icons links/rechts gleich
+            // schwer → wirkt als Ganzes zentriert statt links betont. Kompaktere Höhe
+            // spart oben Platz für das Grid darunter.
             OutlinedTextField(
                 value = state.query,
                 onValueChange = {
                     vm.setQuery(it)
                     if (it.isNotBlank()) vm.clearCookFilters()
                 },
-                placeholder = { Text("Suchen…", fontSize = 13.sp) },
+                placeholder = {
+                    Text(
+                        "Suchen…",
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
                 leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(18.dp)) },
                 trailingIcon = {
-                    IconButton(onClick = { showCollections = true }) {
+                    IconButton(onClick = { showCollections = true }, modifier = Modifier.size(36.dp)) {
                         Icon(
                             Icons.Default.Folder,
                             "Sammlungen",
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 0.dp)
-                    .heightIn(max = 48.dp),
+                    .heightIn(max = 44.dp),
                 singleLine = true,
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(percent = 50),
                 textStyle = LocalTextStyle.current.copy(fontSize = 13.sp)
             )
 
@@ -338,6 +347,13 @@ fun RecipesScreen(
                 collectionFilterId != null,
                 hideIncomplete
             ).count { it }
+            val displayedRecipes = state.recipes
+                .let { if (favoritesOnly) it.filter { r -> r.isFavorite } else it }
+                .let { list ->
+                    val cid = collectionFilterId
+                    if (cid != null) list.filter { it.collectionId == cid } else list
+                }
+                .let { if (hideIncomplete) it.filterNot { r -> r.isIncomplete() } else it }
 
             Row(
                 Modifier
@@ -348,7 +364,6 @@ fun RecipesScreen(
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     FilterChip(
@@ -405,6 +420,21 @@ fun RecipesScreen(
                             }
                         },
                         modifier = Modifier.height(30.dp)
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                if (state.recipes.isNotEmpty()) {
+                    Text(
+                        "${displayedRecipes.size} · " +
+                            when (state.sort) {
+                                RecipeSort.NEWEST   -> "neueste"
+                                RecipeSort.NAME     -> "A–Z"
+                                RecipeSort.CALORIES -> "kcal"
+                            },
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        modifier = Modifier.padding(end = 2.dp)
                     )
                 }
                 IconButton(
@@ -685,26 +715,6 @@ fun RecipesScreen(
                 }
             }
 
-            val displayedRecipes = state.recipes
-                .let { if (favoritesOnly) it.filter { r -> r.isFavorite } else it }
-                .let { list ->
-                    val cid = collectionFilterId
-                    if (cid != null) list.filter { it.collectionId == cid } else list
-                }
-                .let { if (hideIncomplete) it.filterNot { r -> r.isIncomplete() } else it }
-            if (state.recipes.isNotEmpty()) {
-                Text(
-                    "${displayedRecipes.size} · " +
-                        when (state.sort) {
-                            RecipeSort.NEWEST   -> "neueste"
-                            RecipeSort.NAME     -> "A–Z"
-                            RecipeSort.CALORIES -> "kcal"
-                        },
-                    fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp)
-                )
-            }
-
             if (displayedRecipes.isEmpty()) {
                 EmptyState(
                     icon = { Icon(Icons.Default.MenuBook, null, Modifier.size(56.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) },
@@ -712,8 +722,8 @@ fun RecipesScreen(
                     sub = if (hideIncomplete) "Schalte den Filter aus, um alle zu sehen" else "Tippe auf + und füge einen Link ein"
                 )
             } else if (useGrid) {
-                // Exakt targetRows Zeilen in die sichtbare Grid-Fläche (Scroll-Top).
-                // FABs überlagern rechts – kein riesiges bottomPad in der Höhenrechnung.
+                // Kachelhöhe ergibt sich aus 4:3-Foto + Info-Block – keine erzwungene
+                // Zeilenzahl mehr, dafür konsistenter Fotocrop unabhängig von der Bildschirmgrösse.
                 val gap = when {
                     window.isTablet -> 12.dp
                     gridColumns >= 3 -> 4.dp
@@ -721,37 +731,29 @@ fun RecipesScreen(
                     else -> 6.dp
                 }
                 val hPad = if (window.isTablet) 16.dp else if (gridColumns >= 3) 8.dp else 10.dp
-                val targetRows = if (gridDensity <= 4) 2 else 3
 
-                BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    // 3 (bzw. 2) Kartenhöhen + Gaps = volle maxHeight → exakt 6/4 sichtbar
-                    val cardHeight = ((maxHeight - gap * (targetRows - 1)) / targetRows)
-                        .coerceAtLeast(96.dp)
-
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(gridColumns),
-                        contentPadding = PaddingValues(
-                            start = hPad, end = hPad, top = 0.dp,
-                            // Nur beim Weiter-Scrollen Platz unter der letzten Zeile
-                            bottom = 88.dp
-                        ),
-                        horizontalArrangement = Arrangement.spacedBy(gap),
-                        verticalArrangement = Arrangement.spacedBy(gap),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        gridItems(displayedRecipes, key = { it.id }) { recipe ->
-                            RecipeGridCard(
-                                recipe = recipe,
-                                onClick = { selectedRecipe = recipe },
-                                onAddToDiary = { addToDiaryRecipe = recipe },
-                                onEdit = { editRecipe = recipe },
-                                onDelete = { vm.deleteRecipe(recipe) },
-                                onDuplicate = { vm.duplicateRecipe(recipe) },
-                                onToggleFavorite = { vm.toggleFavorite(recipe) },
-                                density = gridDensity,
-                                cardHeight = cardHeight
-                            )
-                        }
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(gridColumns),
+                    contentPadding = PaddingValues(
+                        start = hPad, end = hPad, top = gap,
+                        // Nur beim Weiter-Scrollen Platz unter der letzten Zeile
+                        bottom = 88.dp
+                    ),
+                    horizontalArrangement = Arrangement.spacedBy(gap),
+                    verticalArrangement = Arrangement.spacedBy(gap),
+                    modifier = Modifier.weight(1f).fillMaxWidth()
+                ) {
+                    gridItems(displayedRecipes, key = { it.id }) { recipe ->
+                        RecipeGridCard(
+                            recipe = recipe,
+                            onClick = { selectedRecipe = recipe },
+                            onAddToDiary = { addToDiaryRecipe = recipe },
+                            onEdit = { editRecipe = recipe },
+                            onDelete = { vm.deleteRecipe(recipe) },
+                            onDuplicate = { vm.duplicateRecipe(recipe) },
+                            onToggleFavorite = { vm.toggleFavorite(recipe) },
+                            density = gridDensity
+                        )
                     }
                 }
             } else {
