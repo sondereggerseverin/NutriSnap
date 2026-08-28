@@ -383,6 +383,10 @@ class RecipeScraper(private val context: Context) {
         var bestServerCandidate: Recipe? = null
         var serverUrlError: String? = null
         var serverCapError: String? = null
+        // Wird unten gesetzt und an parseCaptionToRecipe() weitergereicht, damit dort
+        // NICHT nochmal derselbe Server-Call mit identischem Input läuft (war ein
+        // doppelter Roundtrip bei jedem "brauchbar, aber knapp unter AMM"-Fall).
+        var serverCapResult: Recipe? = null
         if (RecipeNormalizeServer.isConfigured()) {
             progress("Server-Import…")
             val serverRecipe = RecipeNormalizeServer.importFromUrl(url, "instagram")
@@ -466,6 +470,7 @@ class RecipeScraper(private val context: Context) {
             val serverCap = RecipeNormalizeServer.normalize(
                 workingCaption, url, "instagram", thumbnail
             )
+            serverCapResult = serverCap
             serverCapError = RecipeNormalizeServer.lastError
             if (serverCap != null && isAmmQuality(serverCap)) {
                 publishReport(
@@ -492,7 +497,10 @@ class RecipeScraper(private val context: Context) {
 
         // Nur wenn Server ausfällt: lokaler Parser + Caption-Merge
         progress("Lokal extrahieren…")
-        var parsed = parseCaptionToRecipe(workingCaption, url, "instagram", thumbnail, fastAi)
+        var parsed = parseCaptionToRecipe(
+            workingCaption, url, "instagram", thumbnail, fastAi,
+            precomputedServer = serverCapResult
+        )
         var pathUsed = "local-fallback"
         val serverUrlScore = -1
 
@@ -611,7 +619,13 @@ class RecipeScraper(private val context: Context) {
         url: String,
         platform: String,
         thumbnail: String?,
-        fastAi: Boolean
+        fastAi: Boolean,
+        /**
+         * Bereits berechnetes Server-Normalisierungs-Ergebnis für exakt dieselbe
+         * Caption (z.B. aus scrapeInstagram()). Wenn gesetzt, wird der Server NICHT
+         * nochmal mit identischem Input aufgerufen — spart bis zu 10s Roundtrip.
+         */
+        precomputedServer: Recipe? = null
     ): Recipe {
         fun finalize(r: Recipe): Recipe {
             val merged = RecipeAiParser.mergeIngredientsFromCaption(r.ingredients, caption)
@@ -633,8 +647,10 @@ class RecipeScraper(private val context: Context) {
             return fallback
         }
 
-        // 2) Server-Normalisierung (max 10s) — oft besser als lokal, aber nicht ewig warten
-        val server = if (RecipeNormalizeServer.isConfigured()) {
+        // 2) Server-Normalisierung (max 10s) — oft besser als lokal, aber nicht ewig warten.
+        // Wiederverwendung, falls der Aufrufer (z.B. scrapeInstagram) dieselbe Anfrage
+        // mit identischer Caption schon gestellt hat.
+        val server = precomputedServer ?: if (RecipeNormalizeServer.isConfigured()) {
             progress("Server-Normalisierung…")
             withTimeoutOrNull(10_000L) {
                 RecipeNormalizeServer.normalize(caption, url, platform, thumbnail)
