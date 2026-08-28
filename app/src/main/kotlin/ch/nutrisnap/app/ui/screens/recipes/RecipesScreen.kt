@@ -337,9 +337,8 @@ fun RecipesScreen(
         // mit unbounded height → alle 251 Items werden gemessen → ANR in RectList/MeasureAndLayout.
         Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(padding)) {
-            // Suchfeld als Pill: Placeholder sitzt direkt neben dem Such-Icon (links-
-            // bündig) statt zentriert mit grosser Lücke dazwischen. Kompaktere Höhe
-            // spart oben Platz für das Grid darunter.
+            // Suchfeld: ~10dp Luft unter den Hub-Tabs (≈3mm), kompakte Pill mit
+            // korrektem contentPadding – kein gequetschter Placeholder mehr.
             OutlinedTextField(
                 value = state.query,
                 onValueChange = {
@@ -349,10 +348,18 @@ fun RecipesScreen(
                 placeholder = {
                     Text(
                         "Rezepte durchsuchen…",
-                        fontSize = 13.sp
+                        fontSize = 13.sp,
+                        maxLines = 1
                     )
                 },
-                leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(18.dp)) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
                 trailingIcon = {
                     IconButton(onClick = { showCollections = true }, modifier = Modifier.size(36.dp)) {
                         Icon(
@@ -365,11 +372,18 @@ fun RecipesScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 0.dp)
-                    .heightIn(max = 44.dp),
+                    .padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 4.dp)
+                    .heightIn(max = 52.dp),
                 singleLine = true,
                 shape = RoundedCornerShape(percent = 50),
-                textStyle = LocalTextStyle.current.copy(fontSize = 13.sp)
+                textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                    focusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                    cursorColor = MaterialTheme.colorScheme.primary
+                )
             )
 
             if (state.ingredientNeedles.isNotEmpty()) {
@@ -794,8 +808,9 @@ fun RecipesScreen(
                     columns = GridCells.Fixed(gridColumns),
                     contentPadding = PaddingValues(
                         start = hPad, end = hPad, top = gap,
-                        // FAB + Bottom-Nav: genug Platz, dass letzte Zeile nicht unter dem + verschwindet
-                        bottom = 100.dp
+                        // Bottom-Nav (68dp) + FAB + Luft: letzte Kachel-Reihe komplett
+                        // sichtbar, nicht als abgeschnittene „runde Kacheln“ unter der Nav
+                        bottom = 132.dp
                     ),
                     horizontalArrangement = Arrangement.spacedBy(gap),
                     verticalArrangement = Arrangement.spacedBy(gap),

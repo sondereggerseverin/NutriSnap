@@ -63,9 +63,9 @@ fun RecipesHubScreen(
             onSelect = { tab = it },
             modifier = Modifier
                 .fillMaxWidth()
-                // Eng am Status/Scaffold – kein toter Streifen; bottom 0, damit
-                // Suchfeld direkt darunter sitzt (kein Doppel-Gap mit Screen-Padding)
-                .padding(start = NutriSpacing.md, end = NutriSpacing.md, top = 2.dp, bottom = 0.dp)
+                // Leicht mehr Top-Luft (~3mm); Bottom 0 – Abstand zur Suche kommt
+                // das Screen-Padding am Suchfeld.
+                .padding(start = NutriSpacing.md, end = NutriSpacing.md, top = 6.dp, bottom = 0.dp)
         )
         when (tab) {
             RecipeTab.SAVED -> RecipesScreen(
