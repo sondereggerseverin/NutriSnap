@@ -10,8 +10,14 @@ import android.content.Intent
 import android.net.Uri
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
@@ -35,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -124,6 +131,33 @@ internal fun RecipeStarsRow(stars: Int, modifier: Modifier = Modifier) {
 }
 
 
+@Composable
+private fun FabMenuItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    containerColor: Color,
+    contentColor: Color,
+    onClick: () -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            shape = RoundedCornerShape(8.dp),
+            shadowElevation = 2.dp
+        ) {
+            Text(label, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), fontSize = 13.sp)
+        }
+        SmallFloatingActionButton(
+            onClick = onClick,
+            containerColor = containerColor,
+            contentColor = contentColor
+        ) {
+            Icon(icon, label, tint = contentColor)
+        }
+    }
+}
+
 // ── Screen ────────────────────────────────────────────────────────────────────
 internal fun Recipe.isIncomplete(): Boolean {
     val t = title.trim()
@@ -168,6 +202,7 @@ fun RecipesScreen(
     var collectionFilterId by remember { mutableStateOf<Long?>(null) }
     var showBatchSheet    by remember { mutableStateOf(false) }
     var showCookSheet     by remember { mutableStateOf(false) }
+    var fabExpanded       by remember { mutableStateOf(false) }
     var cookingRecipe     by remember { mutableStateOf<Recipe?>(null) }
     var showCollections   by remember { mutableStateOf(false) }
     var showFilterSheet   by remember { mutableStateOf(false) }
@@ -239,43 +274,65 @@ fun RecipesScreen(
     Scaffold(
         floatingActionButton = {
             val scheme = MaterialTheme.colorScheme
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                SmallFloatingActionButton(
-                    onClick = { showCookSheet = true },
-                    containerColor = scheme.primaryContainer,
-                    contentColor = scheme.onPrimaryContainer
+            val rotation by animateFloatAsState(if (fabExpanded) 45f else 0f, label = "fabRotation")
+            Column(horizontalAlignment = Alignment.End) {
+                AnimatedVisibility(
+                    visible = fabExpanded,
+                    enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom),
+                    exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom)
                 ) {
-                    Icon(Icons.Default.Kitchen, "Was koche ich?", tint = scheme.onPrimaryContainer)
+                    Column(horizontalAlignment = Alignment.End) {
+                        FabMenuItem(
+                            icon = Icons.Default.Kitchen,
+                            label = "Was koche ich?",
+                            containerColor = scheme.primaryContainer,
+                            contentColor = scheme.onPrimaryContainer,
+                            onClick = { fabExpanded = false; showCookSheet = true }
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        FabMenuItem(
+                            icon = Icons.Default.PlaylistAdd,
+                            label = "Mehrere importieren",
+                            containerColor = scheme.secondaryContainer,
+                            contentColor = scheme.onSecondaryContainer,
+                            onClick = { fabExpanded = false; showBatchSheet = true }
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        FabMenuItem(
+                            icon = Icons.Default.Link,
+                            label = "Rezept importieren",
+                            containerColor = scheme.secondaryContainer,
+                            contentColor = scheme.onSecondaryContainer,
+                            onClick = { fabExpanded = false; showImportSheet = true }
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        FabMenuItem(
+                            icon = Icons.Default.Edit,
+                            label = "Freies Rezept erstellen",
+                            containerColor = scheme.primary,
+                            contentColor = scheme.onPrimary,
+                            onClick = { fabExpanded = false; showCreateSheet = true }
+                        )
+                        Spacer(Modifier.height(14.dp))
+                    }
                 }
-                Spacer(Modifier.height(8.dp))
-                SmallFloatingActionButton(
-                    onClick = { showBatchSheet = true },
-                    containerColor = scheme.secondaryContainer,
-                    contentColor = scheme.onSecondaryContainer
-                ) {
-                    Icon(Icons.Default.PlaylistAdd, "Mehrere Rezepte importieren", tint = scheme.onSecondaryContainer)
-                }
-                Spacer(Modifier.height(8.dp))
-                SmallFloatingActionButton(
-                    onClick = { showImportSheet = true },
-                    containerColor = scheme.secondaryContainer,
-                    contentColor = scheme.onSecondaryContainer
-                ) {
-                    Icon(Icons.Default.Link, "Rezept importieren", tint = scheme.onSecondaryContainer)
-                }
-                Spacer(Modifier.height(8.dp))
                 FloatingActionButton(
-                    onClick = { showCreateSheet = true },
+                    onClick = { fabExpanded = !fabExpanded },
                     containerColor = scheme.primary,
                     contentColor = scheme.onPrimary
                 ) {
-                    Icon(Icons.Default.Add, "Freies Rezept erstellen", tint = scheme.onPrimary)
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = if (fabExpanded) "Menü schliessen" else "Rezept-Aktionen",
+                        modifier = Modifier.rotate(rotation)
+                    )
                 }
             }
         }
     ) { padding ->
         // fillMaxSize + weight(1f) am Grid/List: sonst misst Column die Lazy-Liste
         // mit unbounded height → alle 251 Items werden gemessen → ANR in RectList/MeasureAndLayout.
+        Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(padding)) {
             // Suchfeld als Pill: Placeholder sitzt direkt neben dem Such-Icon (links-
             // bündig) statt zentriert mit grosser Lücke dazwischen. Kompaktere Höhe
@@ -793,6 +850,23 @@ fun RecipesScreen(
                     }
                 }
             }
+        }
+        AnimatedVisibility(
+            visible = fabExpanded,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.32f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { fabExpanded = false }
+            )
+        }
         }
     }
 
