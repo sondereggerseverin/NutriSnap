@@ -320,20 +320,20 @@ fun MainScaffold(
     val renameNavLabel = navPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_NAV_LABEL_RENAME) ?: false
 
     Scaffold(bottomBar = {
-        // Schwebende, abgerundete Nav-Leiste statt flacher Vollbreiten-Bar: schliesst
-        // den toten schwarzen Streifen zwischen Content und System-Navigation, indem
-        // sie mit Rand-Abstand + Schatten über dem Inhalt "liegt" statt hart abzuschneiden.
+        // Schwebende Nav-Leiste: Ecken bewusst eckiger (16dp statt 28dp), damit
+        // rechte Labels („Einstellung“) nicht in der Rundung verschwinden.
+        val navShape = RoundedCornerShape(16.dp)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 10.dp)
+                .padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 10.dp)
         ) {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .shadow(elevation = 14.dp, shape = RoundedCornerShape(28.dp), clip = false),
-                shape = RoundedCornerShape(28.dp),
+                    .shadow(elevation = 14.dp, shape = navShape, clip = false),
+                shape = navShape,
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 tonalElevation = 3.dp
             ) {
@@ -345,7 +345,7 @@ fun MainScaffold(
                 ) {
                     bottomNavItems.forEach { screen ->
                         val label = when {
-                            screen is Screen.Settings && renameNavLabel -> "Einstellungen"
+                            screen is Screen.Settings && renameNavLabel -> "Einstellung"
                             else -> screen.label
                         }
                         NavigationBarItem(
@@ -358,7 +358,14 @@ fun MainScaffold(
                                 }
                             },
                             icon = { Icon(screen.icon, contentDescription = label) },
-                            label = { Text(label, maxLines = 1) }
+                            label = {
+                                Text(
+                                    label,
+                                    maxLines = 1,
+                                    fontSize = 11.sp,
+                                    softWrap = false
+                                )
+                            }
                         )
                     }
                 }
