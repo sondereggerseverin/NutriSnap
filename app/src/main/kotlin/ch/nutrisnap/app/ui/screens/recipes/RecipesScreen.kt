@@ -810,7 +810,8 @@ fun RecipesScreen(
                             onDelete = { vm.deleteRecipe(recipe) },
                             onDuplicate = { vm.duplicateRecipe(recipe) },
                             onToggleFavorite = { vm.toggleFavorite(recipe) },
-                            density = gridDensity
+                            density = gridDensity,
+                            columns = gridColumns
                         )
                     }
                 }

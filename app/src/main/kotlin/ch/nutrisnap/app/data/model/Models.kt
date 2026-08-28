@@ -409,7 +409,9 @@ private val socialEntireJunk = listOf(
     Regex("""^recipe\??\s*(it'?s\s*)?(at|in)\s*(the\s*)?(end|comments?|bio|caption)\.?$""", RegexOption.IGNORE_CASE),
     Regex("""^recipe\s*(in|at)\s*(the\s*)?(comments?|end)\.?$""", RegexOption.IGNORE_CASE),
     Regex("""^(full\s*)?recipe\s*(below|down below)\.?$""", RegexOption.IGNORE_CASE),
-    Regex("""^link\s*in\s*bio\.?$""", RegexOption.IGNORE_CASE)
+    Regex("""^link\s*in\s*bio\.?$""", RegexOption.IGNORE_CASE),
+    // Rest nach Abschneiden von „Recipe?“: „It's at the end“
+    Regex("""^it'?s\s+(at|in)\s+(the\s+)?(end|comments?|bio|caption)\.?$""", RegexOption.IGNORE_CASE)
 )
 private val leadingEmojiOrPunct = Regex("""^[\p{So}\p{Cn}\s!?.\-–—]+""")
 private val trailingEmojiOrPunct = Regex("""[\p{So}\p{Cn}\s!?.\-–—]+$""")

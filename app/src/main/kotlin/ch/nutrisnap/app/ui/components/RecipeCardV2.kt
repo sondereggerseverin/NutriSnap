@@ -27,7 +27,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_RECIPE_MENU
@@ -302,6 +301,8 @@ fun RecipeGridCard(
     onToggleFavorite: () -> Unit = {},
     /** Grössere Kacheln mit mehr Abstand/Schrift (Einstellungen) vs. kompakt (Standard). */
     density: Int = 6,
+    /** Spaltenzahl des Grids – bei ≥3 engere Typo, damit Name + kcal noch lesbar bleiben. */
+    columns: Int = 2,
     modifier: Modifier = Modifier
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -314,13 +315,35 @@ fun RecipeGridCard(
     val fatPer = recipe.fatPerServing
     // 4 = größere Kacheln (mehr Details), 6 = kompakt (Standard)
     val largeTiles = density <= 4
-    val titleSize = if (largeTiles) 14.sp else 13.sp
-    val titleLineHeight = if (largeTiles) 18.sp else 16.sp
-    val kcalSize = if (largeTiles) 13.sp else 12.sp
-    val macroSize = if (largeTiles) 11.sp else 10.sp
-    val contentPad = if (largeTiles) 10.dp else 8.dp
-    val btnSize = if (largeTiles) 30.dp else 26.dp
-    val btnIconSize = if (largeTiles) 16.dp else 14.dp
+    val narrow = columns >= 3
+    // Bei 3 Spalten: etwas kleinere Schrift, aber 2 Titelzeilen – sonst nur „Proteinr…“
+    val titleSize = when {
+        largeTiles -> 14.sp
+        narrow -> 12.sp
+        else -> 13.sp
+    }
+    val titleLineHeight = when {
+        largeTiles -> 18.sp
+        narrow -> 15.sp
+        else -> 16.sp
+    }
+    val kcalSize = when {
+        largeTiles -> 13.sp
+        narrow -> 11.sp
+        else -> 12.sp
+    }
+    val macroSize = when {
+        largeTiles -> 11.sp
+        narrow -> 10.sp
+        else -> 10.sp
+    }
+    val contentPad = when {
+        largeTiles -> 10.dp
+        narrow -> 6.dp
+        else -> 8.dp
+    }
+    val btnSize = if (largeTiles) 30.dp else if (narrow) 24.dp else 26.dp
+    val btnIconSize = if (largeTiles) 16.dp else if (narrow) 13.dp else 14.dp
 
     Card(
         modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
@@ -449,10 +472,8 @@ fun RecipeGridCard(
                 }
             }
 
-            // Info-Block: feste Höhe (2 Titelzeilen + Makrozeile), damit alle Kacheln
-            // in einer Grid-Zeile gleich hoch sind – kein „wackelndes“ Layout mehr.
-            val titleBlockH = titleLineHeight * 2
-            val macroBlockH = if (largeTiles) 16.dp else 14.dp
+            // Info-Block: immer 2 Titelzeilen → einheitliche Kachelhöhe und bei
+            // 3 Spalten noch genug Zeichen für den Namen. Kein fixes height()-Clipping.
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -467,17 +488,13 @@ fun RecipeGridCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(with(LocalDensity.current) { titleBlockH.toDp() })
+                    modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(if (narrow) 2.dp else 4.dp))
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(macroBlockH),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(if (largeTiles) 8.dp else 6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(if (largeTiles) 8.dp else 5.dp)
                 ) {
                     if (kcalPer != null) {
                         Text(
@@ -496,23 +513,26 @@ fun RecipeGridCard(
                                 maxLines = 1
                             )
                         }
-                        carbsPer?.takeIf { it > 0f }?.let {
-                            Text(
-                                "${it.toInt()}KH",
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = macroSize,
-                                color = MacroColors.carbs,
-                                maxLines = 1
-                            )
-                        }
-                        fatPer?.takeIf { it > 0f }?.let {
-                            Text(
-                                "${it.toInt()}F",
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = macroSize,
-                                color = MacroColors.fat,
-                                maxLines = 1
-                            )
+                        // Bei 3 Spalten nur kcal + Protein – KH/F machen die Zeile unlesbar eng
+                        if (!narrow) {
+                            carbsPer?.takeIf { it > 0f }?.let {
+                                Text(
+                                    "${it.toInt()}KH",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = macroSize,
+                                    color = MacroColors.carbs,
+                                    maxLines = 1
+                                )
+                            }
+                            fatPer?.takeIf { it > 0f }?.let {
+                                Text(
+                                    "${it.toInt()}F",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = macroSize,
+                                    color = MacroColors.fat,
+                                    maxLines = 1
+                                )
+                            }
                         }
                     } else {
                         Text(

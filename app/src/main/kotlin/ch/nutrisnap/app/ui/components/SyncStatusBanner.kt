@@ -77,21 +77,17 @@ fun SyncStatusBanner() {
         val scheme = MaterialTheme.colorScheme
         val bg = if (isError) scheme.errorContainer else scheme.secondaryContainer
         val fg = if (isError) scheme.onErrorContainer else scheme.onSecondaryContainer
-        // „Sync…“ statt „Synchronisiert“ – klar als Status, nicht als dritter Hub-Tab
-        val label = if (isError) {
-            "Sync fehlgeschlagen" + (status.lastError?.let { ": ${it.take(40)}" } ?: "")
-        } else {
-            "Sync…"
-        }
+        // Laufender Sync: nur kleiner Spinner (kein Text) – sonst überdeckt der Chip
+        // den rechten Hub-Tab „KI-Koch“. Fehler weiterhin mit kurzem Label.
+        val errorLabel = if (isError) {
+            "Sync fehlgeschlagen" + (status.lastError?.let { ": ${it.take(28)}" } ?: "")
+        } else null
 
-        // Kompakter Chip in der Statusleisten-Zone (TopEnd). Früher grösseres Padding
-        // hat den Chip auf den rechten Hub-Tab (KI-Koch) geschoben → sah aus wie
-        // Segment-Button „Synchronisiert“.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(top = 0.dp, end = 8.dp, bottom = 0.dp),
+                .padding(top = 2.dp, end = 10.dp),
             contentAlignment = Alignment.TopEnd
         ) {
             Row(
@@ -99,27 +95,30 @@ fun SyncStatusBanner() {
                     .shadow(3.dp, RoundedCornerShape(50))
                     .clip(RoundedCornerShape(50))
                     .background(bg)
-                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                    .padding(
+                        horizontal = if (errorLabel != null) 8.dp else 6.dp,
+                        vertical = if (errorLabel != null) 4.dp else 6.dp
+                    ),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (isError) {
-                    Icon(Icons.Default.CloudOff, null, modifier = Modifier.size(11.dp), tint = fg)
+                    Icon(Icons.Default.CloudOff, null, modifier = Modifier.size(12.dp), tint = fg)
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        text = errorLabel!!,
+                        color = fg,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
+                    )
                 } else {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(10.dp),
-                        strokeWidth = 1.5.dp,
+                        modifier = Modifier.size(14.dp),
+                        strokeWidth = 1.8.dp,
                         color = fg
                     )
                 }
-                Spacer(Modifier.width(5.dp))
-                Text(
-                    text = label,
-                    color = fg,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1
-                )
             }
         }
     }
