@@ -313,7 +313,7 @@ fun SettingsScreen(
                         val cols3 = (prefs?.get(KEY_RECIPE_GRID_COLUMNS) ?: 2) >= 3
                         Spacer(Modifier.height(NutriSpacing.sm))
                         Text(
-                            "Standard: 2 Spalten × 3 Zeilen (6 Kacheln). Optional 3 Spalten oder größere Kacheln.",
+                            "Standard: 2 Spalten, Foto im 4:3-Format mit Titel und kcal pro Portion darunter. Optional 3 Spalten oder größere Kacheln.",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -331,8 +331,8 @@ fun SettingsScreen(
                             }
                         )
                         SettingsSwitchRow(
-                            title = "Größere Kacheln (2 Zeilen)",
-                            subtitle = if (density4) "Weniger, dafür höher" else "3 Zeilen auf einen Blick",
+                            title = "Größere Kacheln",
+                            subtitle = if (density4) "Größere Schrift, mehr Abstand" else "Kompakt (Standard)",
                             checked = density4,
                             onCheckedChange = { checked ->
                                 scope.launch {
