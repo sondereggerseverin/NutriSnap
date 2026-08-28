@@ -364,11 +364,13 @@ data class Recipe(
      */
     fun displayTitle(): String {
         val t = title.trim()
-        if (t.isNotEmpty() && !t.equals("null", true) && !t.equals("undefined", true)) return t
+        if (t.isNotEmpty() && !t.equals("null", true) && !t.equals("undefined", true)) {
+            return cleanSocialCaption(t)
+        }
         val fromIngredients = ingredients.lineSequence()
             .map { it.trim().removePrefix("•").removePrefix("-").removePrefix("*").trim() }
             .firstOrNull { it.length in 3..60 && !it.equals("null", true) }
-        return fromIngredients ?: "Rezept"
+        return fromIngredients?.let { cleanSocialCaption(it) } ?: "Rezept"
     }
 
     fun displayDescription(): String {
@@ -381,6 +383,36 @@ data class Recipe(
         title = displayTitle(),
         description = displayDescription()
     )
+}
+
+/**
+ * Entfernt typische Social-Media-Caption-Floskeln aus importierten Titeln
+ * ("POV: ...", "Recipe? It's at the end", "Follow for more", "Link in Bio" etc.),
+ * ohne den eigentlichen Rezeptnamen zu beschädigen. Greift nur bei eindeutigen
+ * Mustern und lässt den Titel unverändert, wenn danach zu wenig übrig bliebe.
+ */
+private val socialLeadingJunk = listOf(
+    Regex("""^pov\s*[:\-]\s*""", RegexOption.IGNORE_CASE),
+    Regex("""^(recipe|rezept)\s*(alert|idea)?\s*[:\-!]\s*""", RegexOption.IGNORE_CASE)
+)
+private val socialTrailingJunk = listOf(
+    Regex("""[!.,\s]*recipe\??\s*(is\s*)?(in|at)\s*(the\s*)?(comments?|end|bio|caption)\.?$""", RegexOption.IGNORE_CASE),
+    Regex("""[!.,\s]*(full\s*)?recipe\s*(below|down below)\.?$""", RegexOption.IGNORE_CASE),
+    Regex("""[!.,\s]*swipe\s*(up|for\s*recipe)?\.?$""", RegexOption.IGNORE_CASE),
+    Regex("""[!.,\s]*(follow|save this)\s*(me|for more)?\.?$""", RegexOption.IGNORE_CASE),
+    Regex("""[!.,\s]*link\s*in\s*bio\.?$""", RegexOption.IGNORE_CASE)
+)
+private val leadingEmojiOrPunct = Regex("""^[\p{So}\p{Cn}\s!?.\-–—]+""")
+private val trailingEmojiOrPunct = Regex("""[\p{So}\p{Cn}\s!?.\-–—]+$""")
+
+private fun cleanSocialCaption(raw: String): String {
+    var s = raw.trim()
+    for (re in socialLeadingJunk) s = re.replace(s, "")
+    for (re in socialTrailingJunk) s = re.replace(s, "")
+    s = s.replace(leadingEmojiOrPunct, "").replace(trailingEmojiOrPunct, "")
+    s = s.replace(Regex("""\s{2,}"""), " ").trim()
+    // Sicherheitsnetz: nichts kaputt bereinigen – bei zu kurzem Rest Original behalten.
+    return if (s.length >= 3) s else raw.trim()
 }
 
 /**
