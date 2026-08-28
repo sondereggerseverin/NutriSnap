@@ -336,170 +336,183 @@ fun RecipeGridCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(1.dp)
     ) {
-        Column(Modifier.fillMaxSize()) {
-            // Bild füllt den Rest über dem Textblock
+        // Alles im Bild: Name + Nährwerte als Overlay unten – kein Abschneiden mehr
+        Box(Modifier.fillMaxSize()) {
+            RecipeCardImage(
+                recipe = recipe,
+                modifier = Modifier.fillMaxSize()
+            )
+            // Verlauf unten für Lesbarkeit auf Fotos
             Box(
                 Modifier
-                    .weight(1f)
+                    .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-            ) {
-                RecipeCardImage(
-                    recipe = recipe,
-                    modifier = Modifier.fillMaxSize()
-                )
-                // Favorit-Hinweis oben links
-                if (recipe.isFavorite) {
-                    Icon(
-                        Icons.Filled.Favorite,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(6.dp)
-                            .size(16.dp),
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                }
-                // Schnell-Add + Menü oben rechts
-                Row(
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    FilledIconButton(
-                        onClick = onAddToDiary,
-                        modifier = Modifier.size(btnSize),
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.92f),
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        )
-                    ) {
-                        Icon(
-                            Icons.Filled.PlaylistAdd,
-                            contentDescription = "Ins Tagebuch",
-                            modifier = Modifier.size(btnIconSize),
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                    Box {
-                        FilledIconButton(
-                            onClick = { menuOpen = true },
-                            modifier = Modifier.size(btnSize),
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                                contentColor = MaterialTheme.colorScheme.onSurface
+                    .background(
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0f to Color.Transparent,
+                                0.35f to Color.Black.copy(alpha = 0.45f),
+                                1f to Color.Black.copy(alpha = 0.82f)
                             )
-                        ) {
-                            Icon(
-                                Icons.Filled.MoreVert,
-                                contentDescription = "Mehr",
-                                modifier = Modifier.size(btnIconSize)
+                        )
+                    )
+                    .padding(horizontal = textPadH, vertical = textPadV)
+            ) {
+                Column {
+                    Text(
+                        recipe.displayTitle(),
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = titleSize,
+                        maxLines = titleMaxLines,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = titleLineHeight,
+                        color = Color.White
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(if (largeTiles) 6.dp else 5.dp)
+                    ) {
+                        kcalPer?.let {
+                            Text(
+                                "${it.toInt()} kcal",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = kcalSize,
+                                color = Color(0xFFFFB74D),
+                                maxLines = 1
                             )
                         }
-                        DropdownMenu(
-                            expanded = menuOpen,
-                            onDismissRequest = { menuOpen = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = {
-                                    Text(if (recipe.isFavorite) "Favorit entfernen" else "Als Favorit")
-                                },
-                                onClick = {
-                                    menuOpen = false
-                                    onToggleFavorite()
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        if (recipe.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                        null,
-                                        Modifier.size(18.dp)
-                                    )
-                                }
+                        protPer?.takeIf { it > 0f }?.let {
+                            Text(
+                                "${it.toInt()}P",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = macroSize,
+                                color = MacroColors.protein,
+                                maxLines = 1
                             )
-                            DropdownMenuItem(
-                                text = { Text("Bearbeiten") },
-                                onClick = {
-                                    menuOpen = false
-                                    onEdit()
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Filled.RestaurantMenu, null, Modifier.size(18.dp))
-                                }
+                        }
+                        carbsPer?.takeIf { it > 0f }?.let {
+                            Text(
+                                "${it.toInt()}KH",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = macroSize,
+                                color = MacroColors.carbs,
+                                maxLines = 1
                             )
-                            DropdownMenuItem(
-                                text = { Text("Kopieren zum Anpassen") },
-                                onClick = {
-                                    menuOpen = false
-                                    onDuplicate()
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Filled.ContentCopy, null, Modifier.size(18.dp))
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Löschen", color = MaterialTheme.colorScheme.error) },
-                                onClick = {
-                                    menuOpen = false
-                                    showDeleteConfirm = true
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Filled.DeleteOutline,
-                                        null,
-                                        Modifier.size(18.dp),
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
-                                }
+                        }
+                        fatPer?.takeIf { it > 0f }?.let {
+                            Text(
+                                "${it.toInt()}F",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = macroSize,
+                                color = MacroColors.fat,
+                                maxLines = 1
                             )
                         }
                     }
                 }
             }
-            // Name + kcal + farbige Makros (wie Raffaello-Kachel)
-            Column(Modifier.padding(horizontal = textPadH, vertical = textPadV)) {
-                Text(
-                    recipe.displayTitle(),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = titleSize,
-                    maxLines = titleMaxLines,
-                    overflow = TextOverflow.Ellipsis,
-                    lineHeight = titleLineHeight
+            if (recipe.isFavorite) {
+                Icon(
+                    Icons.Filled.Favorite,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp)
+                        .size(16.dp),
+                    tint = MaterialTheme.colorScheme.error
                 )
-                Spacer(Modifier.height(if (largeTiles) 2.dp else 1.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(if (largeTiles) 6.dp else 4.dp)
+            }
+            Row(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                FilledIconButton(
+                    onClick = onAddToDiary,
+                    modifier = Modifier.size(btnSize),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.92f),
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
                 ) {
-                    kcalPer?.let {
-                        Text(
-                            "${it.toInt()} kcal",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = kcalSize,
-                            color = MacroColors.calories
+                    Icon(
+                        Icons.Filled.PlaylistAdd,
+                        contentDescription = "Ins Tagebuch",
+                        modifier = Modifier.size(btnIconSize),
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+                Box {
+                    FilledIconButton(
+                        onClick = { menuOpen = true },
+                        modifier = Modifier.size(btnSize),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
+                        Icon(
+                            Icons.Filled.MoreVert,
+                            contentDescription = "Mehr",
+                            modifier = Modifier.size(btnIconSize)
                         )
                     }
-                    protPer?.takeIf { it > 0f }?.let {
-                        Text(
-                            "${it.toInt()}P",
-                            fontWeight = FontWeight.Medium,
-                            fontSize = macroSize,
-                            color = MacroColors.protein
+                    DropdownMenu(
+                        expanded = menuOpen,
+                        onDismissRequest = { menuOpen = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(if (recipe.isFavorite) "Favorit entfernen" else "Als Favorit")
+                            },
+                            onClick = {
+                                menuOpen = false
+                                onToggleFavorite()
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    if (recipe.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                    null,
+                                    Modifier.size(18.dp)
+                                )
+                            }
                         )
-                    }
-                    carbsPer?.takeIf { it > 0f }?.let {
-                        Text(
-                            "${it.toInt()}KH",
-                            fontWeight = FontWeight.Medium,
-                            fontSize = macroSize,
-                            color = MacroColors.carbs
+                        DropdownMenuItem(
+                            text = { Text("Bearbeiten") },
+                            onClick = {
+                                menuOpen = false
+                                onEdit()
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Filled.RestaurantMenu, null, Modifier.size(18.dp))
+                            }
                         )
-                    }
-                    fatPer?.takeIf { it > 0f }?.let {
-                        Text(
-                            "${it.toInt()}F",
-                            fontWeight = FontWeight.Medium,
-                            fontSize = macroSize,
-                            color = MacroColors.fat
+                        DropdownMenuItem(
+                            text = { Text("Kopieren zum Anpassen") },
+                            onClick = {
+                                menuOpen = false
+                                onDuplicate()
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Filled.ContentCopy, null, Modifier.size(18.dp))
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Löschen", color = MaterialTheme.colorScheme.error) },
+                            onClick = {
+                                menuOpen = false
+                                showDeleteConfirm = true
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Filled.DeleteOutline,
+                                    null,
+                                    Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
                         )
                     }
                 }
