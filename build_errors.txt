@@ -1,15 +1,12 @@
-# Build errors - run 1009
+# Build errors - run 1028
 
 ## Unit Tests (test_output.log) - Error lines
 ```
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesViewModel.kt:287:70 Argument type mismatch: actual type is '(??? (Unknown lambda parameter type)) -> ??? (Unknown lambda return type)', but 'Boolean' was expected.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesViewModel.kt:287:72 Cannot infer type for value parameter 'phase'. Specify it explicitly.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesViewModel.kt:508:67 Argument type mismatch: actual type is '(??? (Unknown lambda parameter type)) -> ??? (Unknown lambda return type)', but 'Boolean' was expected.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesViewModel.kt:508:69 Cannot infer type for value parameter 'phase'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:752:33 No parameter with name 'cardHeight' found.
 > Task :app:compileDebugKotlin FAILED
    > Compilation error. See log for more details
 Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilation error. See log for more details
-BUILD FAILED in 1m 27s
+BUILD FAILED in 1m 21s
 ```
 
 ## Unit Tests (test_output.log) - Last 150 lines
@@ -162,7 +159,7 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilat
 	... 2 more
 
 
-BUILD FAILED in 1m 27s
+BUILD FAILED in 1m 21s
 18 actionable tasks: 18 executed
 ```
 
