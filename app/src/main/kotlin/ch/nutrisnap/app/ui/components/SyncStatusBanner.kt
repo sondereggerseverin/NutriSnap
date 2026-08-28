@@ -77,42 +77,46 @@ fun SyncStatusBanner() {
         val scheme = MaterialTheme.colorScheme
         val bg = if (isError) scheme.errorContainer else scheme.secondaryContainer
         val fg = if (isError) scheme.onErrorContainer else scheme.onSecondaryContainer
+        // „Sync…“ statt „Synchronisiert“ – klar als Status, nicht als dritter Hub-Tab
         val label = if (isError) {
             "Sync fehlgeschlagen" + (status.lastError?.let { ": ${it.take(40)}" } ?: "")
         } else {
-            "Synchronisiert"
+            "Sync…"
         }
 
+        // Kompakter Chip in der Statusleisten-Zone (TopEnd). Früher grösseres Padding
+        // hat den Chip auf den rechten Hub-Tab (KI-Koch) geschoben → sah aus wie
+        // Segment-Button „Synchronisiert“.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(top = 4.dp, end = 12.dp, bottom = 4.dp),
+                .padding(top = 0.dp, end = 8.dp, bottom = 0.dp),
             contentAlignment = Alignment.TopEnd
         ) {
             Row(
                 modifier = Modifier
-                    .shadow(4.dp, RoundedCornerShape(50))
+                    .shadow(3.dp, RoundedCornerShape(50))
                     .clip(RoundedCornerShape(50))
                     .background(bg)
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (isError) {
-                    Icon(Icons.Default.CloudOff, null, modifier = Modifier.size(12.dp), tint = fg)
+                    Icon(Icons.Default.CloudOff, null, modifier = Modifier.size(11.dp), tint = fg)
                 } else {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(11.dp),
-                        strokeWidth = 1.6.dp,
+                        modifier = Modifier.size(10.dp),
+                        strokeWidth = 1.5.dp,
                         color = fg
                     )
                 }
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(5.dp))
                 Text(
                     text = label,
                     color = fg,
-                    fontSize = 11.sp,
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1
                 )

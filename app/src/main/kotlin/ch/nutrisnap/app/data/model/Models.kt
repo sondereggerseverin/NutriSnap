@@ -393,20 +393,30 @@ data class Recipe(
  */
 private val socialLeadingJunk = listOf(
     Regex("""^pov\s*[:\-]\s*""", RegexOption.IGNORE_CASE),
-    Regex("""^(recipe|rezept)\s*(alert|idea)?\s*[:\-!]\s*""", RegexOption.IGNORE_CASE)
+    Regex("""^(recipe|rezept)\s*(alert|idea)?\s*[:\-!?]+\s*""", RegexOption.IGNORE_CASE),
+    // "You found a high-protein …" / "I found the perfect …" – reiner Engagement-Klickbait
+    Regex("""^(you|i)\s+found\s+(a|the|this)\s+""", RegexOption.IGNORE_CASE)
 )
 private val socialTrailingJunk = listOf(
-    Regex("""[!.,\s]*recipe\??\s*(is\s*)?(in|at)\s*(the\s*)?(comments?|end|bio|caption)\.?$""", RegexOption.IGNORE_CASE),
+    Regex("""[!.,\s]*recipe\??\s*(is\s*|it'?s\s*)?(in|at)\s*(the\s*)?(comments?|end|bio|caption)\.?$""", RegexOption.IGNORE_CASE),
     Regex("""[!.,\s]*(full\s*)?recipe\s*(below|down below)\.?$""", RegexOption.IGNORE_CASE),
     Regex("""[!.,\s]*swipe\s*(up|for\s*recipe)?\.?$""", RegexOption.IGNORE_CASE),
     Regex("""[!.,\s]*(follow|save this)\s*(me|for more)?\.?$""", RegexOption.IGNORE_CASE),
     Regex("""[!.,\s]*link\s*in\s*bio\.?$""", RegexOption.IGNORE_CASE)
+)
+/** Ganze Titel, die nur Social-Boilerplate sind → Anzeige „Rezept“. */
+private val socialEntireJunk = listOf(
+    Regex("""^recipe\??\s*(it'?s\s*)?(at|in)\s*(the\s*)?(end|comments?|bio|caption)\.?$""", RegexOption.IGNORE_CASE),
+    Regex("""^recipe\s*(in|at)\s*(the\s*)?(comments?|end)\.?$""", RegexOption.IGNORE_CASE),
+    Regex("""^(full\s*)?recipe\s*(below|down below)\.?$""", RegexOption.IGNORE_CASE),
+    Regex("""^link\s*in\s*bio\.?$""", RegexOption.IGNORE_CASE)
 )
 private val leadingEmojiOrPunct = Regex("""^[\p{So}\p{Cn}\s!?.\-–—]+""")
 private val trailingEmojiOrPunct = Regex("""[\p{So}\p{Cn}\s!?.\-–—]+$""")
 
 private fun cleanSocialCaption(raw: String): String {
     var s = raw.trim()
+    if (socialEntireJunk.any { it.matches(s) }) return "Rezept"
     for (re in socialLeadingJunk) s = re.replace(s, "")
     for (re in socialTrailingJunk) s = re.replace(s, "")
     s = s.replace(leadingEmojiOrPunct, "").replace(trailingEmojiOrPunct, "")

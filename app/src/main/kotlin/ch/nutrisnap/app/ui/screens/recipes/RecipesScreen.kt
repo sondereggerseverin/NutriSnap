@@ -272,6 +272,9 @@ fun RecipesScreen(
     }
 
     Scaffold(
+        // Hub-Tabs sitzen bereits über diesem Screen – kein Statusleisten-/Top-Inset,
+        // sonst entsteht der tote Streifen zwischen Segment-Control und Suchfeld.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             val scheme = MaterialTheme.colorScheme
             val rotation by animateFloatAsState(if (fabExpanded) 45f else 0f, label = "fabRotation")
