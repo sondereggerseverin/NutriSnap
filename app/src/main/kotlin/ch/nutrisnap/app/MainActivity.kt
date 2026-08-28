@@ -321,7 +321,7 @@ fun MainScaffold(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(horizontal = 14.dp, top = 4.dp, bottom = 10.dp)
+                .padding(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 10.dp)
         ) {
             Surface(
                 modifier = Modifier
