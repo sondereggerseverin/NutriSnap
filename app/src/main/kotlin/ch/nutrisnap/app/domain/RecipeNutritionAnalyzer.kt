@@ -172,7 +172,13 @@ object RecipeNutritionAnalyzer {
         "tbsp" to 15f, "tbs" to 15f, "el" to 15f,
         "tablespoon" to 15f, "tablespoons" to 15f, "esslöffel" to 15f,
         "tsp" to 5f, "tl" to 5f,
-        "teaspoon" to 5f, "teaspoons" to 5f, "teelöffel" to 5f
+        "teaspoon" to 5f, "teaspoons" to 5f, "teelöffel" to 5f,
+        // Trace-Mengen (Gewürze/Aromen). Ohne diese Einträge fällt z.B. "1 Prise Salz"
+        // durch alle Erkennungen und landet im letzten Fallback (amount * 50f) → 50 g
+        // statt ~2 g. Werte an die bereits bestehende Prise-Sonderbehandlung weiter unten
+        // angeglichen (Zeile mit "Gewürze/Pulver ohne Menge").
+        "prise" to 2f, "prisen" to 2f, "pinch" to 2f, "pinches" to 2f,
+        "spritzer" to 2f, "dash" to 2f
     )
 
     // Units that describe a *count* of items rather than a weight/volume.

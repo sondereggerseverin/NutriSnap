@@ -15,7 +15,7 @@ fun normalizeForCoverageMatch(s: String): String =
 
 data class ParsedIngredient(val amount: String, val unit: String, val name: String)
 /** Anzeige-Einheiten im Dropdown (kurz, lesbar). */
-val INGREDIENT_UNITS = listOf("g", "ml", "kg", "l", "EL", "TL", "Stück", "Prise", "Bund", "Dose", "Packung", "Scheibe", "Zehe")
+val INGREDIENT_UNITS = listOf("g", "ml", "kg", "l", "EL", "TL", "Stück", "Prise", "Spritzer", "Bund", "Dose", "Packung", "Scheibe", "Zehe")
 private const val FRACTION_CHARS = "¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞"
 private val UNICODE_FRACTION_VALUES = mapOf(
     '¼' to 0.25f, '½' to 0.5f, '¾' to 0.75f,
@@ -41,7 +41,8 @@ private val UNIT_ALIASES = mapOf(
     "stück" to "Stück", "stueck" to "Stück", "piece" to "Stück", "pieces" to "Stück",
     "cookie" to "Stück", "cookies" to "Stück", "biscuit" to "Stück", "biscuits" to "Stück",
     "keks" to "Stück", "kekse" to "Stück", "pc" to "Stück", "pcs" to "Stück",
-    "prise" to "Prise", "pinch" to "Prise",
+    "prise" to "Prise", "prisen" to "Prise", "pinch" to "Prise", "pinches" to "Prise",
+    "spritzer" to "Spritzer", "dash" to "Spritzer",
     "bund" to "Bund", "dose" to "Dose", "packung" to "Packung",
     "scheibe" to "Scheibe", "slice" to "Scheibe", "zehe" to "Zehe"
 )
