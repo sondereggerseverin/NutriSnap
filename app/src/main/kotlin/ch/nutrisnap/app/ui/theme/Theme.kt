@@ -1,12 +1,14 @@
 package ch.nutrisnap.app.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -348,8 +350,18 @@ fun NutriSnapTheme(content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalAppTheme provides theme) {
         MaterialTheme(
             colorScheme = if (useDarkColors) theme.toDarkColorScheme() else theme.toColorScheme(),
-            typography  = NutriSnapTypography,
-            content     = content
-        )
+            typography  = NutriSnapTypography
+        ) {
+            // Malt den App-Hintergrund über die gesamte Fensterfläche (inkl. Statusleisten-
+            // Bereich). Ohne das schimmert das helle Basis-Android-Theme (Theme.Material.
+            // Light) überall dort durch, wo kein Composable selbst einen Hintergrund setzt –
+            // vorher unsichtbar, weil der volle Sync-Balken genau das zufällig überdeckt hat.
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background
+            ) {
+                content()
+            }
+        }
     }
 }
