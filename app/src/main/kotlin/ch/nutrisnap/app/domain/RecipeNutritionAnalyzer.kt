@@ -215,7 +215,11 @@ object RecipeNutritionAnalyzer {
         "biscuit" to 12f, "biscuits" to 12f, "cookie" to 12f, "cookies" to 12f,
         "keks" to 12f, "kekse" to 12f,
         "cracker" to 8f, "crackers" to 8f,
-        "tortilla" to 40f, "tortillas" to 40f, "wrap" to 45f, "wraps" to 45f
+        "tortilla" to 40f, "tortillas" to 40f, "wrap" to 45f, "wraps" to 45f,
+        // Nüsse als Stück ("1 Mandel", "1 Stück Mandel") — ohne Eintrag greift der
+        // generische 50g-Fallback in resolveGramsPerUnit, was eine einzelne Mandel
+        // (~1.2g) grotesk überschätzt.
+        "mandel" to 1.2f, "mandeln" to 1.2f, "almond" to 1.2f, "almonds" to 1.2f
     )
 
     /** Display-Label für Zähl-Einheiten (intern lowercase). */
