@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_RECIPE_MENU
@@ -448,7 +449,10 @@ fun RecipeGridCard(
                 }
             }
 
-            // Info-Block auf Kartenfläche (nicht auf dem Foto) – immer lesbar, immer gleich hoch
+            // Info-Block: feste Höhe (2 Titelzeilen + Makrozeile), damit alle Kacheln
+            // in einer Grid-Zeile gleich hoch sind – kein „wackelndes“ Layout mehr.
+            val titleBlockH = titleLineHeight * 2
+            val macroBlockH = if (largeTiles) 16.dp else 14.dp
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -459,12 +463,19 @@ fun RecipeGridCard(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = titleSize,
                     lineHeight = titleLineHeight,
+                    minLines = 2,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(with(LocalDensity.current) { titleBlockH.toDp() })
                 )
                 Spacer(Modifier.height(4.dp))
                 Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(macroBlockH),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(if (largeTiles) 8.dp else 6.dp)
                 ) {

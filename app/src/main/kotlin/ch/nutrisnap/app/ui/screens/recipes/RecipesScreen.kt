@@ -778,20 +778,21 @@ fun RecipesScreen(
             } else if (useGrid) {
                 // Kachelhöhe ergibt sich aus 4:3-Foto + Info-Block – keine erzwungene
                 // Zeilenzahl mehr, dafür konsistenter Fotocrop unabhängig von der Bildschirmgrösse.
+                // 3-Spalten braucht etwas mehr Luft, sonst wirken Kacheln gequetscht
                 val gap = when {
                     window.isTablet -> 12.dp
-                    gridColumns >= 3 -> 4.dp
+                    gridColumns >= 3 -> 8.dp
                     gridDensity <= 4 -> 8.dp
                     else -> 6.dp
                 }
-                val hPad = if (window.isTablet) 16.dp else if (gridColumns >= 3) 8.dp else 10.dp
+                val hPad = if (window.isTablet) 16.dp else if (gridColumns >= 3) 10.dp else 10.dp
 
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(gridColumns),
                     contentPadding = PaddingValues(
                         start = hPad, end = hPad, top = gap,
-                        // Nur beim Weiter-Scrollen Platz unter der letzten Zeile
-                        bottom = 88.dp
+                        // FAB + Bottom-Nav: genug Platz, dass letzte Zeile nicht unter dem + verschwindet
+                        bottom = 100.dp
                     ),
                     horizontalArrangement = Arrangement.spacedBy(gap),
                     verticalArrangement = Arrangement.spacedBy(gap),
