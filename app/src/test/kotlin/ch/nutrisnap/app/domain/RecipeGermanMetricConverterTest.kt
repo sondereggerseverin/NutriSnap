@@ -55,4 +55,38 @@ class RecipeGermanMetricConverterTest {
         val out = RecipeGermanMetricConverter.convertOfflineFull("1 cup chicken stock")
         assertTrue(out.isNotBlank())
     }
+
+    @Test
+    fun `cup flour becomes grams not tasse`() {
+        val out = RecipeGermanMetricConverter.convertUnitsToMetric(
+            "1/3 cup all-purpose flour (spooned and leveled)"
+        )
+        assertFalse(out.lowercase().contains("cup"))
+        assertFalse(out.lowercase().contains("tasse"))
+        assertTrue(out.lowercase().contains("g"))
+        // ~40 g (1/3 * 120)
+        assertTrue(out.contains("40") || out.contains("39") || out.contains("41"))
+    }
+
+    @Test
+    fun `german tasse mehl becomes grams`() {
+        val out = RecipeGermanMetricConverter.convertUnitsToMetric("0.33 Tasse Allzweckmehl")
+        assertFalse(out.lowercase().contains("tasse"))
+        assertTrue(out.lowercase().contains("g"))
+        assertTrue(out.contains("Allzweckmehl") || out.lowercase().contains("mehl"))
+    }
+
+    @Test
+    fun `packed cup brown sugar denser than plain sugar`() {
+        val out = RecipeGermanMetricConverter.convertUnitsToMetric("1/4 cup packed brown sugar")
+        assertFalse(out.lowercase().contains("cup"))
+        assertTrue(out.lowercase().contains("g"))
+    }
+
+    @Test
+    fun `one and half cups flour`() {
+        val out = RecipeGermanMetricConverter.convertUnitsToMetric("1 1/2 cups all-purpose flour")
+        assertFalse(out.lowercase().contains("cup"))
+        assertTrue(out.contains("180") || out.contains("179") || out.contains("181"))
+    }
 }

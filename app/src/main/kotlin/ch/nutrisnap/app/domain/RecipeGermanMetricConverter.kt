@@ -62,9 +62,9 @@ object RecipeGermanMetricConverter {
         val bullet = line.trimStart().startsWith("•")
         val t = line.trim().trimStart('•', '-', '*', ' ').trim()
         if (t.isBlank()) return line
-        // Noch cups/oz/tbsp? → Metric hat nicht gegriffen, nicht als g parsen
+        // Noch cups/tasse/oz/tbsp? → Metric hat nicht gegriffen, nicht als g parsen
         if (Regex(
-                """(?i)\b(cups?|tbsp|tbs|tablespoons?|tsp|teaspoons?|oz|ounces?|lbs?|pounds?)\b"""
+                """(?i)\b(cups?|tassen?|tasse|tbsp|tbs|tablespoons?|tsp|teaspoons?|oz|ounces?|lbs?|pounds?)\b"""
             ).containsMatchIn(t)
         ) return line
         if (!Regex("""^(\d+[.,]?\d*|\d+/\d+|[¼½¾⅓⅔])\b""").containsMatchIn(t) &&
@@ -223,26 +223,38 @@ object RecipeGermanMetricConverter {
             parseAmount(mr.groupValues[1])?.let { fmt(it * 28.35, " g") } ?: mr.value
         }
 
-        // cup → g/ml; tbsp/tsp → EL/TL (deutsche Löffelmasse, präziser als pauschale g-Umrechnung)
-        // Optional: heaped/level/rounded vor der Einheit → Faktor 1.5 / 1.0 / 1.25
+        // cup/tasse → g/ml; tbsp/tsp → EL/TL
+        // Modifier vor ODER nach der Einheit: "1/4 cup packed sugar", "1 packed cup sugar"
         val volPattern = Regex(
             """(\d+\s+\d+/\d+|\d+/\d+|\d+(?:[.,]\d+)?)\s+""" +
                 """(?:(heaped|level|rounded|scant|packed)\s+)?""" +
-                """(cups?|tbsp|tbs|tablespoons?|tsp|teaspoons?)\b\s*(.*)""",
+                """(cups?|tassen?|tasse|tbsp|tbs|tablespoons?|tsp|teaspoons?)\b""" +
+                """(?:\s+(packed|heaped|level|rounded|scant))?""" +
+                """\s*(.*)""",
             RegexOption.IGNORE_CASE
         )
         r = volPattern.replace(r) { mr ->
             val amt = parseAmount(mr.groupValues[1]) ?: return@replace mr.value
-            val modifier = mr.groupValues[2].lowercase()
+            val modifier = (mr.groupValues[2].ifBlank { mr.groupValues[4] }).lowercase()
             val unit = mr.groupValues[3].lowercase()
-            val rest = mr.groupValues[4]
+            var rest = mr.groupValues[5]
+                // Klammern wie "(spooned and leveled)" / "(packed)" entfernen – gehören zur Methode, nicht zum Namen
+                .replace(
+                    Regex(
+                        """\s*\((?:spooned|leveled|levelled|packed|heaped|sifted|room temperature)[^)]*\)""",
+                        RegexOption.IGNORE_CASE
+                    ),
+                    ""
+                )
+                .trim()
             val name = rest.lowercase()
 
-            // heaped ≈ +50 %, rounded ≈ +25 %, scant ≈ −25 %, level/packed = 1.0
+            // heaped ≈ +50 %, rounded ≈ +25 %, scant ≈ −25 %, packed brauner Zucker etwas dichter
             val heapedFactor = when (modifier) {
                 "heaped" -> 1.5
                 "rounded" -> 1.25
                 "scant" -> 0.75
+                "packed" -> 1.1
                 else -> 1.0
             }
             val scaled = amt * heapedFactor
@@ -251,11 +263,11 @@ object RecipeGermanMetricConverter {
             val densityPerCup = densityGPerCup(name)
 
             when {
-                unit.startsWith("cup") -> {
+                unit.startsWith("cup") || unit.startsWith("tasse") -> {
                     when {
                         isLiquid -> fmt(scaled * 240, " ml") + (if (rest.isNotBlank()) " $rest" else "")
                         densityPerCup != null -> fmt(scaled * densityPerCup, " g") + (if (rest.isNotBlank()) " $rest" else "")
-                        else -> fmt(scaled * 240, " g") + (if (rest.isNotBlank()) " $rest" else "")
+                        else -> fmt(scaled * 120, " g") + (if (rest.isNotBlank()) " $rest" else "") // Default eher Mehl als Wasser
                     }
                 }
                 // EL/TL beibehalten — genauer und lesbarer als 15 g / 5 g Defaults
@@ -277,14 +289,19 @@ object RecipeGermanMetricConverter {
 
     /** g pro US-Cup für gängige feste Zutaten (nur noch für cup-Umrechnung relevant). */
     private fun densityGPerCup(nameLower: String): Double? {
+        // Spezifischere Keys zuerst (brown sugar vor sugar, almond flour vor flour)
         val rules = listOf(
+            listOf("almond flour", "mandelmehl", "almond meal") to 96.0,
+            listOf("coconut flour", "kokosmehl") to 112.0,
+            listOf("all-purpose flour", "all purpose flour", "allzweckmehl", "plain flour") to 120.0,
             listOf("flour", "mehl") to 120.0,
-            listOf("sugar", "zucker", "coconut sugar") to 200.0,
+            listOf("brown sugar", "brauner zucker", "dark sugar", "light brown") to 220.0,
             listOf("powdered sugar", "icing", "confectioner", "puderzucker") to 120.0,
+            listOf("sugar", "zucker", "coconut sugar") to 200.0,
             listOf("butter") to 227.0,
-            listOf("cottage cheese", "hüttenkäse", "huttenkase") to 225.0,
+            listOf("cottage cheese", "hüttenkäse", "huettenkaese", "huttenkase") to 225.0,
             listOf("greek yogurt", "greek yoghurt", "griechischer joghurt", "joghurt", "yogurt", "yoghurt") to 245.0,
-            listOf("cream cheese", "frischkäse", "frischkase") to 230.0,
+            listOf("cream cheese", "frischkäse", "frischkaese", "frischkase") to 230.0,
             listOf("biscoff", "cookie butter", "lotus spread") to 300.0,
             listOf("peanut butter", "erdnussbutter", "nutella") to 270.0,
             listOf("honey", "honig") to 340.0,
@@ -292,14 +309,12 @@ object RecipeGermanMetricConverter {
             listOf("cinnamon", "zimt") to 125.0,
             listOf("baking powder", "backpulver") to 220.0,
             listOf("baking soda", "natron") to 220.0,
-            listOf("salt", "salz") to 290.0,
+            listOf("salt", "salz", "meersalz", "sea salt") to 290.0,
             listOf("cocoa", "kakao") to 85.0,
-            listOf("oat", "hafer") to 90.0,
+            listOf("rolled oat", "haferflocken", "oat", "hafer") to 90.0,
             listOf("rice", "reis") to 185.0,
-            listOf("cheese", "käse", "kase") to 110.0,
-            listOf("chia") to 160.0,
-            listOf("almond flour", "mandelmehl") to 96.0,
-            listOf("coconut flour", "kokosmehl") to 112.0
+            listOf("cheese", "käse", "kaese", "kase") to 110.0,
+            listOf("chia") to 160.0
         )
         for ((keys, dens) in rules) {
             if (keys.any { nameLower.contains(it) }) return dens
