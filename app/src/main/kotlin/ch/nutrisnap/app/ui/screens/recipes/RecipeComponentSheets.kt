@@ -319,50 +319,81 @@ internal fun parseIngredientSections(ingredients: String): List<Pair<String, Lis
         val d = line.trim().trimStart('•', '-', '*', ' ').trim()
         if (d.length <= 2) return false
         if (d.first().isDigit()) return false
-        // Menge in der Zeile → Zutat, kein Header (auch "1 Ei", "Prise Salz" mit Kontext)
+        // Menge in der Zeile → Zutat, kein Header
         if (Regex(
                 """\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tbsp|tsp|cup|oz|stück|stk)\b""",
                 RegexOption.IGNORE_CASE
             ).containsMatchIn(d)
         ) return false
-        // "1 Ei", "2 Eier", "Prise Salz" = Zutat, kein Abschnitt
         if (Regex("""(?i)^\d+\s+(ei|eier|prise|bund|zehe|scheibe|dose)\b""").containsMatchIn(d)) {
             return false
         }
+        // Einzel-Zutaten ohne Menge nicht als Abschnitt (Detail-Ansicht zeigt sie als Zutat)
+        if (Regex(
+                """(?i)^(prise|etwas|wenig|salz|pfeffer|salz und pfeffer|salt|pepper|""" +
+                    """olivenöl|olivenoel|öl|oel|butter|milch|wasser)\b"""
+            ).containsMatchIn(d) && d.length < 28
+        ) return false
         if (Regex("""(?i)^(prise|etwas|wenig)\s+\p{L}""").containsMatchIn(d)) return false
         val lc = d.lowercase().trimEnd(':').trim()
-        // Anleitungssätze nie als Abschnitt (auch „für den … vermengen“)
+        // Anleitungssätze nie als Abschnitt
         if (Regex(
                 """(?i)\b(vermischen|vermengen|verrühren|verruehren|unterheben|backen|""" +
-                    """drücken|toppen|kochen)\b"""
+                    """drücken|toppen|kochen|braten|anbraten|erhitzen|servieren)\b"""
             ).containsMatchIn(d)
         ) return false
         if (d.length > 55) return false
-        // Explizite Abschnitts-Muster (inkl. Back-Abschnitte) – NICHT jede kurze Zeile
+        if (d.any { it.isDigit() }) return false
+
+        // 1) Doppelpunkt-Header, „Für die/den …“, klassische Back-Abschnitte
         val shortFuer = Regex("""(?i)^für\s+(die|den|das)\s+[^:]{2,40}$""").matches(lc) ||
             Regex("""(?i)^for\s+the\s+[^:]{2,40}$""").matches(lc)
-        if (shortFuer ||
-            (d.trim().endsWith(":") && d.length in 4..48 && !d.any { it.isDigit() }) ||
-            lc == "dough" || lc == "teig" || lc == "filling" || lc == "füllung" || lc == "fuellung" ||
-            lc == "frosting" || lc == "glasur" || lc == "syrup" || lc == "sirup" ||
-            lc == "topping" || lc == "belag" || lc == "boden" || lc == "crust" ||
-            lc.endsWith(" filling") || lc.endsWith(" füllung") || lc.endsWith(" fuellung") ||
+        if (shortFuer || (d.trim().endsWith(":") && d.length in 4..48)) return true
+
+        val classicSingle = setOf(
+            "dough", "teig", "filling", "füllung", "fuellung", "frosting", "glasur",
+            "syrup", "sirup", "topping", "belag", "boden", "crust", "sauce", "soße", "sosse",
+            "marinade", "dressing", "dip", "beilage", "gemüse", "gemuese", "fleisch",
+            "hähnchen", "haehnchen", "huhn", "chicken", "poulet", "reis", "nudeln", "pasta",
+            "quinoa", "püree", "puree", "stampf", "mash"
+        )
+        if (lc in classicSingle) return true
+
+        // 2) Endet auf typische Abschnitts-Suffixe (auch „Protein-Sauce“, „Cookie Teig“)
+        if (lc.endsWith(" filling") || lc.endsWith(" füllung") || lc.endsWith(" fuellung") ||
             lc.endsWith(" frosting") || lc.endsWith(" glasur") ||
             lc.endsWith(" syrup") || lc.endsWith(" sirup") ||
             lc.endsWith(" dough") || lc.endsWith(" teig") ||
             lc.endsWith(" cookie teig") || lc.endsWith(" cheesecake teig") ||
             lc.endsWith("-füllung") || lc.endsWith("-fuellung") ||
             lc.endsWith("-frosting") || lc.endsWith("-sirup") || lc.endsWith("-teig") ||
-            lc.endsWith("-sauce") || lc.endsWith("-glasur") ||
-            // "Raspberry Cookie Teig", "Cheesecake Teig" ohne Doppelpunkt
-            (lc.contains("teig") && d.length in 4..48 && !d.any { it.isDigit() })
+            lc.endsWith("-sauce") || lc.endsWith("-soße") || lc.endsWith("-sosse") ||
+            lc.endsWith("-glasur") || lc.endsWith(" sauce") || lc.endsWith(" soße") ||
+            lc.endsWith(" sosse") || lc.endsWith(" püree") || lc.endsWith(" puree") ||
+            lc.endsWith(" marinade") || lc.endsWith(" dressing") || lc.endsWith(" topping") ||
+            lc.endsWith(" belag") || lc.contains("teig") || lc.contains("püree") ||
+            lc.contains("puree") || lc.contains("stampf")
         ) return true
-        // Reine GROSSBUCHSTABEN ohne Menge = Social-Caption-Header
+
+        // 3) Enthält Abschnitts-Signalwort (Bowl-Komponenten: Hähnchen, Brokkoli, Sauce …)
+        val sectionHint = Regex(
+            """(?i)\b(sauce|soße|sosse|püree|puree|stampf|mash|marinade|dressing|topping|""" +
+                """belag|füllung|fuellung|frosting|glasur|teig|dough|crust|boden|dip|pesto|""" +
+                """hähnchen|haehnchen|huhn|chicken|poulet|fleisch|gemüse|gemuese|""" +
+                """broccoli|brokkoli|bimi|reis|nudeln|pasta|quinoa|kartoffel|beilage|""" +
+                """protein[- ]?sauce|bowl)\b"""
+        )
+        if (sectionHint.containsMatchIn(d) && d.length in 3..48) return true
+
+        // 4) Slash-Gruppen ohne Menge: „Brokkoli/Bimi“, „Reis/Erbsen“
+        if (d.contains('/') && d.length in 3..40) return true
+
+        // 5) Reine GROSSBUCHSTABEN (Social-Caption), auch mit „/“ oder „&“
         val lettersOnly = d.filter { it.isLetter() || it.isWhitespace() || it == '-' || it == '&' }
         if (lettersOnly.isNotBlank() && lettersOnly == lettersOnly.uppercase() &&
             lettersOnly.replace(" ", "").length in 3..40
         ) return true
-        // Kein pauschales true mehr – sonst wird „Prise Salz“ zum Abschnitt
+
         return false
     }
 
