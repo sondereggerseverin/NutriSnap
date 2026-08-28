@@ -142,18 +142,21 @@ class MainActivity : ComponentActivity() {
                     val isOnline2 by networkMonitor2.isOnline.collectAsStateWithLifecycle(initialValue = true)
                     val hcVm2: HealthConnectViewModel = viewModel()
                     LaunchedEffect(Unit) { healthConnectViewModel = hcVm2 }
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        OfflineBanner(isOnline = isOnline2)
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            OfflineBanner(isOnline = isOnline2)
+                            MainScaffold(
+                                sharedUrl = sharedUrl,
+                                sharedBatchUrls = sharedBatchUrls,
+                                sharedRecipeJson = sharedRecipeJson,
+                                hcVm = hcVm2,
+                                onRequestHealthPermission = {
+                                    healthConnectPermLauncher.launch(HealthConnectManager.REQUESTABLE_PERMISSIONS)
+                                }
+                            )
+                        }
+                        // Overlay: nimmt keinen Layout-Platz, schwebt über dem Content
                         SyncStatusBanner()
-                        MainScaffold(
-                            sharedUrl = sharedUrl,
-                            sharedBatchUrls = sharedBatchUrls,
-                            sharedRecipeJson = sharedRecipeJson,
-                            hcVm = hcVm2,
-                            onRequestHealthPermission = {
-                                healthConnectPermLauncher.launch(HealthConnectManager.REQUESTABLE_PERMISSIONS)
-                            }
-                        )
                     }
                     return@NutriSnapTheme
                 }
@@ -191,24 +194,27 @@ class MainActivity : ComponentActivity() {
                         LaunchedEffect(Unit) { healthConnectViewModel = hcVm }
                         LaunchedEffect(biometricEnabled) { if (biometricEnabled) isUnlocked = false }
 
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            OfflineBanner(isOnline = isOnline)
-                            SyncStatusBanner()
-                            if (!isUnlocked) {
-                                BiometricLockScreen(onUnlocked = { isUnlocked = true })
-                            } else {
-                                MainScaffold(
-                                    sharedUrl = sharedUrl,
-                                    sharedBatchUrls = sharedBatchUrls,
-                                    sharedRecipeJson = sharedRecipeJson,
-                                    hcVm = hcVm,
-                                    onRequestHealthPermission = {
-                                        healthConnectPermLauncher.launch(
-                                            HealthConnectManager.REQUESTABLE_PERMISSIONS
-                                        )
-                                    }
-                                )
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                OfflineBanner(isOnline = isOnline)
+                                if (!isUnlocked) {
+                                    BiometricLockScreen(onUnlocked = { isUnlocked = true })
+                                } else {
+                                    MainScaffold(
+                                        sharedUrl = sharedUrl,
+                                        sharedBatchUrls = sharedBatchUrls,
+                                        sharedRecipeJson = sharedRecipeJson,
+                                        hcVm = hcVm,
+                                        onRequestHealthPermission = {
+                                            healthConnectPermLauncher.launch(
+                                                HealthConnectManager.REQUESTABLE_PERMISSIONS
+                                            )
+                                        }
+                                    )
+                                }
                             }
+                            // Overlay: nimmt keinen Layout-Platz, schwebt über dem Content
+                            SyncStatusBanner()
                         }
                     }
                 }

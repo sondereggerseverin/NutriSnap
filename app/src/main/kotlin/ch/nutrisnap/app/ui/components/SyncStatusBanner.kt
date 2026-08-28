@@ -40,21 +40,17 @@ import ch.nutrisnap.app.data.supabase.SyncStatusHolder
 import kotlinx.coroutines.delay
 
 /**
- * Kompakter Status-Chip statt vollflächigem Balken: hängt oben rechts (unterhalb der
- * echten Statusleiste dank windowInsetsPadding), nimmt nur so viel Platz wie der Text
- * braucht und überlagert den Inhalt statt eine eigene volle Zeile mit Farbbruch zu
- * beanspruchen. Vorher lief der Balken ohne Inset-Padding hinter die System-Statusleiste
- * und verschmolz optisch mit ihr ("13:01 ... Synchronisiert... 5G ... 35%" in einer Zeile).
+ * Overlay-Chip oben rechts – nimmt im Idle-Zustand **keinen Layout-Platz** ein
+ * (kein Statusleisten-Gap mehr). Vorher hat ein immer präsenter Box-Container mit
+ * windowInsetsPadding(statusBars) den gesamten Content dauerhaft nach unten geschoben.
  *
- * Nur bei laufender Voll-Sync (pushAll/pullAll) oder Fehler sichtbar.
- * Einzel-Pushes setzen den Status nicht mehr → kein Dauer-"Synchronisiert…".
- * Hängt der Status >45s, wird er automatisch zurückgesetzt.
+ * Nur bei laufender Voll-Sync oder Fehler sichtbar. Stuck-Guard nach 45s / ERROR nach 8s.
  */
 @Composable
 fun SyncStatusBanner() {
     val status by SyncStatusHolder.status.collectAsStateWithLifecycle()
+    val visible = status.state == SyncState.SYNCING || status.state == SyncState.ERROR
 
-    // Stuck-Guard: alle 10s prüfen
     LaunchedEffect(status.state, status.activeOps) {
         if (status.state == SyncState.SYNCING) {
             while (true) {
@@ -64,7 +60,6 @@ fun SyncStatusBanner() {
         }
     }
 
-    // ERROR nach 8s ausblenden (zurück zu IDLE)
     LaunchedEffect(status.state) {
         if (status.state == SyncState.ERROR) {
             delay(8_000)
@@ -72,28 +67,29 @@ fun SyncStatusBanner() {
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .padding(top = 4.dp, end = 12.dp),
-        contentAlignment = Alignment.TopEnd
+    // AnimatedVisibility aussen: Höhe 0 wenn unsichtbar → kein Leerraum unter der Statusleiste
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn() + scaleIn(initialScale = 0.85f),
+        exit = fadeOut() + scaleOut(targetScale = 0.85f)
     ) {
-        AnimatedVisibility(
-            visible = status.state == SyncState.SYNCING || status.state == SyncState.ERROR,
-            enter = fadeIn() + scaleIn(initialScale = 0.85f),
-            exit = fadeOut() + scaleOut(targetScale = 0.85f)
-        ) {
-            val isError = status.state == SyncState.ERROR
-            val scheme = MaterialTheme.colorScheme
-            val bg = if (isError) scheme.errorContainer else scheme.secondaryContainer
-            val fg = if (isError) scheme.onErrorContainer else scheme.onSecondaryContainer
-            val label = if (isError) {
-                "Sync fehlgeschlagen" + (status.lastError?.let { ": ${it.take(40)}" } ?: "")
-            } else {
-                "Synchronisiert"
-            }
+        val isError = status.state == SyncState.ERROR
+        val scheme = MaterialTheme.colorScheme
+        val bg = if (isError) scheme.errorContainer else scheme.secondaryContainer
+        val fg = if (isError) scheme.onErrorContainer else scheme.onSecondaryContainer
+        val label = if (isError) {
+            "Sync fehlgeschlagen" + (status.lastError?.let { ": ${it.take(40)}" } ?: "")
+        } else {
+            "Synchronisiert"
+        }
 
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(top = 4.dp, end = 12.dp, bottom = 4.dp),
+            contentAlignment = Alignment.TopEnd
+        ) {
             Row(
                 modifier = Modifier
                     .shadow(4.dp, RoundedCornerShape(50))
