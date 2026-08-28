@@ -342,32 +342,29 @@ fun RecipeGridCard(
                 recipe = recipe,
                 modifier = Modifier.fillMaxSize()
             )
-            // Verlauf unten für Lesbarkeit auf Fotos
-            Box(
+            // Dunkle Leiste unten – auf hellen Fotos sonst unsichtbar (nur Placeholder war lesbar)
+            Column(
                 Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            colorStops = arrayOf(
-                                0f to Color.Transparent,
-                                0.35f to Color.Black.copy(alpha = 0.45f),
-                                1f to Color.Black.copy(alpha = 0.82f)
-                            )
-                        )
-                    )
+                    .background(Color.Black.copy(alpha = 0.78f))
                     .padding(horizontal = textPadH, vertical = textPadV)
             ) {
-                Column {
-                    Text(
-                        recipe.displayTitle(),
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = titleSize,
-                        maxLines = titleMaxLines,
-                        overflow = TextOverflow.Ellipsis,
-                        lineHeight = titleLineHeight,
-                        color = Color.White
-                    )
+                Text(
+                    recipe.displayTitle(),
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = titleSize,
+                    maxLines = titleMaxLines,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = titleLineHeight,
+                    color = Color.White
+                )
+                // Nährwerte immer in eigener Zeile, wenn vorhanden
+                val hasMacros = kcalPer != null ||
+                    (protPer != null && protPer > 0f) ||
+                    (carbsPer != null && carbsPer > 0f) ||
+                    (fatPer != null && fatPer > 0f)
+                if (hasMacros) {
                     Spacer(Modifier.height(2.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -387,7 +384,7 @@ fun RecipeGridCard(
                                 "${it.toInt()}P",
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = macroSize,
-                                color = MacroColors.protein,
+                                color = Color(0xFF60A5FA), // helleres Blau auf dunklem Grund
                                 maxLines = 1
                             )
                         }
@@ -396,7 +393,7 @@ fun RecipeGridCard(
                                 "${it.toInt()}KH",
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = macroSize,
-                                color = MacroColors.carbs,
+                                color = Color(0xFFFBBF24),
                                 maxLines = 1
                             )
                         }
@@ -405,7 +402,7 @@ fun RecipeGridCard(
                                 "${it.toInt()}F",
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = macroSize,
-                                color = MacroColors.fat,
+                                color = Color(0xFFF87171),
                                 maxLines = 1
                             )
                         }
