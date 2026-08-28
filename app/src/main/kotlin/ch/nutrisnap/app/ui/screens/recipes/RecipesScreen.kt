@@ -41,7 +41,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -278,8 +277,8 @@ fun RecipesScreen(
         // fillMaxSize + weight(1f) am Grid/List: sonst misst Column die Lazy-Liste
         // mit unbounded height → alle 251 Items werden gemessen → ANR in RectList/MeasureAndLayout.
         Column(Modifier.fillMaxSize().padding(padding)) {
-            // Suchfeld als Pill: Platzhalter mittig zentriert, Icons links/rechts gleich
-            // schwer → wirkt als Ganzes zentriert statt links betont. Kompaktere Höhe
+            // Suchfeld als Pill: Placeholder sitzt direkt neben dem Such-Icon (links-
+            // bündig) statt zentriert mit grosser Lücke dazwischen. Kompaktere Höhe
             // spart oben Platz für das Grid darunter.
             OutlinedTextField(
                 value = state.query,
@@ -289,10 +288,8 @@ fun RecipesScreen(
                 },
                 placeholder = {
                     Text(
-                        "Suchen…",
-                        fontSize = 13.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
+                        "Rezepte durchsuchen…",
+                        fontSize = 13.sp
                     )
                 },
                 leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(18.dp)) },

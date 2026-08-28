@@ -16,6 +16,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -311,26 +314,48 @@ fun MainScaffold(
     val renameNavLabel = navPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_NAV_LABEL_RENAME) ?: false
 
     Scaffold(bottomBar = {
-        NavigationBar(
-            tonalElevation = NavigationBarDefaults.Elevation
+        // Schwebende, abgerundete Nav-Leiste statt flacher Vollbreiten-Bar: schliesst
+        // den toten schwarzen Streifen zwischen Content und System-Navigation, indem
+        // sie mit Rand-Abstand + Schatten über dem Inhalt "liegt" statt hart abzuschneiden.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(horizontal = 14.dp, top = 4.dp, bottom = 10.dp)
         ) {
-            bottomNavItems.forEach { screen ->
-                val label = when {
-                    screen is Screen.Settings && renameNavLabel -> "Einstellungen"
-                    else -> screen.label
-                }
-                NavigationBarItem(
-                    selected = currentRoute == screen.route ||
-                        currentRoute?.startsWith("${screen.route}?") == true,
-                    onClick = {
-                        navController.navigate(screen.route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true; restoreState = true
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(elevation = 14.dp, shape = RoundedCornerShape(28.dp), clip = false),
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                tonalElevation = 3.dp
+            ) {
+                NavigationBar(
+                    containerColor = Color.Transparent,
+                    tonalElevation = 0.dp,
+                    windowInsets = WindowInsets(0, 0, 0, 0),
+                    modifier = Modifier.height(68.dp)
+                ) {
+                    bottomNavItems.forEach { screen ->
+                        val label = when {
+                            screen is Screen.Settings && renameNavLabel -> "Einstellungen"
+                            else -> screen.label
                         }
-                    },
-                    icon = { Icon(screen.icon, contentDescription = label) },
-                    label = { Text(label, maxLines = 1) }
-                )
+                        NavigationBarItem(
+                            selected = currentRoute == screen.route ||
+                                currentRoute?.startsWith("${screen.route}?") == true,
+                            onClick = {
+                                navController.navigate(screen.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                    launchSingleTop = true; restoreState = true
+                                }
+                            },
+                            icon = { Icon(screen.icon, contentDescription = label) },
+                            label = { Text(label, maxLines = 1) }
+                        )
+                    }
+                }
             }
         }
     }) { innerPadding ->
