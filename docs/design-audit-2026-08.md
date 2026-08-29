@@ -29,8 +29,8 @@ Sie schreiben einen Wert in den DataStore, den keine andere Composable je liest.
 | 7 | FABs & Buttons | Diary-FAB konsolidieren | aus | ✅ live | `DiaryScreen.kt` |
 | 8 | Typografie/Nav | Nav-Label „Einstellungen“ | aus | ✅ live | `MainActivity.kt` |
 | 9 | Farben | Macro-Farben absetzen | aus | ❌ tot | nur `SettingsScreen.kt` |
-| 10 | Farben | Card-Elevation erhöhen | aus | ❌ tot | nur `SettingsScreen.kt` |
-| 11 | Farben | Dark-Mode-Kontrast | aus | ❌ tot | nur `SettingsScreen.kt` |
+| 10 | Farben | Card-Elevation erhöhen | aus | 🔧 **teilweise verdrahtet** (s. §8) | `Components.kt` (`NutriCard`), Home-Screen migriert |
+| 11 | Farben | Kontrast-Modus (Text auf Primärfarbe) | aus | 🔧 **verdrahtet** (s. §8) | `Theme.kt` (`toColorScheme`/`toDarkColorScheme`) |
 | 12 | Farben | Cropper Theme-Farbe | **an** | ❌ tot + verwaist (s. §4.4) | nur `SettingsScreen.kt` |
 | 13 | Farben | „Noch X kcal übrig“ hervorheben | aus | 🔧 **in dieser Session verdrahtet** | `HomeCards.kt` |
 | 14 | Layout | Spacing-Tokens | an | ❌ tot | nur `SettingsScreen.kt` |
@@ -160,12 +160,11 @@ sollte einfach korrekt sein.
 
 ---
 
-## 6. Empfohlene Priorisierung für die verbleibenden 14 toten Toggles
+## 6. Empfohlene Priorisierung für die verbleibenden 12 toten Toggles
 
-1. **Card-Elevation (#10)** – ein zentraler `NutriCard`-Wrapper, danach schrittweise
-   Screens migrieren; hoher visueller Effekt pro Aufwand.
-2. **Dark-Mode-/Kontrast-Fix (#11)**, erweitert auf Light Mode wie in §4.1 beschrieben –
-   betrifft das Default-Theme, daher User-relevant.
+1. ~~Card-Elevation (#10)~~ – **NutriCard-Wrapper live**, Home migriert; restliche
+   Screens folgen schrittweise (s. §8.1).
+2. ~~Dark-Mode-/Kontrast-Fix (#11)~~ – **verdrahtet** (s. §8.2).
 3. **Progress-Bar-Farbwechsel (#21)** und **Macro-Farben absetzen (#9)** – klar
    abgegrenzt auf `AnalysisCards.kt`/`HomeCards.kt`, kein grosser Blast-Radius.
 4. **Diary kompakter (#17)**, **Home-Reihenfolge (#16)**, **Activity-Karten
@@ -178,6 +177,40 @@ sollte einfach korrekt sein.
    parallel zu anderer Screen-Arbeit.
 
 Wie gehabt: pro Punkt eigener Commit, CI muss grün sein, bevor der nächste beginnt.
+
+---
+
+## 8. Bereits umgesetzt (29. August 2026, Fortsetzung)
+
+### 8.1 Toggle #10 „Card-Elevation erhöhen“ – NutriCard-Wrapper eingeführt
+
+Zentraler `NutriCard(...)`-Composable in `Components.kt` ersetzt schrittweise die
+~193 einzeln aufgesetzten `Card(...)`-Stellen mit flachem Standard-Look. Default
+(Toggle aus) = bisheriges Verhalten (1dp, `surface`/Weiss) unverändert. Bei
+aktiviertem Toggle: 2dp Elevation + `surfaceContainer` statt Weiss. Bislang auf dem
+Home-Screen migriert (4 Karten); restliche Screens folgen einzeln, damit jeder
+Schritt für sich überschaubar bleibt – nur Karten mit neutralem Container (Weiss/
+`surface`) werden migriert, eingefärbte Karten (Macro-Tint, `secondaryContainer`,
+reine Border-Karten) bleiben bewusst `Card(...)`.
+
+### 8.2 Toggle #11 „Kontrast-Modus“ – jetzt Light **und** Dark, nicht nur Dark
+
+Der Toggle hiess bisher „Dark-Mode-Kontrast“, betraf laut §4.1 aber auch Light Mode
+(4 von 10 Themes fallen mit `onPrimary = Color.White` unter WCAG-AA, u. a. das
+Default-Theme Grün). Umgesetzt in `Theme.kt`:
+
+- `contrastSafeOnColor(background)`: berechnet den echten WCAG-Kontrastwert
+  Weiss-gegen-Hintergrund (`(1.05) / (luminance + 0.05)`, gleiche Luminanz-Basis wie
+  `CropperDefaults.toolbarColor()`); unter 4.5:1 wird Schwarz statt Weiss verwendet.
+- `toColorScheme()`/`toDarkColorScheme()` nehmen neu einen `contrastSafeOnPrimary`-
+  Parameter (Default `false` = bisheriges Verhalten, immer Weiss).
+- `NutriSnapTheme` liest den Toggle-Wert aus dem DataStore und reicht ihn in beide
+  Farbschema-Funktionen durch – wirkt dadurch automatisch in Light **und** Dark Mode.
+- Settings-Text entsprechend umbenannt in „Kontrast-Modus (Text auf Primärfarbe)“,
+  damit klar ist, dass es nicht nur Dark Mode betrifft.
+
+Betrifft u. a. den weissen Text im `HomeHeader`-Gradient (Begrüssung, Kalorienzahl im
+Ring) bei den vier durchfallenden Themes.
 
 ---
 
