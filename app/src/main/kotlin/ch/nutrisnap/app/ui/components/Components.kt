@@ -9,17 +9,56 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.nutrisnap.app.domain.MICRO_META
 import ch.nutrisnap.app.domain.MICRO_MINERALS
 import ch.nutrisnap.app.domain.MICRO_OTHER
 import ch.nutrisnap.app.domain.MICRO_VITAMINS
 import ch.nutrisnap.app.domain.NRV_REFERENCE
+import ch.nutrisnap.app.ui.screens.settings.notifDataStore
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_CARD_ELEVATION
 import ch.nutrisnap.app.ui.theme.MacroColors
 import ch.nutrisnap.app.ui.theme.NutriRadius
 import ch.nutrisnap.app.ui.theme.NutriSpacing
+
+/**
+ * Design-Toggle #10 "Card-Elevation erhöhen" (Mehr → Design).
+ * Zentraler Ersatz für die ~193 einzeln aufgesetzten `Card(...)`-Stellen mit dem
+ * "flachen" Standard-Look (1dp / surface / weiss). Default = exakt das bisherige
+ * Verhalten (1dp, surface). Bei aktiviertem Toggle: 2dp Elevation + surfaceContainer
+ * statt weiss – A/B-vergleichbar, bevor es fest verdrahtet wird (siehe
+ * docs/design-audit-2026-08.md §4.3).
+ *
+ * Nur für die "neutralen" Karten gedacht (containerColor = surface/weiss). Karten mit
+ * bewusst eingefärbtem Container (z. B. MacroColors-Tint, secondaryContainer, reine
+ * Border-Karten ohne Elevation) bleiben unverändert `Card(...)` – die würden vom
+ * Toggle sonst falsch überschrieben.
+ */
+@Composable
+fun NutriCard(
+    modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(NutriRadius.lg),
+    onClick: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val context = LocalContext.current
+    val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
+    val elevated = prefs?.get(KEY_TOGGLE_CARD_ELEVATION) ?: false
+    val colors = CardDefaults.cardColors(
+        containerColor = if (elevated) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surface
+    )
+    val elevation = CardDefaults.cardElevation(if (elevated) 2.dp else 1.dp)
+    if (onClick != null) {
+        Card(onClick = onClick, modifier = modifier, shape = shape, colors = colors, elevation = elevation, content = content)
+    } else {
+        Card(modifier = modifier, shape = shape, colors = colors, elevation = elevation, content = content)
+    }
+}
 
 @Composable
 fun MacroBar(

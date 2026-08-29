@@ -27,6 +27,7 @@ import ch.nutrisnap.app.domain.ACTIVITY_PRESETS
 import ch.nutrisnap.app.domain.ActivityPreset
 import ch.nutrisnap.app.domain.estimateKcal
 import ch.nutrisnap.app.ui.components.MacroRing
+import ch.nutrisnap.app.ui.components.NutriCard
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.*
 
@@ -37,14 +38,11 @@ internal fun HealthCard(
     onOpenHealth: () -> Unit,
     onEditWeight: () -> Unit = {}
 ) {
-    Card(
-        Modifier
+    NutriCard(
+        modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs)
-            .clickable(onClick = onOpenHealth),
-        shape = RoundedCornerShape(NutriRadius.lg),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(1.dp)
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs),
+        onClick = onOpenHealth
     ) {
         Column(Modifier.padding(NutriSpacing.lg)) {
             Row(
@@ -510,13 +508,10 @@ internal fun MealOverviewGrid(
             }
         }
     } else {
-        Card(
+        NutriCard(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs),
-            shape = RoundedCornerShape(NutriRadius.lg),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(1.dp)
+                .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs)
         ) {
             Column {
                 meals.forEachIndexed { index, meal ->
@@ -702,13 +697,10 @@ internal fun HomeScanQuickAccess(
     onBarcode: () -> Unit,
     onLabelScan: () -> Unit
 ) {
-    Card(
-        Modifier
+    NutriCard(
+        modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs),
-        shape = RoundedCornerShape(NutriRadius.lg),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(1.dp)
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs)
     ) {
         Column(Modifier.padding(NutriSpacing.md)) {
             Text(
@@ -861,14 +853,11 @@ internal fun ManualActivityCard(
     totalActive: Float,
     onClick: () -> Unit
 ) {
-    Card(
+    NutriCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.sm)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(NutriRadius.lg),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(1.dp)
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.sm),
+        onClick = onClick
     ) {
         Row(
             Modifier
