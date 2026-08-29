@@ -178,3 +178,50 @@ sollte einfach korrekt sein.
    parallel zu anderer Screen-Arbeit.
 
 Wie gehabt: pro Punkt eigener Commit, CI muss grün sein, bevor der nächste beginnt.
+
+---
+
+## 7. Nachtrag (29. August 2026): Recipes-Screen – Status der zuletzt offenen Layout-Punkte
+
+Aus der letzten Session war offen, ob nach dem Speed-Dial-Umbau (`317cb90`) noch
+FAB/Grid-Überlappung, Sync-Chip-Position, Suchfeld-Bereich und Bottom-Nav-Abstand
+Probleme bereiten. Code-Stand geprüft, nicht nur Commit-Messages gelesen:
+
+### 7.1 Bereits behoben (zwischen `317cb90` und `be570b3`, alle vor dieser Session)
+
+- **FAB/Grid-Überlappung beim Ausklappen**: `317cb90` hat direkt mit dem Speed-Dial
+  auch einen Scrim eingebaut (`Color.Black.copy(alpha = 0.32f)`, `fillMaxSize`,
+  schliesst bei Klick daneben). Das Grid wird beim Ausklappen abgedunkelt statt roh
+  überlappt – visuell kein Bug mehr, sondern das übliche Material-Speed-Dial-Muster.
+- **Sync-Chip**: in zwei Schritten korrigiert – `e540281` (reservierte keinen
+  Statusleisten-Leerraum mehr) und `48ba907` (auf den KI-Tab verschoben).
+- **Suchfeld-Bereich**: `48ba907` (toter Streifen über der Suche behoben) und
+  `560ef93` (Such-/Top-Abstand poliert).
+- **Bottom-Nav / abgeschnittene Kacheln**: `560ef93` (untere Kacheln nicht mehr
+  abgeschnitten) und `be570b3` (Bottom-Nav-Ecken, Labels nicht mehr abgeschnitten).
+- **3-Spalten-Lesbarkeit & Karten-Höhe**: `ae07393`, `c8aef58`.
+
+Kurz: Die in der letzten Session als offen notierten Punkte sind zwischenzeitlich
+bereits gefixt worden – falls du das auf dem Gerät noch anders siehst, ist das
+vermutlich ein Stale-APK-Fall (neuester CI-Build noch nicht installiert), kein
+Code-Problem.
+
+### 7.2 Ein echter, kleiner Rest-Befund: Grid vs. klassische Liste inkonsistent gepolstert
+
+`LazyVerticalGrid` (Standard-Ansicht) reserviert unten **`bottom = 132.dp`** für
+Bottom-Nav + FAB. Die klassische 1-Spalten-Liste (Toggle „Altes Design (vor #758)“,
+`KEY_CLASSIC_RECIPE_LIST`) nutzt für **dieselbe** Bottom-Nav/FAB-Situation nur
+**`bottom = 80.dp`** – 52dp weniger Luft. Kein akuter Überlapp-Bug (der Scrim-Fall
+oben betrifft nur den ausgeklappten Zustand), aber die letzte Listenkarte hat
+spürbar weniger Abstand zur Nav als im Grid. Reine Konsistenz-Korrektur (Liste auf
+132dp anheben), kein gestalterischer Ermessensspielraum – würde ich wie die
+bisherigen "Fix:"-Commits direkt beheben statt extra zu toggeln, sag Bescheid falls
+du es trotzdem A/B-vergleichen willst.
+
+### 7.3 Weitere Screens mit FAB geprüft, kein vergleichbarer Befund
+
+`CustomFoodListScreen`, `MealTemplateScreen`, `ShoppingListScreen`,
+`SupplementsScreen` nutzen je einen einzelnen, nicht animierten FAB (keine
+Höhenänderung → kein Überlapp-Risiko). `DiaryScreen` hat einen Zwei-FAB-Stack
+(Kamera + Add), der aber **statisch** ist (kein Auf-/Zuklappen) – dort besteht das
+Speed-Dial-spezifische Muster gar nicht erst.
