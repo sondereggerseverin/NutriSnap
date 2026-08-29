@@ -834,7 +834,9 @@ fun RecipesScreen(
                 // Klassische 1-Spalten-Liste (ursprüngliches Design); auf Tablet zentriert begrenzt
                 val listPadH = if (window.isTablet) 24.dp else 16.dp
                 LazyColumn(
-                    contentPadding = PaddingValues(start = listPadH, end = listPadH, top = 6.dp, bottom = 80.dp),
+                    // Gleicher Bottom-Puffer wie im Grid (132dp = Bottom-Nav + FAB + Luft) –
+                    // vorher 80dp, letzte Karte hatte weniger Abstand zur Nav als im Grid.
+                    contentPadding = PaddingValues(start = listPadH, end = listPadH, top = 6.dp, bottom = 132.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.weight(1f).fillMaxWidth()
