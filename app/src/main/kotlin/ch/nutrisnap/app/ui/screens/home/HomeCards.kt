@@ -179,6 +179,9 @@ internal fun HomeHeader(
 ) {
     val appTheme = LocalAppTheme.current
     val overGoal = state.totalCalories > state.adjustedGoal && state.adjustedGoal > 0f
+    val headerContext = LocalContext.current
+    val headerPrefs by headerContext.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
+    val highlightRemaining = headerPrefs?.get(KEY_TOGGLE_CALORIES_REMAINING_HIGHLIGHT) ?: false
 
     Column(
         Modifier
@@ -267,12 +270,20 @@ internal fun HomeHeader(
                         },
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = if (highlightRemaining) {
+                            if (overGoal) Color(0xFFFFD67A) else MacroColors.calories
+                        } else {
+                            Color.White
+                        }
                     )
                     Text(
                         if (overGoal) "über" else "übrig",
                         fontSize = 10.sp,
-                        color = Color.White.copy(alpha = 0.75f)
+                        color = if (highlightRemaining && !overGoal) {
+                            MacroColors.calories.copy(alpha = 0.85f)
+                        } else {
+                            Color.White.copy(alpha = 0.75f)
+                        }
                     )
                 }
             }
