@@ -537,8 +537,8 @@ fun SettingsScreen(
                         context = context
                     )
                     DesignToggleRow(
-                        title = "Dark-Mode-Kontrast",
-                        subtitle = "Dedizierte Dark-Primary je Theme (≥4.5:1)",
+                        title = "Kontrast-Modus (Text auf Primärfarbe)",
+                        subtitle = "Schwarz statt Weiss wo nötig, wirkt in Light + Dark (≥4.5:1 WCAG AA)",
                         key = KEY_TOGGLE_DARK_MODE_CONTRAST,
                         defaultOn = false,
                         prefs = prefs,

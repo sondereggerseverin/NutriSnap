@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -178,9 +179,9 @@ enum class AppTheme(
         val pickerThemes: List<AppTheme> get() = entries.filter { it.showInPicker }
     }
 
-    fun toColorScheme() = lightColorScheme(
+    fun toColorScheme(contrastSafeOnPrimary: Boolean = false) = lightColorScheme(
         primary            = primary,
-        onPrimary          = Color.White,
+        onPrimary          = if (contrastSafeOnPrimary) contrastSafeOnColor(primary) else Color.White,
         primaryContainer   = primaryLight,
         onPrimaryContainer = primaryDark,
         secondary          = accent,
@@ -204,10 +205,10 @@ enum class AppTheme(
         surfaceTint        = primary
     )
 
-    fun toDarkColorScheme() = darkColorScheme(
+    fun toDarkColorScheme(contrastSafeOnPrimary: Boolean = false) = darkColorScheme(
         // Primär: gesättigte Markenfarbe, weiße Icons darauf (hoher Kontrast)
         primary            = primary,
-        onPrimary          = Color.White,
+        onPrimary          = if (contrastSafeOnPrimary) contrastSafeOnColor(primary) else Color.White,
         primaryContainer   = primaryDark,
         onPrimaryContainer = primaryLight,
         // Secondary: ebenfalls gesättigt – verhindert „zu helle“ FABs/Icons
@@ -339,6 +340,19 @@ val NutriSnapTypography = Typography(
     labelSmall     = TextStyle(fontWeight = FontWeight.Medium,    fontSize = 11.sp, lineHeight = 16.sp, letterSpacing = 0.5.sp)
 )
 
+/**
+ * Design-Toggle #11 "Dark-Mode-Kontrast" (Mehr → Design) – trotz Name wirkt der Fix in
+ * Light UND Dark: `onPrimary = Color.White` ist bei 4/10 Themes (u. a. Default-Theme
+ * Grün) unter WCAG-AA (4.5:1), siehe docs/design-audit-2026-08.md §4.1. Gleiche
+ * Luminanz-Idee wie `CropperDefaults.toolbarColor()`, hier per echtem WCAG-Kontrastwert
+ * statt reinem Schwellwert. Default = unverändert Weiss (Toggle aus).
+ */
+private fun contrastSafeOnColor(background: Color): Color {
+    val bgLuminance = background.luminance()
+    val contrastWithWhite = (1.05f) / (bgLuminance + 0.05f)
+    return if (contrastWithWhite >= 4.5f) Color.White else Color.Black
+}
+
 @Composable
 fun NutriSnapTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
@@ -346,10 +360,11 @@ fun NutriSnapTheme(content: @Composable () -> Unit) {
     val themeName = prefs?.get(KEY_APP_THEME) ?: AppTheme.FOREST_GREEN.name
     val theme = runCatching { AppTheme.valueOf(themeName) }.getOrDefault(AppTheme.FOREST_GREEN)
     val useDarkColors = isSystemInDarkTheme()
+    val contrastSafeOnPrimary = prefs?.get(KEY_TOGGLE_DARK_MODE_CONTRAST) ?: false
 
     CompositionLocalProvider(LocalAppTheme provides theme) {
         MaterialTheme(
-            colorScheme = if (useDarkColors) theme.toDarkColorScheme() else theme.toColorScheme(),
+            colorScheme = if (useDarkColors) theme.toDarkColorScheme(contrastSafeOnPrimary) else theme.toColorScheme(contrastSafeOnPrimary),
             typography  = NutriSnapTypography
         ) {
             // Malt den App-Hintergrund über die gesamte Fensterfläche (inkl. Statusleisten-
