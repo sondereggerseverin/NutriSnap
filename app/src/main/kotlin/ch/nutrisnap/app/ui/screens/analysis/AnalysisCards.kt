@@ -21,9 +21,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.nutrisnap.app.ui.components.BarChart
 import ch.nutrisnap.app.ui.components.LineChart
-import ch.nutrisnap.app.ui.theme.MacroColors
 import ch.nutrisnap.app.ui.theme.NutriRadius
 import ch.nutrisnap.app.ui.theme.NutriSpacing
+import ch.nutrisnap.app.ui.theme.rememberMacroColors
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -205,6 +205,7 @@ internal fun HistoryPermissionBanner(onGrant: () -> Unit) {
 @Composable
 internal fun DayCaloriesCard(state: AnalysisUiState) {
     val day = state.days.firstOrNull()
+    val macros = rememberMacroColors()
     AnalysisCard(title = "Kalorien gegessen") {
         val eaten = day?.calories?.toInt() ?: 0
         val goal  = state.goals.computedTdee()?.toInt() ?: state.goals.dailyCalorieGoal
@@ -216,8 +217,8 @@ internal fun DayCaloriesCard(state: AnalysisUiState) {
         LinearProgressIndicator(
             progress = { pct },
             modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-            color = MacroColors.calories,
-            trackColor = MacroColors.calories.copy(alpha = 0.12f),
+            color = macros.calories,
+            trackColor = macros.calories.copy(alpha = 0.12f),
             strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
         )
     }
@@ -226,9 +227,10 @@ internal fun DayCaloriesCard(state: AnalysisUiState) {
 @Composable
 internal fun DayActivityCard(state: AnalysisUiState) {
     val day = state.days.firstOrNull()
+    val macros = rememberMacroColors()
     AnalysisCard(title = "Aktivit\u00E4tskalorien") {
         val burned = day?.activityCalories?.toInt() ?: 0
-        Text("$burned kcal", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MacroColors.fiber)
+        Text("$burned kcal", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = macros.fiber)
         Spacer(Modifier.height(NutriSpacing.xs))
         Text("Aus Health Connect", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -287,21 +289,22 @@ internal fun CaloriesCard(state: AnalysisUiState) {
 
 @Composable
 internal fun ActivityCaloriesCard(state: AnalysisUiState) {
+    val macros = rememberMacroColors()
     AnalysisCard(title = "Aktivit\u00E4tskalorien pro Tag") {
         if (state.period == AnalysisPeriod.MONAT) {
             BarChart(
                 values = state.weekBuckets.map { it.activityCalories },
                 labels = state.weekBuckets.map { it.label },
-                barColor = MacroColors.fiber.copy(alpha = 0.4f),
-                highlightColor = MacroColors.fiber
+                barColor = macros.fiber.copy(alpha = 0.4f),
+                highlightColor = macros.fiber
             )
         } else {
             val todayIndex = state.days.indexOfFirst { it.date == LocalDate.now() }
             BarChart(
                 values = state.days.map { it.activityCalories },
                 labels = state.days.map { it.label },
-                barColor = MacroColors.fiber.copy(alpha = 0.4f),
-                highlightColor = MacroColors.fiber,
+                barColor = macros.fiber.copy(alpha = 0.4f),
+                highlightColor = macros.fiber,
                 highlightIndex = if (todayIndex >= 0) todayIndex else null
             )
         }
@@ -316,17 +319,19 @@ internal fun ActivityCaloriesCard(state: AnalysisUiState) {
 
 @Composable
 internal fun MacroCard(state: AnalysisUiState) {
+    val macros = rememberMacroColors()
     AnalysisCard(title = "Durchschnittliche Makros") {
-        MacroAverageRow("Protein",       state.avgProtein, state.goals.proteinGoalG, MacroColors.protein)
+        MacroAverageRow("Protein",       state.avgProtein, state.goals.proteinGoalG, macros.protein)
         Spacer(Modifier.height(NutriSpacing.md))
-        MacroAverageRow("Kohlenhydrate", state.avgCarbs, state.goals.carbsGoalG, MacroColors.carbs)
+        MacroAverageRow("Kohlenhydrate", state.avgCarbs, state.goals.carbsGoalG, macros.carbs)
         Spacer(Modifier.height(NutriSpacing.md))
-        MacroAverageRow("Fett",          state.avgFat, state.goals.fatGoalG, MacroColors.fat)
+        MacroAverageRow("Fett",          state.avgFat, state.goals.fatGoalG, macros.fat)
     }
 }
 
 @Composable
 internal fun WeightCard(state: AnalysisUiState) {
+    val macros = rememberMacroColors()
     AnalysisCard(title = "Gewichtsverlauf") {
         val weightPoints = state.days.filter { it.weightKg != null }
         val weightValues = weightPoints.mapNotNull { it.weightKg }
@@ -375,7 +380,7 @@ internal fun WeightCard(state: AnalysisUiState) {
                     "$sign%.1f kg".format(diff),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (diff > 0) MaterialTheme.colorScheme.error else MacroColors.calories
+                    color = if (diff > 0) MaterialTheme.colorScheme.error else macros.calories
                 )
                 Text(
                     "${state.weightEnd} kg",
@@ -389,13 +394,14 @@ internal fun WeightCard(state: AnalysisUiState) {
 
 @Composable
 internal fun StreakCard(streak: Int) {
+    val macros = rememberMacroColors()
     AnalysisCard(title = "Konsistenz") {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(NutriRadius.md))
-                    .background(MacroColors.fat.copy(alpha = 0.1f)),
+                    .background(macros.fat.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
                 Text("\uD83D\uDD25", fontSize = 24.sp)

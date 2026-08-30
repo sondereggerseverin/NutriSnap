@@ -50,6 +50,82 @@ object MacroColors {
     val fiber = Color(0xFF8B5CF6)
 }
 
+/**
+ * Design-Toggle #9 "Macro-Farben absetzen" (Mehr → Design). Die fixen `MacroColors`
+ * kollidieren bei mehreren Themes mit der Primärfarbe (z. B. Default-Theme Grün
+ * `#16A34A` vs. `MacroColors.calories` `#10B981`, oder Blau vs. `MacroColors.protein`)
+ * – die Makro-Farbe wirkt dann wie ein weiteres Theme-Element statt wie ein
+ * eigenständiges Datenlabel. Bei aktiviertem Toggle wird pro Farbe geprüft, ob ihr
+ * Farbton (Hue) zu nah an der aktuellen Theme-Primärfarbe liegt; falls ja, wird der
+ * Hue um 120° gedreht (Farbrad-Drittel – bleibt gut unterscheidbar, ohne bei exakt
+ * 180° wieder in eine andere fixe Farbe zu kollidieren). Default = aus, alle 5 Farben
+ * bleiben exakt wie bisher.
+ */
+data class MacroColorSet(
+    val protein: Color,
+    val carbs: Color,
+    val fat: Color,
+    val calories: Color,
+    val fiber: Color
+)
+
+private const val MACRO_HUE_COLLISION_THRESHOLD_DEG = 30f
+
+private fun hueOf(color: Color): Float {
+    val hsv = FloatArray(3)
+    android.graphics.Color.RGBToHSV(
+        (color.red * 255f).toInt().coerceIn(0, 255),
+        (color.green * 255f).toInt().coerceIn(0, 255),
+        (color.blue * 255f).toInt().coerceIn(0, 255),
+        hsv
+    )
+    return hsv[0]
+}
+
+private fun hueDistanceDeg(a: Float, b: Float): Float {
+    val d = kotlin.math.abs(a - b) % 360f
+    return if (d > 180f) 360f - d else d
+}
+
+private fun separateFromPrimary(macroColor: Color, themePrimary: Color): Color {
+    if (hueDistanceDeg(hueOf(macroColor), hueOf(themePrimary)) >= MACRO_HUE_COLLISION_THRESHOLD_DEG) {
+        return macroColor
+    }
+    val hsv = FloatArray(3)
+    android.graphics.Color.RGBToHSV(
+        (macroColor.red * 255f).toInt().coerceIn(0, 255),
+        (macroColor.green * 255f).toInt().coerceIn(0, 255),
+        (macroColor.blue * 255f).toInt().coerceIn(0, 255),
+        hsv
+    )
+    hsv[0] = (hsv[0] + 120f) % 360f
+    return Color(android.graphics.Color.HSVToColor(hsv))
+}
+
+@Composable
+fun rememberMacroColors(): MacroColorSet {
+    val context = LocalContext.current
+    val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
+    val separated = prefs?.get(KEY_TOGGLE_MACRO_COLOR_SEPARATION) ?: false
+    if (!separated) {
+        return MacroColorSet(
+            protein = MacroColors.protein,
+            carbs = MacroColors.carbs,
+            fat = MacroColors.fat,
+            calories = MacroColors.calories,
+            fiber = MacroColors.fiber
+        )
+    }
+    val primary = LocalAppTheme.current.primary
+    return MacroColorSet(
+        protein = separateFromPrimary(MacroColors.protein, primary),
+        carbs = separateFromPrimary(MacroColors.carbs, primary),
+        fat = separateFromPrimary(MacroColors.fat, primary),
+        calories = separateFromPrimary(MacroColors.calories, primary),
+        fiber = separateFromPrimary(MacroColors.fiber, primary)
+    )
+}
+
 // ── Theme Definitions ─────────────────────────────────────────────────────────
 
 enum class AppTheme(

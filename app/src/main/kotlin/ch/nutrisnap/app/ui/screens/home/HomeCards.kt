@@ -176,6 +176,7 @@ internal fun HomeHeader(
     onEditActivity: () -> Unit = {}
 ) {
     val appTheme = LocalAppTheme.current
+    val macros = rememberMacroColors()
     val overGoal = state.totalCalories > state.adjustedGoal && state.adjustedGoal > 0f
     val headerContext = LocalContext.current
     val headerPrefs by headerContext.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
@@ -269,7 +270,7 @@ internal fun HomeHeader(
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (highlightRemaining) {
-                            if (overGoal) Color(0xFFFFD67A) else MacroColors.calories
+                            if (overGoal) Color(0xFFFFD67A) else macros.calories
                         } else {
                             Color.White
                         }
@@ -278,7 +279,7 @@ internal fun HomeHeader(
                         if (overGoal) "über" else "übrig",
                         fontSize = 10.sp,
                         color = if (highlightRemaining && !overGoal) {
-                            MacroColors.calories.copy(alpha = 0.85f)
+                            macros.calories.copy(alpha = 0.85f)
                         } else {
                             Color.White.copy(alpha = 0.75f)
                         }
@@ -351,10 +352,10 @@ internal fun HomeHeader(
                 .padding(horizontal = 4.dp, vertical = 5.dp),
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            MacroColumn("Protein", state.totalProtein, state.proteinGoal, accent = MacroColors.protein, modifier = Modifier.weight(1f))
-            MacroColumn("Kohlenh.", state.totalCarbs, state.carbsGoal, accent = MacroColors.carbs, modifier = Modifier.weight(1f))
-            MacroColumn("Fett", state.totalFat, state.fatGoal, accent = MacroColors.fat, modifier = Modifier.weight(1f))
-            MacroColumn("Ballast.", state.totalFiber, state.fiberGoal, decimals = 1, accent = MacroColors.fiber, modifier = Modifier.weight(1f))
+            MacroColumn("Protein", state.totalProtein, state.proteinGoal, accent = macros.protein, modifier = Modifier.weight(1f))
+            MacroColumn("Kohlenh.", state.totalCarbs, state.carbsGoal, accent = macros.carbs, modifier = Modifier.weight(1f))
+            MacroColumn("Fett", state.totalFat, state.fatGoal, accent = macros.fat, modifier = Modifier.weight(1f))
+            MacroColumn("Ballast.", state.totalFiber, state.fiberGoal, decimals = 1, accent = macros.fiber, modifier = Modifier.weight(1f))
         }
     }
 }
@@ -697,6 +698,7 @@ internal fun HomeScanQuickAccess(
     onBarcode: () -> Unit,
     onLabelScan: () -> Unit
 ) {
+    val macros = rememberMacroColors()
     NutriCard(
         modifier = Modifier
             .fillMaxWidth()
@@ -717,21 +719,21 @@ internal fun HomeScanQuickAccess(
                 HomeScanChip(
                     icon = Icons.Default.PhotoCamera,
                     label = "Essen",
-                    color = MacroColors.calories,
+                    color = macros.calories,
                     onClick = onFoodScan,
                     modifier = Modifier.weight(1f)
                 )
                 HomeScanChip(
                     icon = Icons.Default.QrCodeScanner,
                     label = "Barcode",
-                    color = MacroColors.protein,
+                    color = macros.protein,
                     onClick = onBarcode,
                     modifier = Modifier.weight(1f)
                 )
                 HomeScanChip(
                     icon = Icons.Default.CameraAlt,
                     label = "Nährwert",
-                    color = MacroColors.carbs,
+                    color = macros.carbs,
                     onClick = onLabelScan,
                     modifier = Modifier.weight(1f)
                 )
@@ -776,12 +778,13 @@ private fun HomeScanChip(
 @Composable
 internal fun StreakCard(streak: Int) {
     if (streak <= 0) return
+    val macros = rememberMacroColors()
     Card(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs),
         shape = RoundedCornerShape(NutriRadius.lg),
-        colors = CardDefaults.cardColors(containerColor = MacroColors.fat.copy(alpha = 0.1f))
+        colors = CardDefaults.cardColors(containerColor = macros.fat.copy(alpha = 0.1f))
     ) {
         Row(
             Modifier.padding(NutriSpacing.lg),
@@ -791,7 +794,7 @@ internal fun StreakCard(streak: Int) {
                 Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(NutriRadius.md))
-                    .background(MacroColors.fat.copy(alpha = 0.15f)),
+                    .background(macros.fat.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
                 Text("\uD83D\uDD25", fontSize = 24.sp)
