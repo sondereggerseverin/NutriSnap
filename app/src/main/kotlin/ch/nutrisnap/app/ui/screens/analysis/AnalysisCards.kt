@@ -16,11 +16,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.nutrisnap.app.ui.components.BarChart
 import ch.nutrisnap.app.ui.components.LineChart
+import ch.nutrisnap.app.ui.screens.settings.notifDataStore
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_PROGRESS_BAR_COLOR_SHIFT
 import ch.nutrisnap.app.ui.theme.NutriRadius
 import ch.nutrisnap.app.ui.theme.NutriSpacing
 import ch.nutrisnap.app.ui.theme.rememberMacroColors
@@ -320,12 +324,15 @@ internal fun ActivityCaloriesCard(state: AnalysisUiState) {
 @Composable
 internal fun MacroCard(state: AnalysisUiState) {
     val macros = rememberMacroColors()
+    val context = LocalContext.current
+    val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
+    val colorShiftOnOverGoal = prefs?.get(KEY_TOGGLE_PROGRESS_BAR_COLOR_SHIFT) ?: false
     AnalysisCard(title = "Durchschnittliche Makros") {
-        MacroAverageRow("Protein",       state.avgProtein, state.goals.proteinGoalG, macros.protein)
+        MacroAverageRow("Protein",       state.avgProtein, state.goals.proteinGoalG, macros.protein, colorShiftOnOverGoal)
         Spacer(Modifier.height(NutriSpacing.md))
-        MacroAverageRow("Kohlenhydrate", state.avgCarbs, state.goals.carbsGoalG, macros.carbs)
+        MacroAverageRow("Kohlenhydrate", state.avgCarbs, state.goals.carbsGoalG, macros.carbs, colorShiftOnOverGoal)
         Spacer(Modifier.height(NutriSpacing.md))
-        MacroAverageRow("Fett",          state.avgFat, state.goals.fatGoalG, macros.fat)
+        MacroAverageRow("Fett",          state.avgFat, state.goals.fatGoalG, macros.fat, colorShiftOnOverGoal)
     }
 }
 
@@ -436,8 +443,10 @@ internal fun AnalysisCard(title: String, content: @Composable ColumnScope.() -> 
 }
 
 @Composable
-internal fun MacroAverageRow(label: String, value: Float, goal: Float, color: Color) {
+internal fun MacroAverageRow(label: String, value: Float, goal: Float, color: Color, colorShiftOnOverGoal: Boolean = false) {
     val pct = (value / goal.coerceAtLeast(1f)).coerceIn(0f, 1f)
+    val overGoal = value > goal && goal > 0f
+    val barColor = if (colorShiftOnOverGoal && overGoal) MaterialTheme.colorScheme.error else color
     Column {
         Row(
             Modifier.fillMaxWidth(),
@@ -458,8 +467,8 @@ internal fun MacroAverageRow(label: String, value: Float, goal: Float, color: Co
                 .fillMaxWidth()
                 .height(8.dp)
                 .clip(RoundedCornerShape(4.dp)),
-            color = color,
-            trackColor = color.copy(alpha = 0.12f),
+            color = barColor,
+            trackColor = barColor.copy(alpha = 0.12f),
             strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
         )
     }

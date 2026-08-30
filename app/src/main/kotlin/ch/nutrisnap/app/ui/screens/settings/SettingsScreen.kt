@@ -641,7 +641,7 @@ fun SettingsScreen(
                     )
                     DesignToggleRow(
                         title = "Progress-Bar bei Überschreitung",
-                        subtitle = "Farbwechsel wenn über Ziel",
+                        subtitle = "Rot bei Kalorien UND einzelnen Makros (Protein/Kohlenh./Fett)",
                         key = KEY_TOGGLE_PROGRESS_BAR_COLOR_SHIFT,
                         defaultOn = false,
                         prefs = prefs,

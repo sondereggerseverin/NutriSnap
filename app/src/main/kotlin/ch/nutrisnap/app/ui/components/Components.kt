@@ -23,6 +23,7 @@ import ch.nutrisnap.app.domain.MICRO_VITAMINS
 import ch.nutrisnap.app.domain.NRV_REFERENCE
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_CARD_ELEVATION
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_PROGRESS_BAR_COLOR_SHIFT
 import ch.nutrisnap.app.ui.theme.MacroColors
 import ch.nutrisnap.app.ui.theme.NutriRadius
 import ch.nutrisnap.app.ui.theme.NutriSpacing
@@ -151,23 +152,35 @@ fun NutritionFactsProgress(
     fat: Float,      fatGoal: Float,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
+    val colorShiftOnOverGoal = prefs?.get(KEY_TOGGLE_PROGRESS_BAR_COLOR_SHIFT) ?: false
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(NutriRadius.md),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
     ) {
         Column(Modifier.padding(NutriSpacing.lg), verticalArrangement = Arrangement.spacedBy(NutriSpacing.md)) {
-            NutritionProgressRow("Kalorien", calories, caloriesGoal, "Cal", MacroColors.calories)
-            NutritionProgressRow("Kohlenh.", carbs, carbsGoal, "g", MacroColors.carbs)
-            NutritionProgressRow("Protein", protein, proteinGoal, "g", MacroColors.protein)
-            NutritionProgressRow("Fett", fat, fatGoal, "g", MacroColors.fat)
+            NutritionProgressRow("Kalorien", calories, caloriesGoal, "Cal", MacroColors.calories, colorShiftOnOverGoal)
+            NutritionProgressRow("Kohlenh.", carbs, carbsGoal, "g", MacroColors.carbs, colorShiftOnOverGoal)
+            NutritionProgressRow("Protein", protein, proteinGoal, "g", MacroColors.protein, colorShiftOnOverGoal)
+            NutritionProgressRow("Fett", fat, fatGoal, "g", MacroColors.fat, colorShiftOnOverGoal)
         }
     }
 }
 
 @Composable
-private fun NutritionProgressRow(label: String, value: Float, goal: Float, unit: String, color: Color) {
+private fun NutritionProgressRow(
+    label: String,
+    value: Float,
+    goal: Float,
+    unit: String,
+    color: Color,
+    colorShiftOnOverGoal: Boolean = false
+) {
     val progress = (value / goal.coerceAtLeast(1f)).coerceIn(0f, 1f)
+    val overGoal = value > goal && goal > 0f
+    val barColor = if (colorShiftOnOverGoal && overGoal) MaterialTheme.colorScheme.error else color
     Column {
         Row(
             Modifier.fillMaxWidth(),
@@ -188,7 +201,7 @@ private fun NutritionProgressRow(label: String, value: Float, goal: Float, unit:
                 .fillMaxWidth()
                 .height(6.dp)
                 .clip(RoundedCornerShape(3.dp)),
-            color      = color,
+            color      = barColor,
             trackColor = MaterialTheme.colorScheme.surfaceVariant,
             strokeCap  = androidx.compose.ui.graphics.StrokeCap.Round
         )
