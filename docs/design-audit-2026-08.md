@@ -28,9 +28,9 @@ Sie schreiben einen Wert in den DataStore, den keine andere Composable je liest.
 | 6 | Touch-Targets | Rezept-Karten-Menü (⋮) | an | ✅ live | `RecipeCardV2.kt` |
 | 7 | FABs & Buttons | Diary-FAB konsolidieren | aus | ✅ live | `DiaryScreen.kt` |
 | 8 | Typografie/Nav | Nav-Label „Einstellungen“ | aus | ✅ live | `MainActivity.kt` |
-| 9 | Farben | Macro-Farben absetzen | aus | ❌ tot | nur `SettingsScreen.kt` |
+| 9 | Farben | Macro-Farben absetzen | aus | ✅ live | `Theme.kt` (`rememberMacroColors`), `HomeCards.kt`, `AnalysisCards.kt` |
 | 10 | Farben | Card-Elevation erhöhen | aus | 🔧 **teilweise verdrahtet** (s. §8) | `Components.kt` (`NutriCard`), Home-Screen migriert |
-| 11 | Farben | Kontrast-Modus (Text auf Primärfarbe) | aus | 🔧 **verdrahtet** (s. §8) | `Theme.kt` (`toColorScheme`/`toDarkColorScheme`) |
+| 11 | Farben | Kontrast-Modus (Text auf Primärfarbe) | aus | ✅ live | `Theme.kt` (`toColorScheme`/`toDarkColorScheme`) |
 | 12 | Farben | Cropper Theme-Farbe | **an** | ❌ tot + verwaist (s. §4.4) | nur `SettingsScreen.kt` |
 | 13 | Farben | „Noch X kcal übrig“ hervorheben | aus | 🔧 **in dieser Session verdrahtet** | `HomeCards.kt` |
 | 14 | Layout | Spacing-Tokens | an | ❌ tot | nur `SettingsScreen.kt` |
@@ -40,7 +40,7 @@ Sie schreiben einen Wert in den DataStore, den keine andere Composable je liest.
 | 18 | FABs & Buttons | Recipes-FABs konsolidieren | aus | ❌ tot | nur `SettingsScreen.kt` |
 | 19 | FABs & Buttons | Button-Standardgrösse | an | ❌ tot | nur `SettingsScreen.kt` |
 | 20 | FABs & Buttons | Portion-Chips grösser | aus | ❌ tot | nur `SettingsScreen.kt` |
-| 21 | FABs & Buttons | Progress-Bar bei Überschreitung | aus | ❌ tot | nur `SettingsScreen.kt` |
+| 21 | FABs & Buttons | Progress-Bar bei Überschreitung | aus | ✅ live | `Components.kt`, `AnalysisCards.kt` |
 | 22 | Typografie/Nav | Primärzahlen grösser | aus | ❌ tot | nur `SettingsScreen.kt` |
 | 23 | Typografie/Nav | Nav-Shortcuts sichtbar | aus | ❌ tot | nur `SettingsScreen.kt` |
 
@@ -160,13 +160,13 @@ sollte einfach korrekt sein.
 
 ---
 
-## 6. Empfohlene Priorisierung für die verbleibenden 12 toten Toggles
+## 6. Empfohlene Priorisierung für die verbleibenden 10 toten Toggles
 
 1. ~~Card-Elevation (#10)~~ – **NutriCard-Wrapper live**, Home migriert; restliche
    Screens folgen schrittweise (s. §8.1).
 2. ~~Dark-Mode-/Kontrast-Fix (#11)~~ – **verdrahtet** (s. §8.2).
-3. **Progress-Bar-Farbwechsel (#21)** und **Macro-Farben absetzen (#9)** – klar
-   abgegrenzt auf `AnalysisCards.kt`/`HomeCards.kt`, kein grosser Blast-Radius.
+3. ~~Progress-Bar-Farbwechsel (#21)~~ und ~~Macro-Farben absetzen (#9)~~ – beide
+   **verdrahtet** (s. §9).
 4. **Diary kompakter (#17)**, **Home-Reihenfolge (#16)**, **Activity-Karten
    zusammenlegen (#15)** – je auf einen Screen begrenzt.
 5. **Button-Standardgrösse (#19)**, **Portion-Chips (#20)**, **Recipes-FAB (#18)**,
@@ -258,3 +258,38 @@ du es trotzdem A/B-vergleichen willst.
 Höhenänderung → kein Überlapp-Risiko). `DiaryScreen` hat einen Zwei-FAB-Stack
 (Kamera + Add), der aber **statisch** ist (kein Auf-/Zuklappen) – dort besteht das
 Speed-Dial-spezifische Muster gar nicht erst.
+
+---
+
+## 9. Bereits umgesetzt (30. August 2026): Toggle #9 und #21
+
+### 9.1 Toggle #9 „Macro-Farben absetzen“
+
+`rememberMacroColors()` in `Theme.kt`: prüft pro Makro-Farbe den Hue-Abstand (HSV)
+zur aktuellen Theme-Primärfarbe; liegt er unter 30°, wird der Hue um 120° gedreht
+(Farbrad-Drittel). Default aus = alle 5 Farben exakt wie bisher. Betrifft konkret
+z. B. Default-Theme Grün (`#16A34A`) gegen `MacroColors.calories` (`#10B981`) oder
+Theme „Blau“ gegen `MacroColors.protein`, wo die Makro-Farbe sonst wie ein weiteres
+Theme-Element statt wie ein eigenständiges Datenlabel wirkt.
+
+Migriert: `HomeCards.kt` (Header-Ring, Makro-Spalten, Scan-Chips, Streak-Karte) und
+`AnalysisCards.kt` (alle Charts/Karten der Auswertung). Noch offen (13 weitere
+Dateien mit direkten `MacroColors.*`-Referenzen, u. a. `DiaryScreen.kt`,
+`RecipeDetailSheet.kt`, `RecipeCardV2.kt`) – gleiches Migrationsmuster wie bei
+Toggle #10, schrittweise nachziehen.
+
+### 9.2 Toggle #21 „Progress-Bar bei Überschreitung“
+
+Bisher schalteten nur die **Kalorien**-Balken (`MacroBar` in `Components.kt`,
+Kalorien-Header in `DiaryScreen.kt`) fest verdrahtet (kein Toggle) auf
+`colorScheme.error` um, sobald 100 % erreicht sind. Die **Makro**-Balken (Protein/
+Kohlenhydrate/Fett) taten das nirgends – die Progress-Bar füllte sich einfach voll
+in der zugewiesenen Farbe, ohne visuellen Unterschied zwischen „genau am Ziel“ und
+„deutlich drüber“.
+
+Jetzt hinter dem Toggle: `NutritionProgressRow` (`Components.kt`, genutzt in
+`NutritionFactsProgress` → `DiaryScreen.kt`) und `MacroAverageRow`
+(`AnalysisCards.kt` → `MacroCard`) wechseln bei `value > goal` auf
+`colorScheme.error`, wenn der Toggle an ist. Default aus = unverändert. Die
+bestehende feste Kalorien-Logik bleibt wie sie ist (nicht Teil dieses Toggles,
+da schon vorher unconditional aktiv).
