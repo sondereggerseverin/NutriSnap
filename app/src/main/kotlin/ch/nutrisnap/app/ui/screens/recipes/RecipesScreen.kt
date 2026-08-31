@@ -214,6 +214,7 @@ fun RecipesScreen(
     val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
     val classicList = prefs?.get(KEY_CLASSIC_RECIPE_LIST) == true
     val freshCards = (prefs?.get(KEY_FRESH_RECIPE_CARDS) == true) || (prefs?.get(KEY_FRESH_UI) == true)
+    val consolidateFab = prefs?.get(KEY_TOGGLE_RECIPES_FAB_CONSOLIDATION) ?: false
     val useGrid = !classicList
     val window = ch.nutrisnap.app.ui.rememberWindowInfo()
     // 6 (Standard, ~3 Zeilen) oder 4 (größere Kacheln wie früher, ~2 Zeilen)
@@ -277,6 +278,44 @@ fun RecipesScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             val scheme = MaterialTheme.colorScheme
+            if (consolidateFab) {
+                // Design-Toggle #18 "Recipes-FABs konsolidieren": 1 FAB + Overflow-Menü
+                // statt Speed-Dial mit 4 gestapelten Mini-FABs.
+                Box {
+                    FloatingActionButton(
+                        onClick = { fabExpanded = !fabExpanded },
+                        containerColor = scheme.primary,
+                        contentColor = scheme.onPrimary
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Rezept-Aktionen")
+                    }
+                    DropdownMenu(
+                        expanded = fabExpanded,
+                        onDismissRequest = { fabExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Was koche ich?") },
+                            leadingIcon = { Icon(Icons.Default.Kitchen, null) },
+                            onClick = { fabExpanded = false; showCookSheet = true }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Mehrere importieren") },
+                            leadingIcon = { Icon(Icons.Default.PlaylistAdd, null) },
+                            onClick = { fabExpanded = false; showBatchSheet = true }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Rezept importieren") },
+                            leadingIcon = { Icon(Icons.Default.Link, null) },
+                            onClick = { fabExpanded = false; showImportSheet = true }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Freies Rezept erstellen") },
+                            leadingIcon = { Icon(Icons.Default.Edit, null) },
+                            onClick = { fabExpanded = false; showCreateSheet = true }
+                        )
+                    }
+                }
+            } else {
             val rotation by animateFloatAsState(if (fabExpanded) 45f else 0f, label = "fabRotation")
             Column(horizontalAlignment = Alignment.End) {
                 AnimatedVisibility(
@@ -330,6 +369,7 @@ fun RecipesScreen(
                         modifier = Modifier.rotate(rotation)
                     )
                 }
+            }
             }
         }
     ) { padding ->
@@ -874,7 +914,7 @@ fun RecipesScreen(
             }
         }
         AnimatedVisibility(
-            visible = fabExpanded,
+            visible = fabExpanded && !consolidateFab,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.fillMaxSize()
