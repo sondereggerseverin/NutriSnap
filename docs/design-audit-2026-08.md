@@ -37,12 +37,12 @@ Sie schreiben einen Wert in den DataStore, den keine andere Composable je liest.
 | 15 | Layout | Activity-Karten zusammenlegen | aus | ✅ live | `HomeCards.kt` (`ActivityCombinedCard`), `HomeScreen.kt` |
 | 16 | Layout | Home-Reihenfolge neu | aus | ✅ live | `HomeScreen.kt` |
 | 17 | Layout | Diary kompakter | aus | ✅ live | `DiaryScreen.kt` (`DateNavigator`) |
-| 18 | FABs & Buttons | Recipes-FABs konsolidieren | aus | ❌ tot | nur `SettingsScreen.kt` |
+| 18 | FABs & Buttons | Recipes-FABs konsolidieren | aus | ✅ live | `RecipesScreen.kt` |
 | 19 | FABs & Buttons | Button-Standardgrösse | an | ❌ tot | nur `SettingsScreen.kt` |
-| 20 | FABs & Buttons | Portion-Chips grösser | aus | ❌ tot | nur `SettingsScreen.kt` |
+| 20 | FABs & Buttons | Portion-Chips grösser | aus | ✅ live | `AddFoodSheet.kt` |
 | 21 | FABs & Buttons | Progress-Bar bei Überschreitung | aus | ✅ live | `Components.kt`, `AnalysisCards.kt` |
 | 22 | Typografie/Nav | Primärzahlen grösser | aus | ❌ tot | nur `SettingsScreen.kt` |
-| 23 | Typografie/Nav | Nav-Shortcuts sichtbar | aus | ❌ tot | nur `SettingsScreen.kt` |
+| 23 | Typografie/Nav | Nav-Shortcuts sichtbar | aus | ✅ live | `HomeScreen.kt`, `HomeCards.kt`, `MainActivity.kt` |
 
 **Wichtig für dich:** Wenn du bisher #9–23 (ausser #13) im Design-Menü getestet
 hast und keinen Unterschied gesehen hast – das lag nicht an dir, die Schalter
@@ -160,7 +160,7 @@ sollte einfach korrekt sein.
 
 ---
 
-## 6. Empfohlene Priorisierung für die verbleibenden 7 toten Toggles
+## 6. Empfohlene Priorisierung für die verbleibenden 2 toten Toggles
 
 1. ~~Card-Elevation (#10)~~ – **NutriCard-Wrapper live**, Home migriert; restliche
    Screens folgen schrittweise (s. §8.1).
@@ -169,11 +169,14 @@ sollte einfach korrekt sein.
    **verdrahtet** (s. §9).
 4. ~~Diary kompakter (#17)~~, ~~Home-Reihenfolge (#16)~~, ~~Activity-Karten
    zusammenlegen (#15)~~ – alle drei **verdrahtet** (s. §10).
-5. **Button-Standardgrösse (#19)**, **Portion-Chips (#20)**, **Recipes-FAB (#18)**,
-   **Primärzahlen grösser (#22)**, **Nav-Shortcuts (#23)** – breiter, aber mechanisch.
-6. **Cropper-Theme-Farbe (#12)** – erst entscheiden (entfernen vs. neu zuschneiden),
+5. ~~Recipes-FAB (#18)~~, ~~Portion-Chips (#20)~~, ~~Nav-Shortcuts (#23)~~ – alle
+   drei **verdrahtet** (s. §11).
+6. **Button-Standardgrösse (#19)** und **Primärzahlen grösser (#22)** – beide
+   app-weit angelegt (viele Screens), deshalb bewusst zuletzt. Sinnvoll analog zu
+   #10: zentrale Definition + schrittweise Migration statt Big-Bang.
+7. **Cropper-Theme-Farbe (#12)** – erst entscheiden (entfernen vs. neu zuschneiden),
    dann umsetzen.
-7. **Spacing-Tokens (#14)** – kein einzelner Schritt, sondern laufender Refactor
+8. **Spacing-Tokens (#14)** – kein einzelner Schritt, sondern laufender Refactor
    parallel zu anderer Screen-Arbeit.
 
 Wie gehabt: pro Punkt eigener Commit, CI muss grün sein, bevor der nächste beginnt.
@@ -328,3 +331,45 @@ darunter – spart eine ganze Zeile Höhe im Tagebuch. Default aus = unveränder
 Zeile (inkl. bestehendem Toggle „größerer Button“ für diese Zeile, bleibt
 unangetastet). Gleiche `copyYesterdayAction`-Logik in beiden Varianten wiederverwendet,
 kein Verhaltensunterschied ausser der Platzierung.
+
+---
+
+## 11. Bereits umgesetzt (30. August 2026): Toggle #18, #20, #23
+
+### 11.1 Toggle #18 „Recipes-FABs konsolidieren“
+
+Ersetzt den Speed-Dial (Haupt-FAB + 4 `SmallFloatingActionButton`, s. §7.1) durch
+einen einzelnen `FloatingActionButton` mit `DropdownMenu` (4 `DropdownMenuItem`,
+gleiche Icons/Labels/Aktionen: „Was koche ich?“, „Mehrere importieren“, „Rezept
+importieren“, „Freies Rezept erstellen“). Der bestehende Custom-Scrim (§7.1) wird bei
+aktivem Toggle nicht mehr gerendert, da `DropdownMenu` sein eigenes Dismiss-Overlay
+mitbringt – sonst hätte man doppelte Abdunklung. Default aus = weiterhin Speed-Dial
+mit Scrim.
+
+### 11.2 Toggle #20 „Portion-Chips größer“
+
+Trotz Titel „größer“ setzt die Umsetzung exakt das um, was die Subtitle vorgibt:
+klarerer Selected-State. Die Portionsgrössen-`FilterChip`s in `AddFoodSheet.kt`
+(„Standard X g“ + Presets aus `FoodPortionPresets`, die Chips, die bei **jedem**
+Diary-Eintrag erscheinen) nutzen bei aktivem Toggle
+`FilterChipDefaults.filterChipColors(selectedContainerColor = primaryContainer, …)`
+statt der Default-Secondary-Container-Farbe. Noch nicht migriert: die
+Portionen-Schnell-Chips in `RecipeDetailSheet.kt` (Rezept-Skalierung) – gleiches
+Muster, folgt bei Bedarf separat.
+
+### 11.3 Toggle #23 „Nav-Shortcuts sichtbar“
+
+Neue `HomeNavShortcuts`-Karte (`HomeCards.kt`, wiederverwendet den bestehenden
+`HomeScanChip`) mit zwei Kacheln „Eigene Foods“ → Route `custom_foods` und
+„Vorlagen“ → Route `meal_templates`. Erscheint bei aktivem Toggle direkt unter dem
+Scan-Schnellzugriff auf Home (in beiden Reihenfolge-Varianten aus Toggle #16
+respektiert). `HomeScreen` bekam dafür zwei neue optionale Navigations-Parameter,
+verdrahtet in `MainActivity.kt`. Default aus = wie bisher nur über Mehr/Einstellungen
+erreichbar.
+
+### 11.4 CI-Fix zwischendurch
+
+Erster Push von #18 schlug fehl: `RecipesScreen.kt` nutzt (anders als die meisten
+anderen Screens) keine Wildcard-Imports für `ui.theme.*`, daher fehlte der explizite
+Import für `KEY_TOGGLE_RECIPES_FAB_CONSOLIDATION`. Mit dem von CI committeten
+`build_errors.txt` diagnostiziert, Import ergänzt, gemerged, CI danach grün.
