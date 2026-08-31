@@ -42,7 +42,9 @@ fun HomeScreen(
     onNavigateToHealth: () -> Unit = {},
     onNavigateToFoodScan: () -> Unit = {},
     onNavigateToBarcode: () -> Unit = {},
-    onNavigateToLabelScan: () -> Unit = {}
+    onNavigateToLabelScan: () -> Unit = {},
+    onNavigateToCustomFoods: () -> Unit = {},
+    onNavigateToMealTemplates: () -> Unit = {}
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val hcState by hcVm.uiState.collectAsStateWithLifecycle()
@@ -55,6 +57,7 @@ fun HomeScreen(
     val homePrefs by homeContext.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
     val reorderHome = homePrefs?.get(KEY_TOGGLE_HOME_REORDER) ?: false
     val mergeActivityCards = (homePrefs?.get(KEY_TOGGLE_HOME_ACTIVITY_MERGE) ?: false) && state.manualActivityEnabled
+    val showNavShortcuts = homePrefs?.get(KEY_TOGGLE_NAV_SHORTCUTS) ?: false
 
     ch.nutrisnap.app.ui.AdaptiveContent(window = window) {
         LazyColumn(
@@ -117,6 +120,9 @@ fun HomeScreen(
                         onLabelScan = onNavigateToLabelScan
                     )
                 }
+                if (showNavShortcuts) {
+                    item { HomeNavShortcuts(onNavigateToCustomFoods, onNavigateToMealTemplates) }
+                }
                 if (macroSuggestions.isNotEmpty() && state.isViewingToday) {
                     item {
                         RemainingMacroSuggestionsCard(
@@ -139,6 +145,9 @@ fun HomeScreen(
                         onBarcode = onNavigateToBarcode,
                         onLabelScan = onNavigateToLabelScan
                     )
+                }
+                if (showNavShortcuts) {
+                    item { HomeNavShortcuts(onNavigateToCustomFoods, onNavigateToMealTemplates) }
                 }
                 if (macroSuggestions.isNotEmpty() && state.isViewingToday) {
                     item {

@@ -398,7 +398,9 @@ fun MainScaffold(
                     onNavigateToHealth = { navController.navigate("health") },
                     onNavigateToFoodScan = { navController.navigate("food_scan") },
                     onNavigateToBarcode = { navController.navigate("diary?open=true&scan=true") },
-                    onNavigateToLabelScan = { navController.navigate("nutrition_label_scan") }
+                    onNavigateToLabelScan = { navController.navigate("nutrition_label_scan") },
+                    onNavigateToCustomFoods = { navController.navigate("custom_foods") },
+                    onNavigateToMealTemplates = { navController.navigate("meal_templates") }
                 )
             }
             composable(

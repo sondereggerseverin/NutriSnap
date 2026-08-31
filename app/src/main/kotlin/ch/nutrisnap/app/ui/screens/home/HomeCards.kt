@@ -775,6 +775,52 @@ private fun HomeScanChip(
     }
 }
 
+/**
+ * Design-Toggle #23 "Nav-Shortcuts sichtbar" (Mehr → Design). Schnellzugriffe zu
+ * Eigene Lebensmittel / Meal-Vorlagen direkt auf Home statt nur über Mehr/Einstellungen
+ * erreichbar. Default aus.
+ */
+@Composable
+internal fun HomeNavShortcuts(
+    onCustomFoods: () -> Unit,
+    onMealTemplates: () -> Unit
+) {
+    NutriCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs)
+    ) {
+        Column(Modifier.padding(NutriSpacing.md)) {
+            Text(
+                "Verwalten",
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = NutriSpacing.sm)
+            )
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
+            ) {
+                HomeScanChip(
+                    icon = Icons.Default.Fastfood,
+                    label = "Eigene Foods",
+                    color = MaterialTheme.colorScheme.primary,
+                    onClick = onCustomFoods,
+                    modifier = Modifier.weight(1f)
+                )
+                HomeScanChip(
+                    icon = Icons.Default.ListAlt,
+                    label = "Vorlagen",
+                    color = MaterialTheme.colorScheme.secondary,
+                    onClick = onMealTemplates,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
 @Composable
 internal fun StreakCard(streak: Int) {
     if (streak <= 0) return
