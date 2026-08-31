@@ -71,6 +71,7 @@ import ch.nutrisnap.app.ui.theme.KEY_FRESH_RECIPE_DETAIL
 import ch.nutrisnap.app.ui.theme.KEY_CLASSIC_RECIPE_LIST
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_GRID_DENSITY
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_GRID_COLUMNS
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_RECIPES_FAB_CONSOLIDATION
 import ch.nutrisnap.app.ui.components.RecipeGridCard
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import androidx.datastore.preferences.core.edit
