@@ -34,9 +34,9 @@ Sie schreiben einen Wert in den DataStore, den keine andere Composable je liest.
 | 12 | Farben | Cropper Theme-Farbe | **an** | ❌ tot + verwaist (s. §4.4) | nur `SettingsScreen.kt` |
 | 13 | Farben | „Noch X kcal übrig“ hervorheben | aus | 🔧 **in dieser Session verdrahtet** | `HomeCards.kt` |
 | 14 | Layout | Spacing-Tokens | an | ❌ tot | nur `SettingsScreen.kt` |
-| 15 | Layout | Activity-Karten zusammenlegen | aus | ❌ tot | nur `SettingsScreen.kt` |
-| 16 | Layout | Home-Reihenfolge neu | aus | ❌ tot | nur `SettingsScreen.kt` |
-| 17 | Layout | Diary kompakter | aus | ❌ tot | nur `SettingsScreen.kt` |
+| 15 | Layout | Activity-Karten zusammenlegen | aus | ✅ live | `HomeCards.kt` (`ActivityCombinedCard`), `HomeScreen.kt` |
+| 16 | Layout | Home-Reihenfolge neu | aus | ✅ live | `HomeScreen.kt` |
+| 17 | Layout | Diary kompakter | aus | ✅ live | `DiaryScreen.kt` (`DateNavigator`) |
 | 18 | FABs & Buttons | Recipes-FABs konsolidieren | aus | ❌ tot | nur `SettingsScreen.kt` |
 | 19 | FABs & Buttons | Button-Standardgrösse | an | ❌ tot | nur `SettingsScreen.kt` |
 | 20 | FABs & Buttons | Portion-Chips grösser | aus | ❌ tot | nur `SettingsScreen.kt` |
@@ -160,15 +160,15 @@ sollte einfach korrekt sein.
 
 ---
 
-## 6. Empfohlene Priorisierung für die verbleibenden 10 toten Toggles
+## 6. Empfohlene Priorisierung für die verbleibenden 7 toten Toggles
 
 1. ~~Card-Elevation (#10)~~ – **NutriCard-Wrapper live**, Home migriert; restliche
    Screens folgen schrittweise (s. §8.1).
 2. ~~Dark-Mode-/Kontrast-Fix (#11)~~ – **verdrahtet** (s. §8.2).
 3. ~~Progress-Bar-Farbwechsel (#21)~~ und ~~Macro-Farben absetzen (#9)~~ – beide
    **verdrahtet** (s. §9).
-4. **Diary kompakter (#17)**, **Home-Reihenfolge (#16)**, **Activity-Karten
-   zusammenlegen (#15)** – je auf einen Screen begrenzt.
+4. ~~Diary kompakter (#17)~~, ~~Home-Reihenfolge (#16)~~, ~~Activity-Karten
+   zusammenlegen (#15)~~ – alle drei **verdrahtet** (s. §10).
 5. **Button-Standardgrösse (#19)**, **Portion-Chips (#20)**, **Recipes-FAB (#18)**,
    **Primärzahlen grösser (#22)**, **Nav-Shortcuts (#23)** – breiter, aber mechanisch.
 6. **Cropper-Theme-Farbe (#12)** – erst entscheiden (entfernen vs. neu zuschneiden),
@@ -293,3 +293,38 @@ Jetzt hinter dem Toggle: `NutritionProgressRow` (`Components.kt`, genutzt in
 `colorScheme.error`, wenn der Toggle an ist. Default aus = unverändert. Die
 bestehende feste Kalorien-Logik bleibt wie sie ist (nicht Teil dieses Toggles,
 da schon vorher unconditional aktiv).
+
+---
+
+## 10. Bereits umgesetzt (30. August 2026): Toggle #15, #16, #17
+
+### 10.1 Toggle #15 „Activity-Karten zusammenlegen“
+
+Neue `ActivityCombinedCard` (`HomeCards.kt`) fasst `HealthCard`-Inhalt (Health-
+Connect-Stats: Schritte, Verbrannt, Schlaf, Gewicht) und `ManualActivityCard`-Inhalt
+(manueller Eintrag) in einer Karte mit `HorizontalDivider` dazwischen zusammen –
+beide Bereiche bleiben unabhängig klickbar (Health Connect öffnen oben, manuelle
+Aktivität bearbeiten unten). Default aus = weiterhin zwei separate Karten mit Lücke.
+Greift nur, wenn `state.manualActivityEnabled` ohnehin an ist – sonst macht Merge
+keinen Sinn (nichts zum Zusammenlegen).
+
+### 10.2 Toggle #16 „Home-Reihenfolge neu“
+
+`HomeScreen.kt`: bei aktivem Toggle wird die Abfolge zu **Ring (Header) → Meals →
+Makros (`CalorieBreakdownCard`) → Activity** (Health/Manual bzw. kombinierte Karte
+je nach Toggle #15) **→ Streak**. Scan-Schnellzugriff und die (bedingte) Makro-
+Vorschlagskarte sind keine der vier genannten Kern-Sektionen und rücken hinter
+Activity, vor den Streak. Default aus = unveränderte bisherige Reihenfolge (Header →
+Meals → Scan → [Vorschläge] → Makros → Health → Manual → Streak). Kombinierbar mit
+Toggle #15 (in beiden Reihenfolgen respektiert).
+
+### 10.3 Toggle #17 „Diary kompakter“
+
+`DateNavigator` (`DiaryScreen.kt`) bekommt einen optionalen `onCopyYesterday`-
+Parameter: bei aktivem Toggle erscheint „Gestern übernehmen“ als Icon-Button
+(`ContentCopy`) rechtsbündig im Navigator selbst (per `Box` + `Alignment.CenterEnd`,
+Datum bleibt mittig zentriert) statt als eigene, volle Breite einnehmende Zeile
+darunter – spart eine ganze Zeile Höhe im Tagebuch. Default aus = unverändert eigene
+Zeile (inkl. bestehendem Toggle „größerer Button“ für diese Zeile, bleibt
+unangetastet). Gleiche `copyYesterdayAction`-Logik in beiden Varianten wiederverwendet,
+kein Verhaltensunterschied ausser der Platzierung.
