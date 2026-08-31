@@ -51,6 +51,10 @@ fun HomeScreen(
     var showActivityDialog by remember { mutableStateOf(false) }
     var snackMessage by remember { mutableStateOf<String?>(null) }
     val window = ch.nutrisnap.app.ui.rememberWindowInfo()
+    val homeContext = LocalContext.current
+    val homePrefs by homeContext.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
+    val reorderHome = homePrefs?.get(KEY_TOGGLE_HOME_REORDER) ?: false
+    val mergeActivityCards = (homePrefs?.get(KEY_TOGGLE_HOME_ACTIVITY_MERGE) ?: false) && state.manualActivityEnabled
 
     ch.nutrisnap.app.ui.AdaptiveContent(window = window) {
         LazyColumn(
@@ -77,38 +81,105 @@ fun HomeScreen(
                     onQuickAdd = { meal -> onNavigateToDiary(meal.type, true) }
                 )
             }
-            item {
-                HomeScanQuickAccess(
-                    onFoodScan = onNavigateToFoodScan,
-                    onBarcode = onNavigateToBarcode,
-                    onLabelScan = onNavigateToLabelScan
-                )
-            }
-            if (macroSuggestions.isNotEmpty() && state.isViewingToday) {
-                item {
-                    RemainingMacroSuggestionsCard(
-                        remainingKcal = state.remaining,
-                        remainingProtein = state.remainingProtein,
-                        suggestions = macroSuggestions,
-                        onAdd = { suggestion ->
-                            vm.applyMacroSuggestion(suggestion) { ok ->
-                                snackMessage = if (ok) "„${suggestion.title}“ hinzugefügt"
-                                else "Konnte nicht hinzufügen"
-                            }
+            if (reorderHome) {
+                // Design-Toggle #16 "Home-Reihenfolge neu": Ring → Meals → Makros → Activity.
+                // Scan-Zugriff und Makro-Vorschläge sind Zusatz-Widgets, keine der vier
+                // Kern-Sektionen – rücken hinter Activity, vor dem Streak.
+                item { CalorieBreakdownCard(state) }
+                if (mergeActivityCards) {
+                    item {
+                        ActivityCombinedCard(
+                            data = hcState.todayData,
+                            hasPermission = hcState.hasPermission,
+                            onOpenHealth = onNavigateToHealth,
+                            onEditWeight = { showWeightDialog = true },
+                            manualTodayKcal = state.manualActivityKcal,
+                            manualTotalActive = state.burnedKcal,
+                            onOpenManualActivity = { showActivityDialog = true }
+                        )
+                    }
+                } else {
+                    item { HealthCard(hcState.todayData, hcState.hasPermission, onNavigateToHealth) { showWeightDialog = true } }
+                    if (state.manualActivityEnabled) {
+                        item {
+                            ManualActivityCard(
+                                todayKcal = state.manualActivityKcal,
+                                totalActive = state.burnedKcal,
+                                onClick = { showActivityDialog = true }
+                            )
                         }
+                    }
+                }
+                item {
+                    HomeScanQuickAccess(
+                        onFoodScan = onNavigateToFoodScan,
+                        onBarcode = onNavigateToBarcode,
+                        onLabelScan = onNavigateToLabelScan
                     )
                 }
-            }
-            // Breakdown unter den Mahlzeiten, damit Ring + 4 Kacheln ohne Scrollen passen
-            item { CalorieBreakdownCard(state) }
-            item { HealthCard(hcState.todayData, hcState.hasPermission, onNavigateToHealth) { showWeightDialog = true } }
-            if (state.manualActivityEnabled) {
+                if (macroSuggestions.isNotEmpty() && state.isViewingToday) {
+                    item {
+                        RemainingMacroSuggestionsCard(
+                            remainingKcal = state.remaining,
+                            remainingProtein = state.remainingProtein,
+                            suggestions = macroSuggestions,
+                            onAdd = { suggestion ->
+                                vm.applyMacroSuggestion(suggestion) { ok ->
+                                    snackMessage = if (ok) "„${suggestion.title}“ hinzugefügt"
+                                    else "Konnte nicht hinzufügen"
+                                }
+                            }
+                        )
+                    }
+                }
+            } else {
                 item {
-                    ManualActivityCard(
-                        todayKcal = state.manualActivityKcal,
-                        totalActive = state.burnedKcal,
-                        onClick = { showActivityDialog = true }
+                    HomeScanQuickAccess(
+                        onFoodScan = onNavigateToFoodScan,
+                        onBarcode = onNavigateToBarcode,
+                        onLabelScan = onNavigateToLabelScan
                     )
+                }
+                if (macroSuggestions.isNotEmpty() && state.isViewingToday) {
+                    item {
+                        RemainingMacroSuggestionsCard(
+                            remainingKcal = state.remaining,
+                            remainingProtein = state.remainingProtein,
+                            suggestions = macroSuggestions,
+                            onAdd = { suggestion ->
+                                vm.applyMacroSuggestion(suggestion) { ok ->
+                                    snackMessage = if (ok) "„${suggestion.title}“ hinzugefügt"
+                                    else "Konnte nicht hinzufügen"
+                                }
+                            }
+                        )
+                    }
+                }
+                // Breakdown unter den Mahlzeiten, damit Ring + 4 Kacheln ohne Scrollen passen
+                item { CalorieBreakdownCard(state) }
+                if (mergeActivityCards) {
+                    item {
+                        ActivityCombinedCard(
+                            data = hcState.todayData,
+                            hasPermission = hcState.hasPermission,
+                            onOpenHealth = onNavigateToHealth,
+                            onEditWeight = { showWeightDialog = true },
+                            manualTodayKcal = state.manualActivityKcal,
+                            manualTotalActive = state.burnedKcal,
+                            onOpenManualActivity = { showActivityDialog = true }
+                        )
+                    }
+                } else {
+                    item { HealthCard(hcState.todayData, hcState.hasPermission, onNavigateToHealth) { showWeightDialog = true } }
+                    if (state.manualActivityEnabled) {
+                        item {
+                            ManualActivityCard(
+                                todayKcal = state.manualActivityKcal,
+                                totalActive = state.burnedKcal,
+                                onClick = { showActivityDialog = true }
+                            )
+                        }
+                    }
                 }
             }
             item { StreakCard(state.streak) }

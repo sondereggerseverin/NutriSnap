@@ -891,6 +891,140 @@ internal fun ManualActivityCard(
     }
 }
 
+/**
+ * Design-Toggle #15 "Activity-Karten zusammenlegen" (Mehr → Design). Fasst
+ * `HealthCard` (Health-Connect-Stats) und `ManualActivityCard` (manueller Eintrag)
+ * in eine gemeinsame Karte statt zwei separater Karten mit Lücke dazwischen –
+ * beide Bereiche bleiben unabhängig klickbar (Health Connect öffnen / manuelle
+ * Aktivität bearbeiten). Default aus = weiterhin zwei separate Karten.
+ */
+@Composable
+internal fun ActivityCombinedCard(
+    data: ch.nutrisnap.app.data.model.HealthConnectCache?,
+    hasPermission: Boolean,
+    onOpenHealth: () -> Unit,
+    onEditWeight: () -> Unit = {},
+    manualTodayKcal: Float?,
+    manualTotalActive: Float,
+    onOpenManualActivity: () -> Unit
+) {
+    NutriCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs)
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clickable { onOpenHealth() }
+                .padding(NutriSpacing.lg)
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Favorite, null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(NutriSpacing.sm))
+                    Text("Health Connect", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                }
+                Icon(
+                    Icons.Default.ChevronRight, null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            Spacer(Modifier.height(NutriSpacing.md))
+
+            if (!hasPermission || data == null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Info, null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(NutriSpacing.sm))
+                    Text(
+                        "Tippe um Health Connect zu verbinden",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
+                    HealthStatItem(icon = "\uD83D\uDC63", value = "%,d".format(data.steps), label = "Schritte")
+                    HealthStatItem(
+                        icon = "\uD83D\uDD25",
+                        value = data.activeCaloriesKcal?.let { "${it.toInt()} kcal" } ?: "–",
+                        label = "Verbrannt"
+                    )
+                    if (data.sleepMinutes > 0) {
+                        val h = data.sleepMinutes / 60
+                        val m = data.sleepMinutes % 60
+                        HealthStatItem(icon = "\uD83D\uDE34", value = "${h}h ${m}m", label = "Schlaf")
+                    }
+                    if (data.weightKg != null) {
+                        Box {
+                            HealthStatItem(
+                                icon = "\u2696\uFE0F",
+                                value = "%.1f kg".format(data.weightKg),
+                                label = "Gewicht"
+                            )
+                            Icon(
+                                Icons.Default.Edit, "Gewicht bearbeiten",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .size(12.dp)
+                                    .clickable { onEditWeight() }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable { onOpenManualActivity() }
+                .padding(NutriSpacing.lg),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("🏃", fontSize = 22.sp)
+            Spacer(Modifier.width(NutriSpacing.md))
+            Column(Modifier.weight(1f)) {
+                Text("Manuelle Aktivität", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text(
+                    if (manualTodayKcal != null && manualTodayKcal > 0f)
+                        "+${manualTodayKcal.toInt()} kcal ins Ziel · gesamt aktiv ${manualTotalActive.toInt()} kcal"
+                    else
+                        "Tippen, um Aktivitätskalorien einzutragen (zählen 1:1)",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                if (manualTodayKcal != null && manualTodayKcal > 0f) "${manualTodayKcal.toInt()}" else "+",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
 @Composable
 internal fun ManualActivityDialog(
     currentKcal: Float?,
