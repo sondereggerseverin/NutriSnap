@@ -38,6 +38,7 @@ import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_RECIPE_CHIP_SIZING
 import ch.nutrisnap.app.ui.components.EmptyState
 import ch.nutrisnap.app.ui.components.SectionHeader
+import ch.nutrisnap.app.ui.components.rememberNutriButtonStyle
 import ch.nutrisnap.app.ui.screens.barcode.BarcodeScannerScreen
 import ch.nutrisnap.app.ui.screens.scan.PhotoCaptureScreen
 import ch.nutrisnap.app.ui.theme.MacroColors
@@ -615,10 +616,12 @@ private fun SearchTab(
             }
         }
         Spacer(Modifier.height(NutriSpacing.lg))
+        val btnStyle = rememberNutriButtonStyle()
         // Primär: + weiteres Lebensmittel (Sheet bleibt offen)
         Button(
             onClick = { confirmAdd(andClose = false) },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = btnStyle.modifier.then(Modifier.fillMaxWidth()),
+            shape = btnStyle.shape,
             enabled = grams > 0
         ) {
             Icon(Icons.Default.Add, null, Modifier.size(18.dp))
@@ -629,13 +632,15 @@ private fun SearchTab(
         Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
             OutlinedButton(
                 onClick = { selectedFood = null },
-                modifier = Modifier.weight(1f)
+                modifier = btnStyle.modifier.then(Modifier.weight(1f)),
+                shape = btnStyle.shape
             ) {
                 Text("Zurück")
             }
             OutlinedButton(
                 onClick = { confirmAdd(andClose = true) },
-                modifier = Modifier.weight(1f),
+                modifier = btnStyle.modifier.then(Modifier.weight(1f)),
+                shape = btnStyle.shape,
                 enabled = grams > 0
             ) {
                 Text("Hinzufügen & fertig")

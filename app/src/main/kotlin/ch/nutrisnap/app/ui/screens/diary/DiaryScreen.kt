@@ -307,12 +307,16 @@ fun DiaryScreen(
             if (!compactDiary) {
             item {
                 val largerYesterday = mealPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_YESTERDAY_BTN) ?: true
+                val yesterdayBtnStyle = ch.nutrisnap.app.ui.components.rememberNutriButtonStyle()
                 if (largerYesterday) {
                     FilledTonalButton(
                         onClick = copyYesterdayAction,
-                        modifier = Modifier
-                            .padding(horizontal = NutriSpacing.lg)
-                            .heightIn(min = 40.dp)
+                        modifier = yesterdayBtnStyle.modifier.then(
+                            Modifier
+                                .padding(horizontal = NutriSpacing.lg)
+                                .heightIn(min = 40.dp)
+                        ),
+                        shape = yesterdayBtnStyle.shape
                     ) {
                         Icon(Icons.Default.ContentCopy, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))

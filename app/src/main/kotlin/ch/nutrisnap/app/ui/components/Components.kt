@@ -24,6 +24,7 @@ import ch.nutrisnap.app.domain.NRV_REFERENCE
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_CARD_ELEVATION
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_PROGRESS_BAR_COLOR_SHIFT
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_BUTTON_STANDARD_SIZING
 import ch.nutrisnap.app.ui.theme.MacroColors
 import ch.nutrisnap.app.ui.theme.NutriRadius
 import ch.nutrisnap.app.ui.theme.NutriSpacing
@@ -41,6 +42,29 @@ import ch.nutrisnap.app.ui.theme.NutriSpacing
  * Border-Karten ohne Elevation) bleiben unverändert `Card(...)` – die würden vom
  * Toggle sonst falsch überschrieben.
  */
+/**
+ * Design-Toggle #19 "Button-Standardgröße" (Mehr → Design, Default AN – anders als
+ * die meisten Toggles hier, da einheitliche Buttonhöhe/-form als Zielzustand gilt).
+ * Vereinheitlicht Höhe (48dp Mindesthöhe statt je nach Variante 40/48dp durcheinander)
+ * und Form (NutriRadius.md statt M3-Standard-Pillenform) über `Button`/`OutlinedButton`/
+ * `FilledTonalButton`/`TextButton` hinweg. Bei ausgeschaltetem Toggle: reines
+ * `ButtonDefaults.shape` (= M3-Standardform für alle vier Button-Varianten identisch)
+ * und keine Höhen-Modifikation – exakt das bisherige, uneinheitliche Verhalten.
+ */
+data class NutriButtonStyle(val modifier: Modifier, val shape: Shape)
+
+@Composable
+fun rememberNutriButtonStyle(): NutriButtonStyle {
+    val context = LocalContext.current
+    val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
+    val standard = prefs?.get(KEY_TOGGLE_BUTTON_STANDARD_SIZING) ?: true
+    return if (standard) {
+        NutriButtonStyle(Modifier.heightIn(min = 48.dp), RoundedCornerShape(NutriRadius.md))
+    } else {
+        NutriButtonStyle(Modifier, ButtonDefaults.shape)
+    }
+}
+
 @Composable
 fun NutriCard(
     modifier: Modifier = Modifier,
