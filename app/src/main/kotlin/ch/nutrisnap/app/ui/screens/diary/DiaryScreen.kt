@@ -279,6 +279,17 @@ fun DiaryScreen(
             val present = state.entries.map { it.mealType }.toSet()
             mealPatterns.filter { it.mealType !in present }
         }
+        val compactDiary = mealPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_DIARY_LAYOUT_COMPACT) ?: false
+        val copyYesterdayAction: () -> Unit = {
+            vm.copyYesterday { n ->
+                scope.launch {
+                    snackbarHostState.showSnackbar(
+                        if (n > 0) "$n Einträge von gestern übernommen"
+                        else "Gestern war leer – nichts zu kopieren"
+                    )
+                }
+            }
+        }
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
@@ -287,21 +298,18 @@ fun DiaryScreen(
                 bottom = 100.dp
             )
         ) {
-            item { DateNavigator(state.selectedDate, vm::prevDay, vm::nextDay, vm::setDate) }
+            item {
+                DateNavigator(
+                    state.selectedDate, vm::prevDay, vm::nextDay, vm::setDate,
+                    onCopyYesterday = if (compactDiary) copyYesterdayAction else null
+                )
+            }
+            if (!compactDiary) {
             item {
                 val largerYesterday = mealPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_YESTERDAY_BTN) ?: true
                 if (largerYesterday) {
                     FilledTonalButton(
-                        onClick = {
-                            vm.copyYesterday { n ->
-                                scope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        if (n > 0) "$n Einträge von gestern übernommen"
-                                        else "Gestern war leer – nichts zu kopieren"
-                                    )
-                                }
-                            }
-                        },
+                        onClick = copyYesterdayAction,
                         modifier = Modifier
                             .padding(horizontal = NutriSpacing.lg)
                             .heightIn(min = 40.dp)
@@ -312,16 +320,7 @@ fun DiaryScreen(
                     }
                 } else {
                     TextButton(
-                        onClick = {
-                            vm.copyYesterday { n ->
-                                scope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        if (n > 0) "$n Einträge von gestern übernommen"
-                                        else "Gestern war leer – nichts zu kopieren"
-                                    )
-                                }
-                            }
-                        },
+                        onClick = copyYesterdayAction,
                         modifier = Modifier.padding(horizontal = NutriSpacing.lg)
                     ) {
                         Icon(Icons.Default.ContentCopy, null, Modifier.size(16.dp))
@@ -329,6 +328,7 @@ fun DiaryScreen(
                         Text("Gestern übernehmen", fontSize = 13.sp)
                     }
                 }
+            }
             }
             item {
                 CompactDayOverview(
@@ -738,18 +738,21 @@ private fun DateNavigator(
     date: LocalDate,
     onPrev: () -> Unit,
     onNext: () -> Unit,
-    onPick: (LocalDate) -> Unit = {}
+    onPick: (LocalDate) -> Unit = {},
+    onCopyYesterday: (() -> Unit)? = null
 ) {
     var showPicker by remember { mutableStateOf(false) }
     val zone = java.time.ZoneId.systemDefault()
 
-    Row(
+    Box(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = NutriSpacing.sm, vertical = NutriSpacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
+            .padding(horizontal = NutriSpacing.sm, vertical = NutriSpacing.xs)
     ) {
+        Row(
+            Modifier.align(Alignment.Center),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
         IconButton(onClick = { onPick(date.minusDays(7)) }) {
             Icon(Icons.Default.KeyboardDoubleArrowLeft, "−7 Tage")
         }
@@ -781,6 +784,17 @@ private fun DateNavigator(
             enabled = date.isBefore(maxFuture)
         ) {
             Icon(Icons.Default.KeyboardDoubleArrowRight, "+7 Tage")
+        }
+        }
+        // Design-Toggle #17 "Diary kompakter": "Gestern übernehmen" als Icon-Button
+        // im Navigator statt eigener volle Breite einnehmender Zeile darunter.
+        if (onCopyYesterday != null) {
+            IconButton(
+                onClick = onCopyYesterday,
+                modifier = Modifier.align(Alignment.CenterEnd)
+            ) {
+                Icon(Icons.Default.ContentCopy, contentDescription = "Gestern übernehmen", modifier = Modifier.size(20.dp))
+            }
         }
     }
 
