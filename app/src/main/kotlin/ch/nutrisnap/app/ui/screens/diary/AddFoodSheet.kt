@@ -33,6 +33,9 @@ import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.domain.EntryPlausibilityChecker
 import ch.nutrisnap.app.domain.EverydayServingSizes
 import ch.nutrisnap.app.domain.FoodPortionPresets
+import androidx.compose.ui.platform.LocalContext
+import ch.nutrisnap.app.ui.screens.settings.notifDataStore
+import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_RECIPE_CHIP_SIZING
 import ch.nutrisnap.app.ui.components.EmptyState
 import ch.nutrisnap.app.ui.components.SectionHeader
 import ch.nutrisnap.app.ui.screens.barcode.BarcodeScannerScreen
@@ -497,6 +500,20 @@ private fun SearchTab(
         Spacer(Modifier.height(NutriSpacing.md))
         val presets = remember(food) { ch.nutrisnap.app.domain.FoodPortionPresets.forFood(food) }
         val hasRemembered = rememberedGrams != null && rememberedGrams!! > 0f
+        // Design-Toggle #20 "Portion-Chips größer" (Mehr → Design): klarerer
+        // Selected-State via Primary-Container statt Default-Secondary-Container.
+        val chipContext = LocalContext.current
+        val chipPrefs by chipContext.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
+        val boldPortionChips = chipPrefs?.get(KEY_TOGGLE_RECIPE_CHIP_SIZING) ?: false
+        val portionChipColors = if (boldPortionChips) {
+            FilterChipDefaults.filterChipColors(
+                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        } else {
+            FilterChipDefaults.filterChipColors()
+        }
         if (hasRemembered || presets.isNotEmpty()) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm),
@@ -517,14 +534,16 @@ private fun SearchTab(
                         },
                         leadingIcon = {
                             Icon(Icons.Default.History, null, Modifier.size(16.dp))
-                        }
+                        },
+                        colors = portionChipColors
                     )
                 }
                 presets.forEach { preset ->
                     FilterChip(
                         selected = amountText.toFloatOrNull() == preset.grams,
                         onClick  = { amountText = preset.grams.toInt().toString() },
-                        label    = { Text(preset.label, fontSize = 12.sp) }
+                        label    = { Text(preset.label, fontSize = 12.sp) },
+                        colors = portionChipColors
                     )
                 }
             }
