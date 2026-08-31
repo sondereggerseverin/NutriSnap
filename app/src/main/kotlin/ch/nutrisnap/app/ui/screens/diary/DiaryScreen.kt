@@ -116,7 +116,7 @@ private fun CompactDayOverview(
                     Text(
                         "${calories.toInt()}",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
+                        fontSize = ch.nutrisnap.app.ui.theme.primaryNumberFontSize(20.sp),
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(

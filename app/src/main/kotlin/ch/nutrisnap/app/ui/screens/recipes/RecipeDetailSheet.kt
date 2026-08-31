@@ -1228,8 +1228,20 @@ private fun SubNutrientRow(label: String, value: String, highlight: Boolean = fa
 
 @Composable internal fun MacroItem(label: String, value: String, unit: String) {
     Column(horizontalAlignment=Alignment.CenterHorizontally) {
-        Text(value, fontWeight=FontWeight.Bold, fontSize=18.sp, color=MaterialTheme.colorScheme.onPrimaryContainer)
-        Text(unit, fontSize=10.sp, color=MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha=0.7f))
-        Text(label, fontSize=10.sp, color=MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha=0.7f))
+        Text(
+            value, fontWeight=FontWeight.Bold,
+            fontSize = ch.nutrisnap.app.ui.theme.primaryNumberFontSize(18.sp),
+            color=MaterialTheme.colorScheme.onPrimaryContainer
+        )
+        Text(
+            unit,
+            fontSize = ch.nutrisnap.app.ui.theme.secondaryNumberFontSize(10.sp),
+            color=MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha=0.7f)
+        )
+        Text(
+            label,
+            fontSize = ch.nutrisnap.app.ui.theme.secondaryNumberFontSize(10.sp),
+            color=MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha=0.7f)
+        )
     }
 }

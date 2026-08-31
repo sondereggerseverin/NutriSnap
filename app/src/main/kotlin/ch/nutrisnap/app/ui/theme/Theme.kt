@@ -126,6 +126,35 @@ fun rememberMacroColors(): MacroColorSet {
     )
 }
 
+/**
+ * Design-Toggle #22 "Primärzahlen größer" (Mehr → Design). Primärzahlen (Kalorien-/
+ * Makro-Werte, die zentrale Aussage einer Karte) sind aktuell uneinheitlich zwischen
+ * 14sp und 22sp verteilt; Sekundärtext fällt teils unter 12sp (schlecht lesbar).
+ * Bei aktiviertem Toggle: Primärzahlen werden auf mindestens `headlineSmall` (Token-
+ * grösse, aktuell 20sp) angehoben, Sekundärtext auf mindestens 12sp – beides nur nach
+ * oben (`maxOf`), nie eine Verkleinerung bereits grösserer Werte. Default aus =
+ * unveränderte, an der jeweiligen Stelle hart codierte Grösse.
+ */
+@Composable
+fun rememberTypographyNumbersEnabled(): Boolean {
+    val context = LocalContext.current
+    val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
+    return prefs?.get(KEY_TOGGLE_TYPOGRAPHY_NUMBERS) ?: false
+}
+
+@Composable
+fun primaryNumberFontSize(current: androidx.compose.ui.unit.TextUnit): androidx.compose.ui.unit.TextUnit {
+    if (!rememberTypographyNumbersEnabled()) return current
+    val target = MaterialTheme.typography.headlineSmall.fontSize
+    return if (current.value >= target.value) current else target
+}
+
+@Composable
+fun secondaryNumberFontSize(current: androidx.compose.ui.unit.TextUnit): androidx.compose.ui.unit.TextUnit {
+    if (!rememberTypographyNumbersEnabled()) return current
+    return if (current.value >= 12f) current else 12.sp
+}
+
 // ── Theme Definitions ─────────────────────────────────────────────────────────
 
 enum class AppTheme(

@@ -267,7 +267,7 @@ internal fun HomeHeader(
                         } else {
                             "${state.remaining.toInt()}"
                         },
-                        fontSize = 20.sp,
+                        fontSize = primaryNumberFontSize(20.sp),
                         fontWeight = FontWeight.Bold,
                         color = if (highlightRemaining) {
                             if (overGoal) Color(0xFFFFD67A) else macros.calories
@@ -277,7 +277,7 @@ internal fun HomeHeader(
                     )
                     Text(
                         if (overGoal) "über" else "übrig",
-                        fontSize = 10.sp,
+                        fontSize = secondaryNumberFontSize(10.sp),
                         color = if (highlightRemaining && !overGoal) {
                             macros.calories.copy(alpha = 0.85f)
                         } else {
