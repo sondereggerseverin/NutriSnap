@@ -344,15 +344,15 @@ fun SettingsScreen(
                         )
                     }
                 }
-                SettingsCard(title = "Rezept-Import (Experiment)", icon = Icons.Default.Bolt) {
+                SettingsCard(title = "Rezept-Import", icon = Icons.Default.Bolt) {
                     Text(
-                        "Schnellerer Import von Instagram/TikTok/Web. Standard aus = bisherige Qualität und Quellen. Bei Problemen einfach wieder ausschalten.",
+                        "Standard = schneller Import. Ausschalten stellt den gründlicheren (längeren) Pfad wieder her. Nach dem Import gibt es zusätzlich den Button „Gründlicher“.",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(NutriSpacing.sm))
-                    val fastAi = prefs?.get(KEY_RECIPE_FAST_AI_PARSE) ?: false
-                    val fastScrape = prefs?.get(KEY_RECIPE_FAST_SCRAPE) ?: false
+                    val fastAi = prefs?.get(KEY_RECIPE_FAST_AI_PARSE) ?: true
+                    val fastScrape = prefs?.get(KEY_RECIPE_FAST_SCRAPE) ?: true
                     SettingsSwitchRow(
                         title = "Schnelles KI-Parsing",
                         subtitle = "Groq 8B Instant statt 70B (oft ~1 s, etwas weniger präzise)",
@@ -365,7 +365,7 @@ fun SettingsScreen(
                     )
                     SettingsSwitchRow(
                         title = "Schnelle Link-Extraktion",
-                        subtitle = "Kürzerer Timeout, weniger Mirror-Quellen (IG)",
+                        subtitle = "Kürzerer Timeout, weniger WebViews/Mirrors (IG). Aus = wie früher, gründlicher",
                         checked = fastScrape,
                         onCheckedChange = { checked ->
                             scope.launch {

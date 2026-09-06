@@ -32,13 +32,14 @@ object InstagramWebViewScraper {
      * Must be called from a coroutine; internally switches to Main thread
      * for WebView operations (WebView requires main-thread access).
      *
+     * @param fast kürzere Delays/Timeout (Default-Import). false = gründlicher Pfad.
      * @return caption string, or null if extraction failed / timed out
      */
     @SuppressLint("SetJavaScriptEnabled")
-    suspend fun extractCaption(context: Context, url: String): String? =
-        // Gesamttimeout 18 s — WebView läuft ab t=0 parallel zum Race (nicht erst
-        // danach gestartet), braucht aber trotzdem echte Zeit für Laden + React-Render.
-        withTimeout(18_000L) {
+    suspend fun extractCaption(context: Context, url: String, fast: Boolean = false): String? {
+        // Fast: 11 s Gesamttimeout; gründlich: 18 s (Laden + React-Render).
+        val overallTimeoutMs = if (fast) 11_000L else 18_000L
+        return withTimeout(overallTimeoutMs) {
             suspendCancellableCoroutine { cont ->
                 val mainHandler = Handler(Looper.getMainLooper())
                 mainHandler.post {
@@ -78,8 +79,14 @@ object InstagramWebViewScraper {
                     webView.webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView, loadedUrl: String) {
                             if (finished) return
-                            // Längeres Warten: IG React + Caption-Lazy-Load brauchen Zeit
-                            val delayMs = if (isEmbed) 2_500L else 4_500L
+                            // Fast: kürzer warten; gründlich: mehr Zeit für React + Lazy-Caption
+                            val delayMs = when {
+                                fast && isEmbed -> 1_500L
+                                fast -> 2_800L
+                                isEmbed -> 2_500L
+                                else -> 4_500L
+                            }
+                            val retryMs = if (fast) 1_200L else 2_000L
                             mainHandler.postDelayed({
                                 if (finished) return@postDelayed
                                 view.evaluateJavascript(EXTRACT_JS) { rawResult ->
@@ -93,7 +100,7 @@ object InstagramWebViewScraper {
                                             view.evaluateJavascript(EXTRACT_JS) { raw2 ->
                                                 finish(decodeJsString(raw2))
                                             }
-                                        }, 2_000L)
+                                        }, retryMs)
                                     }
                                 }
                             }, delayMs)
@@ -114,6 +121,7 @@ object InstagramWebViewScraper {
                 }
             }
         }
+    }
 
     private fun decodeJsString(rawResult: String?): String? =
         rawResult

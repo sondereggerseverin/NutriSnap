@@ -206,12 +206,12 @@ class RecipeScraper(private val context: Context) {
         .build()
 
     /**
-     * @param fastScrape kürzerer IG-Race-Timeout, weniger Mirror-Quellen
+     * @param fastScrape kürzerer IG-Race-Timeout, 2 statt 4 WebViews, weniger Mirrors
      * @param fastAi     Groq 8B Instant statt 70B beim Caption-Parse
      * @param persistentCache Caption über App-Neustart speichern
      * @param videoTranscript bei schwacher Caption Whisper-Transkript holen
-     * @param highQuality true = Score-Retry mit 3,5 s Pause (gründlicher, langsamer).
-     *                    false = einmaliger Versuch (Default, AMM-ähnlich schnell).
+     * @param highQuality true = Score-Retry + voller Race (gründlicher, langsamer).
+     *                    false = einmaliger schneller Versuch (Default).
      */
     suspend fun scrape(
         rawUrl: String,
@@ -387,13 +387,17 @@ class RecipeScraper(private val context: Context) {
         // NICHT nochmal derselbe Server-Call mit identischem Input läuft (war ein
         // doppelter Roundtrip bei jedem "brauchbar, aber knapp unter AMM"-Fall).
         var serverCapResult: Recipe? = null
+        // Fast-Pfad: Caption-Merge max. 3,5 s; gründlich: 6 s.
+        val mergeCaptionBudgetMs = if (fastScrape) 3_500L else 6_000L
+        val captionAwaitMs = if (fastScrape) 7_500L else 12_000L
+
         if (RecipeNormalizeServer.isConfigured()) {
             progress("Server-Import…")
             val serverRecipe = RecipeNormalizeServer.importFromUrl(url, "instagram")
             serverUrlError = RecipeNormalizeServer.lastError
             if (serverRecipe != null) {
-                // Caption max. 6s mitnehmen, dann fehlende Qty-Zeilen (Milch, ca. ml) nachziehen
-                val capForMerge = withTimeoutOrNull(6_000L) { captionJob.await() }.orEmpty()
+                // Caption parallel mitnehmen, dann fehlende Qty-Zeilen (Milch, ca. ml) nachziehen
+                val capForMerge = withTimeoutOrNull(mergeCaptionBudgetMs) { captionJob.await() }.orEmpty()
                 val merged = if (isGoodCaption(capForMerge)) {
                     serverRecipe.copy(
                         ingredients = RecipeAiParser.mergeIngredientsFromCaption(
@@ -426,7 +430,7 @@ class RecipeScraper(private val context: Context) {
             }
         }
 
-        var caption = withTimeoutOrNull(12_000L) { captionJob.await() }.orEmpty()
+        var caption = withTimeoutOrNull(captionAwaitMs) { captionJob.await() }.orEmpty()
         if (!isGoodCaption(caption)) {
             progress("Caption holen…")
             caption = raceInstagramCaption(canonicalUrls.first(), shortcode, fastScrape)
@@ -692,8 +696,8 @@ class RecipeScraper(private val context: Context) {
      * der zuverlässig etwas liefert. Weil WebView dadurch effektiv nur noch
      * ~4s Restzeit für Laden+Rendern der schweren IG-Seite hatte, lief es fast
      * immer in den Timeout → Import schlug praktisch jedes Mal fehl.
-     * Fix: kein Phasen-Gate mehr, alles rennt ab t=0 parallel; Budget wieder auf
-     * die zuvor bewährten Werte (10s Fast / 22s Standard).
+     * Fix: kein Phasen-Gate mehr, alles rennt ab t=0 parallel.
+     * Fast-Default: 7s Race + 2 WebViews; gründlich: 12s + alle WebViews/Mirrors.
      */
     private suspend fun raceInstagramCaption(url: String, shortcode: String?, fastScrape: Boolean = false): String =
         coroutineScope {
@@ -701,8 +705,8 @@ class RecipeScraper(private val context: Context) {
 
             val desktopUa =
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-            // Fast: 8s, Standard: 12s — WebView meldet oft ~8–12s; 22s fühlte sich wie Hänger an.
-            val raceTimeoutMs = if (fastScrape) 8_000L else 12_000L
+            // Fast: 7s (Default-Import), gründlich: 12s — WebView braucht oft 6–10s.
+            val raceTimeoutMs = if (fastScrape) 7_000L else 12_000L
 
             suspend fun awaitFirstGood(
                 jobs: MutableList<kotlinx.coroutines.Deferred<Cap?>>,
@@ -727,39 +731,59 @@ class RecipeScraper(private val context: Context) {
             }
 
             val jobs = mutableListOf<kotlinx.coroutines.Deferred<Cap?>>()
+            val isReel = "/reel/" in url.lowercase()
 
             // ── WebViews (Geräte-Cookies, volles Chromium) — ab t=0, NICHT verzögert ──
+            // Fast: nur 1× Haupt-URL + 1× passendes Embed (weniger CPU/RAM, kürzeres Race).
+            // Gründlich: alle Varianten (alt-Pfad + beide Embeds).
             jobs += async {
                 runCatching {
-                    InstagramWebViewScraper.extractCaption(context, url)?.let { Cap(it, "webview") }
+                    InstagramWebViewScraper.extractCaption(context, url, fast = fastScrape)
+                        ?.let { Cap(it, "webview") }
                 }.getOrNull()?.takeIf { isGoodCaption(it.text) }
             }
             if (shortcode != null) {
-                val altPath = if ("/reel/" in url.lowercase()) {
-                    "https://www.instagram.com/p/$shortcode/"
-                } else {
-                    "https://www.instagram.com/reel/$shortcode/"
-                }
-                if (altPath != url.substringBefore("?").trimEnd('/') + "/") {
+                if (!fastScrape) {
+                    val altPath = if (isReel) {
+                        "https://www.instagram.com/p/$shortcode/"
+                    } else {
+                        "https://www.instagram.com/reel/$shortcode/"
+                    }
+                    if (altPath != url.substringBefore("?").trimEnd('/') + "/") {
+                        jobs += async {
+                            runCatching {
+                                InstagramWebViewScraper.extractCaption(context, altPath, fast = false)
+                                    ?.let { Cap(it, "webview-alt") }
+                            }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                        }
+                    }
                     jobs += async {
                         runCatching {
-                            InstagramWebViewScraper.extractCaption(context, altPath)
-                                ?.let { Cap(it, "webview-alt") }
+                            val embedUrl = "https://www.instagram.com/p/$shortcode/embed/captioned/"
+                            InstagramWebViewScraper.extractCaption(context, embedUrl, fast = false)
+                                ?.let { Cap(it, "webview-embed") }
                         }.getOrNull()?.takeIf { isGoodCaption(it.text) }
                     }
-                }
-                jobs += async {
-                    runCatching {
-                        val embedUrl = "https://www.instagram.com/p/$shortcode/embed/captioned/"
-                        InstagramWebViewScraper.extractCaption(context, embedUrl)?.let { Cap(it, "webview-embed") }
-                    }.getOrNull()?.takeIf { isGoodCaption(it.text) }
-                }
-                jobs += async {
-                    runCatching {
-                        val embedUrl = "https://www.instagram.com/reel/$shortcode/embed/captioned/"
-                        InstagramWebViewScraper.extractCaption(context, embedUrl)
-                            ?.let { Cap(it, "webview-reel-embed") }
-                    }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                    jobs += async {
+                        runCatching {
+                            val embedUrl = "https://www.instagram.com/reel/$shortcode/embed/captioned/"
+                            InstagramWebViewScraper.extractCaption(context, embedUrl, fast = false)
+                                ?.let { Cap(it, "webview-reel-embed") }
+                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                    }
+                } else {
+                    // Ein Embed reicht im Fast-Pfad (passend zum Link-Typ).
+                    jobs += async {
+                        runCatching {
+                            val embedUrl = if (isReel) {
+                                "https://www.instagram.com/reel/$shortcode/embed/captioned/"
+                            } else {
+                                "https://www.instagram.com/p/$shortcode/embed/captioned/"
+                            }
+                            InstagramWebViewScraper.extractCaption(context, embedUrl, fast = true)
+                                ?.let { Cap(it, "webview-embed") }
+                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                    }
                 }
 
                 // ── Schnelle HTTP-Quellen — laufen parallel zu den WebViews, nicht davor ──

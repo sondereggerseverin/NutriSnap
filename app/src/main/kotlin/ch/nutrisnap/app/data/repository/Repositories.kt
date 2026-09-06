@@ -762,22 +762,25 @@ class RecipeRepository(db: NutriDatabase, private val context: Context) {
             }
         }
 
-        // Experiment-Toggles aus Settings (default = bisheriges Verhalten)
+        // Default-Import ist schnell (fastScrape/fastAi an). Gründlicher Button
+        // (highQuality) und Settings-Toggle „aus“ stellen den alten, gründlicheren
+        // Pfad wieder her.
         val prefs = runCatching {
             context.notifDataStore.data.first()
         }.getOrNull()
-        val fastAi = prefs?.get(KEY_RECIPE_FAST_AI_PARSE) ?: false
-        val fastScrape = prefs?.get(KEY_RECIPE_FAST_SCRAPE) ?: false
+        val prefFastAi = prefs?.get(KEY_RECIPE_FAST_AI_PARSE) ?: true
+        val prefFastScrape = prefs?.get(KEY_RECIPE_FAST_SCRAPE) ?: true
         val persistentCache = prefs?.get(KEY_RECIPE_PERSISTENT_CACHE) ?: true
         val videoTranscript = prefs?.get(KEY_RECIPE_VIDEO_TRANSCRIPT) ?: false
-        // highQuality-Reimport: Video-Transcript mitnutzen, wenn User es global an hat
-        // oder explizit gründlicher Import (mehr Signal bei dünner Caption).
+        // highQuality: voller Race + Retry + ggf. Transcript; nie fast-Shortcuts.
+        val effectiveFastScrape = if (highQuality) false else prefFastScrape
+        val effectiveFastAi = if (highQuality) false else prefFastAi
         val useTranscript = videoTranscript || highQuality
         val result = scraper.scrape(
             url,
             onProgress,
-            fastScrape = fastScrape,
-            fastAi = fastAi,
+            fastScrape = effectiveFastScrape,
+            fastAi = effectiveFastAi,
             persistentCache = persistentCache && !highQuality,
             videoTranscript = useTranscript,
             highQuality = highQuality
