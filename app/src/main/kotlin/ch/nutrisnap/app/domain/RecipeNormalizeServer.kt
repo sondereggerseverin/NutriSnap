@@ -41,8 +41,9 @@ object RecipeNormalizeServer {
         private set
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(28, TimeUnit.SECONDS)
+        .connectTimeout(8, TimeUnit.SECONDS)
+        // 28s Read-Timeout war ein Hauptgrund für 40s-Imports bei hängendem Server.
+        .readTimeout(14, TimeUnit.SECONDS)
         .build()
 
     fun isConfigured(): Boolean =

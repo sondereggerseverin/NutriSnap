@@ -56,14 +56,18 @@ class RecipeScraper(private val context: Context) {
         // HTML/JS-Müll von Jina/Mirrors niemals als Caption akzeptieren
         if (looksLikeHtmlOrCode(t)) return false
         val lc = t.lowercase()
+        // Login-Wall / CSP-Müll
+        if ("log in" in lc && "sign up" in lc && t.length < 200) return false
+        if ("content-security-policy" in lc) return false
         val recipeHints = listOf(
-            "zutaten", "ingredient", "rezept", "recipe", "anleitung", "instructions",
-            "zubereitung", "method", " tbsp", " tsp", " el ", " tl ", "gramm", " ml", " cup",
-            "päckchen", "paeckchen", "backpulver", "portionen"
+            "zutaten", "ingredient", "ingrédient", "ingredienti", "rezept", "recipe", "recette",
+            "anleitung", "instructions", "préparation", "procedimento", "zubereitung", "method",
+            " tbsp", " tsp", " el ", " tl ", " c. à", "gramm", " ml", " cup",
+            "päckchen", "paeckchen", "backpulver", "portionen", "farine", "œuf", "oeuf", "skyr"
         )
-        // Mindestens 2 Mengenangaben (380g / 500 g / 1 EL) → klar strukturierte Caption
+        // Mindestens 2 Mengenangaben (380g / 1 EL / 1 c. à café)
         val qtyCount = Regex(
-            """\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tsp|tbsp|cup|oz|lb|stück|stk|päckchen|paeckchen)\b""",
+            """\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tsp|tbsp|cup|oz|lb|stück|stk|päckchen|paeckchen|c\.\s*à)\b""",
             RegexOption.IGNORE_CASE
         ).findAll(t).count()
         if (qtyCount >= 2) return true
@@ -498,9 +502,13 @@ class RecipeScraper(private val context: Context) {
         // Caption an Server → strukturiertes Rezept (AMM-Fallback wenn URL-Fetch dünn war)
         if (RecipeNormalizeServer.isConfigured()) {
             progress("Server-Normalisierung…")
-            val serverCap = RecipeNormalizeServer.normalize(
-                workingCaption, url, "instagram", thumbnail
-            )
+            // Fast: max. 12 s für Normalisierung – nicht 28 s auf hängenden Server warten.
+            val normBudget = if (fastScrape) 12_000L else 20_000L
+            val serverCap = withTimeoutOrNull(normBudget) {
+                RecipeNormalizeServer.normalize(
+                    workingCaption, url, "instagram", thumbnail
+                )
+            }
             serverCapResult = serverCap
             serverCapError = RecipeNormalizeServer.lastError
             if (serverCap != null) {
@@ -736,10 +744,8 @@ class RecipeScraper(private val context: Context) {
 
             val desktopUa =
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-            // Race-Timeout MUSS >= WebView-Budget sein. 7s war zu kurz → WebView
-            // lieferte erst nach Timeout → leerer 1. Lauf + zweiter Lauf ≈ 30s.
-            // Fast: 13s (WebView ~10s + Puffer), gründlich: 16s.
-            val raceTimeoutMs = if (fastScrape) 13_000L else 16_000L
+            // Race-Timeout >= WebView-Budget (Fast 12s / gründlich 18s).
+            val raceTimeoutMs = if (fastScrape) 14_000L else 18_000L
 
             suspend fun awaitFirstGood(
                 jobs: MutableList<kotlinx.coroutines.Deferred<Cap?>>,
@@ -767,7 +773,7 @@ class RecipeScraper(private val context: Context) {
             val isReel = "/reel/" in url.lowercase()
 
             // ── WebViews (Geräte-Cookies, volles Chromium) — ab t=0 ──
-            // Fast: NUR Embed (lädt oft 2–4 s schneller als volle IG-App-Seite).
+            // Fast: Embed + Haupt-URL parallel (Zuverlässigkeit vor aggressiver Kürzung).
             // Gründlich: Haupt-URL + Alt + beide Embeds.
             if (shortcode != null) {
                 if (fastScrape) {
@@ -780,6 +786,12 @@ class RecipeScraper(private val context: Context) {
                             }
                             InstagramWebViewScraper.extractCaption(context, embedUrl, fast = true)
                                 ?.let { Cap(it, "webview-embed") }
+                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                    }
+                    jobs += async {
+                        runCatching {
+                            InstagramWebViewScraper.extractCaption(context, url, fast = true)
+                                ?.let { Cap(it, "webview") }
                         }.getOrNull()?.takeIf { isGoodCaption(it.text) }
                     }
                 } else {
@@ -917,6 +929,14 @@ class RecipeScraper(private val context: Context) {
                             Cap(t, "instagrapi").takeIf { isGoodCaption(it.text) }
                         }.getOrNull()
                     }
+                }
+            } else {
+                // Kein Shortcode → trotzdem WebView auf Original-URL
+                jobs += async {
+                    runCatching {
+                        InstagramWebViewScraper.extractCaption(context, url, fast = fastScrape)
+                            ?.let { Cap(it, "webview") }
+                    }.getOrNull()?.takeIf { isGoodCaption(it.text) }
                 }
             }
 

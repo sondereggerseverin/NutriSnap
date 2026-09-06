@@ -37,8 +37,8 @@ object InstagramWebViewScraper {
      */
     @SuppressLint("SetJavaScriptEnabled")
     suspend fun extractCaption(context: Context, url: String, fast: Boolean = false): String? {
-        // Fast: 10 s Gesamttimeout; gründlich: 16 s (Laden + React-Render).
-        val overallTimeoutMs = if (fast) 10_000L else 16_000L
+        // Zuverlässige Timeouts: zu kurze Delays lieferten leere/Müll-Captions.
+        val overallTimeoutMs = if (fast) 12_000L else 18_000L
         return withTimeout(overallTimeoutMs) {
             suspendCancellableCoroutine { cont ->
                 val mainHandler = Handler(Looper.getMainLooper())
@@ -79,38 +79,25 @@ object InstagramWebViewScraper {
                     webView.webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView, loadedUrl: String) {
                             if (finished) return
-                            // Fast: aggressive Delays; Embed oft schon nach ~1s hydriert.
+                            // Bewährte Delays: Caption muss gerendert sein (0,9s war zu aggressiv).
                             val delayMs = when {
-                                fast && isEmbed -> 900L
-                                fast -> 1_800L
-                                isEmbed -> 2_000L
-                                else -> 3_500L
+                                fast && isEmbed -> 2_000L
+                                fast -> 3_000L
+                                isEmbed -> 2_500L
+                                else -> 4_000L
                             }
-                            val retryMs = if (fast) 700L else 1_500L
+                            val retryMs = if (fast) 1_500L else 2_000L
                             mainHandler.postDelayed({
                                 if (finished) return@postDelayed
                                 view.evaluateJavascript(EXTRACT_JS) { rawResult ->
                                     val caption = decodeJsString(rawResult)
-                                    if (!caption.isNullOrBlank()) {
+                                    if (!caption.isNullOrBlank() && caption.length >= 40) {
                                         finish(caption)
                                     } else {
                                         mainHandler.postDelayed({
                                             if (finished) return@postDelayed
                                             view.evaluateJavascript(EXTRACT_JS) { raw2 ->
-                                                val c2 = decodeJsString(raw2)
-                                                if (!c2.isNullOrBlank()) {
-                                                    finish(c2)
-                                                } else if (fast) {
-                                                    // Dritter, letzter Versuch im Fast-Pfad
-                                                    mainHandler.postDelayed({
-                                                        if (finished) return@postDelayed
-                                                        view.evaluateJavascript(EXTRACT_JS) { raw3 ->
-                                                            finish(decodeJsString(raw3))
-                                                        }
-                                                    }, 600L)
-                                                } else {
-                                                    finish(null)
-                                                }
+                                                finish(decodeJsString(raw2))
                                             }
                                         }, retryMs)
                                     }
