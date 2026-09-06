@@ -375,9 +375,9 @@ class RecipeScraper(private val context: Context) {
 
         if (RecipeNormalizeServer.isConfigured()) {
             progress("Server-Import…")
-            // Fast: Server max. 12 s (AMM-Ziel ~2–5 s). Danach Client-Fallback.
+            // Fast: Server max. 6 s – wenn er nicht liefert, sofort WebView.
             // Gründlich: volles OkHttp-Budget (28 s).
-            val serverBudgetMs = if (fastScrape) 12_000L else 28_000L
+            val serverBudgetMs = if (fastScrape) 6_000L else 28_000L
             val serverRecipe = withTimeoutOrNull(serverBudgetMs) {
                 RecipeNormalizeServer.importFromUrl(url, "instagram")
             }
@@ -397,8 +397,7 @@ class RecipeScraper(private val context: Context) {
                             "ing=${serverRecipe.ingredients.lines().count { it.isNotBlank() }} " +
                             "fast=$fastScrape url=$url"
                     )
-                    // Thumbnail optional schnell nachziehen (max 1,5 s), nicht blockierend lang
-                    val thumb = withTimeoutOrNull(1_500L) {
+                    val thumb = withTimeoutOrNull(1_200L) {
                         canonicalUrls.firstNotNullOfOrNull { u ->
                             runCatching {
                                 fetchOEmbed(
@@ -418,48 +417,7 @@ class RecipeScraper(private val context: Context) {
             }
         }
 
-        // Ab hier: Server hat nicht geliefert → Client-Caption (WebView-Race).
-        // Gründlich: Caption parallel schon sinnvoll; Fast startet sie erst jetzt.
-        progress("Caption holen…")
-        val captionJob = async {
-            val cached = if (forceRefresh) "" else loadCachedCaption(key)
-            if (isGoodCaption(cached)) cached
-            else {
-                val c = raceInstagramCaption(canonicalUrls.first(), shortcode, fastScrape)
-                if (isGoodCaption(c)) saveCachedCaption(key, c)
-                c
-            }
-        }
-
-        // Gründlich: kurze Chance, Caption an Server-Ergebnis zu mergen
-        if (!fastScrape && bestServerCandidate != null) {
-            val capForMerge = withTimeoutOrNull(6_000L) { captionJob.await() }.orEmpty()
-            if (isGoodCaption(capForMerge)) {
-                val merged = bestServerCandidate!!.copy(
-                    ingredients = RecipeAiParser.mergeIngredientsFromCaption(
-                        bestServerCandidate!!.ingredients, capForMerge
-                    )
-                )
-                if (isAmmQuality(merged) || ingredientQualityScore(merged) >
-                    ingredientQualityScore(bestServerCandidate!!)
-                ) {
-                    bestServerCandidate = merged
-                }
-                if (isAmmQuality(merged)) {
-                    publishReport(
-                        "path=amm-server+merge score=${ingredientQualityScore(merged)} " +
-                            "captionChars=${capForMerge.length} url=$url"
-                    )
-                    return@coroutineScope merged.copy(
-                        sourceUrl = url,
-                        platform = "instagram",
-                        tags = merged.tags.ifBlank { "instagram" }
-                    )
-                }
-            }
-        }
-
-        progress("Metadaten laden…")
+        // oEmbed parallel zur Caption (Thumbnail/Author), blockiert den Race nicht.
         val oEmbedJobs = canonicalUrls.map { u ->
             async {
                 runCatching {
@@ -468,19 +426,47 @@ class RecipeScraper(private val context: Context) {
             }
         }
 
-        val captionAwaitMs = if (fastScrape) 7_500L else 12_000L
-        var caption = withTimeoutOrNull(captionAwaitMs) { captionJob.await() }.orEmpty()
-        if (!isGoodCaption(caption)) {
-            progress("Caption holen…")
-            caption = raceInstagramCaption(canonicalUrls.first(), shortcode, fastScrape)
-            if (isGoodCaption(caption)) saveCachedCaption(key, caption)
+        // Ab hier: Server hat nicht geliefert → genau EIN Caption-Race (kein Doppel-Lauf).
+        progress("Caption holen…")
+        val cachedCap = if (forceRefresh) "" else loadCachedCaption(key)
+        var caption = if (isGoodCaption(cachedCap)) {
+            progress("Caption aus Cache…")
+            cachedCap
         } else {
-            progress("Caption bereit…")
+            // Einziger Race-Aufruf. Timeout >= WebView-Budget, sonst leerer 1. Lauf + 2. Lauf.
+            raceInstagramCaption(canonicalUrls.first(), shortcode, fastScrape).also { c ->
+                if (isGoodCaption(c)) saveCachedCaption(key, c)
+            }
         }
 
-        // oEmbed ist an dieser Stelle praktisch immer schon fertig (lief parallel zur
-        // Caption-Race); maximal 2s zusätzlich warten, Rest hart canceln.
-        val oEmbed = withTimeoutOrNull(2_000L) {
+        // Gründlich: Caption an Server-Kandidat mergen, wenn vorhanden
+        if (!fastScrape && bestServerCandidate != null && isGoodCaption(caption)) {
+            val merged = bestServerCandidate!!.copy(
+                ingredients = RecipeAiParser.mergeIngredientsFromCaption(
+                    bestServerCandidate!!.ingredients, caption
+                )
+            )
+            if (isAmmQuality(merged) || ingredientQualityScore(merged) >
+                ingredientQualityScore(bestServerCandidate!!)
+            ) {
+                bestServerCandidate = merged
+            }
+            if (isAmmQuality(merged)) {
+                publishReport(
+                    "path=amm-server+merge score=${ingredientQualityScore(merged)} " +
+                        "captionChars=${caption.length} url=$url"
+                )
+                return@coroutineScope merged.copy(
+                    sourceUrl = url,
+                    platform = "instagram",
+                    tags = merged.tags.ifBlank { "instagram" }
+                )
+            }
+        }
+
+        progress("Metadaten laden…")
+        // oEmbed lief parallel; max. 1,5 s nachziehen.
+        val oEmbed = withTimeoutOrNull(1_500L) {
             oEmbedJobs.firstNotNullOfOrNull { it.await() }
         }
         oEmbedJobs.forEach { it.cancel() }
@@ -499,8 +485,10 @@ class RecipeScraper(private val context: Context) {
             caption = oEmbedTitle
         }
 
-        // Optional: Whisper wenn Caption dünn (Toggle)
-        caption = enrichWithTranscript("instagram", url, shortcode, caption)
+        // Whisper nur im gründlichen Pfad (kann 10–12 s kosten).
+        if (!fastScrape) {
+            caption = enrichWithTranscript("instagram", url, shortcode, caption)
+        }
         if (isGoodCaption(caption)) saveCachedCaption(key, caption)
 
         if (!isGoodCaption(caption)) throw InstagramBlockedException(url)
@@ -515,26 +503,30 @@ class RecipeScraper(private val context: Context) {
             )
             serverCapResult = serverCap
             serverCapError = RecipeNormalizeServer.lastError
-            if (serverCap != null && isAmmQuality(serverCap)) {
-                publishReport(
-                    "path=amm-server-caption score=${ingredientQualityScore(serverCap)} " +
-                        "captionChars=${workingCaption.length} url=$url"
-                )
-                return@coroutineScope serverCap.copy(
-                    sourceUrl = url,
-                    platform = "instagram",
-                    imageUrl = thumbnail ?: serverCap.imageUrl,
-                    tags = listOfNotNull(
-                        serverCap.tags.ifBlank { null },
-                        author?.let { "@$it" }
-                    ).joinToString(",").take(200)
-                )
-            }
-            if (serverCap != null && hasUsableIngredients(serverCap) &&
-                (bestServerCandidate == null ||
-                    ingredientQualityScore(serverCap) > ingredientQualityScore(bestServerCandidate!!))
-            ) {
-                bestServerCandidate = serverCap
+            if (serverCap != null) {
+                val accept = isAmmQuality(serverCap) ||
+                    (fastScrape && hasUsableIngredients(serverCap))
+                if (accept) {
+                    publishReport(
+                        "path=amm-server-caption score=${ingredientQualityScore(serverCap)} " +
+                            "captionChars=${workingCaption.length} fast=$fastScrape url=$url"
+                    )
+                    return@coroutineScope serverCap.copy(
+                        sourceUrl = url,
+                        platform = "instagram",
+                        imageUrl = thumbnail ?: serverCap.imageUrl,
+                        tags = listOfNotNull(
+                            serverCap.tags.ifBlank { null },
+                            author?.let { "@$it" }
+                        ).joinToString(",").take(200)
+                    )
+                }
+                if (hasUsableIngredients(serverCap) &&
+                    (bestServerCandidate == null ||
+                        ingredientQualityScore(serverCap) > ingredientQualityScore(bestServerCandidate!!))
+                ) {
+                    bestServerCandidate = serverCap
+                }
             }
         }
 
@@ -736,7 +728,7 @@ class RecipeScraper(private val context: Context) {
      * ~4s Restzeit für Laden+Rendern der schweren IG-Seite hatte, lief es fast
      * immer in den Timeout → Import schlug praktisch jedes Mal fehl.
      * Fix: kein Phasen-Gate mehr, alles rennt ab t=0 parallel.
-     * Fast-Default: 7s Race + 2 WebViews; gründlich: 12s + alle WebViews/Mirrors.
+     * Fast-Default: 13s Race + 1 Embed-WebView; gründlich: 12s + alle WebViews/Mirrors.
      */
     private suspend fun raceInstagramCaption(url: String, shortcode: String?, fastScrape: Boolean = false): String =
         coroutineScope {
@@ -744,8 +736,10 @@ class RecipeScraper(private val context: Context) {
 
             val desktopUa =
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-            // Fast: 7s (Default-Import), gründlich: 12s — WebView braucht oft 6–10s.
-            val raceTimeoutMs = if (fastScrape) 7_000L else 12_000L
+            // Race-Timeout MUSS >= WebView-Budget sein. 7s war zu kurz → WebView
+            // lieferte erst nach Timeout → leerer 1. Lauf + zweiter Lauf ≈ 30s.
+            // Fast: 13s (WebView ~10s + Puffer), gründlich: 16s.
+            val raceTimeoutMs = if (fastScrape) 13_000L else 16_000L
 
             suspend fun awaitFirstGood(
                 jobs: MutableList<kotlinx.coroutines.Deferred<Cap?>>,
@@ -772,17 +766,29 @@ class RecipeScraper(private val context: Context) {
             val jobs = mutableListOf<kotlinx.coroutines.Deferred<Cap?>>()
             val isReel = "/reel/" in url.lowercase()
 
-            // ── WebViews (Geräte-Cookies, volles Chromium) — ab t=0, NICHT verzögert ──
-            // Fast: nur 1× Haupt-URL + 1× passendes Embed (weniger CPU/RAM, kürzeres Race).
-            // Gründlich: alle Varianten (alt-Pfad + beide Embeds).
-            jobs += async {
-                runCatching {
-                    InstagramWebViewScraper.extractCaption(context, url, fast = fastScrape)
-                        ?.let { Cap(it, "webview") }
-                }.getOrNull()?.takeIf { isGoodCaption(it.text) }
-            }
+            // ── WebViews (Geräte-Cookies, volles Chromium) — ab t=0 ──
+            // Fast: NUR Embed (lädt oft 2–4 s schneller als volle IG-App-Seite).
+            // Gründlich: Haupt-URL + Alt + beide Embeds.
             if (shortcode != null) {
-                if (!fastScrape) {
+                if (fastScrape) {
+                    jobs += async {
+                        runCatching {
+                            val embedUrl = if (isReel) {
+                                "https://www.instagram.com/reel/$shortcode/embed/captioned/"
+                            } else {
+                                "https://www.instagram.com/p/$shortcode/embed/captioned/"
+                            }
+                            InstagramWebViewScraper.extractCaption(context, embedUrl, fast = true)
+                                ?.let { Cap(it, "webview-embed") }
+                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                    }
+                } else {
+                    jobs += async {
+                        runCatching {
+                            InstagramWebViewScraper.extractCaption(context, url, fast = false)
+                                ?.let { Cap(it, "webview") }
+                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
+                    }
                     val altPath = if (isReel) {
                         "https://www.instagram.com/p/$shortcode/"
                     } else {
@@ -808,19 +814,6 @@ class RecipeScraper(private val context: Context) {
                             val embedUrl = "https://www.instagram.com/reel/$shortcode/embed/captioned/"
                             InstagramWebViewScraper.extractCaption(context, embedUrl, fast = false)
                                 ?.let { Cap(it, "webview-reel-embed") }
-                        }.getOrNull()?.takeIf { isGoodCaption(it.text) }
-                    }
-                } else {
-                    // Ein Embed reicht im Fast-Pfad (passend zum Link-Typ).
-                    jobs += async {
-                        runCatching {
-                            val embedUrl = if (isReel) {
-                                "https://www.instagram.com/reel/$shortcode/embed/captioned/"
-                            } else {
-                                "https://www.instagram.com/p/$shortcode/embed/captioned/"
-                            }
-                            InstagramWebViewScraper.extractCaption(context, embedUrl, fast = true)
-                                ?.let { Cap(it, "webview-embed") }
                         }.getOrNull()?.takeIf { isGoodCaption(it.text) }
                     }
                 }
