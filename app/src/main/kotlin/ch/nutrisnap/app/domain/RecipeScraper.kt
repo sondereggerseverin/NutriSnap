@@ -364,7 +364,63 @@ class RecipeScraper(private val context: Context) {
         val canonicalUrls = instagramCanonicalUrls(url, shortcode)
         val key = shortcode?.let { "ig:$it" } ?: cacheKey(url)
 
-        // Caption parallel zum Server starten (für Merge fehlender Zeilen wie "ca. 150 ml Milch")
+        // ── AMM-Fast-Pfad (Default): NUR Server zuerst, kein WebView ─────────
+        // All My Meals macht es genauso: Link → Server holt Caption + strukturiert
+        // → fertiges Rezept in ~2–5 s. WebView/Race erst, wenn Server scheitert.
+        // Gründlich (fastScrape=false): Caption parallel + strengere Schwelle.
+        var bestServerCandidate: Recipe? = null
+        var serverUrlError: String? = null
+        var serverCapError: String? = null
+        var serverCapResult: Recipe? = null
+
+        if (RecipeNormalizeServer.isConfigured()) {
+            progress("Server-Import…")
+            // Fast: Server max. 12 s (AMM-Ziel ~2–5 s). Danach Client-Fallback.
+            // Gründlich: volles OkHttp-Budget (28 s).
+            val serverBudgetMs = if (fastScrape) 12_000L else 28_000L
+            val serverRecipe = withTimeoutOrNull(serverBudgetMs) {
+                RecipeNormalizeServer.importFromUrl(url, "instagram")
+            }
+            serverUrlError = if (serverRecipe == null && RecipeNormalizeServer.lastError == null) {
+                "server_timeout_${serverBudgetMs}ms"
+            } else {
+                RecipeNormalizeServer.lastError
+            }
+            if (serverRecipe != null) {
+                // Fast: brauchbare Zutaten reichen → sofort fertig (wie AMM).
+                // Gründlich: nur bei isAmmQuality sofort, sonst Caption-Merge.
+                val acceptFast = fastScrape && hasUsableIngredients(serverRecipe)
+                val acceptStrict = isAmmQuality(serverRecipe)
+                if (acceptFast || acceptStrict) {
+                    publishReport(
+                        "path=amm-server-only score=${ingredientQualityScore(serverRecipe)} " +
+                            "ing=${serverRecipe.ingredients.lines().count { it.isNotBlank() }} " +
+                            "fast=$fastScrape url=$url"
+                    )
+                    // Thumbnail optional schnell nachziehen (max 1,5 s), nicht blockierend lang
+                    val thumb = withTimeoutOrNull(1_500L) {
+                        canonicalUrls.firstNotNullOfOrNull { u ->
+                            runCatching {
+                                fetchOEmbed(
+                                    "https://api.instagram.com/oembed/?url=${encode(u)}&omitscript=true"
+                                )?.get("thumbnail_url")
+                            }.getOrNull()?.takeIf { !it.isNullOrBlank() }
+                        }
+                    } ?: serverRecipe.imageUrl
+                    return@coroutineScope serverRecipe.copy(
+                        sourceUrl = url,
+                        platform = "instagram",
+                        imageUrl = thumb ?: serverRecipe.imageUrl,
+                        tags = serverRecipe.tags.ifBlank { "instagram" }
+                    )
+                }
+                if (hasUsableIngredients(serverRecipe)) bestServerCandidate = serverRecipe
+            }
+        }
+
+        // Ab hier: Server hat nicht geliefert → Client-Caption (WebView-Race).
+        // Gründlich: Caption parallel schon sinnvoll; Fast startet sie erst jetzt.
+        progress("Caption holen…")
         val captionJob = async {
             val cached = if (forceRefresh) "" else loadCachedCaption(key)
             if (isGoodCaption(cached)) cached
@@ -375,40 +431,23 @@ class RecipeScraper(private val context: Context) {
             }
         }
 
-        // ── AMM-Pfad: Server + Caption-Merge ─────────────────────────────────
-        // Bestes Server-Ergebnis wird gemerkt, auch wenn es die strenge
-        // AMM-Schwelle knapp verfehlt – ein sauber übersetztes, aber leicht
-        // unvollständiges Groq-Ergebnis ist einem rohen Regex-Fallback fast
-        // immer vorzuziehen (siehe finaler Vergleich unten).
-        var bestServerCandidate: Recipe? = null
-        var serverUrlError: String? = null
-        var serverCapError: String? = null
-        // Wird unten gesetzt und an parseCaptionToRecipe() weitergereicht, damit dort
-        // NICHT nochmal derselbe Server-Call mit identischem Input läuft (war ein
-        // doppelter Roundtrip bei jedem "brauchbar, aber knapp unter AMM"-Fall).
-        var serverCapResult: Recipe? = null
-        // Fast-Pfad: Caption-Merge max. 3,5 s; gründlich: 6 s.
-        val mergeCaptionBudgetMs = if (fastScrape) 3_500L else 6_000L
-        val captionAwaitMs = if (fastScrape) 7_500L else 12_000L
-
-        if (RecipeNormalizeServer.isConfigured()) {
-            progress("Server-Import…")
-            val serverRecipe = RecipeNormalizeServer.importFromUrl(url, "instagram")
-            serverUrlError = RecipeNormalizeServer.lastError
-            if (serverRecipe != null) {
-                // Caption parallel mitnehmen, dann fehlende Qty-Zeilen (Milch, ca. ml) nachziehen
-                val capForMerge = withTimeoutOrNull(mergeCaptionBudgetMs) { captionJob.await() }.orEmpty()
-                val merged = if (isGoodCaption(capForMerge)) {
-                    serverRecipe.copy(
-                        ingredients = RecipeAiParser.mergeIngredientsFromCaption(
-                            serverRecipe.ingredients, capForMerge
-                        )
+        // Gründlich: kurze Chance, Caption an Server-Ergebnis zu mergen
+        if (!fastScrape && bestServerCandidate != null) {
+            val capForMerge = withTimeoutOrNull(6_000L) { captionJob.await() }.orEmpty()
+            if (isGoodCaption(capForMerge)) {
+                val merged = bestServerCandidate!!.copy(
+                    ingredients = RecipeAiParser.mergeIngredientsFromCaption(
+                        bestServerCandidate!!.ingredients, capForMerge
                     )
-                } else serverRecipe
+                )
+                if (isAmmQuality(merged) || ingredientQualityScore(merged) >
+                    ingredientQualityScore(bestServerCandidate!!)
+                ) {
+                    bestServerCandidate = merged
+                }
                 if (isAmmQuality(merged)) {
                     publishReport(
                         "path=amm-server+merge score=${ingredientQualityScore(merged)} " +
-                            "ing=${merged.ingredients.lines().count { it.isNotBlank() }} " +
                             "captionChars=${capForMerge.length} url=$url"
                     )
                     return@coroutineScope merged.copy(
@@ -417,7 +456,6 @@ class RecipeScraper(private val context: Context) {
                         tags = merged.tags.ifBlank { "instagram" }
                     )
                 }
-                if (hasUsableIngredients(merged)) bestServerCandidate = merged
             }
         }
 
@@ -430,6 +468,7 @@ class RecipeScraper(private val context: Context) {
             }
         }
 
+        val captionAwaitMs = if (fastScrape) 7_500L else 12_000L
         var caption = withTimeoutOrNull(captionAwaitMs) { captionJob.await() }.orEmpty()
         if (!isGoodCaption(caption)) {
             progress("Caption holen…")
