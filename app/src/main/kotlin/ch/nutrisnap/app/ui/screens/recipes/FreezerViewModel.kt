@@ -11,8 +11,11 @@ import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeComponent
 import ch.nutrisnap.app.data.repository.DiaryRepository
 import ch.nutrisnap.app.data.repository.FrozenMealRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -20,9 +23,23 @@ import java.time.LocalDate
 class FreezerViewModel(app: Application) : AndroidViewModel(app) {
     private val db = NutriDatabase.getInstance(app)
     private val repo = FrozenMealRepository(db.frozenMealDao(), DiaryRepository(db))
+    private val recipeDao = db.recipeDao()
 
     val meals: StateFlow<List<FrozenMeal>> = repo.getActive()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * recipeId → imageUrl für aktive Gefrierer-Einträge (Lookup am Rezept).
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val imageUrls: StateFlow<Map<Long, String?>> = repo.getActive()
+        .flatMapLatest { list ->
+            flow {
+                val ids = list.mapNotNull { it.recipeId }.distinct()
+                emit(ids.associateWith { id -> recipeDao.getById(id)?.imageUrl })
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     fun freeze(
         name: String,

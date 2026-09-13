@@ -14,6 +14,8 @@ import androidx.compose.runtime.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -21,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.FrozenMeal
 import ch.nutrisnap.app.data.model.MealType
+import coil.compose.AsyncImage
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -29,6 +32,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun FreezerScreen(vm: FreezerViewModel = viewModel()) {
     val meals by vm.meals.collectAsStateWithLifecycle()
+    val imageUrls by vm.imageUrls.collectAsStateWithLifecycle()
     var thawTarget by remember { mutableStateOf<FrozenMeal?>(null) }
 
     Column(Modifier.fillMaxSize()) {
@@ -83,6 +87,7 @@ fun FreezerScreen(vm: FreezerViewModel = viewModel()) {
                 items(meals, key = { it.id }) { meal ->
                     FrozenMealCard(
                         meal = meal,
+                        imageUrl = meal.recipeId?.let { imageUrls[it] },
                         onThaw = { thawTarget = meal },
                         onDelete = { vm.delete(meal) },
                         onQuantityChange = { q -> vm.adjustQuantity(meal, q) }
@@ -108,6 +113,7 @@ fun FreezerScreen(vm: FreezerViewModel = viewModel()) {
 @Composable
 private fun FrozenMealCard(
     meal: FrozenMeal,
+    imageUrl: String? = null,
     onThaw: () -> Unit,
     onDelete: () -> Unit,
     onQuantityChange: (Int) -> Unit
@@ -130,6 +136,17 @@ private fun FrozenMealCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
+                if (!imageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = coilModel(imageUrl),
+                        contentDescription = meal.name,
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(RoundedCornerShape(10.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(Modifier.width(12.dp))
+                }
                 Column(Modifier.weight(1f)) {
                     Text(meal.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Text(
