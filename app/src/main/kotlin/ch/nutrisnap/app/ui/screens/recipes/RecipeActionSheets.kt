@@ -29,7 +29,8 @@ fun AddToDiarySheet(
     yieldTotalG: Float? = null,
     isCookedWeight: Boolean = false,
     onConfirm: (servings: Float, gramsIfGramMode: Float?, meal: MealType, date: java.time.LocalDate) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onFreeze: ((grams: Float, quantity: Int) -> Unit)? = null
 ) {
     var unit by remember { mutableStateOf(if (gramsPerServing != null) DiaryQuantityUnit.GRAM else DiaryQuantityUnit.SERVING) }
     var servingsText by remember { mutableStateOf("1") }
@@ -42,6 +43,7 @@ fun AddToDiarySheet(
     }
     var selectedMeal by remember { mutableStateOf(MealType.LUNCH) }
     var selectedDate by remember { mutableStateOf(java.time.LocalDate.now()) }
+    var freezeQtyText by remember { mutableStateOf("1") }
 
     // Immer in Portionen umrechnen, egal welche Einheit der Nutzer eingibt — die
     // Datenschicht (addRecipeAsMeal) erwartet weiterhin einen Portionsfaktor.
@@ -166,6 +168,53 @@ fun AddToDiarySheet(
                     onConfirm(servings, gramsIfGramMode, selectedMeal, selectedDate)
                 }, Modifier.weight(1f), enabled=servings>0) {
                     Icon(Icons.Default.Check,null,Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Hinzufügen")
+                }
+            }
+            if (onFreeze != null) {
+                val freezeGrams: Float? = when (unit) {
+                    DiaryQuantityUnit.GRAM ->
+                        gramsText.replace(',', '.').toFloatOrNull()?.takeIf { it >= 1f }
+                    DiaryQuantityUnit.SERVING -> {
+                        val per = gramsPerServing
+                            ?: yieldTotalG?.div(recipe.servings.coerceAtLeast(1).toFloat())
+                        per?.times(servings)?.takeIf { it >= 1f }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = freezeQtyText,
+                        onValueChange = { freezeQtyText = it.filter { c -> c.isDigit() } },
+                        label = { Text("Packungen") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.width(110.dp)
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            val g = freezeGrams ?: return@OutlinedButton
+                            val q = freezeQtyText.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                            onFreeze(g, q)
+                        },
+                        enabled = freezeGrams != null,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.AcUnit, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Einfrieren")
+                    }
+                }
+                if (freezeGrams == null) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Einfrieren braucht ein Gewicht (Gramm oder analysierte Portionsgröße).",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }

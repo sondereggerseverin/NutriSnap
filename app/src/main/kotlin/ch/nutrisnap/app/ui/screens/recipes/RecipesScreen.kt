@@ -1362,7 +1362,11 @@ fun RecipesScreen(
                     rateAfterDiary = recipe
                     addToDiaryRecipe = null
                 },
-                onDismiss = { addToDiaryRecipe = null }
+                onDismiss = { addToDiaryRecipe = null },
+                onFreeze = { grams, qty ->
+                    freezerVm.freezeFromRecipe(recipe, grams, qty)
+                    addToDiaryRecipe = null
+                }
             )
         }
     }
