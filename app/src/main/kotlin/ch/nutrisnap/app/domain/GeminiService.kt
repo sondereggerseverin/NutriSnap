@@ -25,8 +25,8 @@ import java.util.concurrent.TimeUnit
 object GeminiService {
     private const val TAG = "GeminiService"
     private const val BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
-    private const val TEXT_MODEL = "gemini-2.5-flash"
-    private const val VISION_MODEL = "gemini-2.5-flash"
+    private const val TEXT_MODEL = "gemini-3.6-flash"
+    private const val VISION_MODEL = "gemini-3.6-flash"
 
     // Kurze Timeouts: Gemini soll bei Problemen schnell an Groq (Parallel-Race)
     // abgeben statt die UI 30s+ blockieren zu lassen.
