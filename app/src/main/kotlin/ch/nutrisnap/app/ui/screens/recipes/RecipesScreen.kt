@@ -184,6 +184,7 @@ fun RecipesScreen(
     sharedRecipeJson: String? = null
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
+    val allRecipes by vm.allRecipes.collectAsStateWithLifecycle()
     val collections by collectionsVm.collections.collectAsStateWithLifecycle()
     var showImportSheet   by remember { mutableStateOf(false) }
     var showCreateSheet   by remember { mutableStateOf(false) }
@@ -506,6 +507,20 @@ fun RecipesScreen(
                         modifier = Modifier.height(30.dp)
                     )
                     FilterChip(
+                        selected = state.cookedFilter == CookedFilter.NOT_COOKED,
+                        onClick = {
+                            vm.setCookedFilter(
+                                if (state.cookedFilter == CookedFilter.NOT_COOKED)
+                                    CookedFilter.ALL
+                                else
+                                    CookedFilter.NOT_COOKED
+                            )
+                            favoritesOnly = false
+                        },
+                        label = { Text("🆕 Neu", fontSize = 12.sp) },
+                        modifier = Modifier.height(30.dp)
+                    )
+                    FilterChip(
                         selected = hasActiveFilters,
                         onClick = { showFilterSheet = true },
                         label = {
@@ -539,9 +554,10 @@ fun RecipesScreen(
                     Text(
                         "${displayedRecipes.size} · " +
                             when (state.sort) {
-                                RecipeSort.NEWEST   -> "neueste"
-                                RecipeSort.NAME     -> "A–Z"
-                                RecipeSort.CALORIES -> "kcal"
+                                RecipeSort.RECOMMENDED -> "empfohlen"
+                                RecipeSort.NEWEST      -> "neueste"
+                                RecipeSort.NAME        -> "A–Z"
+                                RecipeSort.CALORIES    -> "kcal"
                             },
                         fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -552,9 +568,10 @@ fun RecipesScreen(
                 IconButton(
                     onClick = {
                         val next = when (state.sort) {
+                            RecipeSort.RECOMMENDED -> RecipeSort.NEWEST
                             RecipeSort.NEWEST -> RecipeSort.NAME
                             RecipeSort.NAME -> RecipeSort.CALORIES
-                            RecipeSort.CALORIES -> RecipeSort.NEWEST
+                            RecipeSort.CALORIES -> RecipeSort.RECOMMENDED
                         }
                         vm.setSort(next)
                     },
@@ -975,8 +992,21 @@ fun RecipesScreen(
     }
 
     if (showCookSheet) {
+        val diaryState by diaryVm.uiState.collectAsStateWithLifecycle()
+        val remaining = ch.nutrisnap.app.domain.MacroRemaining(
+            kcal = (diaryState.calorieGoal - diaryState.totalCalories).coerceAtLeast(0f),
+            protein = (diaryState.proteinGoal - diaryState.totalProtein).coerceAtLeast(0f),
+            carbs = (diaryState.carbsGoal - diaryState.totalCarbs).coerceAtLeast(0f),
+            fat = (diaryState.fatGoal - diaryState.totalFat).coerceAtLeast(0f)
+        )
         CookWithWhatIHaveSheet(
+            recipes = allRecipes,
+            remaining = remaining.takeIf { it.hasMeaningfulGap },
             onDismiss = { showCookSheet = false },
+            onPickRecipe = { recipe ->
+                showCookSheet = false
+                selectedRecipe = recipe
+            },
             onSearch = { ingredients, category, targetKcal ->
                 vm.searchByIngredients(ingredients, category, targetKcal)
                 showCookSheet = false

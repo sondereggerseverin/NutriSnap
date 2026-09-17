@@ -17,7 +17,8 @@ object RecipeListFilter {
         categoryFilter: RecipeCategory?,
         needles: List<String>,
         sort: RecipeSort,
-        cookedFilter: CookedFilter = CookedFilter.ALL
+        cookedFilter: CookedFilter = CookedFilter.ALL,
+        remaining: MacroRemaining? = null
     ): List<Recipe> {
         var filtered = recipes
         if (platformFilter != null) {
@@ -43,6 +44,9 @@ object RecipeListFilter {
                 }
         } else {
             filtered = when (sort) {
+                RecipeSort.RECOMMENDED -> filtered.sortedByDescending {
+                    RecipeCookSuggester.recommendScore(it, remaining = remaining)
+                }
                 RecipeSort.NEWEST -> filtered.sortedByDescending { it.savedAt }
                 RecipeSort.NAME -> filtered.sortedBy { it.title.lowercase() }
                 RecipeSort.CALORIES -> filtered.sortedByDescending { it.totalCalories ?: -1f }

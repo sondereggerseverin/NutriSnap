@@ -136,7 +136,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     private val _platformFilter = MutableStateFlow<String?>(null)
     private val _categoryFilter = MutableStateFlow<RecipeCategory?>(null)
     private val _ingredientNeedles = MutableStateFlow<List<String>>(emptyList())
-    private val _sort           = MutableStateFlow(RecipeSort.NEWEST)
+    private val _sort           = MutableStateFlow(RecipeSort.RECOMMENDED)
     private val _cookedFilter   = MutableStateFlow(CookedFilter.ALL)
     private val _importState    = MutableStateFlow(ImportState())
     private val _nutritionState = MutableStateFlow(NutritionState())
@@ -227,6 +227,10 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             isTranslating     = translating
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RecipesUiState())
+
+    /** Ungefilterte Rezepte für „Was koche ich?“-Vorschläge. */
+    val allRecipes: StateFlow<List<Recipe>> = repo.getAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
 
     fun setQuery(q: String) { _query.value = q }

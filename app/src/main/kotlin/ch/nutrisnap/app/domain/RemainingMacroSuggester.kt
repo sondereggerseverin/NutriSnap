@@ -59,8 +59,8 @@ data class MacroSuggestion(
 class RemainingMacroSuggester(private val db: NutriDatabase) {
 
     companion object {
-        private const val MAX_SUGGESTIONS = 4
-        private const val MAX_CANDIDATES_PER_SOURCE = 40
+        private const val MAX_SUGGESTIONS = 6
+        private const val MAX_CANDIDATES_PER_SOURCE = 80
         /** kcal-Überschreitung bis zu diesem Faktor wird noch akzeptiert (weich). */
         private const val KCAL_OVERSHOOT_SOFT = 1.25f
         private const val MIN_KCAL = 40f
@@ -90,7 +90,11 @@ class RemainingMacroSuggester(private val db: NutriDatabase) {
         val recipes = db.recipeDao().getAllOnce()
             .asSequence()
             .filter { it.totalCalories != null && it.totalCalories!! > 0f }
-            .sortedByDescending { it.isFavorite }
+            .sortedWith(
+                compareByDescending<ch.nutrisnap.app.data.model.Recipe> { it.isFavorite }
+                    .thenBy { it.timesCooked }
+                    .thenByDescending { it.cookRating }
+            )
             .take(MAX_CANDIDATES_PER_SOURCE)
             .toList()
 

@@ -28,7 +28,7 @@ data class NutritionState(
     val recipeId: Long = -1L
 )
 
-enum class RecipeSort { NEWEST, NAME, CALORIES }
+enum class RecipeSort { RECOMMENDED, NEWEST, NAME, CALORIES }
 
 /** Filter: schon getrackt vs. noch nie gekocht. */
 enum class CookedFilter { ALL, COOKED, NOT_COOKED }
@@ -55,7 +55,7 @@ data class RecipesUiState(
     val platformFilter:   String?      = null,   // null = alle
     val categoryFilter:   RecipeCategory? = null, // null = alle Kategorien
     val ingredientNeedles: List<String> = emptyList(), // alle müssen vorkommen
-    val sort:             RecipeSort   = RecipeSort.NEWEST,
+    val sort:             RecipeSort   = RecipeSort.RECOMMENDED,
     val cookedFilter:     CookedFilter = CookedFilter.ALL,
     val isImporting:      Boolean      = false,
     val importPhase:      String?      = null,
