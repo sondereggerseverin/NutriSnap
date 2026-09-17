@@ -39,6 +39,37 @@ class RecipeCollectionsViewModel(app: Application) : AndroidViewModel(app) {
         dao.getFavoriteRecipes()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val allRecipes: StateFlow<List<Recipe>> =
+        NutriDatabase.getInstance(getApplication()).recipeDao().getAll()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Virtuelle Smart-Sammlungen (kein DB-Eintrag) – stabile Flows pro Modus. */
+    val neverCookedRecipes: StateFlow<List<Recipe>> = smartFlow(ch.nutrisnap.app.domain.CookSuggestMode.NEVER_COOKED)
+    val quickRecipes: StateFlow<List<Recipe>> = smartFlow(ch.nutrisnap.app.domain.CookSuggestMode.QUICK)
+    val highProteinRecipes: StateFlow<List<Recipe>> = smartFlow(ch.nutrisnap.app.domain.CookSuggestMode.HIGH_PROTEIN)
+    val longAgoRecipes: StateFlow<List<Recipe>> = smartFlow(ch.nutrisnap.app.domain.CookSuggestMode.LONG_AGO)
+
+    private fun smartFlow(mode: ch.nutrisnap.app.domain.CookSuggestMode): StateFlow<List<Recipe>> =
+        allRecipes
+            .map { list ->
+                ch.nutrisnap.app.domain.RecipeCookSuggester.suggest(
+                    recipes = list,
+                    mode = mode,
+                    maxResults = 500,
+                    seed = 0L
+                ).map { it.recipe }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun smartRecipes(mode: ch.nutrisnap.app.domain.CookSuggestMode): StateFlow<List<Recipe>> =
+        when (mode) {
+            ch.nutrisnap.app.domain.CookSuggestMode.NEVER_COOKED -> neverCookedRecipes
+            ch.nutrisnap.app.domain.CookSuggestMode.QUICK -> quickRecipes
+            ch.nutrisnap.app.domain.CookSuggestMode.HIGH_PROTEIN -> highProteinRecipes
+            ch.nutrisnap.app.domain.CookSuggestMode.LONG_AGO -> longAgoRecipes
+            else -> neverCookedRecipes
+        }
+
     /** collectionId → Anzahl Rezepte */
     val collectionCounts: StateFlow<Map<Long, Int>> =
         dao.getCollectionCounts()
@@ -88,11 +119,36 @@ fun RecipeCollectionsScreen(
     var newEmoji by remember { mutableStateOf("📁") }
     var openCollection by remember { mutableStateOf<RecipeCollection?>(null) }
     var showFavorites by remember { mutableStateOf(false) }
+    var openSmart by remember { mutableStateOf<ch.nutrisnap.app.domain.CookSuggestMode?>(null) }
     var pendingDelete by remember { mutableStateOf<RecipeCollection?>(null) }
+    val allRecipes by viewModel.allRecipes.collectAsStateWithLifecycle()
 
     val emojis = listOf("📁", "🍕", "🥗", "🍰", "🥩", "🍜", "🥤", "🌮", "🍱", "⭐", "🎄", "💪")
 
     when {
+        openSmart != null -> {
+            val mode = openSmart!!
+            val (title, emptyHint) = when (mode) {
+                ch.nutrisnap.app.domain.CookSuggestMode.NEVER_COOKED ->
+                    "🆕 Noch nie gekocht" to "Alle Rezepte wurden schon getrackt."
+                ch.nutrisnap.app.domain.CookSuggestMode.QUICK ->
+                    "⏱️ Schnell" to "Keine schnellen Rezepte (≤30 min / Tag Schnell)."
+                ch.nutrisnap.app.domain.CookSuggestMode.HIGH_PROTEIN ->
+                    "💪 Proteinreich" to "Keine proteinreichen Rezepte gefunden."
+                ch.nutrisnap.app.domain.CookSuggestMode.LONG_AGO ->
+                    "🔁 Lange nicht gekocht" to "Keine Treffer – alles frisch gekocht."
+                else -> "Smart" to "Keine Treffer."
+            }
+            CollectionRecipesScreen(
+                title = title,
+                recipesFlow = viewModel.smartRecipes(mode),
+                onOpenRecipe = onOpenRecipe,
+                onBack = { openSmart = null },
+                onToggleFavorite = { viewModel.toggleFavorite(it) },
+                emptyHint = emptyHint
+            )
+            return
+        }
         showFavorites -> {
             CollectionRecipesScreen(
                 title = "❤️ Favoriten",
@@ -172,6 +228,62 @@ fun RecipeCollectionsScreen(
                             )
                         }
                         Icon(Icons.Default.ChevronRight, contentDescription = null)
+                    }
+                }
+            }
+
+            item {
+                Text(
+                    "Smart-Sammlungen",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+            item {
+                val smartModes = listOf(
+                    ch.nutrisnap.app.domain.CookSuggestMode.NEVER_COOKED to ("🆕", "Noch nie gekocht"),
+                    ch.nutrisnap.app.domain.CookSuggestMode.QUICK to ("⏱️", "Schnell"),
+                    ch.nutrisnap.app.domain.CookSuggestMode.HIGH_PROTEIN to ("💪", "Proteinreich"),
+                    ch.nutrisnap.app.domain.CookSuggestMode.LONG_AGO to ("🔁", "Lange nicht")
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    smartModes.forEach { (mode, meta) ->
+                        val (emoji, label) = meta
+                        val count = ch.nutrisnap.app.domain.RecipeCookSuggester.suggest(
+                            recipes = allRecipes,
+                            mode = mode,
+                            maxResults = 500,
+                            seed = 0L
+                        ).size
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { openSmart = mode },
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(16.dp)
+                                    .fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(emoji, style = MaterialTheme.typography.headlineSmall)
+                                Spacer(Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(label, style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        "$count Rezept${if (count == 1) "" else "e"}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Icon(Icons.Default.ChevronRight, contentDescription = null)
+                            }
+                        }
                     }
                 }
             }

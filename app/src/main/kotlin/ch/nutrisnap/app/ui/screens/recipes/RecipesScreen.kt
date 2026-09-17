@@ -181,7 +181,8 @@ fun RecipesScreen(
     collectionsVm: RecipeCollectionsViewModel = viewModel(),
     sharedUrl: String? = null,
     sharedBatchUrls: List<String> = emptyList(),
-    sharedRecipeJson: String? = null
+    sharedRecipeJson: String? = null,
+    openCookSheet: Boolean = false
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val allRecipes by vm.allRecipes.collectAsStateWithLifecycle()
@@ -204,6 +205,9 @@ fun RecipesScreen(
     var collectionFilterId by remember { mutableStateOf<Long?>(null) }
     var showBatchSheet    by remember { mutableStateOf(false) }
     var showCookSheet     by remember { mutableStateOf(false) }
+    LaunchedEffect(openCookSheet) {
+        if (openCookSheet) showCookSheet = true
+    }
     var fabExpanded       by remember { mutableStateOf(false) }
     var cookingRecipe     by remember { mutableStateOf<Recipe?>(null) }
     var showCollections   by remember { mutableStateOf(false) }

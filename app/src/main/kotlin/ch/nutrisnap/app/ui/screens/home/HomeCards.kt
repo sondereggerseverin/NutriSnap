@@ -1345,6 +1345,44 @@ internal fun BreakdownLine(label: String, value: String, emphasize: Boolean = fa
 }
 
 @Composable
+internal fun WhatToCookHomeCard(onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+        )
+    ) {
+        Row(
+            Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("🍳", fontSize = 22.sp, modifier = Modifier.padding(end = 10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Was koche ich?",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    "Smart-Vorschläge aus deinen Rezepten",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+@Composable
 internal fun RemainingMacroSuggestionsCard(
     remainingKcal: Float,
     remainingProtein: Float,

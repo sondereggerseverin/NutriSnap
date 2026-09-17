@@ -400,7 +400,14 @@ fun MainScaffold(
                     onNavigateToBarcode = { navController.navigate("diary?open=true&scan=true") },
                     onNavigateToLabelScan = { navController.navigate("nutrition_label_scan") },
                     onNavigateToCustomFoods = { navController.navigate("custom_foods") },
-                    onNavigateToMealTemplates = { navController.navigate("meal_templates") }
+                    onNavigateToMealTemplates = { navController.navigate("meal_templates") },
+                    onNavigateToCookSuggestions = {
+                        navController.navigate("recipes?cook=true") {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = false
+                        }
+                    }
                 )
             }
             composable(
@@ -427,10 +434,33 @@ fun MainScaffold(
                 )
             }
             composable(
+                route = "recipes?cook={cook}",
+                arguments = listOf(
+                    navArgument("cook") { type = NavType.BoolType; defaultValue = false }
+                ),
+                enterTransition = { tabEnter }, exitTransition = { tabExit },
+                popEnterTransition = { tabEnter }, popExitTransition = { tabExit }
+            ) { backStackEntry ->
+                val openCook = backStackEntry.arguments?.getBoolean("cook") ?: false
+                RecipesHubScreen(
+                    sharedUrl = sharedUrl,
+                    sharedBatchUrls = sharedBatchUrls,
+                    sharedRecipeJson = sharedRecipeJson,
+                    openCookSheet = openCook
+                )
+            }
+            // Deep-Link / Bottom-Nav ohne Query: gleiche Destination
+            composable(
                 Screen.Recipes.route,
                 enterTransition = { tabEnter }, exitTransition = { tabExit },
                 popEnterTransition = { tabEnter }, popExitTransition = { tabExit }
-            ) { RecipesHubScreen(sharedUrl = sharedUrl, sharedBatchUrls = sharedBatchUrls, sharedRecipeJson = sharedRecipeJson) }
+            ) {
+                RecipesHubScreen(
+                    sharedUrl = sharedUrl,
+                    sharedBatchUrls = sharedBatchUrls,
+                    sharedRecipeJson = sharedRecipeJson
+                )
+            }
             composable(
                 Screen.Analysis.route,
                 enterTransition = { tabEnter }, exitTransition = { tabExit },

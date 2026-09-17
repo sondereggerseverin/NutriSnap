@@ -53,7 +53,8 @@ private enum class RecipeTab(
 fun RecipesHubScreen(
     sharedUrl: String?,
     sharedBatchUrls: List<String> = emptyList(),
-    sharedRecipeJson: String? = null
+    sharedRecipeJson: String? = null,
+    openCookSheet: Boolean = false
 ) {
     var tab by remember { mutableStateOf(RecipeTab.SAVED) }
 
@@ -71,7 +72,8 @@ fun RecipesHubScreen(
             RecipeTab.SAVED -> RecipesScreen(
                 sharedUrl = sharedUrl,
                 sharedBatchUrls = sharedBatchUrls,
-                sharedRecipeJson = sharedRecipeJson
+                sharedRecipeJson = sharedRecipeJson,
+                openCookSheet = openCookSheet
             )
             RecipeTab.FREEZER -> FreezerScreen()
             RecipeTab.AI -> RecipeGeneratorScreen()

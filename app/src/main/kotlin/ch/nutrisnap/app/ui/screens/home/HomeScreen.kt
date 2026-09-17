@@ -123,6 +123,11 @@ fun HomeScreen(
                 if (showNavShortcuts) {
                     item { HomeNavShortcuts(onNavigateToCustomFoods, onNavigateToMealTemplates) }
                 }
+                if (state.isViewingToday) {
+                    item {
+                        WhatToCookHomeCard(onClick = onNavigateToCookSuggestions)
+                    }
+                }
                 if (macroSuggestions.isNotEmpty() && state.isViewingToday) {
                     item {
                         RemainingMacroSuggestionsCard(
@@ -148,6 +153,11 @@ fun HomeScreen(
                 }
                 if (showNavShortcuts) {
                     item { HomeNavShortcuts(onNavigateToCustomFoods, onNavigateToMealTemplates) }
+                }
+                if (state.isViewingToday) {
+                    item {
+                        WhatToCookHomeCard(onClick = onNavigateToCookSuggestions)
+                    }
                 }
                 if (macroSuggestions.isNotEmpty() && state.isViewingToday) {
                     item {
