@@ -44,7 +44,8 @@ fun HomeScreen(
     onNavigateToBarcode: () -> Unit = {},
     onNavigateToLabelScan: () -> Unit = {},
     onNavigateToCustomFoods: () -> Unit = {},
-    onNavigateToMealTemplates: () -> Unit = {}
+    onNavigateToMealTemplates: () -> Unit = {},
+    onNavigateToCookSuggestions: () -> Unit = {}
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val hcState by hcVm.uiState.collectAsStateWithLifecycle()

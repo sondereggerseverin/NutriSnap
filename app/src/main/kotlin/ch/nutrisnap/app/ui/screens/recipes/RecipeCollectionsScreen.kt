@@ -132,7 +132,7 @@ fun RecipeCollectionsScreen(
                 ch.nutrisnap.app.domain.CookSuggestMode.NEVER_COOKED ->
                     "🆕 Noch nie gekocht" to "Alle Rezepte wurden schon getrackt."
                 ch.nutrisnap.app.domain.CookSuggestMode.QUICK ->
-                    "⏱️ Schnell" to "Keine schnellen Rezepte (≤30 min / Tag Schnell)."
+                    "⏱️ Schnell" to "Keine schnellen Rezepte (max. 30 min / Tag Schnell)."
                 ch.nutrisnap.app.domain.CookSuggestMode.HIGH_PROTEIN ->
                     "💪 Proteinreich" to "Keine proteinreichen Rezepte gefunden."
                 ch.nutrisnap.app.domain.CookSuggestMode.LONG_AGO ->
@@ -243,14 +243,13 @@ fun RecipeCollectionsScreen(
             }
             item {
                 val smartModes = listOf(
-                    ch.nutrisnap.app.domain.CookSuggestMode.NEVER_COOKED to ("🆕", "Noch nie gekocht"),
-                    ch.nutrisnap.app.domain.CookSuggestMode.QUICK to ("⏱️", "Schnell"),
-                    ch.nutrisnap.app.domain.CookSuggestMode.HIGH_PROTEIN to ("💪", "Proteinreich"),
-                    ch.nutrisnap.app.domain.CookSuggestMode.LONG_AGO to ("🔁", "Lange nicht")
+                    Triple(ch.nutrisnap.app.domain.CookSuggestMode.NEVER_COOKED, "🆕", "Noch nie gekocht"),
+                    Triple(ch.nutrisnap.app.domain.CookSuggestMode.QUICK, "⏱️", "Schnell"),
+                    Triple(ch.nutrisnap.app.domain.CookSuggestMode.HIGH_PROTEIN, "💪", "Proteinreich"),
+                    Triple(ch.nutrisnap.app.domain.CookSuggestMode.LONG_AGO, "🔁", "Lange nicht")
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    smartModes.forEach { (mode, meta) ->
-                        val (emoji, label) = meta
+                    smartModes.forEach { (mode, emoji, label) ->
                         val count = ch.nutrisnap.app.domain.RecipeCookSuggester.suggest(
                             recipes = allRecipes,
                             mode = mode,
