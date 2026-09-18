@@ -145,15 +145,23 @@ fun AddFoodSheet(
     // rememberUpdatedState: confirmValueChange-Lambda hält sonst stale imeVisible
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
     val imeVisibleState = rememberUpdatedState(imeVisible)
-    // Tastatur offen: Sheet nicht per Gesture schließen (sonst Crashes/Dismiss beim Öffnen)
+    // Swipe-to-dismiss aus (wie Verify/Komponenten): Sheet bleibt „angepinnt“,
+    // schliesst nur über X / explizites Speichern – und nie bei offener Tastatur.
+    var allowSheetDismiss by remember { mutableStateOf(false) }
     val addSheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
         confirmValueChange = { newValue ->
-            if (imeVisibleState.value && newValue == SheetValue.Hidden) false else true
+            if (newValue == SheetValue.Hidden) {
+                if (imeVisibleState.value) false else allowSheetDismiss
+            } else true
         }
     )
+    fun requestDismiss() {
+        allowSheetDismiss = true
+        onDismiss()
+    }
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { requestDismiss() },
         sheetState = addSheetState,
         // Insets selbst handhaben (imePadding unten), sonst doppelte/kämpfende Resize-Logik
         contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
@@ -167,12 +175,22 @@ fun AddFoodSheet(
                 .padding(horizontal = NutriSpacing.lg)
                 .padding(bottom = NutriSpacing.xl)
         ) {
-            Text(
-                "Eintrag hinzufügen",
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                modifier = Modifier.padding(bottom = NutriSpacing.sm)
-            )
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = NutriSpacing.sm),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Eintrag hinzufügen",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = { requestDismiss() }, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Schliessen")
+                }
+            }
             // Nachträglich tracken: Tag wählen (nutzt dieselbe Datums-Navigation wie das Tagebuch)
             val diaryDate by vm.uiState.collectAsStateWithLifecycle()
             val activeDate = diaryDate.selectedDate
@@ -302,18 +320,18 @@ fun AddFoodSheet(
                     barcodeStatus = barcodeStatus,
                     onOpenScanner = { showScanner = true },
                     onSwitchToAi = { activeTab = AddFoodTab.AI },
-                    onDismiss = onDismiss
+                    onDismiss = { requestDismiss() }
                 )
                 AddFoodTab.AI -> AiEstimateTab(
                     vm = vm,
                     initialMeal = initialMeal,
-                    onDismiss = onDismiss
+                    onDismiss = { requestDismiss() }
                 )
                 AddFoodTab.MANUAL -> ManualEntryTab(
                     initialMeal = initialMeal,
                     onSave = { name, kcal, protein, carbs, fat, meal ->
                         vm.addManualEntry(name, kcal, protein, carbs, fat, meal)
-                        onDismiss()
+                        requestDismiss()
                     }
                 )
             }
