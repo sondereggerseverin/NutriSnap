@@ -94,9 +94,17 @@ class GroqVisionService {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
 
     companion object {
-        // Aktuelles Groq Vision-Modell (Stand 2026, siehe console.groq.com/docs/vision).
-        // Falls Groq dieses Modell dereinst deprecated: hier zentral austauschen.
-        private const val VISION_MODEL = "qwen/qwen3.6-27b"
+        /**
+         * Groq Vision-Modelle in Prioritätsreihenfolge.
+         * qwen3.6-27b ist offiziell dokumentiert, liefert aber bei manchen Keys
+         * model_not_found (404) — deshalb 3.8 zuerst, dann Fallbacks.
+         * @see https://console.groq.com/docs/vision
+         */
+        private val VISION_MODELS = listOf(
+            "qwen/qwen3.8-27b",
+            "qwen/qwen3.6-27b",
+            "meta-llama/llama-4-scout-17b-16e-instruct"
+        )
         /** Standard für Food-/Fridge-Fotos – hält Base64 unter typischen API-Limits. */
         private const val MAX_DIMENSION = 1024
         /**
@@ -247,8 +255,9 @@ und die Portionsgrösse erkennbar ist, rechne korrekt auf 100g um.
 
 Lies auch Produktname und Marke, falls sichtbar (auch bei gedrehtem/spiegelverkehrtem Text).
 
-Antworte NUR mit gültigem JSON (kein Markdown, keine Erklärungen).
+Antworte NUR mit gültigem, VOLLSTÄNDIGEM JSON (kein Markdown, keine Erklärungen).
 Verwende ausschließlich doppelte Anführungszeichen ("), niemals einfache (').
+Alle Zahlenfelder sind Pflicht (fehlend = 0). productName/brand dürfen "" sein.
 {
   "caloriesPer100g": 250,
   "proteinPer100g": 12.0,
@@ -261,8 +270,10 @@ Verwende ausschließlich doppelte Anführungszeichen ("), niemals einfache (').
   "brand": "Marke"
 }
 """.trimIndent()
-        callVisionRaw(prompt, listOf(base64Jpeg)).mapCatching {
-            json.decodeFromString<NutritionLabelResult>(sanitizeLlmJson(it))
+        // 2048: kurze Label-Antwort, aber genug Reserve falls das Modell
+        // trotzdem Reasoning-Tokens verbraucht (sonst abgeschnittenes JSON).
+        callVisionRaw(prompt, listOf(base64Jpeg), maxTokens = 2048).mapCatching {
+            parseNutritionLabelJson(it)
         }
     }
 
@@ -622,37 +633,120 @@ JSON-Schema:
                     })
                 }
             }
-            val requestJson = JSONObject().apply {
-                put("model", VISION_MODEL)
-                put("temperature", 0.3)
-                put("max_completion_tokens", maxTokens)
-                put("reasoning_effort", "none")
-                put("response_format", JSONObject().apply { put("type", "json_object") })
-                put("messages", JSONArray().apply {
-                    put(JSONObject().apply {
-                        put("role", "user")
-                        put("content", content)
+
+            var lastError: Exception? = null
+            for (modelId in VISION_MODELS) {
+                val requestJson = JSONObject().apply {
+                    put("model", modelId)
+                    put("temperature", 0.3)
+                    put("max_completion_tokens", maxTokens)
+                    // Nur Qwen-Familie: Reasoning abschalten, sonst fressen Thinking-Tokens
+                    // das gesamte max_completion_tokens-Budget → abgeschnittenes JSON.
+                    if (modelId.startsWith("qwen/")) {
+                        put("reasoning_effort", "none")
+                    }
+                    put("response_format", JSONObject().apply { put("type", "json_object") })
+                    put("messages", JSONArray().apply {
+                        put(JSONObject().apply {
+                            put("role", "user")
+                            put("content", content)
+                        })
                     })
-                })
-            }.toString()
+                }.toString()
 
-            val requestBody = requestJson.toRequestBody("application/json".toMediaType())
-            val request = Request.Builder()
-                .url("https://api.groq.com/openai/v1/chat/completions")
-                .addHeader("Authorization", "Bearer $apiKey")
-                .post(requestBody)
-                .build()
+                val requestBody = requestJson.toRequestBody("application/json".toMediaType())
+                val request = Request.Builder()
+                    .url("https://api.groq.com/openai/v1/chat/completions")
+                    .addHeader("Authorization", "Bearer $apiKey")
+                    .post(requestBody)
+                    .build()
 
-            val response = client.newCall(request).execute()
-            val bodyStr = response.body?.string() ?: return Result.failure(Exception("Leere Antwort"))
-            if (!response.isSuccessful) return Result.failure(Exception("API Fehler ${response.code}: $bodyStr"))
-
-            val root = JSONObject(bodyStr)
-            val text = root.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content")
-            Result.success(sanitizeLlmJson(text))
+                val response = client.newCall(request).execute()
+                val bodyStr = response.body?.string() ?: ""
+                if (!response.isSuccessful) {
+                    val notFound = response.code == 404 ||
+                        bodyStr.contains("model_not_found", ignoreCase = true) ||
+                        bodyStr.contains("does not exist", ignoreCase = true)
+                    if (notFound) {
+                        lastError = Exception("Modell $modelId nicht verfügbar")
+                        continue
+                    }
+                    val short = bodyStr.take(160).replace(Regex("\s+"), " ")
+                    return Result.failure(
+                        Exception("Groq Vision fehlgeschlagen (${response.code}): $short")
+                    )
+                }
+                if (bodyStr.isBlank()) {
+                    lastError = Exception("Leere Antwort von $modelId")
+                    continue
+                }
+                val root = JSONObject(bodyStr)
+                val text = root.getJSONArray("choices")
+                    .getJSONObject(0)
+                    .getJSONObject("message")
+                    .optString("content", "")
+                if (text.isBlank()) {
+                    lastError = Exception("Leerer Content von $modelId")
+                    continue
+                }
+                return Result.success(sanitizeLlmJson(text))
+            }
+            Result.failure(
+                lastError ?: Exception("Kein Groq-Vision-Modell verfügbar")
+            )
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    /** Robustes Parsing der Nährwert-JSON-Antwort (auch bei abgeschnittenem JSON). */
+    private fun parseNutritionLabelJson(raw: String): NutritionLabelResult {
+        val cleaned = repairTruncatedJson(sanitizeLlmJson(raw))
+        runCatching {
+            return json.decodeFromString<NutritionLabelResult>(cleaned)
+        }
+        // Fallback: org.json – einzelne Felder opt*
+        val obj = runCatching { JSONObject(cleaned) }.getOrElse {
+            throw IllegalArgumentException(
+                "Nährwert-JSON unvollständig. Bitte Foto nochmal scannen."
+            )
+        }
+        fun num(key: String): Float =
+            obj.optDouble(key, 0.0).toFloat().takeIf { !it.isNaN() } ?: 0f
+        return NutritionLabelResult(
+            caloriesPer100g = num("caloriesPer100g"),
+            proteinPer100g = num("proteinPer100g"),
+            carbsPer100g = num("carbsPer100g"),
+            fatPer100g = num("fatPer100g"),
+            fiberPer100g = num("fiberPer100g"),
+            sugarPer100g = num("sugarPer100g"),
+            saltPer100g = num("saltPer100g"),
+            productName = obj.optString("productName", ""),
+            brand = obj.optString("brand", "")
+        )
+    }
+
+    /**
+     * Schließt abgeschnittenes JSON so weit wie möglich:
+     * offene Strings beenden, fehlende Klammern ergänzen.
+     * Reicht oft, damit opt*-Parsing die bereits gelesenen Felder rettet.
+     */
+    private fun repairTruncatedJson(raw: String): String {
+        var s = raw.trim()
+        if (s.isEmpty()) return "{}"
+        // Offenen String am Ende schließen (häufig bei Token-Limit)
+        if (s.count { it == '"' } % 2 != 0) s += '"'
+        // Fehlende schließende Klammern
+        val openObj = s.count { it == '{' }
+        val closeObj = s.count { it == '}' }
+        if (openObj > closeObj) s += "}".repeat(openObj - closeObj)
+        val openArr = s.count { it == '[' }
+        val closeArr = s.count { it == ']' }
+        if (openArr > closeArr) s += "]".repeat(openArr - closeArr)
+        // Trailing Komma vor } entfernen
+        s = s.replace(Regex(",\s*}"), "}")
+        s = s.replace(Regex(",\s*]"), "]")
+        return s
     }
 
     /**
