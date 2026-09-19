@@ -368,60 +368,16 @@ class RecipeScraper(private val context: Context) {
         val canonicalUrls = instagramCanonicalUrls(url, shortcode)
         val key = shortcode?.let { "ig:$it" } ?: cacheKey(url)
 
-        // ── AMM-Fast-Pfad (Default): NUR Server zuerst, kein WebView ─────────
-        // All My Meals macht es genauso: Link → Server holt Caption + strukturiert
-        // → fertiges Rezept in ~2–5 s. WebView/Race erst, wenn Server scheitert.
-        // Gründlich (fastScrape=false): Caption parallel + strengere Schwelle.
+        // ── AMM-Fast-Pfad: Server + Caption-Race PARALLEL ────────────────────
+        // Früher: Server max. 6s sequentiell, DANN WebView-Race (bis 14s) → oft 10–20s.
+        // Jetzt: beides ab t=0; sobald Server brauchbare Zutaten hat → sofort fertig.
+        // WebView/HTTP-Race läuft parallel als Fallback (wie AMM: erster brauchbarer Pfad gewinnt).
         var bestServerCandidate: Recipe? = null
         var serverUrlError: String? = null
         var serverCapError: String? = null
         var serverCapResult: Recipe? = null
 
-        if (RecipeNormalizeServer.isConfigured()) {
-            progress("Server-Import…")
-            // Fast: Server max. 6 s – wenn er nicht liefert, sofort WebView.
-            // Gründlich: volles OkHttp-Budget (28 s).
-            val serverBudgetMs = if (fastScrape) 6_000L else 28_000L
-            val serverRecipe = withTimeoutOrNull(serverBudgetMs) {
-                RecipeNormalizeServer.importFromUrl(url, "instagram")
-            }
-            serverUrlError = if (serverRecipe == null && RecipeNormalizeServer.lastError == null) {
-                "server_timeout_${serverBudgetMs}ms"
-            } else {
-                RecipeNormalizeServer.lastError
-            }
-            if (serverRecipe != null) {
-                // Fast: brauchbare Zutaten reichen → sofort fertig (wie AMM).
-                // Gründlich: nur bei isAmmQuality sofort, sonst Caption-Merge.
-                val acceptFast = fastScrape && hasUsableIngredients(serverRecipe)
-                val acceptStrict = isAmmQuality(serverRecipe)
-                if (acceptFast || acceptStrict) {
-                    publishReport(
-                        "path=amm-server-only score=${ingredientQualityScore(serverRecipe)} " +
-                            "ing=${serverRecipe.ingredients.lines().count { it.isNotBlank() }} " +
-                            "fast=$fastScrape url=$url"
-                    )
-                    val thumb = withTimeoutOrNull(1_200L) {
-                        canonicalUrls.firstNotNullOfOrNull { u ->
-                            runCatching {
-                                fetchOEmbed(
-                                    "https://api.instagram.com/oembed/?url=${encode(u)}&omitscript=true"
-                                )?.get("thumbnail_url")
-                            }.getOrNull()?.takeIf { !it.isNullOrBlank() }
-                        }
-                    } ?: serverRecipe.imageUrl
-                    return@coroutineScope serverRecipe.copy(
-                        sourceUrl = url,
-                        platform = "instagram",
-                        imageUrl = thumb ?: serverRecipe.imageUrl,
-                        tags = serverRecipe.tags.ifBlank { "instagram" }
-                    )
-                }
-                if (hasUsableIngredients(serverRecipe)) bestServerCandidate = serverRecipe
-            }
-        }
-
-        // oEmbed parallel zur Caption (Thumbnail/Author), blockiert den Race nicht.
+        // oEmbed parallel (Thumbnail/Author), blockiert nichts.
         val oEmbedJobs = canonicalUrls.map { u ->
             async {
                 runCatching {
@@ -430,18 +386,65 @@ class RecipeScraper(private val context: Context) {
             }
         }
 
-        // Ab hier: Server hat nicht geliefert → genau EIN Caption-Race (kein Doppel-Lauf).
-        progress("Caption holen…")
+        val serverBudgetMs = if (fastScrape) 5_500L else 28_000L
+        val serverJob = if (RecipeNormalizeServer.isConfigured()) {
+            async {
+                progress("Server-Import…")
+                withTimeoutOrNull(serverBudgetMs) {
+                    RecipeNormalizeServer.importFromUrl(url, "instagram")
+                }
+            }
+        } else null
+
         val cachedCap = if (forceRefresh) "" else loadCachedCaption(key)
-        var caption = if (isGoodCaption(cachedCap)) {
-            progress("Caption aus Cache…")
-            cachedCap
-        } else {
-            // Einziger Race-Aufruf. Timeout >= WebView-Budget, sonst leerer 1. Lauf + 2. Lauf.
-            raceInstagramCaption(canonicalUrls.first(), shortcode, fastScrape).also { c ->
-                if (isGoodCaption(c)) saveCachedCaption(key, c)
+        val captionJob = async {
+            if (isGoodCaption(cachedCap)) {
+                progress("Caption aus Cache…")
+                cachedCap
+            } else {
+                progress("Caption holen…")
+                raceInstagramCaption(canonicalUrls.first(), shortcode, fastScrape).also { c ->
+                    if (isGoodCaption(c)) saveCachedCaption(key, c)
+                }
             }
         }
+
+        // Server zuerst abwarten (kurzes Budget); bei Treffer Caption-Job canceln.
+        val serverRecipe = serverJob?.await()
+        serverUrlError = when {
+            serverJob == null -> "not_configured"
+            serverRecipe == null && RecipeNormalizeServer.lastError == null ->
+                "server_timeout_${serverBudgetMs}ms"
+            else -> RecipeNormalizeServer.lastError
+        }
+        if (serverRecipe != null) {
+            val acceptFast = fastScrape && hasUsableIngredients(serverRecipe)
+            val acceptStrict = isAmmQuality(serverRecipe)
+            if (acceptFast || acceptStrict) {
+                captionJob.cancel()
+                oEmbedJobs.forEach { it.cancel() }
+                publishReport(
+                    "path=amm-server-only score=${ingredientQualityScore(serverRecipe)} " +
+                        "ing=${serverRecipe.ingredients.lines().count { it.isNotBlank() }} " +
+                        "fast=$fastScrape url=$url"
+                )
+                val thumb = withTimeoutOrNull(800L) {
+                    oEmbedJobs.firstNotNullOfOrNull { d ->
+                        runCatching { d.await()?.get("thumbnail_url") }.getOrNull()
+                            ?.takeIf { !it.isNullOrBlank() }
+                    }
+                } ?: serverRecipe.imageUrl
+                return@coroutineScope serverRecipe.copy(
+                    sourceUrl = url,
+                    platform = "instagram",
+                    imageUrl = thumb ?: serverRecipe.imageUrl,
+                    tags = serverRecipe.tags.ifBlank { "instagram" }
+                )
+            }
+            if (hasUsableIngredients(serverRecipe)) bestServerCandidate = serverRecipe
+        }
+
+        var caption = captionJob.await()
 
         // Gründlich: Caption an Server-Kandidat mergen, wenn vorhanden
         if (!fastScrape && bestServerCandidate != null && isGoodCaption(caption)) {
@@ -502,8 +505,8 @@ class RecipeScraper(private val context: Context) {
         // Caption an Server → strukturiertes Rezept (AMM-Fallback wenn URL-Fetch dünn war)
         if (RecipeNormalizeServer.isConfigured()) {
             progress("Server-Normalisierung…")
-            // Fast: max. 12 s für Normalisierung – nicht 28 s auf hängenden Server warten.
-            val normBudget = if (fastScrape) 12_000L else 20_000L
+            // Fast: max. 6 s – Server hat Caption, braucht nur noch Groq-Struktur.
+            val normBudget = if (fastScrape) 6_000L else 20_000L
             val serverCap = withTimeoutOrNull(normBudget) {
                 RecipeNormalizeServer.normalize(
                     workingCaption, url, "instagram", thumbnail
@@ -690,12 +693,12 @@ class RecipeScraper(private val context: Context) {
             return fallback
         }
 
-        // 2) Server-Normalisierung (max 10s) — oft besser als lokal, aber nicht ewig warten.
+        // 2) Server-Normalisierung (max 6s) — oft besser als lokal, aber nicht ewig warten.
         // Wiederverwendung, falls der Aufrufer (z.B. scrapeInstagram) dieselbe Anfrage
         // mit identischer Caption schon gestellt hat.
         val server = precomputedServer ?: if (RecipeNormalizeServer.isConfigured()) {
             progress("Server-Normalisierung…")
-            withTimeoutOrNull(10_000L) {
+            withTimeoutOrNull(if (fastAi) 6_000L else 10_000L) {
                 RecipeNormalizeServer.normalize(caption, url, platform, thumbnail)
             }
         } else null
@@ -710,7 +713,7 @@ class RecipeScraper(private val context: Context) {
         progress("Rezept extrahieren…")
         val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
         val local = if (apiKey.isNotBlank()) {
-            withTimeoutOrNull(12_000L) {
+            withTimeoutOrNull(if (fastAi) 7_000L else 12_000L) {
                 RecipeAiParser.parse(caption, url, platform, thumbnail, apiKey, fastModel = true)
             }
         } else null
@@ -744,8 +747,8 @@ class RecipeScraper(private val context: Context) {
 
             val desktopUa =
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-            // Race-Timeout >= WebView-Budget (Fast 12s / gründlich 18s).
-            val raceTimeoutMs = if (fastScrape) 14_000L else 18_000L
+            // Race-Timeout >= WebView-Budget (Fast 10s / gründlich 18s).
+            val raceTimeoutMs = if (fastScrape) 10_000L else 18_000L
 
             suspend fun awaitFirstGood(
                 jobs: MutableList<kotlinx.coroutines.Deferred<Cap?>>,
@@ -1130,94 +1133,112 @@ class RecipeScraper(private val context: Context) {
     //  4. Generic og:description via Jsoup
     //  5. oEmbed title (lowest quality, no body text)
 
-    private suspend fun scrapeTikTok(url: String, fastAi: Boolean = false, forceRefresh: Boolean = false): Recipe {
-        progress("Link auflösen…")
-        val expandedUrl = runCatching {
-            if ("vm.tiktok.com" in url || "vt.tiktok.com" in url) {
-                val req = Request.Builder().url(url).head().build()
-                client.newCall(req).execute().use { it.request.url.toString() }
-            } else url
-        }.getOrDefault(url)
-        val key = cacheKey(expandedUrl)
+    private suspend fun scrapeTikTok(url: String, fastAi: Boolean = false, forceRefresh: Boolean = false): Recipe =
+        coroutineScope {
+            progress("Link auflösen…")
+            val expandedUrl = runCatching {
+                if ("vm.tiktok.com" in url || "vt.tiktok.com" in url) {
+                    val req = Request.Builder().url(url).head().build()
+                    client.newCall(req).execute().use { it.request.url.toString() }
+                } else url
+            }.getOrDefault(url)
+            val key = cacheKey(expandedUrl)
 
-        // AMM-Pfad: Server zuerst, Ergebnis 1:1 übernehmen
-        if (RecipeNormalizeServer.isConfigured()) {
-            progress("Server-Import…")
-            val serverRecipe = RecipeNormalizeServer.importFromUrl(expandedUrl, "tiktok")
-            if (serverRecipe != null && isAmmQuality(serverRecipe)) {
-                return serverRecipe.copy(
+            // Server + Caption-Race parallel (nicht sequentiell auf 14s Server warten)
+            val cachedCap = if (forceRefresh) null else loadCachedCaption(key).ifBlank { null }
+            val serverJob = if (RecipeNormalizeServer.isConfigured()) {
+                async {
+                    progress("Server-Import…")
+                    withTimeoutOrNull(5_500L) {
+                        RecipeNormalizeServer.importFromUrl(expandedUrl, "tiktok")
+                    }
+                }
+            } else null
+            val raceJob = async {
+                if (isGoodCaption(cachedCap)) {
+                    progress("Aus Cache…")
+                    Triple(cachedCap, null as String?, null as String?)
+                } else {
+                    progress("Seite laden (parallel)…")
+                    raceTikTokCaption(expandedUrl)
+                }
+            }
+
+            val serverRecipe = serverJob?.await()
+            if (serverRecipe != null &&
+                (isAmmQuality(serverRecipe) || hasUsableIngredients(serverRecipe))
+            ) {
+                raceJob.cancel()
+                publishReport(
+                    "path=amm-server-tiktok score=${ingredientQualityScore(serverRecipe)} url=$url"
+                )
+                return@coroutineScope serverRecipe.copy(
                     sourceUrl = url,
                     platform = "tiktok",
                     tags = serverRecipe.tags.ifBlank { "tiktok" }
                 )
             }
-        }
 
-        var caption: String? = if (forceRefresh) null else loadCachedCaption(key).ifBlank { null }
-        var thumbnail: String? = null
-        var author: String? = null
-
-        if (isGoodCaption(caption)) {
-            progress("Aus Cache…")
-        } else {
-            progress("Seite laden (parallel)…")
-            val raced = raceTikTokCaption(expandedUrl)
-            caption = raced.first
-            thumbnail = raced.second
-            author = raced.third
+            val raced = raceJob.await()
+            var caption: String? = raced.first
+            var thumbnail: String? = raced.second
+            val author: String? = raced.third
             if (isGoodCaption(caption)) saveCachedCaption(key, caption!!)
-        }
 
-        // Optional Whisper bei schwacher Caption
-        val enriched = enrichWithTranscript("tiktok", expandedUrl, null, caption.orEmpty())
-        if (enriched.isNotBlank()) {
-            caption = enriched
-            if (isGoodCaption(caption)) saveCachedCaption(key, caption!!)
-        }
+            // Optional Whisper bei schwacher Caption
+            val enriched = enrichWithTranscript("tiktok", expandedUrl, null, caption.orEmpty())
+            if (enriched.isNotBlank()) {
+                caption = enriched
+                if (isGoodCaption(caption)) saveCachedCaption(key, caption!!)
+            }
 
-        if (caption.isNullOrBlank()) {
-            return Recipe(
-                title        = "TikTok Rezept",
-                description  = "Caption konnte nicht geladen werden. Tippe auf ✏️ und füge die Zutaten manuell ein.",
-                sourceUrl    = url,
-                platform     = "tiktok",
-                imageUrl     = thumbnail,
-                ingredients  = "",
-                tags         = author?.let { "@$it" } ?: "tiktok"
-            )
-        }
+            if (caption.isNullOrBlank()) {
+                return@coroutineScope Recipe(
+                    title = "TikTok Rezept",
+                    description = "Caption konnte nicht geladen werden. Tippe auf ✏️ und füge die Zutaten manuell ein.",
+                    sourceUrl = url,
+                    platform = "tiktok",
+                    imageUrl = thumbnail,
+                    ingredients = "",
+                    tags = author?.let { "@$it" } ?: "tiktok"
+                )
+            }
 
-        progress("Rezept extrahieren…")
-        var workingCaption = caption!!
-        var parsed = parseCaptionToRecipe(workingCaption, url, "tiktok", thumbnail, fastAi)
-        if (!hasUsableIngredients(parsed)) {
-            progress("Struktur nachbessern…")
-            val fallback = RecipeAiParser.fallbackParse(workingCaption, url, "tiktok", thumbnail)
-            if (hasUsableIngredients(fallback)) parsed = fallback
-        }
-        if (!hasUsableIngredients(parsed)) {
-            val prevToggle = useVideoTranscript
-            useVideoTranscript = true
-            val reEnriched = enrichWithTranscript("tiktok", expandedUrl, null, workingCaption)
-            useVideoTranscript = prevToggle
-            if (reEnriched != workingCaption && isGoodCaption(reEnriched)) {
-                workingCaption = reEnriched
-                progress("Rezept aus Transkript…")
-                parsed = parseCaptionToRecipe(workingCaption, url, "tiktok", thumbnail, fastAi = false)
-                if (!hasUsableIngredients(parsed)) {
-                    val fb = RecipeAiParser.fallbackParse(workingCaption, url, "tiktok", thumbnail)
-                    if (hasUsableIngredients(fb)) parsed = fb
+            progress("Rezept extrahieren…")
+            var workingCaption = caption!!
+            var parsed = parseCaptionToRecipe(workingCaption, url, "tiktok", thumbnail, fastAi)
+            if (!hasUsableIngredients(parsed)) {
+                progress("Struktur nachbessern…")
+                val fallback = RecipeAiParser.fallbackParse(workingCaption, url, "tiktok", thumbnail)
+                if (hasUsableIngredients(fallback)) parsed = fallback
+            }
+            if (!hasUsableIngredients(parsed)) {
+                val prevToggle = useVideoTranscript
+                useVideoTranscript = true
+                val reEnriched = enrichWithTranscript("tiktok", expandedUrl, null, workingCaption)
+                useVideoTranscript = prevToggle
+                if (reEnriched != workingCaption && isGoodCaption(reEnriched)) {
+                    workingCaption = reEnriched
+                    progress("Rezept aus Transkript…")
+                    parsed = parseCaptionToRecipe(workingCaption, url, "tiktok", thumbnail, fastAi = false)
+                    if (!hasUsableIngredients(parsed)) {
+                        val fb = RecipeAiParser.fallbackParse(workingCaption, url, "tiktok", thumbnail)
+                        if (hasUsableIngredients(fb)) parsed = fb
+                    }
                 }
             }
+            parsed.copy(
+                title = RecipeAiParser.extractTitle(
+                    parsed.title.ifBlank { workingCaption },
+                    fallback = parsed.title.ifBlank { "TikTok Rezept" }
+                ),
+                imageUrl = thumbnail ?: parsed.imageUrl,
+                sourceUrl = url,
+                platform = "tiktok",
+                tags = listOfNotNull(parsed.tags.ifBlank { null }, author?.let { "@$it" })
+                    .joinToString(",").take(200)
+            )
         }
-        return parsed.copy(
-            title     = RecipeAiParser.extractTitle(parsed.title.ifBlank { workingCaption }, fallback = parsed.title.ifBlank { "TikTok Rezept" }),
-            imageUrl  = thumbnail ?: parsed.imageUrl,
-            sourceUrl = url,
-            platform  = "tiktok",
-            tags      = listOfNotNull(parsed.tags.ifBlank { null }, author?.let { "@$it" }).joinToString(",").take(200)
-        )
-    }
 
     /** Parallel: tikwm API, WebView, oEmbed, Jsoup — erste brauchbare Caption. */
     private suspend fun raceTikTokCaption(expandedUrl: String): Triple<String?, String?, String?> =

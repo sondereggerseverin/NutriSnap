@@ -41,9 +41,9 @@ object RecipeNormalizeServer {
         private set
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(8, TimeUnit.SECONDS)
-        // 28s Read-Timeout war ein Hauptgrund für 40s-Imports bei hängendem Server.
-        .readTimeout(14, TimeUnit.SECONDS)
+        .connectTimeout(5, TimeUnit.SECONDS)
+        // Fast-Pfad: Server sollte in <5s antworten; 14s Read ließ hängende Calls den Import blockieren.
+        .readTimeout(8, TimeUnit.SECONDS)
         .build()
 
     fun isConfigured(): Boolean =

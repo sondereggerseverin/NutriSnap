@@ -16,11 +16,12 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-// llama-3.3-70b-versatile wurde von Groq am 17.06.2026 deprecated und ist seit
-// dem Shutdown nicht mehr erreichbar (model_not_found) - offizielle Empfehlung
-// von Groq: openai/gpt-oss-120b (Alternative: qwen/qwen3.6-27b).
-// https://console.groq.com/docs/deprecations
-const MODEL = "openai/gpt-oss-120b";
+// Schnelles Modell für Sub-5s-Import (AMM-Niveau). Qualität reicht für
+// strukturierte Caption→Rezept-Extraktion; 120b war unnötig langsam.
+// Fallback-Kette siehe groqChat().
+// https://console.groq.com/docs/models
+const MODEL_FAST = "llama-3.1-8b-instant";
+const MODEL_QUALITY = "openai/gpt-oss-120b";
 
 const SYSTEM = `You are a recipe extraction assistant for a German nutrition app (NutriSnap).
 Convert ANY social-media caption OR spoken video transcript (German, English, French, OR Italian; emoji bullets)
@@ -138,29 +139,9 @@ serve(async (req) => {
     const userMsg =
       `Platform: ${platform}\nSource: ${sourceUrl || "n/a"}\nExtract recipe from this ${sourceLabel}:\n\n${clipped}`;
 
-    const groqResp = await fetch(GROQ_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: 0.1,
-        max_tokens: 2500,
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: userMsg },
-        ],
-      }),
-    });
-
-    const groqText = await groqResp.text();
-    if (!groqResp.ok) {
-      return json(
-        { error: `Groq ${groqResp.status}`, detail: groqText.slice(0, 400) },
-        502,
-      );
+    const groqText = await groqChat(apiKey, userMsg);
+    if (!groqText) {
+      return json({ error: "Groq failed for all models" }, 502);
     }
 
     const choice = JSON.parse(groqText)?.choices?.[0]?.message?.content ?? "";
@@ -261,7 +242,11 @@ function scoreCaption(text: string): number {
   return Math.max(0, s);
 }
 
-/** Parallel multi-source caption fetch; best score wins. */
+/**
+ * Parallel multi-source caption fetch — erste brauchbare Caption gewinnt.
+ * Früher: Promise.allSettled wartete auf ALLE Quellen (inkl. 9s-Jina),
+ * selbst wenn oEmbed schon nach 1s eine gute Caption hatte → +8s tot.
+ */
 async function fetchCaptionFromUrl(
   url: string,
   platform: string,
@@ -273,8 +258,15 @@ async function fetchCaptionFromUrl(
     setTimeout(() => c.abort(), ms);
     return c.signal;
   };
+  const abortAll = () => {
+    for (const c of controllers) {
+      try {
+        c.abort();
+      } catch { /* ignore */ }
+    }
+  };
 
-  const jina = async (target: string, ms = 9000) => {
+  const jina = async (target: string, ms = 4500) => {
     const r = await fetch(`https://r.jina.ai/${target}`, {
       signal: timeout(ms),
       headers: {
@@ -287,8 +279,9 @@ async function fetchCaptionFromUrl(
     return { caption: cleanFetchedText(text), imageUrl: null as string | null };
   };
 
-  const jobs: Promise<{ caption: string; imageUrl: string | null }>[] = [];
-  jobs.push(jina(url, 9000));
+  type CapResult = { caption: string; imageUrl: string | null };
+  const jobs: Promise<CapResult>[] = [];
+  jobs.push(jina(url, 4500));
 
   const isIg = platform.includes("instagram") || url.includes("instagram");
   if (isIg) {
@@ -301,7 +294,7 @@ async function fetchCaptionFromUrl(
           `https://api.instagram.com/oembed/?url=${
             encodeURIComponent(url)
           }&omitscript=true`;
-        const r = await fetch(oe, { signal: timeout(5000) });
+        const r = await fetch(oe, { signal: timeout(3000) });
         const j = await r.json();
         return {
           caption: cleanFetchedText(String(j.title ?? "")),
@@ -311,24 +304,22 @@ async function fetchCaptionFromUrl(
     );
 
     if (code) {
+      // Weniger Varianten, kürzere Timeouts — Race statt Exhaustion
       const variants = [
-        `https://www.instagram.com/p/${code}/`,
-        `https://www.instagram.com/reel/${code}/`,
         `https://www.instagram.com/p/${code}/embed/captioned/`,
         `https://www.instagram.com/reel/${code}/embed/captioned/`,
         `https://ddinstagram.com/p/${code}/`,
         `https://ddinstagram.com/reel/${code}/`,
         `https://imginn.com/p/${code}/`,
-        `https://www.picuki.com/media/${code}`,
       ];
       for (const v of variants) {
-        jobs.push(jina(v, 8000));
+        jobs.push(jina(v, 4000));
       }
     } else {
       const dd = url
         .replace("www.instagram.com", "ddinstagram.com")
         .replace("instagram.com", "ddinstagram.com");
-      if (dd !== url) jobs.push(jina(dd, 8000));
+      if (dd !== url) jobs.push(jina(dd, 4000));
     }
   }
 
@@ -337,7 +328,7 @@ async function fetchCaptionFromUrl(
       (async () => {
         const oe =
           `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
-        const r = await fetch(oe, { signal: timeout(5000) });
+        const r = await fetch(oe, { signal: timeout(3000) });
         const j = await r.json();
         return {
           caption: cleanFetchedText(
@@ -347,29 +338,99 @@ async function fetchCaptionFromUrl(
         };
       })(),
     );
+    // tikwm oft schneller/voller Caption als oEmbed
+    jobs.push(
+      (async () => {
+        const r = await fetch(
+          `https://www.tikwm.com/api/?url=${encodeURIComponent(url)}&hd=1`,
+          { signal: timeout(4000) },
+        );
+        const j = await r.json();
+        const title = String(j?.data?.title ?? j?.title ?? "");
+        const cover = j?.data?.cover ?? j?.data?.origin_cover ?? null;
+        return {
+          caption: cleanFetchedText(title),
+          imageUrl: cover ? String(cover) : null,
+        };
+      })(),
+    );
   }
 
-  const results = await Promise.allSettled(jobs);
-  controllers.forEach((c) => {
-    try {
-      c.abort();
-    } catch {
-      /* ignore */
+  // Erste Caption mit Score ≥ 25 gewinnt; max. 5s Gesamtbudget
+  const GOOD = 25;
+  let best = { caption: "", imageUrl: null as string | null, score: -1 };
+
+  await new Promise<void>((resolve) => {
+    let pending = jobs.length;
+    if (pending === 0) {
+      resolve();
+      return;
+    }
+    const hardStop = setTimeout(() => {
+      abortAll();
+      resolve();
+    }, 5000);
+
+    for (const job of jobs) {
+      job.then((c) => {
+        const sc = scoreCaption(c.caption);
+        if (sc > best.score) {
+          best = {
+            caption: c.caption,
+            imageUrl: c.imageUrl ?? best.imageUrl,
+            score: sc,
+          };
+        } else if (!best.imageUrl && c.imageUrl) {
+          best.imageUrl = c.imageUrl;
+        }
+        if (best.score >= GOOD) {
+          clearTimeout(hardStop);
+          abortAll();
+          resolve();
+        }
+      }).catch(() => {
+        /* ignore */
+      }).finally(() => {
+        pending -= 1;
+        if (pending <= 0) {
+          clearTimeout(hardStop);
+          resolve();
+        }
+      });
     }
   });
 
-  let best = { caption: "", imageUrl: null as string | null, score: -1 };
-  for (const r of results) {
-    if (r.status !== "fulfilled") continue;
-    const c = r.value;
-    const sc = scoreCaption(c.caption);
-    if (sc > best.score) {
-      best = { caption: c.caption, imageUrl: c.imageUrl ?? best.imageUrl, score: sc };
-    } else if (!best.imageUrl && c.imageUrl) {
-      best.imageUrl = c.imageUrl;
+  abortAll();
+  return { caption: best.caption, imageUrl: best.imageUrl };
+}
+
+/** Schnelles Modell zuerst, Qualitäts-Modell nur bei Fehler. */
+async function groqChat(apiKey: string, userMsg: string): Promise<string | null> {
+  for (const model of [MODEL_FAST, MODEL_QUALITY]) {
+    try {
+      const resp = await fetch(GROQ_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.1,
+          max_tokens: 1600,
+          messages: [
+            { role: "system", content: SYSTEM },
+            { role: "user", content: userMsg },
+          ],
+        }),
+      });
+      const text = await resp.text();
+      if (resp.ok) return text;
+    } catch {
+      /* try next model */
     }
   }
-  return { caption: best.caption, imageUrl: best.imageUrl };
+  return null;
 }
 
 function cleanFetchedText(raw: string): string {
