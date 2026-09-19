@@ -692,7 +692,7 @@ Antworte NUR mit JSON:
     private suspend fun callLlm(prompt: String): Result<String> = coroutineScope {
         val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
 
-        if (!GeminiService.isAvailable()) {
+        if (!GeminiService.isUsable()) {
             return@coroutineScope if (apiKey.isNotBlank()) callGroq(prompt, apiKey)
             else Result.failure(Exception("Weder Gemini- noch Groq-API-Key konfiguriert"))
         }

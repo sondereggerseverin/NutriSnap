@@ -27,6 +27,8 @@ object GeminiService {
     private const val BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
     private const val TEXT_MODEL = "gemini-3.6-flash"
     private const val VISION_MODEL = "gemini-3.6-flash"
+    /** Nach 429/Quota: Gemini für diese Dauer überspringen (Groq übernimmt). */
+    private const val QUOTA_COOLDOWN_MS = 60_000L
 
     // Kurze Timeouts: Gemini soll bei Problemen schnell an Groq (Parallel-Race)
     // abgeben statt die UI 30s+ blockieren zu lassen.
@@ -35,8 +37,38 @@ object GeminiService {
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
 
+    @Volatile
+    private var quotaBlockedUntilMs: Long = 0L
+
     /** Prüft ob ein Gemini API Key konfiguriert ist. */
     fun isAvailable(): Boolean = BuildConfig.GEMINI_API_KEY.isNotBlank()
+
+    /** true wenn Key da ist und kein frisches Quota-Cooldown aktiv ist. */
+    fun isUsable(): Boolean =
+        isAvailable() && System.currentTimeMillis() >= quotaBlockedUntilMs
+
+    private fun markQuotaExhausted(retryAfterSeconds: Double? = null) {
+        val waitMs = ((retryAfterSeconds ?: 60.0).coerceIn(15.0, 300.0) * 1000).toLong()
+        quotaBlockedUntilMs = System.currentTimeMillis() + waitMs.coerceAtLeast(QUOTA_COOLDOWN_MS)
+        Log.w(TAG, "Gemini Quota erschöpft – Pause ${waitMs / 1000}s, Fallback auf Groq")
+    }
+
+    /** Nutzerwfreundliche Meldung statt rohem API-JSON. */
+    private fun friendlyError(code: Int, body: String): String {
+        if (code == 429 || body.contains("RESOURCE_EXHAUSTED", ignoreCase = true) ||
+            body.contains("quota", ignoreCase = true)
+        ) {
+            val retrySec = Regex("""retry in ([\d.]+)s""", RegexOption.IGNORE_CASE)
+                .find(body)?.groupValues?.getOrNull(1)?.toDoubleOrNull()
+            markQuotaExhausted(retrySec)
+            return "KI-Kontingent kurz erschöpft – bitte in etwa ${
+                (retrySec ?: 60.0).toInt().coerceAtLeast(15)
+            } s erneut versuchen (oder es läuft automatisch über den Fallback)."
+        }
+        if (code == 401 || code == 403) return "KI-Zugang ungültig – API-Key prüfen."
+        if (code in 500..599) return "KI-Dienst vorübergehend nicht erreichbar."
+        return "KI-Anfrage fehlgeschlagen (Code $code)."
+    }
 
     /**
      * Text-basierter LLM-Call (kein Vision).
@@ -49,6 +81,9 @@ object GeminiService {
         maxTokens: Int = 2000
     ): Result<String> = withContext(Dispatchers.IO) {
         if (!isAvailable()) return@withContext Result.failure(Exception("Kein GEMINI_API_KEY konfiguriert"))
+        if (!isUsable()) {
+            return@withContext Result.failure(Exception("Gemini Quota-Pause aktiv – Fallback nutzen"))
+        }
 
         try {
             val contents = JSONArray()
@@ -96,8 +131,8 @@ object GeminiService {
             val bodyStr = response.body?.string() ?: return@withContext Result.failure(Exception("Leere Gemini-Antwort"))
 
             if (!response.isSuccessful) {
-                Log.w(TAG, "Gemini API Fehler ${response.code}: $bodyStr")
-                return@withContext Result.failure(Exception("Gemini API Fehler ${response.code}: $bodyStr"))
+                Log.w(TAG, "Gemini API Fehler ${response.code}: ${bodyStr.take(200)}")
+                return@withContext Result.failure(Exception(friendlyError(response.code, bodyStr)))
             }
 
             val text = extractText(bodyStr)
@@ -108,7 +143,7 @@ object GeminiService {
             Result.success(text.trim())
         } catch (e: Exception) {
             Log.w(TAG, "Gemini text call fehlgeschlagen: ${e.message}")
-            Result.failure(e)
+            Result.failure(Exception(e.message?.take(120) ?: "Gemini-Anfrage fehlgeschlagen"))
         }
     }
 
@@ -137,6 +172,9 @@ object GeminiService {
         maxTokens: Int = 1000
     ): Result<String> = withContext(Dispatchers.IO) {
         if (!isAvailable()) return@withContext Result.failure(Exception("Kein GEMINI_API_KEY konfiguriert"))
+        if (!isUsable()) {
+            return@withContext Result.failure(Exception("Gemini Quota-Pause aktiv – Fallback nutzen"))
+        }
         val images = base64Jpegs.filter { it.isNotBlank() }.take(4)
         if (images.isEmpty()) {
             return@withContext Result.failure(IllegalArgumentException("Keine Bilder"))
@@ -180,8 +218,8 @@ object GeminiService {
             val bodyStr = response.body?.string() ?: return@withContext Result.failure(Exception("Leere Gemini-Antwort"))
 
             if (!response.isSuccessful) {
-                Log.w(TAG, "Gemini Vision API Fehler ${response.code}: $bodyStr")
-                return@withContext Result.failure(Exception("Gemini Vision API Fehler ${response.code}: $bodyStr"))
+                Log.w(TAG, "Gemini Vision API Fehler ${response.code}: ${bodyStr.take(200)}")
+                return@withContext Result.failure(Exception(friendlyError(response.code, bodyStr)))
             }
 
             val text = extractText(bodyStr)
@@ -192,7 +230,7 @@ object GeminiService {
             Result.success(text.trim())
         } catch (e: Exception) {
             Log.w(TAG, "Gemini vision call fehlgeschlagen: ${e.message}")
-            Result.failure(e)
+            Result.failure(Exception(e.message?.take(120) ?: "Gemini-Vision fehlgeschlagen"))
         }
     }
 

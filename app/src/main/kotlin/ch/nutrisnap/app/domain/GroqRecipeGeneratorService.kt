@@ -543,7 +543,7 @@ $JSON_SCHEMA_HINT
      * wurde (s. dortige Kommentare), hier aber noch nicht.
      */
     private suspend fun callLlm(prompt: String, maxTokens: Int = 3000): Result<String> = coroutineScope {
-        if (!GeminiService.isAvailable()) {
+        if (!GeminiService.isUsable()) {
             return@coroutineScope callGroq(prompt, maxTokens)
         }
 

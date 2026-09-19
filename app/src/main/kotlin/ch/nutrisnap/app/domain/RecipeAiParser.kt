@@ -1210,7 +1210,7 @@ Rules:
     private suspend fun callLlm(caption: String, apiKey: String, fastModel: Boolean = false): Recipe = coroutineScope {
         val userMessage = "Extract recipe from this caption:\n\n$caption"
 
-        if (!GeminiService.isAvailable()) {
+        if (!GeminiService.isUsable()) {
             return@coroutineScope callGroq(caption, apiKey, fastModel)
         }
 

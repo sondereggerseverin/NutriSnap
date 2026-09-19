@@ -69,7 +69,7 @@ object GroqFoodEstimatorApi {
             {"name":"...","calories":0.0,"protein":0.0,"carbs":0.0,"fat":0.0,"fiber":0.0,"sugar":0.0,"salt":0.0}
         """.trimIndent()
 
-        if (!GeminiService.isAvailable()) {
+        if (!GeminiService.isUsable()) {
             return@withContext runCatching { estimateViaGroq(prompt, query) }
                 .onFailure { e -> Log.w(TAG, "Schätzung für \"$query\" fehlgeschlagen: ${e.message}") }
                 .getOrNull()

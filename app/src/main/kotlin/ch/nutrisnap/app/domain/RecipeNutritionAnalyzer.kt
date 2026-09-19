@@ -895,7 +895,7 @@ object RecipeNutritionAnalyzer {
             return parseAiResponse(content)
         }
 
-        if (!GeminiService.isAvailable()) {
+        if (!GeminiService.isUsable()) {
             return@coroutineScope callGroq()
         }
 

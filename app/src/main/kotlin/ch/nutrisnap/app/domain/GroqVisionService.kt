@@ -414,7 +414,7 @@ JSON-Schema:
 {"title":"…","description":"…","ingredients":"…","instructions":"…","servings":1,"prepTimeMinutes":null,"caloriesPerServing":null,"proteinPerServing":null,"carbsPerServing":null,"fatPerServing":null}
 """.trimIndent()
 
-        val textResult = if (GeminiService.isAvailable()) {
+        val textResult = if (GeminiService.isUsable()) {
             GeminiService.generateText(prompt = prompt, temperature = 0.2, maxTokens = 2500)
         } else {
             Result.failure(Exception("Kein Text-Modell"))
@@ -569,7 +569,8 @@ JSON-Schema:
         val groqDeferred: Deferred<Result<String>> =
             async(Dispatchers.IO) { callGroqVision(prompt, images, maxTokens) }
 
-        if (!GeminiService.isAvailable()) return@coroutineScope groqDeferred.await()
+        // Quota-Pause: Gemini überspringen, nur Groq (kein nutzloser 429-Roundtrip).
+        if (!GeminiService.isUsable()) return@coroutineScope groqDeferred.await()
 
         val geminiDeferred: Deferred<Result<String>> = async(Dispatchers.IO) {
             GeminiService.generateVision(
@@ -586,6 +587,15 @@ JSON-Schema:
         }
         geminiDeferred.cancel()
         groqDeferred.cancel()
+        // Beide fehlgeschlagen: kurze, lesbare Meldung statt API-JSON
+        if (result.isFailure) {
+            val msg = result.exceptionOrNull()?.message.orEmpty()
+            if (msg.contains("{") || msg.length > 180) {
+                return@coroutineScope Result.failure(
+                    Exception("Analyse fehlgeschlagen. Bitte erneut versuchen.")
+                )
+            }
+        }
         result
     }
 
