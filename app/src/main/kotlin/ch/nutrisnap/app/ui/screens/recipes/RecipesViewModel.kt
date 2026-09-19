@@ -136,7 +136,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     private val _platformFilter = MutableStateFlow<String?>(null)
     private val _categoryFilter = MutableStateFlow<RecipeCategory?>(null)
     private val _ingredientNeedles = MutableStateFlow<List<String>>(emptyList())
-    private val _sort           = MutableStateFlow(RecipeSort.RECOMMENDED)
+    private val _sort           = MutableStateFlow(RecipeSort.NEWEST)
     private val _cookedFilter   = MutableStateFlow(CookedFilter.ALL)
     private val _importState    = MutableStateFlow(ImportState())
     private val _nutritionState = MutableStateFlow(NutritionState())

@@ -55,7 +55,7 @@ data class RecipesUiState(
     val platformFilter:   String?      = null,   // null = alle
     val categoryFilter:   RecipeCategory? = null, // null = alle Kategorien
     val ingredientNeedles: List<String> = emptyList(), // alle müssen vorkommen
-    val sort:             RecipeSort   = RecipeSort.RECOMMENDED,
+    val sort:             RecipeSort   = RecipeSort.NEWEST,
     val cookedFilter:     CookedFilter = CookedFilter.ALL,
     val isImporting:      Boolean      = false,
     val importPhase:      String?      = null,
