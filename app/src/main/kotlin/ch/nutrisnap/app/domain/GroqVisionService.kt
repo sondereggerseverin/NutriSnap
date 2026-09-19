@@ -671,7 +671,7 @@ JSON-Schema:
                         lastError = Exception("Modell $modelId nicht verfügbar")
                         continue
                     }
-                    val short = bodyStr.take(160).replace(Regex("\s+"), " ")
+                    val short = bodyStr.take(160).replace(Regex("\\s+"), " ")
                     return Result.failure(
                         Exception("Groq Vision fehlgeschlagen (${response.code}): $short")
                     )
@@ -744,8 +744,8 @@ JSON-Schema:
         val closeArr = s.count { it == ']' }
         if (openArr > closeArr) s += "]".repeat(openArr - closeArr)
         // Trailing Komma vor } entfernen
-        s = s.replace(Regex(",\s*}"), "}")
-        s = s.replace(Regex(",\s*]"), "]")
+        s = s.replace(Regex(",\\s*}"), "}")
+        s = s.replace(Regex(",\\s*]"), "]")
         return s
     }
 
