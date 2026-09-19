@@ -104,6 +104,8 @@ class GroqVisionService {
          * Lesbarkeit von Zutatenlisten profitiert stärker von Auflösung als Food-Fotos.
          */
         private const val MAX_DIMENSION_TEXT = 1536
+        /** Einfache Anführungszeichen als JSON-String-Delimiter → doppelte. */
+        private val SINGLE_QUOTED_JSON = Regex("""'((?:[^'\\]|\\.)*)'""")
     }
 
     /** Komprimiert ein Foto auf eine fuer die API geeignete Groesse und kodiert es als Base64-JPEG. */
@@ -212,7 +214,9 @@ confidence ist "hoch", "mittel" oder "niedrig". Erfinde keine Zutaten, die nicht
 """.trimIndent()
         // Hoeheres Token-Limit als Standard-1000: bei vielen kleinen Zutaten (Bowls, Mezze-Teller)
         // braucht die JSON-Antwort mit einem Eintrag pro Zutat mehr Platz als eine einzelne Schaetzung.
-        callVisionRaw(prompt, listOf(base64Jpeg), maxTokens = 2000).mapCatching { json.decodeFromString<DishScanResult>(it) }
+        callVisionRaw(prompt, listOf(base64Jpeg), maxTokens = 2000).mapCatching {
+            json.decodeFromString<DishScanResult>(sanitizeLlmJson(it))
+        }
     }
 
     /** Erkennt vorhandene Zutaten auf einem Foto (z.B. offener Kühlschrank/Vorratsschrank). */
@@ -223,12 +227,15 @@ Identifiziere ALLE klar erkennbaren Lebensmittel/Zutaten auf dem Foto. Sei konkr
 "Naturejoghurt" statt "Milchprodukt"), aber erfinde nichts, was nicht wirklich zu sehen ist.
 Ignoriere nicht-essbare Dinge.
 
-Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
+Antworte NUR mit gültigem JSON (kein Markdown, keine Erklärungen).
+Verwende ausschließlich doppelte Anführungszeichen ("):
 {
   "ingredients": ["Rüebli", "Naturejoghurt", "Eier", "Zwiebeln"]
 }
 """.trimIndent()
-        callVisionRaw(prompt, listOf(base64Jpeg)).mapCatching { json.decodeFromString<FridgeScanResult>(it) }
+        callVisionRaw(prompt, listOf(base64Jpeg)).mapCatching {
+            json.decodeFromString<FridgeScanResult>(sanitizeLlmJson(it))
+        }
     }
 
     /** Liest eine fotografierte Nährwerttabelle aus und gibt die Werte pro 100g zurück. */
@@ -240,7 +247,8 @@ und die Portionsgrösse erkennbar ist, rechne korrekt auf 100g um.
 
 Lies auch Produktname und Marke, falls sichtbar (auch bei gedrehtem/spiegelverkehrtem Text).
 
-Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
+Antworte NUR mit gültigem JSON (kein Markdown, keine Erklärungen).
+Verwende ausschließlich doppelte Anführungszeichen ("), niemals einfache (').
 {
   "caloriesPer100g": 250,
   "proteinPer100g": 12.0,
@@ -253,7 +261,9 @@ Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
   "brand": "Marke"
 }
 """.trimIndent()
-        callVisionRaw(prompt, listOf(base64Jpeg)).mapCatching { json.decodeFromString<NutritionLabelResult>(it) }
+        callVisionRaw(prompt, listOf(base64Jpeg)).mapCatching {
+            json.decodeFromString<NutritionLabelResult>(sanitizeLlmJson(it))
+        }
     }
 
     /**
@@ -443,7 +453,8 @@ JSON-Schema:
     /**
      * Parst Vision-JSON robust: neues Format {"recipes":[...]} und Legacy-Einzelobjekt.
      */
-    private fun parseRecipesFromImageJson(raw: String): List<RecipeFromImageResult> {
+    private fun parseRecipesFromImageJson(rawInput: String): List<RecipeFromImageResult> {
+        val raw = sanitizeLlmJson(rawInput)
         // Primär: Array-Wrapper
         runCatching {
             val wrapped = json.decodeFromString<RecipesFromImageResult>(raw)
@@ -628,10 +639,39 @@ JSON-Schema:
 
             val root = JSONObject(bodyStr)
             val text = root.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content")
-            val cleaned = text.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
-            Result.success(cleaned)
+            Result.success(sanitizeLlmJson(text))
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    /**
+     * Bereinigt LLM-JSON, das oft leicht invalid ist:
+     * Markdown-Fences, Smart-Quotes, einfache Anführungszeichen als String-Delimiter,
+     * führender/nachgestellter Fließtext um das Objekt herum.
+     */
+    private fun sanitizeLlmJson(raw: String): String {
+        var s = raw.trim()
+            .removePrefix("```json").removePrefix("```JSON").removePrefix("```")
+            .removeSuffix("```").trim()
+        // Typografische Anführungszeichen → ASCII
+        s = s
+            .replace('\u201c', '"').replace('\u201d', '"')
+            .replace('\u201e', '"').replace('\u00ab', '"').replace('\u00bb', '"')
+            .replace('\u2018', '\'').replace('\u2019', '\'')
+        // Äußerstes JSON-Objekt extrahieren (falls Modell Text drumherum schreibt)
+        val start = s.indexOf('{')
+        val end = s.lastIndexOf('}')
+        if (start >= 0 && end > start) {
+            s = s.substring(start, end + 1)
+        }
+        // '…' String-Literale → "…"
+        s = SINGLE_QUOTED_JSON.replace(s) { m ->
+            val inner = m.groupValues[1]
+                .replace("\"", "\\\"")
+                .replace("\\'", "'")
+            "\"$inner\""
+        }
+        return s
     }
 }
