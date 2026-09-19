@@ -743,9 +743,11 @@ JSON-Schema:
         val openArr = s.count { it == '[' }
         val closeArr = s.count { it == ']' }
         if (openArr > closeArr) s += "]".repeat(openArr - closeArr)
-        // Trailing Komma vor } entfernen
-        s = s.replace(Regex(",\\s*}"), "}")
-        s = s.replace(Regex(",\\s*]"), "]")
+        // Trailing Komma vor } / ] entfernen (ohne Regex – } ist in Java-Pattern heikel)
+        while (",}" in s) s = s.replace(",}", "}")
+        while (",]" in s) s = s.replace(",]", "]")
+        // Varianten mit Whitespace
+        s = s.replace(", }", "}").replace(", ]", "]")
         return s
     }
 
