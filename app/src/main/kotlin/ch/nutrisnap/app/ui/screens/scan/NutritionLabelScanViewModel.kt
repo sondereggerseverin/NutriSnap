@@ -8,9 +8,13 @@ import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.CustomFoodItem
 import ch.nutrisnap.app.data.repository.CustomFoodRepository
 import ch.nutrisnap.app.domain.GroqVisionService
+import ch.nutrisnap.app.domain.IngredientNutritionDatabase
 import ch.nutrisnap.app.domain.NutritionLabelResult
+import ch.nutrisnap.app.ui.screens.settings.notifDataStore
+import ch.nutrisnap.app.ui.theme.KEY_MICRO_NUTRIENT_FILL
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 sealed class LabelScanState {
@@ -37,10 +41,37 @@ class NutritionLabelScanViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val base64 = visionService.bitmapToBase64JpegForText(bitmap)
             visionService.analyzeNutritionLabel(base64).fold(
-                onSuccess = { result -> _state.value = LabelScanState.Result(result) },
+                onSuccess = { result ->
+                    val filled = fillMissingMicros(result)
+                    _state.value = LabelScanState.Result(filled)
+                },
                 onFailure = { e -> _state.value = LabelScanState.Error(e.message ?: "Unbekannter Fehler") }
             )
         }
+    }
+
+    /**
+     * Wenn das Etikett keine Ballaststoffe zeigt und der Mikro-Toggle an ist,
+     * aus der lokalen Referenz-DB nachziehen (Produktname/Marke).
+     */
+    private suspend fun fillMissingMicros(result: NutritionLabelResult): NutritionLabelResult {
+        val enabled = getApplication<Application>().notifDataStore.data.first()
+            ?.get(KEY_MICRO_NUTRIENT_FILL) ?: true
+        if (!enabled) return result
+        if (result.fiberPer100g > 0f) return result
+        val candidates = listOfNotNull(
+            result.productName.takeIf { it.isNotBlank() },
+            result.brand.takeIf { it.isNotBlank() },
+            listOf(result.brand, result.productName).filter { it.isNotBlank() }.joinToString(" ")
+                .takeIf { it.isNotBlank() }
+        )
+        for (c in candidates) {
+            val entry = IngredientNutritionDatabase.lookup(c) ?: continue
+            if (entry.fiber >= 0f) {
+                return result.copy(fiberPer100g = entry.fiber)
+            }
+        }
+        return result
     }
 
     fun retake() {

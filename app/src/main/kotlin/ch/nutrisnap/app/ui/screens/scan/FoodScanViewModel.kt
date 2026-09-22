@@ -13,6 +13,7 @@ import ch.nutrisnap.app.domain.DishIngredientCandidate
 import ch.nutrisnap.app.domain.DishScanResult
 import ch.nutrisnap.app.domain.EntryPlausibilityChecker
 import ch.nutrisnap.app.domain.GroqVisionService
+import ch.nutrisnap.app.domain.MealSummaryResult
 import ch.nutrisnap.app.domain.OnDeviceFoodBackendRegistry
 import ch.nutrisnap.app.domain.OnDeviceScanStats
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
@@ -98,6 +99,9 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
             var usedOnDevice = false
 
             val onDeviceBackend = OnDeviceFoodBackendRegistry.active()
+            var mealSummary: MealSummaryResult? = null
+            var usedMealSummaryOnly = false
+
             val dish: DishScanResult = if (!online) {
                 // Phase C: On-Device-Fallback ohne Cloud
                 usedOnDevice = true
@@ -123,7 +127,7 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                 val mealSummaryEnabled = getApplication<Application>().notifDataStore.data.first()
                     ?.get(KEY_MEAL_PHOTO_SUMMARY) ?: true
                 // Parallel: Zutaten zerlegen + optional Meal-Summary (Yazio-ähnlich)
-                val (dishResult, mealSummary) = coroutineScope {
+                val (dishResult, summary) = coroutineScope {
                     val dishJob = async {
                         visionService.analyzeDishIngredients(base64).getOrNull()
                     }
@@ -134,17 +138,19 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     dishJob.await() to summaryJob.await()
                 }
+                mealSummary = summary
                 when {
                     dishResult != null && dishResult.ingredients.any { it.name.isNotBlank() } ->
                         dishResult
-                    mealSummary != null && mealSummary.calories > 50f -> {
-                        // Fallback: eine synthetische «Zutat» = gesamtes Gericht
-                        val g = mealSummary.servingGrams.coerceIn(100f, 1200f)
+                    mealSummary != null && mealSummary!!.calories > 50f -> {
+                        usedMealSummaryOnly = true
+                        val g = mealSummary!!.servingGrams.coerceIn(100f, 1200f)
+                        val name = mealSummary!!.dishName.ifBlank { "Gericht vom Foto" }
                         DishScanResult(
-                            dishName = mealSummary.dishName.ifBlank { "Gericht vom Foto" },
+                            dishName = name,
                             ingredients = listOf(
                                 DishIngredientCandidate(
-                                    name = mealSummary.dishName.ifBlank { "Gericht vom Foto" },
+                                    name = name,
                                     estimatedGrams = g,
                                     confidence = "mittel"
                                 )
@@ -152,7 +158,6 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                         )
                     }
                     else -> {
-                        // Cloud fehlgeschlagen → On-Device versuchen
                         usedOnDevice = true
                         showStage(PhotoAnalysisStage.ON_DEVICE_LABELING, onDevice = true, minDelayMs = 300)
                         onDeviceBackend.analyze(bitmap).fold(
@@ -182,31 +187,31 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
             }
 
             showStage(PhotoAnalysisStage.SEARCHING_NUTRITION_DATABASE, onDevice = usedOnDevice)
-            // Wandelt die erkannten Zutaten in Zeilen um, die RecipeNutritionAnalyzer
-            // (DB-Abgleich + AI-Fallback) genau wie manuell eingegebene Rezeptzeilen
-            // verarbeiten kann. Unsichere Erkennungen bleiben im Namen sichtbar,
-            // damit sie im Verify-Screen transparent markiert sind.
-            val lines = cleanedIngredients.map { ing ->
-                val grams = ing.estimatedGrams.toInt().coerceAtLeast(1)
-                // Komma vor dem Hinweis: parseIngredientLine() kappt Zutatennamen ab dem
-                // ersten Komma fuer die DB-Suche (bestehendes Verhalten) — so bleibt der
-                // Hinweis in der Anzeige sichtbar, verfaelscht aber nie den Suchbegriff.
-                val label = if (ing.confidence.equals("niedrig", ignoreCase = true) || usedOnDevice)
-                    "${ing.name}, Unsichere Erkennung – bitte prüfen" else ing.name
-                "${grams}g $label"
-            }
-
             _state.value = FoodScanState.Analyzing(
                 PhotoAnalysisStage.BREAKING_DOWN_MACROS,
                 onDevice = usedOnDevice
             )
-            // On-Device/Offline: nur lokale Nährwert-DB + Cache – kein OFF/KI-Timeout
-            val analysisResult = RecipeNutritionAnalyzer.analyzeIngredientLines(
-                lines = lines,
-                allowNetwork = !usedOnDevice
-            )
+
+            val analysisResult = if (usedMealSummaryOnly && mealSummary != null) {
+                // Makros aus Gericht-Summary direkt injizieren (nicht DB-Lookup)
+                buildAnalysisFromMealSummary(mealSummary!!)
+            } else {
+                val lines = cleanedIngredients.map { ing ->
+                    val grams = ing.estimatedGrams.toInt().coerceAtLeast(1)
+                    val label = if (ing.confidence.equals("niedrig", ignoreCase = true) || usedOnDevice)
+                        "${ing.name}, Unsichere Erkennung – bitte prüfen" else ing.name
+                    "${grams}g $label"
+                }
+                RecipeNutritionAnalyzer.analyzeIngredientLines(
+                    lines = lines,
+                    allowNetwork = !usedOnDevice
+                )
+            }
 
             val warnings = buildScanWarnings(cleanedIngredients, analysisResult).toMutableList()
+            if (usedMealSummaryOnly) {
+                warnings.add(0, "Gesamtschätzung aus Foto (Yazio-ähnlich) – Zutaten nicht einzeln getrennt.")
+            }
             if (usedOnDevice) {
                 warnings.add(0, "On-Device-Erkennung (ohne Cloud) – Zutaten und Mengen bitte prüfen.")
             }
@@ -215,14 +220,79 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                     "Nur ${analysisResult.matchedCount}/${analysisResult.totalCount} Zutaten lokal gefunden – restliche Nährwerte fehlen offline."
                 )
             }
+            // Wenn beides da: Hinweis bei stark abweichenden Kalorien
+            if (!usedMealSummaryOnly && mealSummary != null && mealSummary!!.calories > 50f) {
+                val sumKcal = analysisResult.totalCalories
+                val summaryKcal = mealSummary!!.calories
+                if (sumKcal > 50f && kotlin.math.abs(sumKcal - summaryKcal) / summaryKcal > 0.35f) {
+                    warnings.add(
+                        "Zutaten-Summe ~${sumKcal.toInt()} kcal, Foto-Gesamtschätzung ~${summaryKcal.toInt()} kcal – bitte prüfen."
+                    )
+                }
+            }
+
+            val displayName = when {
+                mealSummary?.dishName?.isNotBlank() == true -> mealSummary!!.dishName
+                dish.dishName.isNotBlank() -> dish.dishName
+                else -> "Gescanntes Essen"
+            }
 
             showStage(PhotoAnalysisStage.FINALIZING_RESULTS, onDevice = usedOnDevice)
             _state.value = FoodScanState.Verify(
-                dishName = dish.dishName.ifBlank { "Gescanntes Essen" },
+                dishName = displayName,
                 analysisResult = analysisResult,
-                warnings = warnings.distinct().take(5)
+                warnings = warnings.distinct().take(6)
             )
         }
+    }
+
+    /** Baut ein AnalysisResult aus der Vision-Gerichtsschätzung (pro Portion). */
+    private fun buildAnalysisFromMealSummary(summary: MealSummaryResult): RecipeNutritionAnalyzer.AnalysisResult {
+        val grams = summary.servingGrams.coerceIn(100f, 1200f)
+        val name = summary.dishName.ifBlank { "Gericht vom Foto" }
+        val per100 = 100f / grams
+        val food = FoodItem(
+            name = name,
+            brand = "KI-Gerichtsschätzung",
+            calories = summary.calories * per100,
+            protein = summary.protein * per100,
+            carbs = summary.carbs * per100,
+            fat = summary.fat * per100,
+            fiber = summary.fiber * per100,
+            servingSize = grams,
+            servingUnit = "g",
+            source = FoodSource.MANUAL,
+            completenessScore = 30
+        )
+        val line = "${grams.toInt()}g $name"
+        val ingredient = RecipeNutritionAnalyzer.IngredientResult(
+            line = line,
+            parsed = RecipeNutritionAnalyzer.ParsedIngredient(amountG = grams, name = name),
+            foodItem = food,
+            calories = summary.calories,
+            protein = summary.protein,
+            carbs = summary.carbs,
+            fat = summary.fat,
+            matched = true,
+            estimated = true,
+            micros = if (summary.fiber > 0f) mapOf("fiber" to summary.fiber) else emptyMap()
+        )
+        return RecipeNutritionAnalyzer.AnalysisResult(
+            ingredients = listOf(ingredient),
+            totalCalories = summary.calories,
+            totalProtein = summary.protein,
+            totalCarbs = summary.carbs,
+            totalFat = summary.fat,
+            caloriesPerServing = summary.calories,
+            proteinPerServing = summary.protein,
+            carbsPerServing = summary.carbs,
+            fatPerServing = summary.fat,
+            matchedCount = 1,
+            totalCount = 1,
+            estimatedCount = 1,
+            totalMicros = if (summary.fiber > 0f) mapOf("fiber" to summary.fiber) else emptyMap(),
+            fiberComplete = summary.fiber > 0f
+        )
     }
 
     /**
