@@ -45,6 +45,22 @@ data class DishScanResult(
     val ingredients: List<DishIngredientCandidate> = emptyList()
 )
 
+/**
+ * Yazio-ähnliche Gesamtschätzung eines Tellerfotos:
+ * Gerichtname + Makros für die sichtbare Portion (nicht pro 100g).
+ */
+@Serializable
+data class MealSummaryResult(
+    val dishName: String = "",
+    val calories: Float = 0f,
+    val protein: Float = 0f,
+    val carbs: Float = 0f,
+    val fat: Float = 0f,
+    val fiber: Float = 0f,
+    /** Geschätztes Gesamtgewicht der Portion in g. */
+    val servingGrams: Float = 400f
+)
+
 @Serializable
 data class NutritionLabelResult(
     val caloriesPer100g: Float = 0f,
@@ -224,6 +240,37 @@ confidence ist "hoch", "mittel" oder "niedrig". Erfinde keine Zutaten, die nicht
         // braucht die JSON-Antwort mit einem Eintrag pro Zutat mehr Platz als eine einzelne Schaetzung.
         callVisionRaw(prompt, listOf(base64Jpeg), maxTokens = 2000).mapCatching {
             json.decodeFromString<DishScanResult>(sanitizeLlmJson(it))
+        }
+    }
+
+    /**
+     * Yazio-ähnliche Gesamtschätzung: ein Tellerfoto → Gerichtname + Makros der Portion.
+     * Schneller Shortcut ohne Zutaten-Zerlegung; optional danach weiter in Zutaten trennen.
+     */
+    suspend fun analyzeMealSummary(base64Jpeg: String): Result<MealSummaryResult> = withContext(Dispatchers.IO) {
+        val prompt = """
+Du bist Ernährungsberater. Analysiere das Foto einer Mahlzeit auf dem Teller.
+Schätze die Nährwerte der gesamten sichtbaren Portion (nicht pro 100g).
+
+Antworte NUR mit JSON (kein Markdown):
+{
+  "dishName": "Kurzer deutscher Name, z.B. Tagliatelle mit Hähnchen und Pilzen",
+  "calories": 650,
+  "protein": 35,
+  "carbs": 70,
+  "fat": 22,
+  "fiber": 6,
+  "servingGrams": 420
+}
+
+Regeln:
+- Realistische Restaurant-/Heimportion (Pasta oft 500–900 kcal)
+- calories ≈ 4*protein + 4*carbs + 9*fat (±20%)
+- servingGrams: geschätztes Gesamtgewicht in Gramm
+- Keine erfundenen Zutaten im Namen; beschreibe nur was sichtbar ist
+""".trimIndent()
+        callVisionRaw(prompt, listOf(base64Jpeg), maxTokens = 800).mapCatching {
+            json.decodeFromString<MealSummaryResult>(sanitizeLlmJson(it))
         }
     }
 

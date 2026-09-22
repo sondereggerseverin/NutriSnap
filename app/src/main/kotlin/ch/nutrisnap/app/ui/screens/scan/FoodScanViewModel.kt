@@ -7,6 +7,9 @@ import androidx.lifecycle.viewModelScope
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.repository.DiaryRepository
+import ch.nutrisnap.app.data.model.FoodItem
+import ch.nutrisnap.app.data.model.FoodSource
+import ch.nutrisnap.app.domain.DishIngredientCandidate
 import ch.nutrisnap.app.domain.DishScanResult
 import ch.nutrisnap.app.domain.EntryPlausibilityChecker
 import ch.nutrisnap.app.domain.GroqVisionService
@@ -14,10 +17,15 @@ import ch.nutrisnap.app.domain.OnDeviceFoodBackendRegistry
 import ch.nutrisnap.app.domain.OnDeviceScanStats
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import ch.nutrisnap.app.ui.screens.recipes.IngredientOverride
+import ch.nutrisnap.app.ui.screens.settings.notifDataStore
+import ch.nutrisnap.app.ui.theme.KEY_MEAL_PHOTO_SUMMARY
 import ch.nutrisnap.app.utils.NetworkMonitor
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -112,23 +120,55 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                 showStage(PhotoAnalysisStage.IDENTIFYING_INGREDIENTS)
                 _state.value = FoodScanState.Analyzing(PhotoAnalysisStage.SEPARATING_INGREDIENTS)
                 val base64 = visionService.bitmapToBase64Jpeg(bitmap)
-                visionService.analyzeDishIngredients(base64).getOrElse { cloudErr ->
-                    // Cloud fehlgeschlagen → On-Device versuchen
-                    usedOnDevice = true
-                    showStage(PhotoAnalysisStage.ON_DEVICE_LABELING, onDevice = true, minDelayMs = 300)
-                    onDeviceBackend.analyze(bitmap).fold(
-                        onSuccess = { result ->
-                            OnDeviceScanStats.recordSuccess(getApplication())
-                            result
-                        },
-                        onFailure = {
-                            OnDeviceScanStats.recordFailure(getApplication())
-                            _state.value = FoodScanState.Error(
-                                cloudErr.message ?: "Bilderkennung fehlgeschlagen"
+                val mealSummaryEnabled = getApplication<Application>().notifDataStore.data.first()
+                    ?.get(KEY_MEAL_PHOTO_SUMMARY) ?: true
+                // Parallel: Zutaten zerlegen + optional Meal-Summary (Yazio-ähnlich)
+                val (dishResult, mealSummary) = coroutineScope {
+                    val dishJob = async {
+                        visionService.analyzeDishIngredients(base64).getOrNull()
+                    }
+                    val summaryJob = async {
+                        if (mealSummaryEnabled) {
+                            visionService.analyzeMealSummary(base64).getOrNull()
+                        } else null
+                    }
+                    dishJob.await() to summaryJob.await()
+                }
+                when {
+                    dishResult != null && dishResult.ingredients.any { it.name.isNotBlank() } ->
+                        dishResult
+                    mealSummary != null && mealSummary.calories > 50f -> {
+                        // Fallback: eine synthetische «Zutat» = gesamtes Gericht
+                        val g = mealSummary.servingGrams.coerceIn(100f, 1200f)
+                        DishScanResult(
+                            dishName = mealSummary.dishName.ifBlank { "Gericht vom Foto" },
+                            ingredients = listOf(
+                                DishIngredientCandidate(
+                                    name = mealSummary.dishName.ifBlank { "Gericht vom Foto" },
+                                    estimatedGrams = g,
+                                    confidence = "mittel"
+                                )
                             )
-                            return@launch
-                        }
-                    )
+                        )
+                    }
+                    else -> {
+                        // Cloud fehlgeschlagen → On-Device versuchen
+                        usedOnDevice = true
+                        showStage(PhotoAnalysisStage.ON_DEVICE_LABELING, onDevice = true, minDelayMs = 300)
+                        onDeviceBackend.analyze(bitmap).fold(
+                            onSuccess = { result ->
+                                OnDeviceScanStats.recordSuccess(getApplication())
+                                result
+                            },
+                            onFailure = {
+                                OnDeviceScanStats.recordFailure(getApplication())
+                                _state.value = FoodScanState.Error(
+                                    "Bilderkennung fehlgeschlagen"
+                                )
+                                return@launch
+                            }
+                        )
+                    }
                 }
             }
 
