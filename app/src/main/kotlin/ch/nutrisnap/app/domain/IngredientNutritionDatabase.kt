@@ -71,6 +71,9 @@ object IngredientNutritionDatabase {
         "frischkäse light"      to Entry(155f, 8f,    4f,  12f),
         "frischkäse"            to Entry(241f, 6f,    4f,  23f),
         "cream cheese"          to Entry(241f, 6f,    4f,  23f),
+        // Philadelphia Balance (fettreduziert, ~145 kcal / 100 g)
+        "philadelphia balance"  to Entry(145f, 7.2f,  5.1f, 10f,  0.3f),
+        "philadelphia"          to Entry(253f, 5.5f,  4.1f, 25f,  0f),
         "quark"                 to Entry(67f,  12f,   4f,   0.3f),
         "magerquark"            to Entry(67f,  12f,   4f,   0.2f),
         "hüttenkäse"            to Entry(98f,  11f,   3.4f, 4.3f),
@@ -123,6 +126,15 @@ object IngredientNutritionDatabase {
         "black beans"           to Entry(132f, 8.9f,  24f,  0.5f, 8.7f),
         "kidneybohnen"          to Entry(127f, 8.7f,  23f,  0.5f, 6.4f),
         "kidney beans"          to Entry(127f, 8.7f,  23f,  0.5f, 6.4f),
+        // Weisse Bohnen / Cannellini (gekocht/Abtropfgewicht)
+        "weisse bohnen"         to Entry(118f, 8.1f,  21f,  0.5f, 6.3f),
+        "weiße bohnen"          to Entry(118f, 8.1f,  21f,  0.5f, 6.3f),
+        "weissbohnen"           to Entry(118f, 8.1f,  21f,  0.5f, 6.3f),
+        "cannellini"            to Entry(118f, 8.1f,  21f,  0.5f, 6.3f),
+        "cannellini bohnen"     to Entry(118f, 8.1f,  21f,  0.5f, 6.3f),
+        "white beans"           to Entry(118f, 8.1f,  21f,  0.5f, 6.3f),
+        "bohnen an tomatensauce" to Entry(82f, 5f, 10f, 1.5f, 4f),
+        "bohnen in tomatensauce" to Entry(82f, 5f, 10f, 1.5f, 4f),
         "tofu"                  to Entry(76f,  8f,    1.9f, 4.8f, 0.3f),
         "edamame"               to Entry(121f, 11.9f, 8.9f, 5.2f, 5.2f),
 
@@ -162,6 +174,12 @@ object IngredientNutritionDatabase {
         "corn"                  to Entry(86f,  3.3f,  19f,  1.4f, 2.7f),
         "erbsen"                to Entry(81f,  5.4f,  14f,  0.4f, 5.1f),
         "peas"                  to Entry(81f,  5.4f,  14f,  0.4f, 5.1f),
+        "rote bete"             to Entry(44f,  1.7f,  10f,  0.2f, 2f),
+        "rote beete"            to Entry(44f,  1.7f,  10f,  0.2f, 2f),
+        "roote beete"           to Entry(44f,  1.7f,  10f,  0.2f, 2f),
+        "gekochte rote bete"    to Entry(44f,  1.7f,  10f,  0.2f, 2f),
+        "beetroot"              to Entry(44f,  1.7f,  10f,  0.2f, 2f),
+        "beets"                 to Entry(44f,  1.7f,  10f,  0.2f, 2f),
 
         // ── Fruits ───────────────────────────────────────────────────────────
         "banane"                to Entry(89f,  1.1f,  23f,  0.3f, 2.6f),

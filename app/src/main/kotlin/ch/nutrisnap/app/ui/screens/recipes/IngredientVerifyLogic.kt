@@ -74,8 +74,8 @@ data class IngredientVerifyState(
         val factor = effectiveAmountG / 100f
         val base = effectiveFood?.let { food ->
             buildMap {
-                val fiberPer100 = food.fiber?.takeIf { it > 0f }
-                    ?: lookupLocalFiberPer100()
+                // Expliziter Wert (auch 0 g bei Käse/Öl) hat Vorrang; nur bei null Fallback.
+                val fiberPer100 = food.fiber ?: lookupLocalFiberPer100()
                 fiberPer100?.let { put("fiber", it * factor) }
                 food.sugar?.let { put("sugar", it * factor) }
                 food.saturatedFat?.let { put("saturatedFat", it * factor) }
@@ -93,7 +93,8 @@ data class IngredientVerifyState(
         return manualFiber?.let { base + ("fiber" to it) } ?: base
     }
 
-    /** Ballaststoffe pro 100 g aus der lokalen Referenz-DB (Name der Zutat / Match). */
+    /** Ballaststoffe pro 100 g aus der lokalen Referenz-DB (Name der Zutat / Match).
+     *  Gibt auch 0 zurück, wenn der Eintrag bekannt und fiberlos ist (Käse, Öl). */
     private fun lookupLocalFiberPer100(): Float? {
         val candidates = listOfNotNull(
             result.parsed?.name,
@@ -102,7 +103,7 @@ data class IngredientVerifyState(
         )
         for (c in candidates) {
             val entry = IngredientNutritionDatabase.lookup(c) ?: continue
-            if (entry.fiber > 0f) return entry.fiber
+            return entry.fiber
         }
         return null
     }

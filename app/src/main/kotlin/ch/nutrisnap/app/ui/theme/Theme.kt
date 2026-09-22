@@ -425,6 +425,18 @@ val KEY_TOGGLE_TYPOGRAPHY_NUMBERS = androidx.datastore.preferences.core.booleanP
 val KEY_TOGGLE_NAV_LABEL_RENAME = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_nav_label_rename")
 val KEY_TOGGLE_NAV_SHORTCUTS = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_nav_shortcuts")
 
+// ── Experimentell: Ernährung / AI (Yazio-Vergleich) ───────────────────────────
+/** Wenn Match keinen Fiber hat: lokale Referenz-DB nachziehen (default an). */
+val KEY_FIBER_FALLBACK = androidx.datastore.preferences.core.booleanPreferencesKey("fiber_fallback")
+/** Smarte Dosen-/Konserven-Mengen (Bohnen etc. statt pauschal 120–200 g, default an). */
+val KEY_SMART_CAN_PORTIONS = androidx.datastore.preferences.core.booleanPreferencesKey("smart_can_portions")
+/** Foto → Gesamtschätzung Gericht (Name + Makros), Yazio-ähnlich (default an). */
+val KEY_MEAL_PHOTO_SUMMARY = androidx.datastore.preferences.core.booleanPreferencesKey("meal_photo_summary")
+/** Bei Gerichtsnamen in „KI schätzen“ Meal-Summary statt Einzelzutaten-Fail (default an). */
+val KEY_DISH_NAME_AI_ESTIMATE = androidx.datastore.preferences.core.booleanPreferencesKey("dish_name_ai_estimate")
+/** Mikronährstoffe (Fiber/Vitamine) bei Label-Scan und Referenz stärker befüllen (default an). */
+val KEY_MICRO_NUTRIENT_FILL = androidx.datastore.preferences.core.booleanPreferencesKey("micro_nutrient_fill")
+
 // ── Typography ─────────────────────────────────────────────────────────────────
 
 val NutriSnapTypography = Typography(

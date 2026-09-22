@@ -208,6 +208,10 @@ object RecipeNutritionAnalyzer {
         "thigh" to 120f, "thighs" to 120f, "schenkel" to 120f,
         "stange" to 200f, "porree" to 200f, "lauch" to 200f,
         "packung" to 150f, "pack" to 150f, "dose" to 200f,
+        // Bohnen/Hülsenfrüchte: typische Dose Abtropfgewicht ~240 g, ganze Dose oft 400 g
+        "weisse bohnen" to 240f, "weiße bohnen" to 240f, "weissbohnen" to 240f,
+        "cannellini" to 240f, "kidneybohnen" to 240f, "schwarze bohnen" to 240f,
+        "bohnen" to 240f, "beans" to 240f, "linsen" to 240f, "kichererbsen" to 240f,
         "bund" to 50f, "scheibe" to 25f, "scheiben" to 25f,
         // Frühstücks-/Keks-Produkte (g pro Stück)
         "weetbix" to 37.5f, "weetabix" to 37.5f, "weet-bix" to 37.5f,
@@ -541,7 +545,8 @@ object RecipeNutritionAnalyzer {
                     carbs    = g("carbohydrates_100g"),
                     fat      = g("fat_100g"),
                     // OFF liefert bei vielen Produkten keine Fiber → lokale Referenz nachziehen
-                    fiber    = offFiber ?: localRef?.fiber?.takeIf { it > 0f },
+                    // (auch 0 g ist ein gültiger Wert, z.B. Käse/Öl)
+                    fiber    = offFiber ?: localRef?.fiber,
                     source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
                 )
             }
@@ -553,7 +558,7 @@ object RecipeNutritionAnalyzer {
                     protein  = localRef.protein,
                     carbs    = localRef.carbs,
                     fat      = localRef.fat,
-                    fiber    = localRef.fiber.takeIf { it > 0f },
+                    fiber    = localRef.fiber,
                     source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
                 )
             }
@@ -593,7 +598,7 @@ object RecipeNutritionAnalyzer {
                     val local = IngredientNutritionDatabase.lookup(m.ingredientName)
                         ?: IngredientNutritionDatabase.lookup(m.matchedFoodName.orEmpty())
                         ?: IngredientNutritionDatabase.lookup(m.ingredientRaw)
-                    local?.fiber?.takeIf { it > 0f }?.let { it * amountG / 100f }
+                    local?.fiber?.let { it * amountG / 100f }
                 }
             val foodItem = if (matched && m.matchedFoodName != null && amountG > 0f) {
                 FoodItem(
@@ -685,7 +690,7 @@ object RecipeNutritionAnalyzer {
                                 protein  = local.protein,
                                 carbs    = local.carbs,
                                 fat      = local.fat,
-                                fiber    = local.fiber.takeIf { it > 0f },
+                                fiber    = local.fiber,
                                 source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
                             )
                             return@async IngredientResult(
@@ -779,9 +784,8 @@ object RecipeNutritionAnalyzer {
                     if (r.matched || r.parsed == null) return@map r
                     val est = estimates[r.parsed.name] ?: return@map r
                     val factor = r.parsed.amountG / 100f
-                    // AI liefert oft keine Fiber → lokale Referenz nachziehen
-                    val localFiber = IngredientNutritionDatabase.lookup(r.parsed.name)
-                        ?.fiber?.takeIf { it > 0f }
+                    // AI liefert oft keine Fiber → lokale Referenz nachziehen (auch 0 g gültig)
+                    val localFiber = IngredientNutritionDatabase.lookup(r.parsed.name)?.fiber
                     val aiFood = FoodItem(
                         name     = r.parsed.name,
                         calories = est.calories,

@@ -73,6 +73,11 @@ import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_PROGRESS_BAR_COLOR_SHIFT
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TYPOGRAPHY_NUMBERS
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_NAV_LABEL_RENAME
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_NAV_SHORTCUTS
+import ch.nutrisnap.app.ui.theme.KEY_FIBER_FALLBACK
+import ch.nutrisnap.app.ui.theme.KEY_SMART_CAN_PORTIONS
+import ch.nutrisnap.app.ui.theme.KEY_MEAL_PHOTO_SUMMARY
+import ch.nutrisnap.app.ui.theme.KEY_DISH_NAME_AI_ESTIMATE
+import ch.nutrisnap.app.ui.theme.KEY_MICRO_NUTRIENT_FILL
 
 enum class FitnessGoal(val label: String, val emoji: String, val desc: String) {
     LOSE_WEIGHT("Abnehmen",        "\uD83D\uDD25", "–500 kcal vom TDEE · mehr Protein"),
@@ -453,6 +458,60 @@ fun SettingsScreen(
                                 context.notifDataStore.edit { it[KEY_FRESH_RECIPE_DETAIL] = checked }
                             }
                         }
+                    )
+                }
+                // ── Experimentell: Ernährung / AI (Yazio-Vergleich) ──────────
+                SettingsCard(title = "Ernährung & AI (Experiment)", icon = Icons.Default.AutoFixHigh) {
+                    Text(
+                        "Neue Funktionen zum Vergleich mit dem bisherigen Verhalten. Ausschalten = wie bisher.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(NutriSpacing.sm))
+                    DesignToggleRow(
+                        title = "Fiber-Fallback (lokale DB)",
+                        subtitle = "Fehlende Ballaststoffe aus Referenz-DB ergänzen",
+                        key = KEY_FIBER_FALLBACK,
+                        defaultOn = true,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "Smarte Dosen-Mengen",
+                        subtitle = "Bohnen/Konserven realistischer (nicht 120 g)",
+                        key = KEY_SMART_CAN_PORTIONS,
+                        defaultOn = true,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "Foto → Gericht-Summary",
+                        subtitle = "Yazio-ähnlich: Name + Makros aus Tellerfoto",
+                        key = KEY_MEAL_PHOTO_SUMMARY,
+                        defaultOn = true,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "Gerichtsname in KI schätzen",
+                        subtitle = "„Tagliatelle mit …“ als Gericht statt Fail",
+                        key = KEY_DISH_NAME_AI_ESTIMATE,
+                        defaultOn = true,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
+                    )
+                    DesignToggleRow(
+                        title = "Mikronährstoffe stärker füllen",
+                        subtitle = "Fiber/Vitamine bei Label & Referenz",
+                        key = KEY_MICRO_NUTRIENT_FILL,
+                        defaultOn = true,
+                        prefs = prefs,
+                        scope = scope,
+                        context = context
                     )
                 }
                 // ── Design-Backlog-Toggles ──────────────────────────────────
