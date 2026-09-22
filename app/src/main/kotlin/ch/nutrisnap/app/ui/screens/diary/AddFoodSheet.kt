@@ -708,6 +708,9 @@ private fun AiEstimateTab(
     var amountText by remember { mutableStateOf("100") }
     var selectedMeal by remember { mutableStateOf(initialMeal ?: MealType.LUNCH) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
+    val dishAiEnabled = prefs?.get(ch.nutrisnap.app.ui.theme.KEY_DISH_NAME_AI_ESTIMATE) ?: true
 
     fun runEstimate(name: String) {
         val q = name.trim()
@@ -733,18 +736,34 @@ private fun AiEstimateTab(
                     completenessScore = 80
                 )
                 sourceLabel = "Lokale Referenz (USDA-nah)"
+                amountText = "100"
                 isLoading = false
                 return@launch
             }
-            // 2) KI-Schätzung
-            val estimated = runCatching {
-                ch.nutrisnap.app.data.api.GroqFoodEstimatorApi.estimate(q)
-            }.getOrNull()
+            // 2) Gerichtsname → Portionsschätzung (wenn Toggle an)
+            val estimator = ch.nutrisnap.app.data.api.GroqFoodEstimatorApi
+            if (dishAiEnabled && estimator.looksLikeDish(q)) {
+                val dish = runCatching { estimator.estimateDish(q) }.getOrNull()
+                if (dish != null) {
+                    result = dish
+                    sourceLabel = "KI-Gerichtsschätzung (1 Portion, nicht verifiziert)"
+                    amountText = dish.servingSize.toInt().coerceIn(50, 1500).toString()
+                    isLoading = false
+                    return@launch
+                }
+            }
+            // 3) KI-Schätzung pro 100g (Einzelzutat)
+            val estimated = runCatching { estimator.estimate(q) }.getOrNull()
             if (estimated != null) {
                 result = estimated
                 sourceLabel = "KI-Schätzung (nicht verifiziert)"
+                amountText = "100"
             } else {
-                errorMsg = "Keine Schätzung möglich – probiere Suche oder Manuell."
+                errorMsg = if (estimator.looksLikeDish(q)) {
+                    "Gericht konnte nicht geschätzt werden – Foto-Scan oder Rezept-Import nutzen."
+                } else {
+                    "Keine Schätzung möglich – probiere Suche oder Manuell."
+                }
             }
             isLoading = false
         }

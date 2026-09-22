@@ -36,6 +36,70 @@ object GroqFoodEstimatorApi {
         .build()
 
     /**
+     * Heuristik: freier Text sieht aus wie ein Gericht (nicht Einzelzutat).
+     * Beispiele: «Tagliatelle mit Poulet Stroganoff», «Pasta al pesto», «Burger mit Pommes».
+     */
+    fun looksLikeDish(query: String): Boolean {
+        val q = query.trim().lowercase()
+        if (q.length < 8) return false
+        val words = q.split(Regex("""\s+""")).filter { it.length > 1 }
+        if (words.size < 2) return false
+        val dishHints = listOf(
+            "mit ", " and ", " & ", " al ", " alla ", " au ", " à ",
+            "pasta", "tagliatelle", "spaghetti", "penne", "risotto", "pizza",
+            "burger", "bowl", "salat", "suppe", "curry", "stir fry", "pfanne",
+            "stroganoff", "gulasch", "ragout", "lasagne", "couscous", "wrap",
+            "sandwich", "teller", "menü", "menu", "gericht"
+        )
+        return dishHints.any { it in q }
+    }
+
+    /**
+     * Schätzt Nährwerte für ein komplettes Gericht pro typischer Portion (nicht pro 100 g).
+     * servingSize wird auf die geschätzte Portionsgrösse in g gesetzt.
+     */
+    suspend fun estimateDish(query: String): FoodItem? = withContext(Dispatchers.IO) {
+        val prompt = """
+            Du schätzt die Nährwerte einer typischen Restaurant-/Heimportion des Gerichts "$query".
+            Nicht pro 100g, sondern für EINE realistische Portion (Teller, wie serviert).
+
+            Regeln:
+            - calories, protein, carbs, fat, fiber, sugar, salt für die ganze Portion
+            - servingGrams: geschätztes Gesamtgewicht der Portion in Gramm (z.B. 350–500)
+            - calories muss ungefähr 4*protein + 4*carbs + 9*fat (±20%) entsprechen
+            - Realistische Restaurant-Portionen: Pasta-Gericht oft 500–900 kcal, Salat 200–450, Burger 600–900
+            - Unbekannt → {}
+
+            Antworte NUR mit JSON, kein Markdown:
+            {"name":"...","calories":0.0,"protein":0.0,"carbs":0.0,"fat":0.0,"fiber":0.0,"sugar":0.0,"salt":0.0,"servingGrams":400}
+        """.trimIndent()
+
+        val item = if (!GeminiService.isUsable()) {
+            runCatching { estimateViaGroq(prompt, query) }.getOrNull()
+        } else {
+            coroutineScope {
+                val geminiJob: Deferred<FoodItem?> = async {
+                    runCatching { estimateViaGemini(prompt, query) }.getOrNull()
+                }
+                val groqJob: Deferred<FoodItem?> = async {
+                    runCatching { estimateViaGroq(prompt, query) }.getOrNull()
+                }
+                select<FoodItem?> {
+                    geminiJob.onAwait { it }
+                    groqJob.onAwait { it }
+                } ?: geminiJob.await() ?: groqJob.await()
+            }
+        } ?: return@withContext null
+
+        // Dish-Schätzung: servingSize = Portionsgewicht (Default 400 g)
+        item.copy(
+            brand = "KI-Gerichtsschätzung",
+            servingSize = item.servingSize.takeIf { it > 100f } ?: 400f,
+            completenessScore = 25
+        )
+    }
+
+    /**
      * Ruft Gemini und Groq PARALLEL auf (statt sequenziell mit Fallback via runBlocking)
      * und nimmt das erste erfolgreiche Ergebnis. Vorher wartete dieser Call bis zu Gemini's
      * vollem Timeout (~28s, s. GeminiService), bevor überhaupt erst Groq versucht wurde -
@@ -168,17 +232,22 @@ object GroqFoodEstimatorApi {
         val fiber = g("fiber")
         if (fiber != null && fiber > 50f) return null // z.B. 20g bei Mais wäre falsch, 50+ absurd
 
+        val servingGrams = g("servingGrams")?.takeIf { it in 50f..1500f }
+        // Dish-Prompt liefert absolute Portionswerte → auf pro 100 g umrechnen,
+        // damit der Rest der App (amount/100 * per100) korrekt bleibt.
+        // servingSize merkt die empfohlene Portionsgrösse für die UI.
+        val per100 = if (servingGrams != null && servingGrams > 0f) 100f / servingGrams else 1f
         return FoodItem(
             name = data.optString("name", query).ifBlank { query },
-            brand = "KI-geschätzt",
-            calories = calories,
-            protein  = protein,
-            carbs    = carbs,
-            fat      = fat,
-            fiber    = fiber,
-            sugar    = g("sugar"),
-            salt     = g("salt"),
-            servingSize = 100f,
+            brand = if (servingGrams != null) "KI-Gerichtsschätzung" else "KI-geschätzt",
+            calories = if (servingGrams != null) calories * per100 else calories,
+            protein  = if (servingGrams != null) protein * per100 else protein,
+            carbs    = if (servingGrams != null) carbs * per100 else carbs,
+            fat      = if (servingGrams != null) fat * per100 else fat,
+            fiber    = fiber?.let { if (servingGrams != null) it * per100 else it },
+            sugar    = g("sugar")?.let { if (servingGrams != null) it * per100 else it },
+            salt     = g("salt")?.let { if (servingGrams != null) it * per100 else it },
+            servingSize = servingGrams ?: 100f,
             servingUnit = "g",
             source = FoodSource.MANUAL,
             completenessScore = 20 // niedrig gewichtet — nur Fallback, keine verifizierte Quelle
