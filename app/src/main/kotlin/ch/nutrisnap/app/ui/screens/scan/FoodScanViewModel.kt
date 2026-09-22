@@ -55,7 +55,9 @@ sealed class FoodScanState {
         val dishName: String,
         val analysisResult: RecipeNutritionAnalyzer.AnalysisResult,
         /** Sanfte Hinweise (grosse Portionen, unsichere Erkennungen) – nicht blockierend. */
-        val warnings: List<String> = emptyList()
+        val warnings: List<String> = emptyList(),
+        /** Optional: Yazio-ähnliche Gesamtschätzung parallel zur Zutaten-Zerlegung. */
+        val mealSummaryAlternative: RecipeNutritionAnalyzer.AnalysisResult? = null
     ) : FoodScanState()
     data class Error(val message: String) : FoodScanState()
     object Saved : FoodScanState()
@@ -220,14 +222,21 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                     "Nur ${analysisResult.matchedCount}/${analysisResult.totalCount} Zutaten lokal gefunden – restliche Nährwerte fehlen offline."
                 )
             }
-            // Wenn beides da: Hinweis bei stark abweichenden Kalorien
-            if (!usedMealSummaryOnly && mealSummary != null && mealSummary!!.calories > 50f) {
+            // Alternative Gesamtschätzung, wenn Zutaten UND Summary vorhanden
+            val summaryAlt: RecipeNutritionAnalyzer.AnalysisResult? =
+                if (!usedMealSummaryOnly && mealSummary != null && mealSummary!!.calories > 50f) {
+                    buildAnalysisFromMealSummary(mealSummary!!)
+                } else null
+
+            if (summaryAlt != null) {
                 val sumKcal = analysisResult.totalCalories
-                val summaryKcal = mealSummary!!.calories
-                if (sumKcal > 50f && kotlin.math.abs(sumKcal - summaryKcal) / summaryKcal > 0.35f) {
+                val summaryKcal = summaryAlt.totalCalories
+                if (sumKcal > 50f && kotlin.math.abs(sumKcal - summaryKcal) / summaryKcal > 0.25f) {
                     warnings.add(
-                        "Zutaten-Summe ~${sumKcal.toInt()} kcal, Foto-Gesamtschätzung ~${summaryKcal.toInt()} kcal – bitte prüfen."
+                        "Zutaten ~${sumKcal.toInt()} kcal vs. Gesamtschätzung ~${summaryKcal.toInt()} kcal – Ansicht umschaltbar."
                     )
+                } else {
+                    warnings.add("Gesamtschätzung aus Foto verfügbar – oben zwischen Zutaten und Gesamt wechseln.")
                 }
             }
 
@@ -241,7 +250,8 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
             _state.value = FoodScanState.Verify(
                 dishName = displayName,
                 analysisResult = analysisResult,
-                warnings = warnings.distinct().take(6)
+                warnings = warnings.distinct().take(6),
+                mealSummaryAlternative = summaryAlt
             )
         }
     }

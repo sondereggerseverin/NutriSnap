@@ -83,7 +83,9 @@ fun IngredientVerifySheet(
      * false bei Frühstück/Dessert/Getränk: keine Beilage/Sauce-Zuordnung,
      * Zutaten bleiben flach (ein Gericht).
      */
-    allowComponentSplit: Boolean = true
+    allowComponentSplit: Boolean = true,
+    /** Optionaler Inhalt unter dem Titel (z.B. Zutaten/Gesamt-Umschalter beim Foto-Scan). */
+    headerExtra: (@Composable () -> Unit)? = null
 ) {
     var overrides by remember { mutableStateOf(initialOverrides) }
     var verifyStates by remember {
@@ -323,6 +325,10 @@ fun IngredientVerifySheet(
                         "$recipeName · $servings Portion${if (servings != 1) "en" else ""}",
                         fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    headerExtra?.let {
+                        Spacer(Modifier.height(8.dp))
+                        it()
+                    }
                     Spacer(Modifier.height(12.dp))
 
                     // Summary card

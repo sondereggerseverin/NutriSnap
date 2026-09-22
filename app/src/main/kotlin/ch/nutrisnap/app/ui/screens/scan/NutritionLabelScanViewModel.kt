@@ -105,10 +105,32 @@ class NutritionLabelScanViewModel(app: Application) : AndroidViewModel(app) {
                 source = "label_scan",
                 verified = true
             )
-            // Über FoodItemRepository, damit Barcode auch in food_items liegt
-            ch.nutrisnap.app.data.repository.FoodItemRepository(
+            val foodRepo = ch.nutrisnap.app.data.repository.FoodItemRepository(
                 ch.nutrisnap.app.data.db.NutriDatabase.getInstance(getApplication())
-            ).saveCustomFoodWithBarcode(item)
+            )
+            // Über FoodItemRepository, damit Barcode auch in food_items liegt
+            foodRepo.saveCustomFoodWithBarcode(item)
+            // Vitamine/Mineralstoffe aus Etikett in food_items (CustomFood hat keine Mikro-Spalten)
+            val food = ch.nutrisnap.app.data.model.FoodItem(
+                name = name.trim(),
+                brand = result.brand.ifBlank { null },
+                barcode = bc,
+                calories = result.caloriesPer100g,
+                protein = result.proteinPer100g,
+                carbs = result.carbsPer100g,
+                fat = result.fatPer100g,
+                fiber = result.fiberPer100g,
+                sugar = result.sugarPer100g,
+                salt = result.saltPer100g,
+                vitaminC = result.vitaminCPer100g.takeIf { it > 0f },
+                vitaminD = result.vitaminDPer100g.takeIf { it > 0f },
+                calcium = result.calciumPer100g.takeIf { it > 0f },
+                iron = result.ironPer100g.takeIf { it > 0f },
+                servingSize = portionSizeG.coerceAtLeast(1f),
+                source = ch.nutrisnap.app.data.model.FoodSource.MANUAL,
+                completenessScore = 95
+            )
+            foodRepo.saveCustomFood(food)
             _state.value = LabelScanState.Saved
         }
     }

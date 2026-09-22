@@ -36,6 +36,7 @@ fun FoodScanScreen(
         is FoodScanState.Verify -> VerifyAndSaveFlow(
             dishName = s.dishName,
             analysisResult = s.analysisResult,
+            mealSummaryAlternative = s.mealSummaryAlternative,
             warnings = s.warnings,
             initialOverrides = vm.getOverrides(),
             onOverridesChanged = vm::setOverrides,
@@ -163,6 +164,7 @@ private fun StageRow(label: String, status: StageStatus) {
 private fun VerifyAndSaveFlow(
     dishName: String,
     analysisResult: ch.nutrisnap.app.domain.RecipeNutritionAnalyzer.AnalysisResult,
+    mealSummaryAlternative: ch.nutrisnap.app.domain.RecipeNutritionAnalyzer.AnalysisResult? = null,
     warnings: List<String> = emptyList(),
     initialOverrides: Map<String, ch.nutrisnap.app.ui.screens.recipes.IngredientOverride>,
     onOverridesChanged: (Map<String, ch.nutrisnap.app.ui.screens.recipes.IngredientOverride>) -> Unit,
@@ -178,6 +180,13 @@ private fun VerifyAndSaveFlow(
     // Mahlzeit-Auswahl erfolgt danach in einem leichten Dialog.
     var pendingTotals by remember { mutableStateOf<PendingTotals?>(null) }
     var showWarnings by remember(warnings) { mutableStateOf(warnings.isNotEmpty()) }
+    // false = Zutaten-Zerlegung, true = Foto-Gesamtschätzung
+    var useMealSummary by remember { mutableStateOf(false) }
+    val activeResult = if (useMealSummary && mealSummaryAlternative != null) {
+        mealSummaryAlternative
+    } else {
+        analysisResult
+    }
 
     if (showWarnings && warnings.isNotEmpty()) {
         AlertDialog(
@@ -196,17 +205,42 @@ private fun VerifyAndSaveFlow(
         )
     }
 
-    IngredientVerifySheet(
-        analysisResult = analysisResult,
-        recipeName = dishName,
-        servings = 1,
-        initialOverrides = initialOverrides,
-        onOverridesChanged = onOverridesChanged,
-        onDismiss = onDismiss,
-        onConfirm = { kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium, _totalWeightG, _ingredientsText ->
-            pendingTotals = PendingTotals(kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium)
-        }
-    )
+    key(useMealSummary) {
+        IngredientVerifySheet(
+            analysisResult = activeResult,
+            recipeName = if (useMealSummary) "$dishName (Gesamtschätzung)" else dishName,
+            servings = 1,
+            initialOverrides = if (useMealSummary) emptyMap() else initialOverrides,
+            onOverridesChanged = { if (!useMealSummary) onOverridesChanged(it) },
+            onDismiss = onDismiss,
+            onConfirm = { kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium, _totalWeightG, _ingredientsText ->
+                pendingTotals = PendingTotals(kcal, prot, carbs, fat, fiber, sugar, satFat, salt, sodium)
+            },
+            headerExtra = if (mealSummaryAlternative != null) {
+                {
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        SegmentedButton(
+                            selected = !useMealSummary,
+                            onClick = { useMealSummary = false },
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                        ) {
+                            Text("Zutaten", fontSize = 13.sp)
+                        }
+                        SegmentedButton(
+                            selected = useMealSummary,
+                            onClick = { useMealSummary = true },
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                        ) {
+                            Text(
+                                "Gesamt ~${mealSummaryAlternative.totalCalories.toInt()} kcal",
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                }
+            } else null
+        )
+    }
 
     pendingTotals?.let { t ->
         MealTypePickerDialog(

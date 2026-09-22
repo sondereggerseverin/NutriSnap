@@ -71,7 +71,12 @@ data class NutritionLabelResult(
     val sugarPer100g: Float = 0f,
     val saltPer100g: Float = 0f,
     val productName: String = "",
-    val brand: String = ""
+    val brand: String = "",
+    /** Optional aus erweiterter Nährwerttabelle (pro 100g), 0 = nicht angegeben. */
+    val vitaminCPer100g: Float = 0f,
+    val vitaminDPer100g: Float = 0f,
+    val calciumPer100g: Float = 0f,
+    val ironPer100g: Float = 0f
 )
 
 /** Aus einem Rezept-Foto / Screenshot extrahiertes Rezept. */
@@ -301,6 +306,8 @@ Lies die Werte PRO 100g/100ml aus der Tabelle ab. Falls die Tabelle nur Werte pr
 und die Portionsgrösse erkennbar ist, rechne korrekt auf 100g um.
 
 Lies auch Produktname und Marke, falls sichtbar (auch bei gedrehtem/spiegelverkehrtem Text).
+Falls Vitamine/Mineralstoffe auf dem Etikett stehen (Vitamin C, D, Calcium, Eisen), pro 100g übernehmen.
+Einheiten: Vitamin C in mg, Vitamin D in µg, Calcium in mg, Eisen in mg. Nicht erkennbar = 0.
 
 Antworte NUR mit gültigem, VOLLSTÄNDIGEM JSON (kein Markdown, keine Erklärungen).
 Verwende ausschließlich doppelte Anführungszeichen ("), niemals einfache (').
@@ -313,6 +320,10 @@ Alle Zahlenfelder sind Pflicht (fehlend = 0). productName/brand dürfen "" sein.
   "fiberPer100g": 3.0,
   "sugarPer100g": 5.0,
   "saltPer100g": 1.0,
+  "vitaminCPer100g": 0,
+  "vitaminDPer100g": 0,
+  "calciumPer100g": 0,
+  "ironPer100g": 0,
   "productName": "Produktname",
   "brand": "Marke"
 }
@@ -769,7 +780,11 @@ JSON-Schema:
             sugarPer100g = num("sugarPer100g"),
             saltPer100g = num("saltPer100g"),
             productName = obj.optString("productName", ""),
-            brand = obj.optString("brand", "")
+            brand = obj.optString("brand", ""),
+            vitaminCPer100g = num("vitaminCPer100g"),
+            vitaminDPer100g = num("vitaminDPer100g"),
+            calciumPer100g = num("calciumPer100g"),
+            ironPer100g = num("ironPer100g")
         )
     }
 
