@@ -259,31 +259,7 @@ internal fun IngredientVerifyRow(
         }
 
 
-        // Schnell umhängen: nächste Gruppe in availableGroups
-        if (onMoveComponent != null && componentGroup != null && availableGroups.size >= 2) {
-            val curIdx = availableGroups.indexOf(componentGroup).let { if (it < 0) 0 else it }
-            val nextLabel = availableGroups[(curIdx + 1) % availableGroups.size].let { k ->
-                when (k) {
-                    "side" -> "Beilage"
-                    "sauce" -> "Sauce / Fleisch"
-                    else -> k
-                }
-            }
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(start = 60.dp, end = 16.dp, bottom = 4.dp),
-                horizontalArrangement = Arrangement.Start
-            ) {
-                AssistChip(
-                    onClick = onMoveComponent,
-                    label = {
-                        Text("→ $nextLabel", fontSize = 11.sp)
-                    },
-                    modifier = Modifier.height(28.dp)
-                )
-            }
-        }
+        // Komponenten-Zuordnung nur noch in «Komponenten trennen» – hier keine →-Buttons.
 
         // Detail- & Action-Bereich — shown when expanded
         if (showActions) {

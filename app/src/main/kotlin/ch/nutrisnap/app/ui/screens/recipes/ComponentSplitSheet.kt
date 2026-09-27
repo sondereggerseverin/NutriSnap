@@ -296,21 +296,9 @@ fun ComponentSplitSheet(
                             OutlinedTextField(
                                 value = part.name,
                                 onValueChange = { v ->
-                                    val newKey = if (part.key == "side" || part.key == "sauce") part.key
-                                    else v.trim().ifBlank { part.key }
-                                    // Key stabil halten wenn side/sauce, sonst Name als Key
-                                    val updatedKey = when {
-                                        part.key == "side" || part.key == "sauce" -> part.key
-                                        else -> v.trim().ifBlank { part.key }
-                                    }
-                                    val oldKey = part.key
+                                    // Key bleibt stabil – nur Anzeigename ändert sich
                                     parts = parts.toMutableList().also {
-                                        it[index] = part.copy(key = updatedKey, name = v)
-                                    }
-                                    if (updatedKey != oldKey) {
-                                        groups = groups.mapValues { (_, g) ->
-                                            if (g == oldKey) updatedKey else g
-                                        }
+                                        it[index] = part.copy(name = v)
                                     }
                                 },
                                 label = { Text("Name") },

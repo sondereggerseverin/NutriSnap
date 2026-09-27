@@ -497,17 +497,10 @@ fun IngredientVerifySheet(
                             updateOverride(line, updated[index].toOverride(null))
                         }
                     },
+                    // Komponenten nur in «Komponenten trennen» – Verify speichert bestehende Zuordnung
                     componentGroup = groups[line],
-                    availableGroups = availableGroupKeys,
-                    onMoveComponent = {
-                        val keys = availableGroupKeys
-                        if (keys.isNotEmpty()) {
-                            val cur = groups[line] ?: keys.first()
-                            val idx = keys.indexOf(cur).let { if (it < 0) 0 else it }
-                            val next = keys[(idx + 1) % keys.size]
-                            setGroup(line, next)
-                        }
-                    }
+                    availableGroups = emptyList(),
+                    onMoveComponent = null
                 )
                 HorizontalDivider(
                     Modifier.padding(horizontal = 16.dp),
@@ -625,7 +618,7 @@ fun IngredientVerifySheet(
                     Text("Nährwerte übernehmen ($verifiedCount/${verifyStates.size} verifiziert)")
                 }
                 Text(
-                    "Für mehrere Teile: Button „Trennen“ neben Verify nutzen.",
+                    "Zutaten aufteilen: «Komponenten trennen» im Rezept nutzen (nicht hier).",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)

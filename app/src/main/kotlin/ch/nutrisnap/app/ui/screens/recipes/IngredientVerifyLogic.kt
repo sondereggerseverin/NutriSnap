@@ -159,8 +159,10 @@ fun resolveComponentGroup(
     allowComponentSplit: Boolean
 ): String? {
     if (!allowComponentSplit) return null
+    // 1) Gespeicherte Zuordnung (Match/Override) hat immer Vorrang – auch side/sauce
     overrideGroup?.takeIf { it.isNotBlank() }?.let { return it }
-    existingGroup?.takeIf { it.isNotBlank() && it != "side" && it != "sauce" }?.let { return it }
+    existingGroup?.takeIf { it.isNotBlank() }?.let { return it }
+    // 2) Abschnitts-Header aus Zutaten-Text
     val lineLc = line.lowercase().trim()
     val nameLc = parsedName?.lowercase()?.trim().orEmpty()
     val fromSection = sectionByLine.entries.firstOrNull { (k, _) ->
@@ -170,7 +172,7 @@ fun resolveComponentGroup(
             (nameLc.length >= 3 && (key.contains(nameLc) || nameLc.contains(key.take(24))))
     }?.value
     if (fromSection != null) return fromSection
-    existingGroup?.takeIf { it.isNotBlank() }?.let { return it }
+    // 3) Heuristik nur wenn noch nie zugeordnet
     val key = "$line ${parsedName.orEmpty()} ${foodName.orEmpty()}"
     return defaultComponentGroup(key)
 }

@@ -153,9 +153,21 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     }
     /** Session + persistente Matches → Overrides-Map für Verify/Recalculate. */
     suspend fun resolveOverrides(recipeId: Long): Map<String, IngredientOverride> {
+        val fromDb = matchesToOverrides(matchDao.getMatchesForRecipeOnce(recipeId))
         val session = _sessionOverrides.value[recipeId]
-        if (!session.isNullOrEmpty()) return session
-        return matchesToOverrides(matchDao.getMatchesForRecipeOnce(recipeId))
+        if (session.isNullOrEmpty()) return fromDb
+        // Session gewinnt bei Mengen/Food – componentGroup aus DB nachziehen falls Session null hat
+        return (fromDb.keys + session.keys).associateWith { line ->
+            val s = session[line]
+            val d = fromDb[line]
+            when {
+                s == null -> d!!
+                d == null -> s
+                s.componentGroup.isNullOrBlank() && !d.componentGroup.isNullOrBlank() ->
+                    s.copy(componentGroup = d.componentGroup)
+                else -> s
+            }
+        }
     }
 
     private data class FilterMeta(
@@ -1188,6 +1200,22 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     fun mergeMatchesForRecipe(recipeId: Long, matches: List<ch.nutrisnap.app.data.model.IngredientMatch>) {
         viewModelScope.launch {
             repo.mergeMatchesForRecipe(recipeId, matches)
+            // Session-Overrides mit neuen componentGroup-Werten synchronisieren
+            // (sonst gewinnt ein alter Session-Cache ohne Trennung beim nächsten Verify)
+            val session = _sessionOverrides.value[recipeId]
+            if (!session.isNullOrEmpty()) {
+                val byRaw = matches.associateBy { it.ingredientRaw }
+                val merged = session.mapValues { (line, ov) ->
+                    val m = byRaw[line]
+                    if (m?.componentGroup != null) ov.copy(componentGroup = m.componentGroup)
+                    else ov
+                }
+                // Auch neue Zeilen aus Matches übernehmen
+                val extra = matchesToOverrides(matches).filterKeys { it !in merged }
+                _sessionOverrides.update { it + (recipeId to (merged + extra)) }
+            } else {
+                // Kein Session-Cache: nächster Verify lädt frisch aus Matches
+            }
         }
     }
 
