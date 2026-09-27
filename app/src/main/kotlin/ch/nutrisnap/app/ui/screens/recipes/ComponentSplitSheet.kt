@@ -468,7 +468,7 @@ fun ComponentSplitSheet(
 
                     val toSave = parts.mapIndexed { i, part ->
                         val typed = part.weightText.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
-                        val assigned = workingMatches.any { idx -> groups[idx] == part.key }
+                        val assigned = workingMatches.indices.any { idx -> groups[idx] == part.key }
                         val fallbackG = ingredientGrams(part.key).takeIf { it > 0f }
                         val w = typed ?: fallbackG ?: 0f
                         Triple(i, part, w) to assigned
