@@ -64,27 +64,23 @@ internal fun formatPortionAmount(amount: Float): String {
     return "$text Portion${if (amount == 1f) "" else "en"}"
 }
 
-/** Anzeige für Rezept-/Manual-Einträge: Gramm wenn gram-getrackt, sonst Portionen. */
+/** Anzeige für Rezept-/Manual-Einträge: Gramm wenn erfasst, sonst Portionen. */
 internal fun recipeAmountLabel(entry: DiaryEntry): String {
-    if (entry.isGramTrackedRecipe) {
-        return "${entry.recipeGrams!!.toInt()} g"
+    // Komponenten / gram-getrackte Rezepte: immer Gramm anzeigen
+    val g = entry.recipeGrams
+    if (g != null && g >= 1f) {
+        return "${g.toInt()} g"
     }
     // Legacy: amountGrams fälschlich als Gramm statt Portionsfaktor gespeichert
     if (entry.isRecipeEntry && entry.amountGrams >= 20f && entry.recipeGrams == null) {
         return "${entry.amountGrams.toInt()} g"
     }
     val portions = when {
-        entry.recipeGrams != null && entry.recipeGrams > 0f && entry.recipeGrams < 10f ->
-            entry.recipeGrams
         entry.amountGrams > 0f -> entry.amountGrams
         else -> 1f
     }
     return formatPortionAmount(portions)
 }
-
-/** true wenn Menge eher Portion/Rezept als echte Gramm-Angabe ist. */
-private fun looksLikePortionEntry(entry: DiaryEntry): Boolean = entry.isPortionTracked
-
 
 /** Kompakte Tagesübersicht: eine Zeile Kalorien + dünner Balken + Makro-Mini-Stats.
  *  Ersetzt die frühere, deutlich höhere MacroBar-Karte auf dem Tagebuch-Screen. */
@@ -859,9 +855,14 @@ private fun DiaryEntryRow(
     val largerDiaryIcons = prefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_DIARY_ICONS) ?: true
     val diaryIconBtnSize = if (largerDiaryIcons) 40.dp else 32.dp
 
-    val isRecipeEntry = looksLikePortionEntry(entry)
-    val amountLabel   = if (isRecipeEntry) recipeAmountLabel(entry)
-                         else "${entry.amountGrams.toInt()} g"
+    // Menge: bei Rezept mit recipeGrams → Gramm; bei normalem Food → Gramm; sonst Portionen
+    val amountLabel = when {
+        entry.isFoodEntry -> "${entry.amountGrams.toInt()} g"
+        entry.recipeGrams != null && entry.recipeGrams >= 1f ->
+            "${entry.recipeGrams!!.toInt()} g"
+        entry.isRecipeEntry || entry.isManualEntry -> recipeAmountLabel(entry)
+        else -> "${entry.amountGrams.toInt()} g"
+    }
 
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->

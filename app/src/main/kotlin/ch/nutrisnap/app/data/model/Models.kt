@@ -103,17 +103,18 @@ val DiaryEntry.isFoodEntry: Boolean get() = kind == DiaryEntryKind.FOOD
 val DiaryEntry.isPortionTracked: Boolean
     get() = when {
         isManualEntry -> true
-        isRecipeEntry -> recipeGrams == null || recipeGrams < 10f
-        recipeGrams != null -> true
+        // Rezept mit erfassten Gramm → kein Portions-Modus
+        isRecipeEntry -> recipeGrams == null || recipeGrams < 1f
+        recipeGrams != null && recipeGrams >= 1f -> false
         amountGrams <= 0f -> true
         // Legacy: „1 g“ bei ~vollen Portions-kcal kann keine echte Gramm-Angabe sein
         amountGrams < 10f && calories >= 40f -> true
         else -> false
     }
 
-/** true, wenn Rezept-Menge in Gramm erfasst wurde (recipeGrams ≥ 10). */
+/** true, wenn Rezept-Menge in Gramm erfasst wurde (recipeGrams ≥ 1). */
 val DiaryEntry.isGramTrackedRecipe: Boolean
-    get() = isRecipeEntry && recipeGrams != null && recipeGrams >= 10f
+    get() = isRecipeEntry && recipeGrams != null && recipeGrams >= 1f
 
 /**
  * Skaliert alle Nährwerte (und optionale Original-Snapshots) um [factor].

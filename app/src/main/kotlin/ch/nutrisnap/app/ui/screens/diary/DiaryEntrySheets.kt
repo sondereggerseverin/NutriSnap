@@ -37,7 +37,7 @@ internal fun EditEntryDialog(
     onDelete: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    // Gramm-Tracking nur bei echten Rezept-Gramm (≥10); sonst Portionen für Rezept/Manual.
+    // Gramm-Tracking wenn recipeGrams gesetzt (≥1 g); sonst Portionen für Rezept/Manual.
     val isGramTracked = entry.isGramTrackedRecipe
     val isPortionUnit = entry.isPortionTracked && !isGramTracked
     // "baseValue" ist die Menge in der Einheit, in der amountText editiert wird.
