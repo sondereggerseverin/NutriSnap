@@ -458,26 +458,40 @@ fun ComponentSplitSheet(
 
             Button(
                 onClick = {
-                    val withWeights = parts.mapIndexedNotNull { i, part ->
-                        val w = part.weightText.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
-                            ?: return@mapIndexedNotNull null
-                        Triple(i, part, w)
-                    }
-                    if (withWeights.isEmpty()) return@Button
+                    // Alle Abschnitte speichern, die Zutaten haben ODER ein Kochgewicht –
+                    // leeres Gewicht verwirft den Abschnitt NICHT mehr (sonst verschwindet Teil 3).
+                    fun ingredientGrams(key: String): Float =
+                        workingMatches.filterIndexed { i, _ -> groups[i] == key }
+                            .sumOf { m ->
+                                (m.manualAmountG ?: m.amountGrams).toDouble().coerceAtLeast(0.0)
+                            }.toFloat()
 
-                    val weightSum = withWeights.sumOf { it.third.toDouble() }.toFloat().coerceAtLeast(1f)
+                    val toSave = parts.mapIndexed { i, part ->
+                        val typed = part.weightText.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
+                        val assigned = workingMatches.any { idx -> groups[idx] == part.key }
+                        val fallbackG = ingredientGrams(part.key).takeIf { it > 0f }
+                        val w = typed ?: fallbackG ?: 0f
+                        Triple(i, part, w) to assigned
+                    }.filter { (triple, assigned) ->
+                        // Behalten wenn: Gewicht > 0, oder Zutaten zugeordnet, oder einziger Abschnitt
+                        triple.third > 0f || assigned || parts.size == 1
+                    }.map { it.first }
+
+                    if (toSave.isEmpty()) return@Button
+
+                    val weightSum = toSave.sumOf { it.third.toDouble() }.toFloat().coerceAtLeast(1f)
                     val serv = recipe.servings.coerceAtLeast(1).toFloat()
                     val recipeKcal = recipe.totalCalories ?: 0f
                     val recipeProt = (recipe.proteinPerServing ?: 0f) * serv
                     val recipeCarbs = (recipe.carbsPerServing ?: 0f) * serv
                     val recipeFat = (recipe.fatPerServing ?: 0f) * serv
 
-                    val comps = withWeights.map { (i, part, w) ->
+                    val comps = toSave.map { (i, part, w) ->
                         val kcalM = sumKcal(part.key)
                         val protM = sumProt(part.key)
                         val carbsM = sumCarbs(part.key)
                         val fatM = sumFat(part.key)
-                        val frac = w / weightSum
+                        val frac = if (w > 0f) w / weightSum else 0f
                         RecipeComponent(
                             recipeId = recipe.id,
                             name = part.name.trim().ifBlank { displayNameForKey(part.key) },
@@ -489,10 +503,11 @@ fun ComponentSplitSheet(
                             sortOrder = i
                         )
                     }
-                    // Dedup nach Name
+                    // Dedup nach Name (nicht nach Key) – „Teil 3“ bleibt eigenständig
                     val deduped = comps
                         .groupBy { it.name.trim().lowercase() }
                         .map { (_, g) -> g.maxByOrNull { it.cookedWeightG } ?: g.last() }
+                        .sortedBy { it.sortOrder }
 
                     val updatedMatches = workingMatches.mapIndexed { i, m ->
                         m.copy(componentGroup = groups[i] ?: parts.firstOrNull()?.key ?: "sauce")
@@ -500,9 +515,11 @@ fun ComponentSplitSheet(
                     onSave(deduped, updatedMatches)
                     requestDismiss()
                 },
-                enabled = parts.any {
-                    it.weightText.replace(',', '.').toFloatOrNull()?.let { w -> w > 0f } == true
-                },
+                enabled = parts.isNotEmpty() && (
+                    parts.any {
+                        it.weightText.replace(',', '.').toFloatOrNull()?.let { w -> w > 0f } == true
+                    } || workingMatches.isNotEmpty()
+                ),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Default.Check, null, Modifier.size(18.dp))
