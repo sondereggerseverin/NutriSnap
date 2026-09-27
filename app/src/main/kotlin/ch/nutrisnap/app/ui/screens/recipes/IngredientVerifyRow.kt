@@ -387,19 +387,56 @@ internal fun IngredientVerifyRow(
                     }
                 }
 
-                // Makro-Details — gleiche Quelle wie die Kalorien-Anzeige oben (effectiveXxx)
-                Row(
-                    Modifier.fillMaxWidth().padding(bottom = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text("P ${fmtMacro(state.effectiveProtein)} g", fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("·", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("K ${fmtMacro(state.effectiveCarbs)} g", fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("·", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("F ${fmtMacro(state.effectiveFat)} g", fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // Makro-Details: Gesamt (Rezeptmenge) + pro 100 g
+                val amountG = state.effectiveAmountG.coerceAtLeast(0.1f)
+                val food = state.effectiveFood
+                val kcal100 = food?.calories
+                    ?: (state.effectiveCalories / amountG * 100f).takeIf { it.isFinite() }
+                val prot100 = food?.protein
+                    ?: (state.effectiveProtein / amountG * 100f).takeIf { it.isFinite() }
+                val carbs100 = food?.carbs
+                    ?: (state.effectiveCarbs / amountG * 100f).takeIf { it.isFinite() }
+                val fat100 = food?.fat
+                    ?: (state.effectiveFat / amountG * 100f).takeIf { it.isFinite() }
+                val fiberAbs = state.effectiveMicros["fiber"]
+                val fiber100 = when {
+                    isManualFiber && fiberAbs != null -> fiberAbs / amountG * 100f
+                    food?.fiber != null -> food.fiber
+                    fiberAbs != null -> fiberAbs / amountG * 100f
+                    else -> null
+                }
+
+                Column(Modifier.padding(bottom = 6.dp)) {
+                    Text(
+                        "Im Rezept (${"%.0f".format(amountG)} g)",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "${safeInt(state.effectiveCalories)} kcal · P ${fmtMacro(state.effectiveProtein)} · K ${fmtMacro(state.effectiveCarbs)} · F ${fmtMacro(state.effectiveFat)}" +
+                            (fiberAbs?.let { " · Ballast ${"%.1f".format(it)}" } ?: ""),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "pro 100 g",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        listOfNotNull(
+                            kcal100?.let { "${safeInt(it)} kcal" },
+                            prot100?.let { "P ${fmtMacro(it)}" },
+                            carbs100?.let { "K ${fmtMacro(it)}" },
+                            fat100?.let { "F ${fmtMacro(it)}" },
+                            fiber100?.let { "Ballast ${"%.1f".format(it)}" }
+                        ).joinToString(" · ").ifBlank { "—" },
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 }
 
                 // Ballaststoffe — hervorgehoben, ggf. mit manueller Eingabe
