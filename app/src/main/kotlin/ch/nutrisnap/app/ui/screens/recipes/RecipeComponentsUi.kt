@@ -59,20 +59,24 @@ private fun nutritionFor(
     recipe: Recipe,
     allDrafts: List<Draft>
 ): RecipeComponent {
+    val name = draft.name.trim()
+    // Strikt nach Name matchen – kein Index-Fallback mehr (vermeidet Beilage-Nährwerte auf Sauce)
     val byName = suggested.firstOrNull {
-        it.name.equals(draft.name.trim(), ignoreCase = true) &&
-            !it.name.equals("Gesamt", ignoreCase = true)
+        it.name.equals(name, ignoreCase = true) &&
+            !it.name.equals("Gesamt", ignoreCase = true) &&
+            it.totalCalories > 0f
     }
-    // Index nur wenn Suggestion echte Splits hat (nicht einzelnes „Gesamt“)
-    val realSplits = suggested.filter {
-        it.totalCalories > 0f && !it.name.equals("Gesamt", ignoreCase = true)
-    }
-    val byIndex = realSplits.getOrNull(index)
-    val base = byName ?: byIndex
-    if (base != null && base.totalCalories > 0f) return base
+    if (byName != null) return byName
 
-    // Kein Fake-Split: ohne echte Zutaten-Matches bleiben Nährwerte leer
-    // (Verify → Zutaten zuordnen → Kochgewicht ist der korrekte Weg)
+    // Fuzzy: normalisierter Key (side/sauce)
+    val draftKey = normalizeGroupKey(name)
+    if (draftKey != null) {
+        val byKey = suggested.firstOrNull {
+            normalizeGroupKey(it.name) == draftKey && it.totalCalories > 0f
+        }
+        if (byKey != null) return byKey
+    }
+
     return RecipeComponent(
         recipeId = recipe.id,
         name = draft.name,
@@ -98,12 +102,13 @@ fun RecipeComponentsEditorSheet(
                 Draft(0, "Sauce / Fleisch", "")
             )
         }
-        // Duplikate nach Name entfernen (z. B. 2× Sauce)
+        // Duplikate nach normalisiertem Key entfernen (2× „Sauce / Fleisch“, side/Beilage …)
         val deduped = list
-            .groupBy { it.name.trim().lowercase() }
+            .groupBy { normalizeGroupKey(it.name) ?: it.name.trim().lowercase() }
             .map { (_, g) ->
                 g.lastOrNull { it.cookedWeightG > 0f } ?: g.last()
             }
+            .sortedBy { it.sortOrder }
         return deduped.map { componentToDraft(it) }
     }
 
