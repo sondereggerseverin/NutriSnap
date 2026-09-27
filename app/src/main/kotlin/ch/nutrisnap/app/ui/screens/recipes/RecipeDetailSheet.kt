@@ -362,7 +362,7 @@ fun RecipeDetailSheet(
                 if (splitAllowed) {
                     Spacer(Modifier.height(6.dp))
                     OutlinedButton(
-                        onClick = onEditComponents,
+                        onClick = onSplitComponents,
                         modifier = Modifier.fillMaxWidth(),
                         contentPadding = PaddingValues(vertical = 8.dp)
                     ) {
@@ -897,12 +897,12 @@ fun RecipeDetailSheet(
                                 )
                             }
                             OutlinedButton(
-                                onClick = onEditComponents,
+                                onClick = onSplitComponents,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Icon(Icons.Default.Restaurant, null, Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("Komponenten (Beilage / Sauce)…", fontSize = 13.sp)
+                                Text("Komponenten trennen", fontSize = 13.sp)
                             }
                             Text(
                                 "Getrennt abwiegen oder Meal-Prep gleichmässig aufteilen.",
@@ -1052,12 +1052,6 @@ internal fun NutritionAnalysisCard(
                                 Icon(Icons.Default.QrCodeScanner, null, Modifier.size(13.dp))
                                 Spacer(Modifier.width(2.dp))
                                 Text("Verify", fontSize = 11.sp)
-                            }
-                            val canSplit = recipeAllowsComponentSplit(recipe)
-                            if (canSplit) {
-                                TextButton(onClick = onSplitComponents, contentPadding = PaddingValues(2.dp)) {
-                                    Text("Trennen", fontSize = 11.sp)
-                                }
                             }
                         }
                         TextButton(onClick = onAnalyze, contentPadding = PaddingValues(2.dp)) {
