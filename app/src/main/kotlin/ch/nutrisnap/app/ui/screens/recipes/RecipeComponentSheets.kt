@@ -35,11 +35,16 @@ fun MultiComponentAddToDiarySheet(
     components: List<RecipeComponent>,
     onConfirm: (gramsByComponentId: Map<Long, Float>, meal: MealType, date: LocalDate) -> Unit,
     onDismiss: () -> Unit,
-    onFreeze: ((gramsByComponentId: Map<Long, Float>, quantity: Int) -> Unit)? = null
+    onFreeze: ((gramsByComponentId: Map<Long, Float>, quantity: Int) -> Unit)? = null,
+    /** Als Ganzes tracken (ohne Komponenten): Portionen + optional Gramm. */
+    onConfirmWhole: ((servings: Float, gramsIfGramMode: Float?, meal: MealType, date: LocalDate) -> Unit)? = null
 ) {
     // Nährwerte bevorzugt aus Matches ableiten (Fallback: proportionale Heilung)
     val comps = remember(recipe.id, components) { enrichComponentsFromMatches(recipe, components, emptyList()) }
-    var equalMode by remember { mutableStateOf(false) }
+    // 0 = getrennt, 1 = gleichmässig, 2 = als Ganzes (kein Split)
+    var trackMode by remember { mutableIntStateOf(0) }
+    val equalMode = trackMode == 1
+    val wholeMode = trackMode == 2
     var portionsText by remember { mutableStateOf(recipe.servings.coerceAtLeast(1).toString()) }
     var gramsTexts by remember(comps) {
         mutableStateOf(
@@ -56,6 +61,19 @@ fun MultiComponentAddToDiarySheet(
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var freezeQtyText by remember { mutableStateOf("1") }
 
+    // Als-Ganzes: Gesamtgewicht / Portion
+    val wholeYieldG = remember(recipe.id, comps) {
+        recipe.yieldWeightG()
+            ?: comps.sumOf { it.cookedWeightG.toDouble() }.toFloat().takeIf { it > 0f }
+            ?: RecipeNutritionAnalyzer.estimateTotalGrams(recipe.ingredients).takeIf { it > 0f }
+    }
+    val wholeGramsPerServing = wholeYieldG?.div(recipe.servings.coerceAtLeast(1))
+    var wholeUnitGram by remember { mutableStateOf(wholeGramsPerServing != null) }
+    var wholeServingsText by remember { mutableStateOf("1") }
+    var wholeGramsText by remember {
+        mutableStateOf(wholeGramsPerServing?.toInt()?.toString() ?: "")
+    }
+
     val portions = portionsText.toIntOrNull()?.coerceAtLeast(1) ?: 1
 
     // Im Equal-Mode: Gramm pro Komponente aus Portionszahl ableiten
@@ -71,12 +89,37 @@ fun MultiComponentAddToDiarySheet(
         }
     }
 
-    val totalCals = comps.sumOf { c ->
-        c.scaledTo(effectiveGrams[c.id] ?: 0f).calories.toDouble()
-    }.toFloat()
-    val totalProtein = comps.sumOf { c ->
-        c.scaledTo(effectiveGrams[c.id] ?: 0f).protein.toDouble()
-    }.toFloat()
+    val wholeServings = if (wholeUnitGram) {
+        val g = wholeGramsText.replace(',', '.').toFloatOrNull()?.coerceAtLeast(1f)
+            ?: (wholeGramsPerServing ?: 1f)
+        if (wholeGramsPerServing != null && wholeGramsPerServing > 0f) g / wholeGramsPerServing else 1f
+    } else {
+        wholeServingsText.toFloatOrNull()?.coerceAtLeast(0.1f) ?: 1f
+    }
+    val wholeGramsAmount = if (wholeUnitGram) {
+        wholeGramsText.replace(',', '.').toFloatOrNull()?.takeIf { it >= 10f }
+    } else null
+
+    val totalCals = if (wholeMode) {
+        val calsPer = recipe.totalCalories?.div(recipe.servings.coerceAtLeast(1))
+            ?: comps.sumOf { it.totalCalories.toDouble() }.toFloat()
+                .div(recipe.servings.coerceAtLeast(1))
+        calsPer * wholeServings
+    } else {
+        comps.sumOf { c ->
+            c.scaledTo(effectiveGrams[c.id] ?: 0f).calories.toDouble()
+        }.toFloat()
+    }
+    val totalProtein = if (wholeMode) {
+        val pPer = recipe.proteinPerServing
+            ?: comps.sumOf { it.proteinG.toDouble() }.toFloat()
+                .div(recipe.servings.coerceAtLeast(1))
+        pPer * wholeServings
+    } else {
+        comps.sumOf { c ->
+            c.scaledTo(effectiveGrams[c.id] ?: 0f).protein.toDouble()
+        }.toFloat()
+    }
 
     var allowTrackDismiss by remember { mutableStateOf(false) }
     val trackSheetState = rememberModalBottomSheetState(
@@ -121,66 +164,112 @@ fun MultiComponentAddToDiarySheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FilterChip(
-                    selected = !equalMode,
-                    onClick = { equalMode = false },
-                    label = { Text("Getrennt abwiegen") }
+                    selected = trackMode == 0,
+                    onClick = { trackMode = 0 },
+                    label = { Text("Getrennt") }
                 )
                 FilterChip(
-                    selected = equalMode,
-                    onClick = { equalMode = true },
-                    label = { Text("Gleichmässig (Meal-Prep)") }
+                    selected = trackMode == 1,
+                    onClick = { trackMode = 1 },
+                    label = { Text("Gleichmässig") }
+                )
+                FilterChip(
+                    selected = trackMode == 2,
+                    onClick = { trackMode = 2 },
+                    label = { Text("Als Ganzes") }
                 )
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                if (equalMode)
-                    "Feste Portionszahl – Ratio wie im Rezept, ideal für gleiche Boxen."
-                else
-                    "Jede Komponente einzeln abwiegen (z. B. 400 g Reis, 360 g Sauce).",
+                when (trackMode) {
+                    1 -> "Feste Portionszahl – Ratio wie im Rezept, ideal für gleiche Boxen."
+                    2 -> "Ohne Komponenten – ein Gesamtgewicht oder Portionen, wie ein normales Rezept."
+                    else -> "Jede Komponente einzeln abwiegen (z. B. 400 g Reis, 360 g Sauce)."
+                },
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(12.dp))
 
-            if (equalMode) {
-                OutlinedTextField(
-                    value = portionsText,
-                    onValueChange = { portionsText = it },
-                    label = { Text("Anzahl gleicher Portionen") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(8.dp))
-                comps.forEach { c ->
-                    val g = effectiveGrams[c.id] ?: 0f
-                    val dens = if (c.cookedWeightG > 0f)
-                        (c.totalCalories / c.cookedWeightG * 100f).toInt() else 0
-                    Text(
-                        "• ${c.name}: ${g.toInt()} g  (von ${c.cookedWeightG.toInt()} g · $dens kcal/100g)",
-                        fontSize = 13.sp
-                    )
-                }
-            } else {
-                comps.forEach { c ->
-                    val dens = if (c.cookedWeightG > 0f)
-                        (c.totalCalories / c.cookedWeightG * 100f).toInt() else 0
+            when (trackMode) {
+                1 -> {
                     OutlinedTextField(
-                        value = gramsTexts[c.id] ?: "",
-                        onValueChange = { v ->
-                            gramsTexts = gramsTexts.toMutableMap().also { it[c.id] = v }
-                        },
-                        label = { Text("${c.name} (g)") },
-                        supportingText = {
-                            Text(
-                                "Batch: ${c.cookedWeightG.toInt()} g · " +
-                                    "${c.totalCalories.toInt()} kcal · $dens kcal/100g"
-                            )
-                        },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        value = portionsText,
+                        onValueChange = { portionsText = it },
+                        label = { Text("Anzahl gleicher Portionen") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+                        modifier = Modifier.fillMaxWidth()
                     )
+                    Spacer(Modifier.height(8.dp))
+                    comps.forEach { c ->
+                        val g = effectiveGrams[c.id] ?: 0f
+                        val dens = if (c.cookedWeightG > 0f)
+                            (c.totalCalories / c.cookedWeightG * 100f).toInt() else 0
+                        Text(
+                            "• ${c.name}: ${g.toInt()} g  (von ${c.cookedWeightG.toInt()} g · $dens kcal/100g)",
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+                2 -> {
+                    if (wholeYieldG != null && wholeYieldG > 0f) {
+                        Text(
+                            "Batch: ${wholeYieldG.toInt()} g · " +
+                                "${wholeGramsPerServing?.toInt() ?: "–"} g/Portion",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = if (wholeUnitGram) wholeGramsText else wholeServingsText,
+                            onValueChange = {
+                                if (wholeUnitGram) wholeGramsText = it else wholeServingsText = it
+                            },
+                            label = { Text("Menge") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = !wholeUnitGram,
+                            onClick = { wholeUnitGram = false },
+                            label = { Text("Portion") }
+                        )
+                        FilterChip(
+                            selected = wholeUnitGram,
+                            onClick = { if (wholeGramsPerServing != null) wholeUnitGram = true },
+                            enabled = wholeGramsPerServing != null,
+                            label = { Text("Gramm") }
+                        )
+                    }
+                }
+                else -> {
+                    comps.forEach { c ->
+                        val dens = if (c.cookedWeightG > 0f)
+                            (c.totalCalories / c.cookedWeightG * 100f).toInt() else 0
+                        OutlinedTextField(
+                            value = gramsTexts[c.id] ?: "",
+                            onValueChange = { v ->
+                                gramsTexts = gramsTexts.toMutableMap().also { it[c.id] = v }
+                            },
+                            label = { Text("${c.name} (g)") },
+                            supportingText = {
+                                Text(
+                                    "Batch: ${c.cookedWeightG.toInt()} g · " +
+                                        "${c.totalCalories.toInt()} kcal · $dens kcal/100g"
+                                )
+                            },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+                        )
+                    }
                 }
             }
 
@@ -254,18 +343,34 @@ fun MultiComponentAddToDiarySheet(
                 }
                 Button(
                     onClick = {
-                        val filtered = effectiveGrams.filter { it.value >= 1f }
-                        if (filtered.isNotEmpty()) onConfirm(filtered, selectedMeal, selectedDate)
+                        if (wholeMode) {
+                            onConfirmWhole?.invoke(
+                                wholeServings,
+                                wholeGramsAmount,
+                                selectedMeal,
+                                selectedDate
+                            )
+                        } else {
+                            val filtered = effectiveGrams.filter { it.value >= 1f }
+                            if (filtered.isNotEmpty()) onConfirm(filtered, selectedMeal, selectedDate)
+                        }
                     },
                     modifier = Modifier.weight(1f),
-                    enabled = effectiveGrams.any { it.value >= 1f }
+                    enabled = if (wholeMode) {
+                        onConfirmWhole != null && (
+                            if (wholeUnitGram) (wholeGramsText.replace(',', '.').toFloatOrNull() ?: 0f) >= 1f
+                            else (wholeServingsText.toFloatOrNull() ?: 0f) >= 0.1f
+                        )
+                    } else {
+                        effectiveGrams.any { it.value >= 1f }
+                    }
                 ) {
                     Icon(Icons.Default.Check, null, Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("Hinzufügen")
                 }
             }
-            if (onFreeze != null) {
+            if (onFreeze != null && !wholeMode) {
                 Spacer(Modifier.height(8.dp))
                 Row(
                     Modifier.fillMaxWidth(),

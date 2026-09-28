@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -25,11 +26,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ch.nutrisnap.app.data.model.CustomFoodItem
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.FoodSource
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.repository.FoodItemRepository
+import ch.nutrisnap.app.domain.GroqVisionService
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
+import ch.nutrisnap.app.ui.screens.scan.PhotoCaptureScreen
 import kotlinx.coroutines.launch
 
 // ── Identify Sheet: Barcode / Search / KI-Schätzung ───────────────────────────
@@ -45,12 +49,44 @@ fun IngredientIdentifySheet(
     val scope = rememberCoroutineScope()
     var mode by remember { mutableStateOf<IdentifyMode>(IdentifyMode.Choose) }
 
+    // Label-Foto ausserhalb des BottomSheets (Vollbild wie im Tagebuch)
+    if (mode is IdentifyMode.LabelCapture) {
+        val bc = (mode as IdentifyMode.LabelCapture).barcode
+        PhotoCaptureScreen(
+            title = "Nährwerttabelle fotografieren",
+            instructions = "Barcode $bc – Tabelle (pro 100 g) scharf fotografieren. Danach wird das Produkt gespeichert und ist per Barcode wiederfindbar.",
+            onPhotoCaptured = { bitmap ->
+                mode = IdentifyMode.LabelSaving(bc, bitmap)
+            },
+            onNavigateBack = { mode = IdentifyMode.UnknownBarcode(bc) }
+        )
+        return
+    }
+    if (mode is IdentifyMode.LabelSaving) {
+        val m = mode as IdentifyMode.LabelSaving
+        LaunchedEffect(m.barcode) {
+            val food = runCatching {
+                saveProductFromLabel(context, m.barcode, m.bitmap)
+            }.getOrNull()
+            if (food != null) onFoodSelected(food)
+            else mode = IdentifyMode.UnknownBarcode(m.barcode, error = "Etikett konnte nicht gelesen werden – bitte nochmals versuchen")
+        }
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator()
+                Spacer(Modifier.height(12.dp))
+                Text("Nährwerte werden gelesen…", fontSize = 14.sp)
+            }
+        }
+        return
+    }
+
     val identifySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = identifySheetState
     ) {
-        when (mode) {
+        when (val m = mode) {
             IdentifyMode.Choose -> IdentifyChooseScreen(
                 ingredientName = ingredientName,
                 onBarcode = { mode = IdentifyMode.Barcode },
@@ -58,35 +94,93 @@ fun IngredientIdentifySheet(
                 onAi      = { mode = IdentifyMode.AiEstimate }
             )
             IdentifyMode.Barcode -> BarcodeLookupScreen(
-                onBarcodeScanned = { barcode ->
+                onBarcodeScanned = { raw ->
                     scope.launch {
+                        val barcode = ch.nutrisnap.app.utils.BarcodeUtils.normalize(raw).ifBlank { raw.trim() }
                         val repo = FoodItemRepository(NutriDatabase.getInstance(context))
-                        val food = runCatching { repo.searchAll(barcode).firstOrNull() }.getOrNull()
+                        val food = runCatching { repo.searchBarcode(barcode) }.getOrNull()
                         if (food != null) onFoodSelected(food)
-                        else mode = IdentifyMode.Search(barcode)
+                        else mode = IdentifyMode.UnknownBarcode(barcode)
                     }
                 },
                 onBack = { mode = IdentifyMode.Choose }
             )
-            is IdentifyMode.Search -> FoodSearchScreen(
-                query = (mode as IdentifyMode.Search).query,
-                onFoodSelected = onFoodSelected,
+            is IdentifyMode.UnknownBarcode -> UnknownBarcodeScreen(
+                barcode = m.barcode,
+                error = m.error,
+                onCaptureLabel = { mode = IdentifyMode.LabelCapture(m.barcode) },
+                onSearchName = { mode = IdentifyMode.Search(ingredientName.ifBlank { "" }) },
                 onBack = { mode = IdentifyMode.Choose }
+            )
+            is IdentifyMode.Search -> FoodSearchScreen(
+                query = m.query,
+                onFoodSelected = onFoodSelected,
+                onBack = { mode = IdentifyMode.Choose },
+                onCaptureLabel = if (m.query.all { it.isDigit() } && m.query.length in 8..14) {
+                    { mode = IdentifyMode.LabelCapture(m.query) }
+                } else null
             )
             IdentifyMode.AiEstimate -> AiEstimateScreen(
                 name = ingredientName,
                 onConfirm = onFoodSelected,
                 onBack = { mode = IdentifyMode.Choose }
             )
+            is IdentifyMode.LabelCapture, is IdentifyMode.LabelSaving -> { /* handled above */ }
         }
     }
 }
 
 sealed class IdentifyMode {
-    object Choose  : IdentifyMode()
-    object Barcode : IdentifyMode()
+    data object Choose  : IdentifyMode()
+    data object Barcode : IdentifyMode()
     data class Search(val query: String) : IdentifyMode()
-    object AiEstimate : IdentifyMode()
+    data object AiEstimate : IdentifyMode()
+    data class UnknownBarcode(val barcode: String, val error: String? = null) : IdentifyMode()
+    data class LabelCapture(val barcode: String) : IdentifyMode()
+    data class LabelSaving(val barcode: String, val bitmap: Bitmap) : IdentifyMode()
+}
+
+private suspend fun saveProductFromLabel(
+    context: android.content.Context,
+    barcode: String,
+    bitmap: Bitmap
+): FoodItem? {
+    val vision = GroqVisionService()
+    val b64 = vision.bitmapToBase64JpegForText(bitmap, quality = 85)
+    val label = vision.analyzeNutritionLabel(b64).getOrElse { return null }
+    val bc = ch.nutrisnap.app.utils.BarcodeUtils.normalize(barcode).ifBlank { barcode.trim() }
+    val name = label.productName.ifBlank { "Produkt $bc" }
+    val custom = CustomFoodItem(
+        name = name,
+        brand = label.brand.ifBlank { null },
+        barcode = bc,
+        calories = label.caloriesPer100g,
+        protein = label.proteinPer100g,
+        carbs = label.carbsPer100g,
+        fat = label.fatPer100g,
+        fiber = label.fiberPer100g,
+        sugar = label.sugarPer100g,
+        salt = label.saltPer100g,
+        portionSizeG = 100f,
+        source = "label_scan"
+    )
+    val repo = FoodItemRepository(NutriDatabase.getInstance(context))
+    repo.saveCustomFoodWithBarcode(custom)
+    return FoodItem(
+        name = custom.name,
+        brand = custom.brand,
+        barcode = bc,
+        calories = custom.calories,
+        protein = custom.protein,
+        carbs = custom.carbs,
+        fat = custom.fat,
+        fiber = custom.fiber,
+        sugar = custom.sugar,
+        salt = custom.salt,
+        servingSize = 100f,
+        source = FoodSource.MANUAL,
+        completenessScore = 95
+    )
 }
 
 // ── Choose screen ─────────────────────────────────────────────────────────────
@@ -214,13 +308,62 @@ private fun BarcodeLookupScreen(
     }
 }
 
+// ── Unbekannter Barcode ───────────────────────────────────────────────────────
+
+@Composable
+private fun UnknownBarcodeScreen(
+    barcode: String,
+    error: String?,
+    onCaptureLabel: () -> Unit,
+    onSearchName: () -> Unit,
+    onBack: () -> Unit
+) {
+    Column(Modifier.padding(16.dp).padding(bottom = 24.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück")
+            }
+            Text("Produkt nicht gefunden", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Barcode $barcode ist nicht in der Datenbank.",
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (error != null) {
+            Spacer(Modifier.height(6.dp))
+            Text(error, fontSize = 13.sp, color = MaterialTheme.colorScheme.error)
+        }
+        Spacer(Modifier.height(16.dp))
+        OptionRow(
+            icon = Icons.Default.PhotoCamera,
+            title = "Nährwerttabelle fotografieren",
+            subtitle = "Wie beim normalen Tracking – Produkt wird gespeichert und ist nächstes Mal per Barcode findbar",
+            badge = "Empfohlen",
+            badgeColor = Color(0xFF2E7D32),
+            onClick = onCaptureLabel
+        )
+        Spacer(Modifier.height(8.dp))
+        OptionRow(
+            icon = Icons.Default.Search,
+            title = "Nach Namen suchen",
+            subtitle = "In OpenFoodFacts und lokaler DB suchen",
+            badge = null,
+            badgeColor = Color.Transparent,
+            onClick = onSearchName
+        )
+    }
+}
+
 // ── Food Search Screen ────────────────────────────────────────────────────────
 
 @Composable
 private fun FoodSearchScreen(
     query: String,
     onFoodSelected: (FoodItem) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onCaptureLabel: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -228,15 +371,20 @@ private fun FoodSearchScreen(
     var results by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
+    val looksLikeBarcode = query.all { it.isDigit() } && query.length in 8..14
 
-    // Auto-search on open
+    // Auto-search on open – bei reinem Barcode zuerst searchBarcode, sonst searchAll
     LaunchedEffect(Unit) {
         if (query.isNotBlank()) {
             isSearching = true
             errorMsg = null
             runCatching {
                 val repo = FoodItemRepository(NutriDatabase.getInstance(context))
-                results = repo.searchAll(query)
+                results = if (looksLikeBarcode) {
+                    listOfNotNull(repo.searchBarcode(query))
+                } else {
+                    repo.searchAll(query)
+                }
             }.onFailure { errorMsg = it.message }
             isSearching = false
         }
@@ -260,7 +408,12 @@ private fun FoodSearchScreen(
                         isSearching = true; errorMsg = null
                         runCatching {
                             val repo = FoodItemRepository(NutriDatabase.getInstance(context))
-                            results = repo.searchAll(searchText)
+                            val q = searchText.trim()
+                            results = if (q.all { it.isDigit() } && q.length in 8..14) {
+                                listOfNotNull(repo.searchBarcode(q))
+                            } else {
+                                repo.searchAll(q)
+                            }
                         }.onFailure { errorMsg = it.message }
                         isSearching = false
                     }
@@ -282,10 +435,23 @@ private fun FoodSearchScreen(
             errorMsg != null -> Text(
                 "Fehler: $errorMsg", color = MaterialTheme.colorScheme.error, fontSize = 13.sp
             )
-            results.isEmpty() && !isSearching -> Text(
-                "Keine Ergebnisse — versuche einen anderen Begriff",
-                fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            results.isEmpty() && !isSearching -> {
+                Text(
+                    "Keine Ergebnisse — versuche einen anderen Begriff",
+                    fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (onCaptureLabel != null) {
+                    Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick = onCaptureLabel,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.PhotoCamera, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Nährwerttabelle fotografieren")
+                    }
+                }
+            }
             else -> {
                 results.forEach { food ->
                     Card(

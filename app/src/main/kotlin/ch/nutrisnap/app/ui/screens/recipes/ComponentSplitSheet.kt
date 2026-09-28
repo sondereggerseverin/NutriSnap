@@ -526,6 +526,20 @@ fun ComponentSplitSheet(
                 Spacer(Modifier.width(8.dp))
                 Text("Trennung speichern")
             }
+            // Bestehende Trennung entfernen → normales Gesamtgewicht-Tracking
+            if (initialComponents.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                OutlinedButton(
+                    onClick = {
+                        val cleared = workingMatches.map { it.copy(componentGroup = null) }
+                        onSave(emptyList(), cleared)
+                        requestDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Ohne Trennung – als Ganzes tracken")
+                }
+            }
             TextButton(onClick = { requestDismiss() }, modifier = Modifier.fillMaxWidth()) {
                 Text("Abbrechen")
             }

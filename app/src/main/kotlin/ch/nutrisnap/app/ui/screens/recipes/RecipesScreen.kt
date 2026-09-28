@@ -1373,6 +1373,11 @@ fun RecipesScreen(
                 onFreeze = { gramsMap, qty ->
                     freezerVm.freezeFromComponents(recipe, safeComponents, gramsMap, qty)
                     addToDiaryRecipe = null
+                },
+                onConfirmWhole = { servings, grams, meal, date ->
+                    diaryVm.addRecipeAsMeal(recipe, servings, meal, grams, date)
+                    rateAfterDiary = recipe
+                    addToDiaryRecipe = null
                 }
             )
         } else {
