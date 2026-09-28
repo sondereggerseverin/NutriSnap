@@ -30,8 +30,44 @@ import java.time.LocalDate
 private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 /**
+ * Postgres/Supabase „duplicate key value violates unique constraint …“
+ * und ähnliche Konflikte: Daten sind schon in der Cloud → kein echter Fehler.
+ */
+internal fun isBenignSyncConflict(t: Throwable?): Boolean {
+    if (t == null) return false
+    val msg = (t.message ?: "") + " " + (t.cause?.message ?: "")
+    val lower = msg.lowercase()
+    return "duplicate key" in lower ||
+        "unique constraint" in lower ||
+        "23505" in lower || // Postgres unique_violation
+        ("conflict" in lower && "409" in lower)
+}
+
+/** Kurze, nutzerfreundliche Sync-Meldung (kein Postgres-Jargon im Banner). */
+internal fun humanizeSyncError(raw: String?): String {
+    if (raw.isNullOrBlank()) return "Cloud-Sync fehlgeschlagen"
+    val lower = raw.lowercase()
+    return when {
+        isBenignSyncConflict(Exception(raw)) -> "Bereits synchronisiert"
+        "keine session" in lower || "not authenticated" in lower || "jwt" in lower ->
+            "Nicht angemeldet"
+        "timeout" in lower || "timed out" in lower -> "Netz-Timeout"
+        "unable to resolve host" in lower || "unknownhost" in lower ||
+            "failed to connect" in lower || "network" in lower -> "Keine Verbindung"
+        "permission" in lower || "rls" in lower || "row-level" in lower ->
+            "Keine Cloud-Berechtigung"
+        else -> raw
+            .replace(Regex("""(?i)duplicate key value violates[^\n]*"""), "Konflikt (bereits vorhanden)")
+            .replace(Regex("""\s+"""), " ")
+            .trim()
+            .take(48)
+    }
+}
+
+/**
  * Einzel-Push mit bis zu 4 Versuchen (Session/Netz kurz flackern oft).
  * Banner nur bei finalem Fehler — kein Dauer-„Synchronisiert…“ pro Tipp.
+ * Duplicate-Key / Unique-Konflikt = Daten schon in Cloud → still OK.
  */
 private fun pushSafely(block: suspend () -> Unit) {
     syncScope.launch {
@@ -45,15 +81,26 @@ private fun pushSafely(block: suspend () -> Unit) {
                 return@launch
             }
             lastError = result.exceptionOrNull()
+            if (isBenignSyncConflict(lastError)) {
+                Log.i(
+                    "NutriSync",
+                    "Push: Duplikat/Konflikt – bereits in Cloud, ignoriere (${lastError?.message?.take(80)})"
+                )
+                return@launch
+            }
             Log.w(
                 "NutriSync",
                 "Push Versuch ${attempt + 1}/4 fehlgeschlagen: ${lastError?.message}"
             )
             kotlinx.coroutines.delay(400L * (attempt + 1))
         }
+        if (isBenignSyncConflict(lastError)) {
+            Log.i("NutriSync", "Push: finaler Konflikt als OK gewertet")
+            return@launch
+        }
         Log.e("NutriSync", "Push endgültig fehlgeschlagen: ${lastError?.message}", lastError)
         SyncStatusHolder.opFailed(
-            lastError?.message?.take(120) ?: "Cloud-Sync fehlgeschlagen"
+            humanizeSyncError(lastError?.message)
         )
     }
 }

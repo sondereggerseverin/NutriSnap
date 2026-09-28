@@ -62,7 +62,8 @@ fun SyncStatusBanner() {
 
     LaunchedEffect(status.state) {
         if (status.state == SyncState.ERROR) {
-            delay(8_000)
+            // Kurzer Hinweis, dann weg – Postgres-Jargon soll nicht stören
+            delay(5_000)
             SyncStatusHolder.clearStaleSyncing(0)
         }
     }
@@ -78,9 +79,14 @@ fun SyncStatusBanner() {
         val bg = if (isError) scheme.errorContainer else scheme.secondaryContainer
         val fg = if (isError) scheme.onErrorContainer else scheme.onSecondaryContainer
         // Laufender Sync: nur kleiner Spinner (kein Text) – sonst überdeckt der Chip
-        // den rechten Hub-Tab „KI-Koch“. Fehler weiterhin mit kurzem Label.
+        // den rechten Hub-Tab „KI-Koch“. Fehler: kurze, verständliche Meldung.
         val errorLabel = if (isError) {
-            "Sync fehlgeschlagen" + (status.lastError?.let { ": ${it.take(28)}" } ?: "")
+            val detail = status.lastError?.trim().orEmpty()
+            when {
+                detail.isBlank() -> "Sync fehlgeschlagen"
+                detail.length <= 36 -> detail
+                else -> detail.take(34) + "…"
+            }
         } else null
 
         Box(

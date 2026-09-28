@@ -27,26 +27,21 @@ object SyncManager {
     suspend fun pushAllLocal(db: NutriDatabase) {
         SyncStatusHolder.opStarted()
         var firstError: String? = null
-        runCatching { pushDiary(db) }.onFailure {
-            Log.e("NutriSync", "Push diary_entries fehlgeschlagen: ${it.message}", it)
-            firstError = firstError ?: it.message
+        fun noteFailure(label: String, t: Throwable) {
+            if (ch.nutrisnap.app.data.repository.isBenignSyncConflict(t)) {
+                Log.i("NutriSync", "Push $label: Konflikt/Duplikat – ok (${t.message?.take(60)})")
+                return
+            }
+            Log.e("NutriSync", "Push $label fehlgeschlagen: ${t.message}", t)
+            if (firstError == null) {
+                firstError = ch.nutrisnap.app.data.repository.humanizeSyncError(t.message)
+            }
         }
-        runCatching { pushRecipes(db) }.onFailure {
-            Log.e("NutriSync", "Push recipes fehlgeschlagen: ${it.message}", it)
-            firstError = firstError ?: it.message
-        }
-        runCatching { pushCustomFoods(db) }.onFailure {
-            Log.e("NutriSync", "Push custom_foods fehlgeschlagen: ${it.message}", it)
-            firstError = firstError ?: it.message
-        }
-        runCatching { pushWeight(db) }.onFailure {
-            Log.e("NutriSync", "Push weight_entries fehlgeschlagen: ${it.message}", it)
-            firstError = firstError ?: it.message
-        }
-        runCatching { pushUserProfile(db) }.onFailure {
-            Log.e("NutriSync", "Push user_profiles fehlgeschlagen: ${it.message}", it)
-            firstError = firstError ?: it.message
-        }
+        runCatching { pushDiary(db) }.onFailure { noteFailure("diary_entries", it) }
+        runCatching { pushRecipes(db) }.onFailure { noteFailure("recipes", it) }
+        runCatching { pushCustomFoods(db) }.onFailure { noteFailure("custom_foods", it) }
+        runCatching { pushWeight(db) }.onFailure { noteFailure("weight_entries", it) }
+        runCatching { pushUserProfile(db) }.onFailure { noteFailure("user_profiles", it) }
         if (firstError != null) SyncStatusHolder.opFailed(firstError)
         else SyncStatusHolder.opSucceeded()
     }
@@ -57,11 +52,22 @@ object SyncManager {
         pullAll(db)
     }
 
+    /** Ein Eintrag-Fehler soll den Rest nicht abbrechen; echte Fehler werden geworfen. */
+    private suspend fun pushOne(label: String, block: suspend () -> Unit) {
+        runCatching { block() }.onFailure { t ->
+            if (ch.nutrisnap.app.data.repository.isBenignSyncConflict(t)) {
+                Log.i("NutriSync", "$label: Duplikat – übersprungen")
+            } else {
+                throw t
+            }
+        }
+    }
+
     private suspend fun pushDiary(db: NutriDatabase) {
         val entries = db.diaryDao().getAllOnce()
         Log.i("NutriSync", "Push diary: ${entries.size} Einträge")
         for (entry in entries) {
-            SupabaseSync.upsertDiaryEntry(entry)
+            pushOne("diary ${entry.id}") { SupabaseSync.upsertDiaryEntry(entry) }
         }
     }
 
@@ -69,7 +75,7 @@ object SyncManager {
         val recipes = db.recipeDao().getAllOnce()
         Log.i("NutriSync", "Push recipes: ${recipes.size}")
         for (r in recipes) {
-            SupabaseSync.upsertRecipe(r)
+            pushOne("recipe ${r.id}") { SupabaseSync.upsertRecipe(r) }
         }
     }
 
@@ -77,14 +83,14 @@ object SyncManager {
         val foods = db.customFoodDao().getAllOnce()
         Log.i("NutriSync", "Push custom_foods: ${foods.size}")
         for (f in foods) {
-            SupabaseSync.upsertCustomFood(f)
+            pushOne("custom_food ${f.id}") { SupabaseSync.upsertCustomFood(f) }
         }
     }
 
     private suspend fun pushWeight(db: NutriDatabase) {
         val entries = db.weightDao().getAllOnce()
         for (e in entries) {
-            SupabaseSync.upsertWeight(e)
+            pushOne("weight ${e.dateStr}") { SupabaseSync.upsertWeight(e) }
         }
     }
 
@@ -106,38 +112,33 @@ object SyncManager {
     suspend fun pullAll(db: NutriDatabase) {
         SyncStatusHolder.opStarted()
         var firstError: String? = null
-        runCatching { pullDiary(db) }.onFailure {
-            Log.e("NutriSync", "Pull diary_entries fehlgeschlagen: ${it.message}", it)
-            firstError = firstError ?: it.message
+        fun notePullFailure(label: String, t: Throwable) {
+            if (ch.nutrisnap.app.data.repository.isBenignSyncConflict(t)) {
+                Log.i("NutriSync", "Pull $label: Konflikt – ok (${t.message?.take(60)})")
+                return
+            }
+            Log.e("NutriSync", "Pull $label fehlgeschlagen: ${t.message}", t)
+            if (firstError == null) {
+                firstError = ch.nutrisnap.app.data.repository.humanizeSyncError(t.message)
+            }
         }
+        runCatching { pullDiary(db) }.onFailure { notePullFailure("diary_entries", it) }
         runCatching {
             val n = ch.nutrisnap.app.data.repository.DiaryRepository(db).deduplicateEntries()
             if (n > 0) Log.i("NutriSync", "Diary-Dedup nach Pull: $n entfernt")
         }.onFailure {
             Log.e("NutriSync", "Diary-Dedup fehlgeschlagen: ${it.message}", it)
         }
-        runCatching { pullRecipes(db) }.onFailure {
-            Log.e("NutriSync", "Pull recipes fehlgeschlagen: ${it.message}", it)
-            firstError = firstError ?: it.message
-        }
+        runCatching { pullRecipes(db) }.onFailure { notePullFailure("recipes", it) }
         runCatching {
             val n = deduplicateRecipesLocal(db)
             if (n > 0) Log.i("NutriSync", "Rezept-Dedup nach Pull: $n entfernt")
         }.onFailure {
             Log.e("NutriSync", "Rezept-Dedup fehlgeschlagen: ${it.message}", it)
         }
-        runCatching { pullWeight(db) }.onFailure {
-            Log.e("NutriSync", "Pull weight_entries fehlgeschlagen: ${it.message}", it)
-            firstError = firstError ?: it.message
-        }
-        runCatching { pullUserProfile(db) }.onFailure {
-            Log.e("NutriSync", "Pull user_profiles fehlgeschlagen: ${it.message}", it)
-            firstError = firstError ?: it.message
-        }
-        runCatching { pullCustomFoods(db) }.onFailure {
-            Log.e("NutriSync", "Pull custom_foods fehlgeschlagen: ${it.message}", it)
-            firstError = firstError ?: it.message
-        }
+        runCatching { pullWeight(db) }.onFailure { notePullFailure("weight_entries", it) }
+        runCatching { pullUserProfile(db) }.onFailure { notePullFailure("user_profiles", it) }
+        runCatching { pullCustomFoods(db) }.onFailure { notePullFailure("custom_foods", it) }
         if (firstError != null) SyncStatusHolder.opFailed(firstError)
         else SyncStatusHolder.opSucceeded()
     }
