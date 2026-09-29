@@ -85,6 +85,15 @@ enum class DiaryEntryKind { FOOD, RECIPE, MANUAL }
 /** foodItemId-Marker für manuell erfasste Einträge (kein FoodItem in der DB). */
 const val MANUAL_FOOD_ITEM_ID: Int = -999
 
+/**
+ * foodItemId für Rezept-Tagebucheinträge: immer negativ (= RECIPE-Kind).
+ *
+ * Wichtig: Nicht `-(id).coerceAtMost(-1)` schreiben — Postfix `.` bindet enger als
+ * unäres Minus, dadurch wird aus jedem positiven id fälschlich `1` (FOOD).
+ */
+fun recipeDiaryFoodItemId(recipeId: Long): Int =
+    (-recipeId.toInt()).coerceAtMost(-1)
+
 val DiaryEntry.kind: DiaryEntryKind
     get() = when {
         foodItemId == MANUAL_FOOD_ITEM_ID -> DiaryEntryKind.MANUAL

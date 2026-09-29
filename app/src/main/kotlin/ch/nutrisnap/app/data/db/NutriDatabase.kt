@@ -81,7 +81,7 @@ interface UserProfileDao {
         RecipeComponent::class,
         FrozenMeal::class
     ],
-    version = 37,
+    version = 38,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -766,6 +766,31 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // foodItemId-Bug: `-(id).coerceAtMost(-1)` speicherte wegen Operator-Precedenz
+        // immer 1 statt -recipeId → Rezepte/Komponenten als FOOD mit „0 g“/„1 g“.
+        private val MIGRATION_37_38 = object : Migration(37, 38) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Komponenten / Rezepte mit matchedRecipeId → negatives foodItemId
+                db.execSQL("""
+                    UPDATE diary_entries
+                    SET foodItemId = -CAST(matchedRecipeId AS INTEGER)
+                    WHERE matchedRecipeId IS NOT NULL
+                      AND matchedRecipeId > 0
+                      AND foodItemId > 0
+                      AND foodItemId != -999
+                """.trimIndent())
+                // Gramm-getrackte Rezepte ohne matchedRecipeId → generisch als RECIPE markieren
+                db.execSQL("""
+                    UPDATE diary_entries
+                    SET foodItemId = -1
+                    WHERE recipeGrams IS NOT NULL
+                      AND recipeGrams >= 1
+                      AND foodItemId > 0
+                      AND foodItemId != -999
+                      AND matchedRecipeId IS NULL
+                """.trimIndent())
+            }
+        }
 
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
@@ -784,7 +809,7 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28,
                         MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32,
                         MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36,
-                        MIGRATION_36_37
+                        MIGRATION_36_37, MIGRATION_37_38
                     )
                     .build()
                     .also { INSTANCE = it }

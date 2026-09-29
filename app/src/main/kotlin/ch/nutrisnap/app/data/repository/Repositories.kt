@@ -213,7 +213,7 @@ class DiaryRepository(db: NutriDatabase) {
 
         val id = dao.insert(
             DiaryEntry(
-                foodItemId  = -(recipe.id.toInt()).coerceAtMost(-1), // negative = recipe entry
+                foodItemId  = ch.nutrisnap.app.data.model.recipeDiaryFoodItemId(recipe.id),
                 foodName    = recipe.title,
                 amountGrams = storedAmount,
                 mealType    = mealType,
@@ -227,7 +227,8 @@ class DiaryRepository(db: NutriDatabase) {
                 saturatedFat = saturatedFat,
                 salt        = salt,
                 sodium      = sodium,
-                recipeGrams = storedRecipeGrams
+                recipeGrams = storedRecipeGrams,
+                matchedRecipeId = recipe.id
             )
         )
         dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }
@@ -256,7 +257,7 @@ class DiaryRepository(db: NutriDatabase) {
             val factor = if (c.cookedWeightG > 0f) (grams / c.cookedWeightG).coerceAtLeast(0.001f) else 1f
             val id = dao.insert(
                 DiaryEntry(
-                    foodItemId = -(recipe.id.toInt()).coerceAtMost(-1),
+                    foodItemId = ch.nutrisnap.app.data.model.recipeDiaryFoodItemId(recipe.id),
                     foodName = "${recipe.displayTitle()} – ${c.name}",
                     amountGrams = factor,
                     mealType = mealType,

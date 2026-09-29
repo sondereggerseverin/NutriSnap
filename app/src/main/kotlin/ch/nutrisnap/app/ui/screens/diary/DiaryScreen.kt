@@ -855,12 +855,13 @@ private fun DiaryEntryRow(
     val largerDiaryIcons = prefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_DIARY_ICONS) ?: true
     val diaryIconBtnSize = if (largerDiaryIcons) 40.dp else 32.dp
 
-    // Menge: bei Rezept mit recipeGrams → Gramm; bei normalem Food → Gramm; sonst Portionen
+    // Menge: recipeGrams hat Vorrang (Komponenten); sonst Portionen bei Rezept/Manual/
+    // Portions-Heuristik (deckt auch den foodItemId=1-Bug ab); echtes Food → Gramm.
     val amountLabel = when {
-        entry.isFoodEntry -> "${entry.amountGrams.toInt()} g"
         entry.recipeGrams != null && entry.recipeGrams >= 1f ->
             "${entry.recipeGrams!!.toInt()} g"
-        entry.isRecipeEntry || entry.isManualEntry -> recipeAmountLabel(entry)
+        entry.isRecipeEntry || entry.isManualEntry || entry.isPortionTracked ->
+            recipeAmountLabel(entry)
         else -> "${entry.amountGrams.toInt()} g"
     }
 
