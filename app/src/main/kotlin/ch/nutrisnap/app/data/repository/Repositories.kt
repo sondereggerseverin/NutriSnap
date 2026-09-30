@@ -189,11 +189,15 @@ class DiaryRepository(db: NutriDatabase) {
         val yieldG = recipe.yieldWeightG()
             ?: ch.nutrisnap.app.domain.RecipeNutritionAnalyzer.estimateTotalGrams(recipe.ingredients)
                 .takeIf { it > 0f }
+        // Explizite Gramm-Angabe ODER Portionsfeld mit unrealistisch hohem Wert
+        // (UI erzwang oft „Portion“ ohne Portionsgewicht → Nutzer tippt 650 für 650 g).
         val realGrams = gramsAmount?.takeIf { it >= 10f }
+            ?: servingsFactor.takeIf { gramsAmount == null && it >= 20f }
         val factor = when {
             realGrams != null && yieldG != null && yieldG > 0f ->
                 (realGrams / yieldG * perServing).coerceAtLeast(0.05f)
-            // Kein stiller Portions-Fallback aus „Gramm < 10“: Aufrufer muss servingsFactor setzen
+            // Gramm ohne Yield: 1 Portion als Näherung, Anzeige trotzdem in g
+            realGrams != null -> 1f
             else -> servingsFactor.coerceAtLeast(0.05f)
         }
         val calsPerServ = recipe.totalCalories?.let { it / perServing } ?: 0f

@@ -32,7 +32,9 @@ fun AddToDiarySheet(
     onDismiss: () -> Unit,
     onFreeze: ((grams: Float, quantity: Int) -> Unit)? = null
 ) {
-    var unit by remember { mutableStateOf(if (gramsPerServing != null) DiaryQuantityUnit.GRAM else DiaryQuantityUnit.SERVING) }
+    // Gramm immer anbieten (auch ohne analysiertes Portionsgewicht) — sonst tippt
+    // man 650 „Portionen“ statt 650 g beim Onepot.
+    var unit by remember { mutableStateOf(DiaryQuantityUnit.GRAM) }
     var servingsText by remember { mutableStateOf("1") }
     var gramsText by remember {
         mutableStateOf(
@@ -45,13 +47,22 @@ fun AddToDiarySheet(
     var selectedDate by remember { mutableStateOf(java.time.LocalDate.now()) }
     var freezeQtyText by remember { mutableStateOf("1") }
 
+    // Effektives g/Portion: analysiert oder aus Gesamt-Yield abgeleitet
+    val effectiveGPerServing = gramsPerServing
+        ?: yieldTotalG?.div(recipe.servings.coerceAtLeast(1).toFloat())?.takeIf { it > 0f }
+
     // Immer in Portionen umrechnen, egal welche Einheit der Nutzer eingibt — die
     // Datenschicht (addRecipeAsMeal) erwartet weiterhin einen Portionsfaktor.
     val servings = when (unit) {
         DiaryQuantityUnit.SERVING -> servingsText.toFloatOrNull()?.coerceAtLeast(0.1f) ?: 1f
         DiaryQuantityUnit.GRAM -> {
-            val grams = gramsText.toFloatOrNull()?.coerceAtLeast(1f) ?: (gramsPerServing ?: 1f)
-            if (gramsPerServing != null && gramsPerServing > 0f) grams / gramsPerServing else 1f
+            val grams = gramsText.replace(',', '.').toFloatOrNull()?.coerceAtLeast(1f)
+                ?: (effectiveGPerServing ?: 1f)
+            if (effectiveGPerServing != null && effectiveGPerServing > 0f) {
+                grams / effectiveGPerServing
+            } else {
+                1f // ohne Yield: 1 Portion + echte Gramm in recipeGrams
+            }
         }
     }
     val calsPerServ = recipe.totalCalories?.let { it / recipe.servings.coerceAtLeast(1) }
@@ -106,16 +117,18 @@ fun AddToDiarySheet(
                         DropdownMenuItem(text={Text("Portion")}, onClick={unit=DiaryQuantityUnit.SERVING;unitExpanded=false})
                         DropdownMenuItem(
                             text={Text("Gramm")},
-                            enabled = gramsPerServing != null,
                             onClick={unit=DiaryQuantityUnit.GRAM;unitExpanded=false}
                         )
                     }
                 }
             }
-            if (gramsPerServing == null) {
+            if (effectiveGPerServing == null && unit == DiaryQuantityUnit.GRAM) {
                 Spacer(Modifier.height(4.dp))
-                Text("Gramm-Eingabe nicht verfügbar — Nährwerte noch nicht analysiert.",
-                    fontSize=11.sp, color=MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "Kein Portionsgewicht hinterlegt — Gramm werden gespeichert, kcal ≈ 1 Portion.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp), verticalAlignment=Alignment.CenterVertically) {

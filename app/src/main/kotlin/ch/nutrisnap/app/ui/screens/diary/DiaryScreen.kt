@@ -71,8 +71,9 @@ internal fun recipeAmountLabel(entry: DiaryEntry): String {
     if (g != null && g >= 1f) {
         return "${g.toInt()} g"
     }
-    // Legacy: amountGrams fälschlich als Gramm statt Portionsfaktor gespeichert
-    if (entry.isRecipeEntry && entry.amountGrams >= 20f && entry.recipeGrams == null) {
+    // Legacy / Onepot-Bug: hohe amountGrams sind Gramm, keine Portionen
+    // (UI speicherte 650 g oft als Portionsfaktor → „650 Portionen“)
+    if (entry.amountGrams >= 20f && entry.recipeGrams == null) {
         return "${entry.amountGrams.toInt()} g"
     }
     val portions = when {
