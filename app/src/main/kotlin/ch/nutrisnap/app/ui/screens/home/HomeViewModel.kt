@@ -15,7 +15,13 @@ import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.KEY_MEAL_ORDER
 import ch.nutrisnap.app.ui.theme.KEY_MANUAL_ACTIVITY_ENABLED
 import ch.nutrisnap.app.ui.theme.KEY_AGGRESSIVE_SPORT_DAY
+import ch.nutrisnap.app.ui.theme.KEY_PRIORITY_NUTRIENTS
 import ch.nutrisnap.app.data.model.ManualActivityEntry
+import ch.nutrisnap.app.data.repository.FoodItemRepository
+import ch.nutrisnap.app.data.repository.RecipeRepository
+import ch.nutrisnap.app.domain.DailyMicronutrientAggregator
+import ch.nutrisnap.app.domain.PriorityNutrientStatus
+import ch.nutrisnap.app.domain.parsePriorityNutrientKeys
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -112,6 +118,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val hcDao       = db.healthConnectDao()
     private val manualActivityDao = db.manualActivityDao()
     private val macroSuggester = ch.nutrisnap.app.domain.RemainingMacroSuggester(db)
+    private val microAggregator = DailyMicronutrientAggregator(
+        FoodItemRepository(db),
+        RecipeRepository(db, app)
+    )
 
     private val _streak = MutableStateFlow(0)
 
@@ -324,6 +334,24 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 else runCatching { macroSuggester.suggest(remaining) }.getOrDefault(emptyList())
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * Priority-Mikronährstoffe für den angezeigten Tag (bis zu 6 sticky Cards).
+     * Keys aus DataStore [KEY_PRIORITY_NUTRIENTS], sonst Default-Liste.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val priorityNutrients: StateFlow<List<PriorityNutrientStatus>> =
+        _selectedDate.flatMapLatest { selected ->
+            combine(
+                diaryRepo.getEntriesForDate(selected),
+                app.notifDataStore.data
+            ) { entries, prefs ->
+                entries to parsePriorityNutrientKeys(prefs[KEY_PRIORITY_NUTRIENTS])
+            }.mapLatest { (entries, keys) ->
+                runCatching { microAggregator.priorityStatuses(entries, keys) }
+                    .getOrDefault(emptyList())
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /**
      * Ein-Tap: Vorschlag ins heutige Tagebuch (Snack, falls unklar).

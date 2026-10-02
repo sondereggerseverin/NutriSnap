@@ -50,6 +50,7 @@ fun HomeScreen(
     val state by vm.uiState.collectAsStateWithLifecycle()
     val hcState by hcVm.uiState.collectAsStateWithLifecycle()
     val macroSuggestions by vm.macroSuggestions.collectAsStateWithLifecycle()
+    val priorityNutrients by vm.priorityNutrients.collectAsStateWithLifecycle()
     var showWeightDialog by remember { mutableStateOf(false) }
     var showActivityDialog by remember { mutableStateOf(false) }
     var snackMessage by remember { mutableStateOf<String?>(null) }
@@ -84,6 +85,11 @@ fun HomeScreen(
                     onClick = { meal -> onNavigateToDiary(meal.type, meal.count == 0) },
                     onQuickAdd = { meal -> onNavigateToDiary(meal.type, true) }
                 )
+            }
+            if (priorityNutrients.isNotEmpty()) {
+                item {
+                    PriorityNutrientsSection(items = priorityNutrients)
+                }
             }
             if (reorderHome) {
                 // Design-Toggle #16 "Home-Reihenfolge neu": Ring → Meals → Makros → Activity.

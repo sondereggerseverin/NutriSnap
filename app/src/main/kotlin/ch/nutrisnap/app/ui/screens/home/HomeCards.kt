@@ -1455,3 +1455,128 @@ internal fun RemainingMacroSuggestionsCard(
         }
     }
 }
+
+@Composable
+internal fun PriorityNutrientsSection(
+    items: List<ch.nutrisnap.app.domain.PriorityNutrientStatus>,
+    onClick: (ch.nutrisnap.app.domain.PriorityNutrientStatus) -> Unit = {}
+) {
+    if (items.isEmpty()) return
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs)
+    ) {
+        Text(
+            "Nährstoffe im Blick",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(bottom = NutriSpacing.sm)
+        )
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items.take(3).forEach { status ->
+                PriorityNutrientCard(
+                    status = status,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onClick(status) }
+                )
+            }
+        }
+        if (items.size > 3) {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items.drop(3).take(3).forEach { status ->
+                    PriorityNutrientCard(
+                        status = status,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onClick(status) }
+                    )
+                }
+                // Platzhalter, damit die zweite Reihe nicht auseinanderzieht
+                repeat(3 - items.drop(3).take(3).size) {
+                    Spacer(Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PriorityNutrientCard(
+    status: ch.nutrisnap.app.domain.PriorityNutrientStatus,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {}
+) {
+    val levelColor = when (status.level) {
+        ch.nutrisnap.app.domain.PriorityNutrientLevel.OK -> Color(0xFF2E7D32)
+        ch.nutrisnap.app.domain.PriorityNutrientLevel.LOW -> Color(0xFFF9A825)
+        ch.nutrisnap.app.domain.PriorityNutrientLevel.CRITICAL -> Color(0xFFC62828)
+        ch.nutrisnap.app.domain.PriorityNutrientLevel.UNKNOWN ->
+            MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val progress = (status.pctOfGoal ?: 0).coerceIn(0, 100) / 100f
+
+    Card(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(NutriRadius.md),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 10.dp)
+        ) {
+            Text(
+                status.label.substringBefore(" ("),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1
+            )
+            Spacer(Modifier.height(4.dp))
+            val amountText = when {
+                status.amountDisplay >= 100f -> status.amountDisplay.toInt().toString()
+                status.amountDisplay >= 10f -> "%.0f".format(status.amountDisplay)
+                status.amountDisplay >= 1f -> "%.1f".format(status.amountDisplay)
+                status.amountDisplay > 0f -> "%.2f".format(status.amountDisplay)
+                else -> "0"
+            }
+            Text(
+                "$amountText ${status.unit}",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = levelColor,
+                maxLines = 1
+            )
+            status.pctOfGoal?.let { pct ->
+                Spacer(Modifier.height(6.dp))
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp)),
+                    color = levelColor,
+                    trackColor = levelColor.copy(alpha = 0.15f),
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "$pct %",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
