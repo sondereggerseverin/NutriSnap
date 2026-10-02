@@ -20,6 +20,9 @@ import ch.nutrisnap.app.data.model.ManualActivityEntry
 import ch.nutrisnap.app.data.repository.FoodItemRepository
 import ch.nutrisnap.app.data.repository.RecipeRepository
 import ch.nutrisnap.app.domain.DailyMicronutrientAggregator
+import ch.nutrisnap.app.domain.HealthScoreBreakdown
+import ch.nutrisnap.app.domain.HealthScoreCalculator
+import ch.nutrisnap.app.domain.HealthScoreInput
 import ch.nutrisnap.app.domain.PriorityNutrientStatus
 import ch.nutrisnap.app.domain.parsePriorityNutrientKeys
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -352,6 +355,27 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     .getOrDefault(emptyList())
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Tages-Health-Score aus Makros + Priority-Mikros (transparent, 0–100). */
+    val healthScore: StateFlow<HealthScoreBreakdown?> =
+        combine(uiState, priorityNutrients) { state, micros ->
+            if (state.totalCalories < HealthScoreCalculator.MIN_KCAL_FOR_SCORE) return@combine null
+            HealthScoreCalculator.compute(
+                HealthScoreInput(
+                    caloriesEaten = state.totalCalories,
+                    calorieGoal = state.adjustedGoal,
+                    proteinEaten = state.totalProtein,
+                    proteinGoal = state.proteinGoal,
+                    carbsEaten = state.totalCarbs,
+                    carbsGoal = state.carbsGoal,
+                    fatEaten = state.totalFat,
+                    fatGoal = state.fatGoal,
+                    fiberEaten = state.totalFiber,
+                    fiberGoal = state.fiberGoal,
+                    priorityNutrientPcts = micros.mapNotNull { it.pctOfGoal }
+                )
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**
      * Ein-Tap: Vorschlag ins heutige Tagebuch (Snack, falls unklar).

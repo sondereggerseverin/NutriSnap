@@ -52,6 +52,7 @@ fun HomeScreen(
     val hcState by hcVm.uiState.collectAsStateWithLifecycle()
     val macroSuggestions by vm.macroSuggestions.collectAsStateWithLifecycle()
     val priorityNutrients by vm.priorityNutrients.collectAsStateWithLifecycle()
+    val healthScore by vm.healthScore.collectAsStateWithLifecycle()
     var showWeightDialog by remember { mutableStateOf(false) }
     var showActivityDialog by remember { mutableStateOf(false) }
     var snackMessage by remember { mutableStateOf<String?>(null) }
@@ -94,6 +95,9 @@ fun HomeScreen(
                         onClick = { status -> onNavigateToNutrientDetail(status.key) }
                     )
                 }
+            }
+            healthScore?.let { score ->
+                item { DailyHealthScoreCard(breakdown = score) }
             }
             if (reorderHome) {
                 // Design-Toggle #16 "Home-Reihenfolge neu": Ring → Meals → Makros → Activity.

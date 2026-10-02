@@ -1580,3 +1580,84 @@ private fun PriorityNutrientCard(
         }
     }
 }
+
+@Composable
+internal fun DailyHealthScoreCard(
+    breakdown: ch.nutrisnap.app.domain.HealthScoreBreakdown,
+    modifier: Modifier = Modifier
+) {
+    var showInfo by remember { mutableStateOf(false) }
+    val scoreColor = when {
+        breakdown.score >= 80 -> Color(0xFF2E7D32)
+        breakdown.score >= 55 -> Color(0xFFF9A825)
+        else -> Color(0xFFC62828)
+    }
+
+    NutriCard(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs)
+            .clickable { showInfo = true }
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(NutriSpacing.lg),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Tages-Score",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    "Kalorien · Makros · Nährstoffe · Ballaststoffe",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(scoreColor.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "${breakdown.score}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    color = scoreColor
+                )
+            }
+        }
+    }
+
+    if (showInfo) {
+        AlertDialog(
+            onDismissRequest = { showInfo = false },
+            title = { Text("So entsteht der Score") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("0–100 Punkte aus deinem heutigen Log:")
+                    Text("• Kalorienziel: ${breakdown.caloriePart} (40 %)")
+                    Text("• Makros (P/C/F): ${breakdown.macroPart} (30 %)")
+                    breakdown.microPart?.let {
+                        Text("• Priority-Nährstoffe: $it (20 %)")
+                    }
+                    Text("• Ballaststoffe: ${breakdown.fiberPart} (10 %)")
+                    Text(
+                        "Nähe zum Ziel zählt – starkes Über- oder Unterschreiten senkt den Wert.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showInfo = false }) { Text("OK") }
+            }
+        )
+    }
+}
