@@ -78,6 +78,15 @@ import ch.nutrisnap.app.ui.theme.KEY_SMART_CAN_PORTIONS
 import ch.nutrisnap.app.ui.theme.KEY_MEAL_PHOTO_SUMMARY
 import ch.nutrisnap.app.ui.theme.KEY_DISH_NAME_AI_ESTIMATE
 import ch.nutrisnap.app.ui.theme.KEY_MICRO_NUTRIENT_FILL
+import ch.nutrisnap.app.ui.theme.KEY_PRIORITY_NUTRIENTS
+import ch.nutrisnap.app.domain.DEFAULT_PRIORITY_NUTRIENT_KEYS
+import ch.nutrisnap.app.domain.MAX_PRIORITY_NUTRIENTS
+import ch.nutrisnap.app.domain.MICRO_META
+import ch.nutrisnap.app.domain.NRV_REFERENCE
+import ch.nutrisnap.app.domain.parsePriorityNutrientKeys
+import ch.nutrisnap.app.domain.serializePriorityNutrientKeys
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 
 enum class FitnessGoal(val label: String, val emoji: String, val desc: String) {
     LOSE_WEIGHT("Abnehmen",        "\uD83D\uDD25", "–500 kcal vom TDEE · mehr Protein"),
@@ -514,6 +523,8 @@ fun SettingsScreen(
                         context = context
                     )
                 }
+                // ── Priority-Mikronährstoffe (Home) ──────────────────────────
+                PriorityNutrientsSettingsCard(prefs = prefs, scope = scope, context = context)
                 // ── Design-Backlog-Toggles ──────────────────────────────────
                 SettingsCard(title = "Touch-Targets", icon = Icons.Default.TouchApp) {
                     Text(
@@ -1234,3 +1245,86 @@ fun ActivitySlider(value: Float, onValueChange: (Float) -> Unit) {
     }
 }
 
+
+/** Auswahlkandidaten: Fiber + alle NRV-Nährstoffe mit Meta-Label. */
+private val PRIORITY_NUTRIENT_CANDIDATES: List<String> =
+    (listOf("fiber") + NRV_REFERENCE.keys.toList())
+        .filter { MICRO_META.containsKey(it) }
+        .distinct()
+        .sortedBy { MICRO_META[it]?.first ?: it }
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PriorityNutrientsSettingsCard(
+    prefs: androidx.datastore.preferences.core.Preferences?,
+    scope: kotlinx.coroutines.CoroutineScope,
+    context: android.content.Context
+) {
+    val selected = remember(prefs) {
+        parsePriorityNutrientKeys(prefs?.get(KEY_PRIORITY_NUTRIENTS)).toMutableStateList()
+    }
+    // Sync when DataStore updates from outside
+    LaunchedEffect(prefs?.get(KEY_PRIORITY_NUTRIENTS)) {
+        val parsed = parsePriorityNutrientKeys(prefs?.get(KEY_PRIORITY_NUTRIENTS))
+        if (selected.toList() != parsed) {
+            selected.clear()
+            selected.addAll(parsed)
+        }
+    }
+
+    fun persist(keys: List<String>) {
+        scope.launch {
+            context.notifDataStore.edit {
+                it[KEY_PRIORITY_NUTRIENTS] = serializePriorityNutrientKeys(keys)
+            }
+        }
+    }
+
+    SettingsCard(title = "Nährstoffe im Blick", icon = Icons.Default.Visibility) {
+        Text(
+            "Bis zu $MAX_PRIORITY_NUTRIENTS Nährstoffe auf dem Home-Screen. Ampel zeigt den Tagesfortschritt.",
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            "${selected.size} / $MAX_PRIORITY_NUTRIENTS ausgewählt",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            PRIORITY_NUTRIENT_CANDIDATES.forEach { key ->
+                val label = MICRO_META[key]?.first?.substringBefore(" (") ?: key
+                val isOn = key in selected
+                FilterChip(
+                    selected = isOn,
+                    onClick = {
+                        if (isOn) {
+                            if (selected.size <= 1) return@FilterChip // mindestens einer
+                            selected.remove(key)
+                            persist(selected.toList())
+                        } else {
+                            if (selected.size >= MAX_PRIORITY_NUTRIENTS) return@FilterChip
+                            selected.add(key)
+                            persist(selected.toList())
+                        }
+                    },
+                    label = { Text(label, fontSize = 12.sp) },
+                    enabled = isOn || selected.size < MAX_PRIORITY_NUTRIENTS
+                )
+            }
+        }
+        TextButton(
+            onClick = {
+                selected.clear()
+                selected.addAll(DEFAULT_PRIORITY_NUTRIENT_KEYS)
+                persist(DEFAULT_PRIORITY_NUTRIENT_KEYS)
+            }
+        ) {
+            Text("Standard wiederherstellen", fontSize = 12.sp)
+        }
+    }
+}
