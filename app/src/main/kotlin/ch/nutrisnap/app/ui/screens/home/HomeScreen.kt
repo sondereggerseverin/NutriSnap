@@ -45,6 +45,7 @@ fun HomeScreen(
     onNavigateToLabelScan: () -> Unit = {},
     onNavigateToCustomFoods: () -> Unit = {},
     onNavigateToMealTemplates: () -> Unit = {},
+    onNavigateToNutrientDetail: (String) -> Unit = {},
     onNavigateToCookSuggestions: () -> Unit = {}
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
@@ -88,7 +89,10 @@ fun HomeScreen(
             }
             if (priorityNutrients.isNotEmpty()) {
                 item {
-                    PriorityNutrientsSection(items = priorityNutrients)
+                    PriorityNutrientsSection(
+                        items = priorityNutrients,
+                        onClick = { status -> onNavigateToNutrientDetail(status.key) }
+                    )
                 }
             }
             if (reorderHome) {

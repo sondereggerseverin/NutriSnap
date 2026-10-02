@@ -51,6 +51,7 @@ import ch.nutrisnap.app.ui.screens.auth.LoginScreen
 import ch.nutrisnap.app.ui.screens.customfood.CreateCustomFoodScreen
 import ch.nutrisnap.app.ui.screens.customfood.CustomFoodListScreen
 import ch.nutrisnap.app.ui.screens.deficiency.DeficiencyTrendScreen
+import ch.nutrisnap.app.ui.screens.nutrient.NutrientDetailScreen
 import ch.nutrisnap.app.ui.screens.diary.DiaryScreen
 import ch.nutrisnap.app.ui.screens.export.ExportScreen
 import ch.nutrisnap.app.ui.screens.insights.InsightsScreen
@@ -401,6 +402,9 @@ fun MainScaffold(
                     onNavigateToLabelScan = { navController.navigate("nutrition_label_scan") },
                     onNavigateToCustomFoods = { navController.navigate("custom_foods") },
                     onNavigateToMealTemplates = { navController.navigate("meal_templates") },
+                    onNavigateToNutrientDetail = { key ->
+                        navController.navigate("nutrient_detail/$key")
+                    },
                     onNavigateToCookSuggestions = {
                         navController.navigate("recipes?cook=true") {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
@@ -538,6 +542,18 @@ fun MainScaffold(
                 popEnterTransition = { popEnter }, popExitTransition = { popExit }
             ) {
                 DeficiencyTrendScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = "nutrient_detail/{key}",
+                arguments = listOf(navArgument("key") { type = NavType.StringType }),
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) { entry ->
+                val key = entry.arguments?.getString("key") ?: "fiber"
+                NutrientDetailScreen(
+                    nutrientKey = key,
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable(
                 "chat",
