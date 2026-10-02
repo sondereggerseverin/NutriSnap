@@ -454,54 +454,93 @@ fun IngredientVerifySheet(
                 key = { index, state -> "${index}\u0000${state.result.line}" }
             ) { index, state ->
                 val line = state.result.line
-                IngredientVerifyRow(
-                    state = state,
-                    expanded = expandedLines.contains(line),
-                    onToggleExpand = {
-                        expandedLines = if (expandedLines.contains(line)) expandedLines - line else expandedLines + line
-                    },
-                    autoFocusFiberEdit = !readOnly && fiberEditTarget == line,
-                    onFiberEditConsumed = { if (fiberEditTarget == line) fiberEditTarget = null },
-                    onScan = { if (!readOnly) scanTarget = index },
-                    readOnly = readOnly,
-                    onDelete = {
-                        // Index-basiert: indexOf(state) ist bei NaN-Floats / gleichen Zeilen unzuverlässig
-                        if (index in verifyStates.indices) {
-                            verifyStates = verifyStates.toMutableList().also { it.removeAt(index) }
-                            updateOverride(line, IngredientOverride(deleted = true))
-                        }
-                    },
-                    onManualFiberSaved = { value ->
-                        if (index in verifyStates.indices) {
-                            val updated = verifyStates.toMutableList().also {
-                                it[index] = it[index].copy(manualFiber = value)
+                val deleteRow = {
+                    if (index in verifyStates.indices) {
+                        verifyStates = verifyStates.toMutableList().also { it.removeAt(index) }
+                        updateOverride(line, IngredientOverride(deleted = true))
+                    }
+                }
+                val row: @Composable () -> Unit = {
+                    IngredientVerifyRow(
+                        state = state,
+                        expanded = expandedLines.contains(line),
+                        onToggleExpand = {
+                            expandedLines =
+                                if (expandedLines.contains(line)) expandedLines - line
+                                else expandedLines + line
+                        },
+                        autoFocusFiberEdit = !readOnly && fiberEditTarget == line,
+                        onFiberEditConsumed = { if (fiberEditTarget == line) fiberEditTarget = null },
+                        onScan = { if (!readOnly) scanTarget = index },
+                        readOnly = readOnly,
+                        onDelete = deleteRow,
+                        onManualFiberSaved = { value ->
+                            if (index in verifyStates.indices) {
+                                val updated = verifyStates.toMutableList().also {
+                                    it[index] = it[index].copy(manualFiber = value)
+                                }
+                                verifyStates = updated
+                                updateOverride(line, updated[index].toOverride(null))
+                                val newTotal = updated.mapNotNull { it.effectiveMicros["fiber"] }
+                                    .takeIf { it.isNotEmpty() }?.sum()
+                                newTotal?.let {
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "Ballaststoffe aktualisiert → neuer Gesamtwert: ${"%.1f".format(it)} g",
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                }
                             }
-                            verifyStates = updated
-                            updateOverride(line, updated[index].toOverride(null))
-                            val newTotal = updated.mapNotNull { it.effectiveMicros["fiber"] }.takeIf { it.isNotEmpty() }?.sum()
-                            newTotal?.let {
-                                android.widget.Toast.makeText(
-                                    context,
-                                    "Ballaststoffe aktualisiert → neuer Gesamtwert: ${"%.1f".format(it)} g",
-                                    android.widget.Toast.LENGTH_SHORT
-                                ).show()
+                        },
+                        onAmountSaved = { value ->
+                            if (index in verifyStates.indices) {
+                                val updated = verifyStates.toMutableList().also {
+                                    it[index] = it[index].copy(amountOverride = value)
+                                }
+                                verifyStates = updated
+                                updateOverride(line, updated[index].toOverride(null))
+                            }
+                        },
+                        componentGroup = groups[line],
+                        availableGroups = emptyList(),
+                        onMoveComponent = null
+                    )
+                }
+                if (readOnly) {
+                    row()
+                } else {
+                    // Swipe nach links → Zutat entfernen (Micron-ähnlicher Flow)
+                    val dismissState = rememberSwipeToDismissBoxState(
+                        confirmValueChange = { value ->
+                            if (value == SwipeToDismissBoxValue.EndToStart) {
+                                deleteRow()
+                                true
+                            } else false
+                        }
+                    )
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        enableDismissFromStartToEnd = false,
+                        enableDismissFromEndToStart = true,
+                        backgroundContent = {
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.errorContainer)
+                                    .padding(horizontal = 20.dp),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Entfernen",
+                                    tint = MaterialTheme.colorScheme.onErrorContainer
+                                )
                             }
                         }
-                    },
-                    onAmountSaved = { value ->
-                        if (index in verifyStates.indices) {
-                            val updated = verifyStates.toMutableList().also {
-                                it[index] = it[index].copy(amountOverride = value)
-                            }
-                            verifyStates = updated
-                            updateOverride(line, updated[index].toOverride(null))
-                        }
-                    },
-                    // Komponenten nur in «Komponenten trennen» – Verify speichert bestehende Zuordnung
-                    componentGroup = groups[line],
-                    availableGroups = emptyList(),
-                    onMoveComponent = null
-                )
+                    ) {
+                        row()
+                    }
+                }
                 HorizontalDivider(
                     Modifier.padding(horizontal = 16.dp),
                     thickness = 0.5.dp,

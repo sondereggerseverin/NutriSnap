@@ -202,16 +202,29 @@ internal fun IngredientVerifyRow(
                 maxLines = 1
             )
 
-            // Name + optional Match-Unterzeile
+            // Name + optional Match-Unterzeile / Unsicher-Badge
+            val lowConfidence = state.result.line.contains("Unsichere Erkennung", ignoreCase = true)
+            val displayName = parts.name
+                .replace(Regex("""(?i),\s*Unsichere Erkennung\s*[–\-]\s*bitte prüfen"""), "")
+                .trim()
+                .ifBlank { parts.name }
             Column(Modifier.weight(1f)) {
                 Text(
-                    text = parts.name,
+                    text = displayName,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 2
                 )
-                if (showMatchSub) {
+                if (lowConfidence) {
+                    Text(
+                        "Unsicher – bitte prüfen",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFFF9A825),
+                        maxLines = 1
+                    )
+                } else if (showMatchSub) {
                     Text(
                         text = matchLabel,
                         fontSize = 11.sp,
