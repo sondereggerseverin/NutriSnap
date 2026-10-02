@@ -436,6 +436,11 @@ val KEY_MEAL_PHOTO_SUMMARY = androidx.datastore.preferences.core.booleanPreferen
 val KEY_DISH_NAME_AI_ESTIMATE = androidx.datastore.preferences.core.booleanPreferencesKey("dish_name_ai_estimate")
 /** Mikronährstoffe (Fiber/Vitamine) bei Label-Scan und Referenz stärker befüllen (default an). */
 val KEY_MICRO_NUTRIENT_FILL = androidx.datastore.preferences.core.booleanPreferencesKey("micro_nutrient_fill")
+/**
+ * Priority-Mikronährstoffe auf dem Home-Screen (kommagetrennte Keys, max. 6).
+ * Leer / fehlend → [ch.nutrisnap.app.domain.DEFAULT_PRIORITY_NUTRIENT_KEYS].
+ */
+val KEY_PRIORITY_NUTRIENTS = androidx.datastore.preferences.core.stringPreferencesKey("priority_nutrients")
 
 // ── Typography ─────────────────────────────────────────────────────────────────
 
