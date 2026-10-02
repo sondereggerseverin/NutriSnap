@@ -102,7 +102,13 @@ fun LineChart(
     chartHeight: Dp = 100.dp,
     lineColor:   Color = MaterialTheme.colorScheme.primary,
     xLabels:     List<String> = emptyList(),
-    valueFormatter: (Float) -> String = { "%.1f".format(it) }
+    valueFormatter: (Float) -> String = { "%.1f".format(it) },
+    /** Optionale zweite Serie (z. B. geglätteter Trend), gestrichelt. */
+    secondaryValues: List<Float>? = null,
+    secondaryColor: Color = MaterialTheme.colorScheme.tertiary,
+    /** Horizontale Ziellinie (z. B. Zielgewicht). */
+    targetValue: Float? = null,
+    targetColor: Color = MaterialTheme.colorScheme.outline
 ) {
     if (values.size < 2) {
         Box(
@@ -118,8 +124,9 @@ fun LineChart(
         return
     }
 
-    val min   = (values.minOrNull() ?: 0f) - 0.5f
-    val max   = (values.maxOrNull() ?: 1f) + 0.5f
+    val allForScale = values + (secondaryValues ?: emptyList()) + listOfNotNull(targetValue)
+    val min   = (allForScale.minOrNull() ?: 0f) - 0.5f
+    val max   = (allForScale.maxOrNull() ?: 1f) + 0.5f
     val range = (max - min).coerceAtLeast(0.1f)
 
     val axisLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -152,6 +159,46 @@ fun LineChart(
                         end   = Offset(w, y),
                         strokeWidth = 1.dp.toPx()
                     )
+                }
+
+                targetValue?.let { tv ->
+                    val y = h - ((tv - min) / range) * h
+                    drawLine(
+                        color = targetColor,
+                        start = Offset(0f, y),
+                        end = Offset(w, y),
+                        strokeWidth = 1.5.dp.toPx(),
+                        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
+                            floatArrayOf(8f, 6f), 0f
+                        )
+                    )
+                }
+
+                fun drawSeries(series: List<Float>, color: Color, widthPx: Float, dashed: Boolean) {
+                    if (series.size < 2) return
+                    val pts = series.mapIndexed { i, v ->
+                        Offset(x = i * stepX, y = h - ((v - min) / range) * h)
+                    }
+                    for (i in 0 until pts.size - 1) {
+                        drawLine(
+                            color = color,
+                            start = pts[i],
+                            end = pts[i + 1],
+                            strokeWidth = widthPx,
+                            cap = StrokeCap.Round,
+                            pathEffect = if (dashed) {
+                                androidx.compose.ui.graphics.PathEffect.dashPathEffect(
+                                    floatArrayOf(10f, 8f), 0f
+                                )
+                            } else null
+                        )
+                    }
+                }
+
+                secondaryValues?.let { sec ->
+                    if (sec.size == values.size) {
+                        drawSeries(sec, secondaryColor, 2.5.dp.toPx(), dashed = true)
+                    }
                 }
 
                 val points = values.mapIndexed { i, v ->

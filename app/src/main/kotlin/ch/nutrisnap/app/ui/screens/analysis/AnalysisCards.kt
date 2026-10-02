@@ -360,6 +360,9 @@ internal fun WeightCard(state: AnalysisUiState) {
                     weightPoints[idx].date.format(dateFormatter)
                 }
             }
+            // 7-Punkte-gleitender Mittelwert (Trendlinie)
+            val smoothed = movingAverage(weightValues, window = minOf(7, weightValues.size))
+            val targetKg = state.goals.targetWeightKg
             Text(
                 "Zeitraum: ${weightPoints.first().date.format(dateFormatter)} \u2013 ${weightPoints.last().date.format(dateFormatter)} \u00B7 ${weightValues.size} Messungen",
                 fontSize = 11.sp,
@@ -369,7 +372,9 @@ internal fun WeightCard(state: AnalysisUiState) {
             LineChart(
                 values = weightValues,
                 xLabels = xLabels,
-                valueFormatter = { "%.1f kg".format(it) }
+                valueFormatter = { "%.1f kg".format(it) },
+                secondaryValues = if (smoothed.size == weightValues.size) smoothed else null,
+                targetValue = targetKg
             )
             Spacer(Modifier.height(NutriSpacing.md))
             Row(
@@ -395,8 +400,75 @@ internal fun WeightCard(state: AnalysisUiState) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            // Tempo + Projektion zum Zielgewicht
+            val projectionText = weightProjectionHint(weightPoints, targetKg)
+            if (projectionText != null) {
+                Spacer(Modifier.height(NutriSpacing.sm))
+                Text(
+                    projectionText,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (targetKg != null) {
+                Text(
+                    "Gestrichelte Linie = Zielgewicht (%.1f kg) · Trend = gleitender Mittelwert".format(targetKg),
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else if (smoothed.size >= 2) {
+                Text(
+                    "Gestrichelte Kurve = geglätteter Trend",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
+}
+
+/** Einfacher gleitender Mittelwert (Fenster endet am jeweiligen Index). */
+private fun movingAverage(values: List<Float>, window: Int): List<Float> {
+    if (values.isEmpty() || window <= 1) return values
+    return values.indices.map { i ->
+        val from = (i - window + 1).coerceAtLeast(0)
+        val slice = values.subList(from, i + 1)
+        slice.average().toFloat()
+    }
+}
+
+/**
+ * Schätzt Wochenrate aus erstem/letztem Messpunkt und rechnet Wochen bis Zielgewicht.
+ */
+private fun weightProjectionHint(
+    points: List<ch.nutrisnap.app.ui.screens.analysis.DayPoint>,
+    targetKg: Float?
+): String? {
+    if (points.size < 2) return null
+    val first = points.first()
+    val last = points.last()
+    val w0 = first.weightKg ?: return null
+    val w1 = last.weightKg ?: return null
+    val days = java.time.temporal.ChronoUnit.DAYS.between(first.date, last.date).toFloat()
+        .coerceAtLeast(1f)
+    val weeklyRate = (w1 - w0) / days * 7f
+    val rateText = when {
+        kotlin.math.abs(weeklyRate) < 0.05f -> "Tempo: stabil (±0 kg/Woche)"
+        weeklyRate < 0 -> "Tempo: %.2f kg/Woche Abnahme".format(-weeklyRate)
+        else -> "Tempo: %.2f kg/Woche Zunahme".format(weeklyRate)
+    }
+    if (targetKg == null) return rateText
+    val remaining = w1 - targetKg
+    if (kotlin.math.abs(remaining) < 0.15f) return "$rateText · Ziel bereits erreicht"
+    if (kotlin.math.abs(weeklyRate) < 0.05f) return "$rateText · zu wenig Trend für eine Prognose"
+    // Nur prognostizieren, wenn die Richtung zum Ziel passt
+    val movingTowardTarget = (remaining > 0 && weeklyRate < 0) || (remaining < 0 && weeklyRate > 0)
+    if (!movingTowardTarget) return "$rateText · Trend geht vom Ziel weg"
+    val weeks = kotlin.math.abs(remaining / weeklyRate)
+    val daysLeft = (weeks * 7).toInt().coerceAtLeast(1)
+    val eta = java.time.LocalDate.now().plusDays(daysLeft.toLong())
+    val etaFmt = eta.format(java.time.format.DateTimeFormatter.ofPattern("d.M.yyyy"))
+    return "$rateText · Ziel ca. in $daysLeft Tagen ($etaFmt)"
 }
 
 @Composable
