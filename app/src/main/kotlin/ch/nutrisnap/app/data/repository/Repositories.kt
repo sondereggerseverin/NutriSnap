@@ -182,11 +182,9 @@ class DiaryRepository(db: NutriDatabase) {
         date: LocalDate,
         gramsAmount: Float? = null
     ): Long {
-        // Persistierte Korrektur falls P/K/F noch Batch-Summen sind
+        // Nur in-memory korrigieren (DiaryRepo hat kein updateRecipe)
         val recipe = if (recipe.macrosLookLikeBatchTotals()) {
-            recipe.withNormalizedPerServingMacros().also { fixed ->
-                runCatching { updateRecipe(fixed) }
-            }
+            recipe.withNormalizedPerServingMacros()
         } else recipe
         val perServing  = recipe.servings.coerceAtLeast(1).toFloat()
         // Gramm-Modus: Anteil am Gesamtgericht (Roh- oder Kochgewicht).
