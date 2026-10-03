@@ -137,6 +137,56 @@ class DailyMicronutrientAggregator(
         return sumMaps(maps)
     }
 
+    data class NutrientContributor(
+        val name: String,
+        /** Beitrag in Gramm (Rohwert, wie totals). */
+        val amountGrams: Float
+    )
+
+    /**
+     * Top-Lebensmittel/Rezepte des Tages für einen Nährstoff-Key (absteigend).
+     * Leere Liste = keine Einträge mit diesem Mikrowert in den geloggten Foods.
+     */
+    suspend fun topContributors(
+        entries: List<DiaryEntry>,
+        key: String,
+        limit: Int = 8
+    ): List<NutrientContributor> {
+        if (entries.isEmpty() || key.isBlank()) return emptyList()
+        val foodCache = mutableMapOf<Int, FoodItem?>()
+        val recipeCache = mutableMapOf<Long, Map<String, Float>?>()
+        val byName = linkedMapOf<String, Float>()
+        for (entry in entries) {
+            val micros = microsForEntry(entry, foodCache, recipeCache) ?: continue
+            val grams = micros[key] ?: continue
+            if (grams <= 0f) continue
+            val name = entry.foodName.ifBlank {
+                when {
+                    entry.isFoodEntry -> foodCache[entry.foodItemId]?.name ?: "Lebensmittel"
+                    entry.isRecipeEntry -> "Rezept"
+                    else -> "Eintrag"
+                }
+            }
+            byName[name] = (byName[name] ?: 0f) + grams
+        }
+        // Fiber oft nur am DiaryEntry
+        if (key == "fiber") {
+            for (entry in entries) {
+                if (entry.fiber > 0f) {
+                    val name = entry.foodName.ifBlank { "Eintrag" }
+                    // nur addieren wenn noch nicht aus FoodItem-Micros
+                    if (name !in byName) {
+                        byName[name] = (byName[name] ?: 0f) + entry.fiber
+                    }
+                }
+            }
+        }
+        return byName.entries
+            .sortedByDescending { it.value }
+            .take(limit)
+            .map { NutrientContributor(it.key, it.value) }
+    }
+
     suspend fun priorityStatuses(
         entries: List<DiaryEntry>,
         keys: List<String>

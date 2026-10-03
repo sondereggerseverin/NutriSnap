@@ -46,6 +46,12 @@ data class DayNutrientPoint(
     val pctOfGoal: Int?
 )
 
+data class NutrientContributorUi(
+    val name: String,
+    val amountDisplay: Float,
+    val pctOfToday: Int?
+)
+
 data class NutrientDetailUiState(
     val key: String = "",
     val label: String = "",
@@ -56,6 +62,8 @@ data class NutrientDetailUiState(
     val level: PriorityNutrientLevel = PriorityNutrientLevel.UNKNOWN,
     val description: String = "",
     val history: List<DayNutrientPoint> = emptyList(),
+    /** Top-Quellen heute (leer = keine Mikro-Daten in den geloggten Foods). */
+    val contributors: List<NutrientContributorUi> = emptyList(),
     val isLoading: Boolean = true
 )
 
@@ -123,6 +131,16 @@ class NutrientDetailViewModel(app: Application) : AndroidViewModel(app) {
             }
 
             val status = buildPriorityStatuses(listOf(key), mapOf(key to todayGrams)).firstOrNull()
+            val todayEntries = diaryRepo.getEntriesForDateOnce(today)
+            val top = aggregator.topContributors(todayEntries, key, limit = 8)
+            val contributors = top.map { c ->
+                val display = c.amountGrams * factor
+                val pct = if (todayGrams > 0f) {
+                    ((c.amountGrams / todayGrams) * 100f).toInt().coerceIn(0, 100)
+                } else null
+                NutrientContributorUi(name = c.name, amountDisplay = display, pctOfToday = pct)
+            }
+
             _state.value = NutrientDetailUiState(
                 key = key,
                 label = label,
@@ -134,6 +152,7 @@ class NutrientDetailViewModel(app: Application) : AndroidViewModel(app) {
                 description = NUTRIENT_BLURBS[key]
                     ?: "Tageszufuhr im Vergleich zur Referenzmenge (NRV bzw. D-A-CH bei Ballaststoffen).",
                 history = history,
+                contributors = contributors,
                 isLoading = false
             )
         }
@@ -225,6 +244,55 @@ fun NutrientDetailScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 20.sp
                 )
+            }
+            item {
+                Text(
+                    "Heute aus",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(6.dp))
+                if (state.contributors.isEmpty()) {
+                    Text(
+                        if (state.amountDisplay <= 0f) {
+                            "Keine Quelle mit ${state.label}-Angabe in den heutigen Einträgen. " +
+                                "Oft fehlen Vitamine bei Marken-/OFF-Produkten – generische USDA-Treffer (z. B. Lachs, Eier) liefern Werte."
+                        } else {
+                            "Beitrag konnte nicht den einzelnen Lebensmitteln zugeordnet werden."
+                        },
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+            if (state.contributors.isNotEmpty()) {
+                items(state.contributors) { c ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            c.name,
+                            fontSize = 14.sp,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 2
+                        )
+                        Text(
+                            buildString {
+                                append(formatAmount(c.amountDisplay, state.unit))
+                                c.pctOfToday?.let { append(" · $it %") }
+                            },
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                }
             }
             item {
                 Text(
