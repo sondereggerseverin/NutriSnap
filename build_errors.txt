@@ -1,13 +1,14 @@
-# Build errors - run 1110
+# Build errors - run 1111
 
 ## Unit Tests (test_output.log) - Error lines
 ```
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/ingredientdefaults/IngredientDefaultsScreen.kt:201:49 No parameter with name 'Modifier' found.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/ingredientdefaults/IngredientDefaultsScreen.kt:201:49 No value passed for parameter 'progress'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/ingredientdefaults/IngredientDefaultsScreen.kt:201:25 None of the following candidates is applicable:
+fun CircularProgressIndicator(progress: () -> Float, modifier: Modifier = ..., color: Color = ..., strokeWidth: Dp = ..., trackColor: Color = ..., strokeCap: StrokeCap = ..., gapSize: Dp = ...): Unit:
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/ingredientdefaults/IngredientDefaultsScreen.kt:201:51 No parameter with name 'Modifier' found.
 > Task :app:compileDebugKotlin FAILED
    > Compilation error. See log for more details
 Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilation error. See log for more details
-BUILD FAILED in 1m 8s
+BUILD FAILED in 56s
 ```
 
 ## Unit Tests (test_output.log) - Last 150 lines
@@ -160,7 +161,7 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilat
 	... 2 more
 
 
-BUILD FAILED in 1m 8s
+BUILD FAILED in 56s
 18 actionable tasks: 18 executed
 ```
 
