@@ -752,7 +752,42 @@ object RecipeNutritionAnalyzer {
                         }
                         val factor = parsed.amountG / 100f
 
-                        // Try local DB with original name + simplified versions
+                        // 1) Persönliche Standards (gescannt/verifiziert) vor generischer DB
+                        val personal = globalDictionary?.lookup(parsed.name)
+                        if (personal != null) {
+                            val localFiber = IngredientNutritionDatabase.lookup(parsed.name)?.fiber
+                                ?.takeIf { it > 0f }
+                                ?: IngredientNutritionDatabase.lookup(personal.offProductName)?.fiber
+                                    ?.takeIf { it > 0f }
+                            val personalFood = FoodItem(
+                                name     = personal.offProductName,
+                                brand    = if (personal.isVerifiedByUser) "Mein Standard" else null,
+                                barcode  = personal.offProductId.takeIf { it.isNotBlank() },
+                                calories = personal.kcalPer100g.toFloat(),
+                                protein  = personal.proteinPer100g.toFloat(),
+                                carbs    = personal.carbsPer100g.toFloat(),
+                                fat      = personal.fatPer100g.toFloat(),
+                                fiber    = localFiber,
+                                source   = if (personal.isVerifiedByUser)
+                                    ch.nutrisnap.app.data.model.FoodSource.MANUAL
+                                else
+                                    ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS,
+                                completenessScore = if (personal.isVerifiedByUser) 95 else 50
+                            )
+                            return@async IngredientResult(
+                                line     = line,
+                                parsed   = parsed,
+                                foodItem = personalFood,
+                                calories = (personalFood.calories ?: 0f) * factor,
+                                protein  = (personalFood.protein ?: 0f) * factor,
+                                carbs    = (personalFood.carbs ?: 0f) * factor,
+                                fat      = (personalFood.fat ?: 0f) * factor,
+                                matched  = true,
+                                micros   = personalFood.scaledMicros(factor)
+                            )
+                        }
+
+                        // 2) Generische Referenz-DB
                         val localSearchTerms = listOf(parsed.name) +
                             listOf(parsed.name.lowercase()
                                 .replace(Regex("""\b(veganes?|veganer?|vegan|fettarm|fettarme[rns]?|mager|light|frisch[er]*|bio|protein|high[- ]protein|low[- ]fat)\b"""), "")
@@ -781,37 +816,20 @@ object RecipeNutritionAnalyzer {
                             )
                         }
 
-                        // Feature 2: bereits einmal aufgelöste Zutat (egal ob damals lokale DB
-                        // oder OFF) -> direkt aus dem Cache, ohne erneute OFF-Netzwerkanfrage.
-                        // Cache-Miss -> normale OFF-Suche (nur wenn allowNetwork), neuer Treffer
-                        // wird für's nächste Mal im globalen Wörterbuch abgelegt.
-                        val cachedFood = globalDictionary?.lookup(parsed.name)?.let { cached ->
-                            // Cache speichert kein Fiber → lokale Referenz nachziehen
-                            val localFiber = IngredientNutritionDatabase.lookup(parsed.name)?.fiber
-                                ?.takeIf { it > 0f }
-                                ?: IngredientNutritionDatabase.lookup(cached.offProductName)?.fiber
-                                    ?.takeIf { it > 0f }
-                            FoodItem(
-                                name     = cached.offProductName,
-                                calories = cached.kcalPer100g.toFloat(),
-                                protein  = cached.proteinPer100g.toFloat(),
-                                carbs    = cached.carbsPer100g.toFloat(),
-                                fat      = cached.fatPer100g.toFloat(),
-                                fiber    = localFiber,
-                                source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
-                            )
-                        }
-                        val food = cachedFood ?: if (allowNetwork) {
+                        // 3) Netzwerk: USDA/OFF (Cache nur speichern wenn noch kein persönlicher Standard)
+                        val food = if (allowNetwork) {
                             // USDA (Mikros) vor OFF – sonst bleiben Priority-Nährstoffe oft leer
                             searchReferenceFood(parsed.name)?.also { found ->
+                                // Automatischer Cache, kein Nutzer-Standard
                                 globalDictionary?.save(
                                     originalName    = parsed.name,
-                                    offProductId    = "",
+                                    offProductId    = found.barcode.orEmpty(),
                                     offProductName  = found.name,
                                     kcalPer100g     = (found.calories ?: 0f).toDouble(),
                                     proteinPer100g  = (found.protein  ?: 0f).toDouble(),
                                     carbsPer100g    = (found.carbs    ?: 0f).toDouble(),
-                                    fatPer100g      = (found.fat      ?: 0f).toDouble()
+                                    fatPer100g      = (found.fat      ?: 0f).toDouble(),
+                                    verifiedByUser  = false
                                 )
                             }
                         } else null

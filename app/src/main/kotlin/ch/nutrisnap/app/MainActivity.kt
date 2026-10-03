@@ -50,6 +50,7 @@ import ch.nutrisnap.app.ui.screens.auth.AuthViewModel
 import ch.nutrisnap.app.ui.screens.auth.LoginScreen
 import ch.nutrisnap.app.ui.screens.customfood.CreateCustomFoodScreen
 import ch.nutrisnap.app.ui.screens.customfood.CustomFoodListScreen
+import ch.nutrisnap.app.ui.screens.ingredientdefaults.IngredientDefaultsScreen
 import ch.nutrisnap.app.ui.screens.deficiency.DeficiencyTrendScreen
 import ch.nutrisnap.app.ui.screens.nutrient.NutrientDetailScreen
 import ch.nutrisnap.app.ui.screens.diary.DiaryScreen
@@ -486,6 +487,7 @@ fun MainScaffold(
                     onNavigateToStats         = { navController.navigate("stats") },
                     onNavigateToExport        = { navController.navigate("export") },
                     onNavigateToCustomFoods   = { navController.navigate("custom_foods") },
+                    onNavigateToIngredientDefaults = { navController.navigate("ingredient_defaults") },
                     onNavigateToMealTemplates = { navController.navigate("meal_templates") },
                     onNavigateToYazioImport   = { navController.navigate("yazio_import") },
                     onNavigateToScan          = { navController.navigate("scan_chooser") },
@@ -591,6 +593,15 @@ fun MainScaffold(
                     onEdit = { id -> navController.navigate("custom_food_edit/$id") }
                 )
             }
+            
+            composable(
+                "ingredient_defaults",
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) {
+                IngredientDefaultsScreen(onBack = { navController.popBackStack() })
+            }
+
             composable(
                 "custom_food_create",
                 enterTransition = { pushEnter }, exitTransition = { pushExit },

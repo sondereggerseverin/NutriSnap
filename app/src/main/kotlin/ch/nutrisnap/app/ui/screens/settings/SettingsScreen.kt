@@ -151,6 +151,7 @@ fun SettingsScreen(
     onNavigateToStats: () -> Unit = {},
     onNavigateToExport: () -> Unit = {},
     onNavigateToCustomFoods: () -> Unit = {},
+    onNavigateToIngredientDefaults: () -> Unit = {},
     onNavigateToMealTemplates: () -> Unit = {},
     onNavigateToYazioImport: () -> Unit = {},
     onNavigateToScan: () -> Unit = {},
@@ -1011,6 +1012,10 @@ fun SettingsScreen(
                         }
                     }
                     Spacer(Modifier.height(NutriSpacing.sm))
+                    OutlinedButton(onClick = onNavigateToIngredientDefaults, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.QrCodeScanner, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(NutriSpacing.xs)); Text("Zutaten-Standards (Barcode)")
+                    }
                     OutlinedButton(onClick = onNavigateToSupplements, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Default.Medication, null, Modifier.size(16.dp))
                         Spacer(Modifier.width(NutriSpacing.xs)); Text("Supplements")

@@ -31,4 +31,7 @@ interface GlobalIngredientMatchDao {
         WHERE normalizedName = :normalizedName""")
     suspend fun verifyAndUpdate(normalizedName: String, offId: String, offName: String,
         kcal: Double, protein: Double, carbs: Double, fat: Double)
+
+    @Query("DELETE FROM global_ingredient_matches WHERE normalizedName = :normalizedName")
+    suspend fun deleteByName(normalizedName: String)
 }
