@@ -198,7 +198,7 @@ fun IngredientDefaultsScreen(
                         )
                     }
                     if (loading) {
-                        LinearProgressIndicator(Modifier = Modifier.fillMaxWidth())
+                        CircularProgressIndicator(Modifier = Modifier.size(24.dp))
                     }
                 }
             },
