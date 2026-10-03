@@ -198,7 +198,7 @@ fun IngredientDefaultsScreen(
                         )
                     }
                     if (loading) {
-                        CircularProgressIndicator(Modifier = Modifier.size(24.dp))
+                        Text("Suche Produkt…", fontSize = 13.sp)
                     }
                 }
             },
