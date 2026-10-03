@@ -983,16 +983,16 @@ internal fun NutritionAnalysisCard(
 
     // Use analyzed result if available, otherwise use stored macros
     val calsPerServ = result?.caloriesPerServing
-        ?: recipe.totalCalories?.let { it / recipe.servings.coerceAtLeast(1) }
-    val protPerServ = result?.proteinPerServing ?: recipe.proteinPerServing
-    val carbPerServ = result?.carbsPerServing   ?: recipe.carbsPerServing
-    val fatPerServ  = result?.fatPerServing     ?: recipe.fatPerServing
+        ?: recipe.caloriesPerServingEffective()
+    val protPerServ = result?.proteinPerServing ?: recipe.proteinPerServingEffective()
+    val carbPerServ = result?.carbsPerServing   ?: recipe.carbsPerServingEffective()
+    val fatPerServ  = result?.fatPerServing     ?: recipe.fatPerServingEffective()
     val servDiv = recipe.servings.coerceAtLeast(1)
-    val fiberPerServ  = result?.totalMicros?.get("fiber")?.let { it / servDiv } ?: recipe.fiberPerServing
-    val sugarPerServ  = result?.totalMicros?.get("sugar")?.let { it / servDiv } ?: recipe.sugarPerServing
-    val satFatPerServ = result?.totalMicros?.get("saturatedFat")?.let { it / servDiv } ?: recipe.saturatedFatPerServing
-    val saltPerServ   = result?.totalMicros?.get("salt")?.let { it / servDiv } ?: recipe.saltPerServing
-    val sodiumPerServ = result?.totalMicros?.get("sodium")?.let { it / servDiv } ?: recipe.sodiumPerServing
+    val fiberPerServ  = result?.totalMicros?.get("fiber")?.let { it / servDiv } ?: recipe.fiberPerServingEffective()
+    val sugarPerServ  = result?.totalMicros?.get("sugar")?.let { it / servDiv } ?: recipe.sugarPerServingEffective()
+    val satFatPerServ = result?.totalMicros?.get("saturatedFat")?.let { it / servDiv } ?: recipe.saturatedFatPerServingEffective()
+    val saltPerServ   = result?.totalMicros?.get("salt")?.let { it / servDiv } ?: recipe.saltPerServingEffective()
+    val sodiumPerServ = result?.totalMicros?.get("sodium")?.let { it / servDiv } ?: recipe.sodiumPerServingEffective()
 
     // Vitamine/Mineralstoffe: frische Analyse (falls vorhanden) hat Vorrang, sonst
     // die zuletzt gespeicherten Werte aus microNutrientsJson.
@@ -1170,10 +1170,10 @@ internal fun NutritionAnalysisCard(
  *  Immer die Basis-Portion des Rezepts – unabhängig vom Portionen-Stepper. */
 @Composable
 internal fun NutrientSummaryStrip(recipe: Recipe) {
-    val calsPerServ = recipe.totalCalories?.let { it / recipe.servings.coerceAtLeast(1) }
-    val prot = recipe.proteinPerServing
-    val carb = recipe.carbsPerServing
-    val fat  = recipe.fatPerServing
+    val calsPerServ = recipe.caloriesPerServingEffective()
+    val prot = recipe.proteinPerServingEffective()
+    val carb = recipe.carbsPerServingEffective()
+    val fat  = recipe.fatPerServingEffective()
     if (calsPerServ == null && prot == null && carb == null && fat == null) return
 
     val parts = buildList {

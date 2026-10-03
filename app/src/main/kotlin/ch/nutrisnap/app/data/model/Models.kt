@@ -357,6 +357,65 @@ data class Recipe(
     fun yieldWeightG(): Float? =
         cookedWeightG?.takeIf { it > 0f } ?: totalIngredientWeightG?.takeIf { it > 0f }
 
+    /**
+     * true, wenn protein/carbs/fat klar als Gesamtrezept gespeichert sind,
+     * während totalCalories/servings die echte Portions-kcal ist.
+     * Typisch: Analyse mit servings=1, später Portionenzahl auf 12 ohne Neu-Analyse.
+     */
+    fun macrosLookLikeBatchTotals(): Boolean {
+        val s = servings.coerceAtLeast(1)
+        if (s <= 1) return false
+        val kcalPer = totalCalories?.let { it / s } ?: return false
+        if (kcalPer < 20f) return false
+        val macroKcal = (proteinPerServing ?: 0f) * 4f +
+            (carbsPerServing ?: 0f) * 4f +
+            (fatPerServing ?: 0f) * 9f
+        return macroKcal > kcalPer * 1.75f && macroKcal > kcalPer + 150f
+    }
+
+    fun caloriesPerServingEffective(): Float? =
+        totalCalories?.let { it / servings.coerceAtLeast(1) }
+
+    fun proteinPerServingEffective(): Float? =
+        proteinPerServing?.let { if (macrosLookLikeBatchTotals()) it / servings.coerceAtLeast(1) else it }
+
+    fun carbsPerServingEffective(): Float? =
+        carbsPerServing?.let { if (macrosLookLikeBatchTotals()) it / servings.coerceAtLeast(1) else it }
+
+    fun fatPerServingEffective(): Float? =
+        fatPerServing?.let { if (macrosLookLikeBatchTotals()) it / servings.coerceAtLeast(1) else it }
+
+    fun fiberPerServingEffective(): Float? =
+        fiberPerServing?.let { if (macrosLookLikeBatchTotals()) it / servings.coerceAtLeast(1) else it }
+
+    fun sugarPerServingEffective(): Float? =
+        sugarPerServing?.let { if (macrosLookLikeBatchTotals()) it / servings.coerceAtLeast(1) else it }
+
+    fun saturatedFatPerServingEffective(): Float? =
+        saturatedFatPerServing?.let { if (macrosLookLikeBatchTotals()) it / servings.coerceAtLeast(1) else it }
+
+    fun saltPerServingEffective(): Float? =
+        saltPerServing?.let { if (macrosLookLikeBatchTotals()) it / servings.coerceAtLeast(1) else it }
+
+    fun sodiumPerServingEffective(): Float? =
+        sodiumPerServing?.let { if (macrosLookLikeBatchTotals()) it / servings.coerceAtLeast(1) else it }
+
+    /** Persistierbare Korrektur: P/K/F auf echte Pro-Portion-Werte. */
+    fun withNormalizedPerServingMacros(): Recipe {
+        if (!macrosLookLikeBatchTotals()) return this
+        val s = servings.coerceAtLeast(1).toFloat()
+        return copy(
+            proteinPerServing = proteinPerServing?.div(s),
+            carbsPerServing = carbsPerServing?.div(s),
+            fatPerServing = fatPerServing?.div(s),
+            fiberPerServing = fiberPerServing?.div(s),
+            sugarPerServing = sugarPerServing?.div(s),
+            saturatedFatPerServing = saturatedFatPerServing?.div(s),
+            saltPerServing = saltPerServing?.div(s),
+            sodiumPerServing = sodiumPerServing?.div(s)
+        )
+    }
+
     fun getDietTags(): List<DietTag> =
         tags.split(",").mapNotNull { tag ->
             DietTag.entries.firstOrNull { it.name == tag.trim() }

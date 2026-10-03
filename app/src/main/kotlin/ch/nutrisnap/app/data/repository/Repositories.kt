@@ -182,6 +182,12 @@ class DiaryRepository(db: NutriDatabase) {
         date: LocalDate,
         gramsAmount: Float? = null
     ): Long {
+        // Persistierte Korrektur falls P/K/F noch Batch-Summen sind
+        val recipe = if (recipe.macrosLookLikeBatchTotals()) {
+            recipe.withNormalizedPerServingMacros().also { fixed ->
+                runCatching { updateRecipe(fixed) }
+            }
+        } else recipe
         val perServing  = recipe.servings.coerceAtLeast(1).toFloat()
         // Gramm-Modus: Anteil am Gesamtgericht (Roh- oder Kochgewicht).
         // Nur explizite Gramm-Angaben ≥ 10 g; kleinere Werte sind Portionsfaktoren
@@ -200,16 +206,17 @@ class DiaryRepository(db: NutriDatabase) {
             realGrams != null -> 1f
             else -> servingsFactor.coerceAtLeast(0.05f)
         }
-        val calsPerServ = recipe.totalCalories?.let { it / perServing } ?: 0f
+        // Effective: korrigiert Batch-Totale, die fälschlich als «pro Portion» lagen
+        val calsPerServ = recipe.caloriesPerServingEffective() ?: 0f
         val calories    = calsPerServ * factor
-        val protein     = (recipe.proteinPerServing ?: 0f) * factor
-        val carbs       = (recipe.carbsPerServing   ?: 0f) * factor
-        val fat         = (recipe.fatPerServing     ?: 0f) * factor
-        val fiber       = (recipe.fiberPerServing   ?: 0f) * factor
-        val sugar       = (recipe.sugarPerServing   ?: 0f) * factor
-        val saturatedFat = (recipe.saturatedFatPerServing ?: 0f) * factor
-        val salt        = (recipe.saltPerServing    ?: 0f) * factor
-        val sodium      = (recipe.sodiumPerServing  ?: 0f) * factor
+        val protein     = (recipe.proteinPerServingEffective() ?: 0f) * factor
+        val carbs       = (recipe.carbsPerServingEffective()   ?: 0f) * factor
+        val fat         = (recipe.fatPerServingEffective()     ?: 0f) * factor
+        val fiber       = (recipe.fiberPerServingEffective()   ?: 0f) * factor
+        val sugar       = (recipe.sugarPerServingEffective()   ?: 0f) * factor
+        val saturatedFat = (recipe.saturatedFatPerServingEffective() ?: 0f) * factor
+        val salt        = (recipe.saltPerServingEffective()    ?: 0f) * factor
+        val sodium      = (recipe.sodiumPerServingEffective()  ?: 0f) * factor
 
         // amountGrams = immer Portionsfaktor (Skalierung); recipeGrams = Anzeige in g
         val storedAmount = factor
@@ -527,9 +534,19 @@ class RecipeRepository(db: NutriDatabase, private val context: Context) {
     }
 
     suspend fun updateRecipe(r: Recipe) {
-        val clean = r.withoutNullArtifacts().let { if (it.mealCategory.isBlank()) it.withGuessedCategoryIfEmpty() else it }
+        val clean = r.withoutNullArtifacts()
+            .let { if (it.mealCategory.isBlank()) it.withGuessedCategoryIfEmpty() else it }
+            .withNormalizedPerServingMacros()
         dao.update(clean)
         pushSafely { SupabaseSync.upsertRecipe(clean) }
+    }
+
+    /** Einmalige Korrektur: Batch-Makros → pro Portion (z.B. nach falschem Import). */
+    suspend fun normalizeRecipeMacrosIfNeeded(recipe: Recipe): Recipe {
+        if (!recipe.macrosLookLikeBatchTotals()) return recipe
+        val fixed = recipe.withNormalizedPerServingMacros()
+        updateRecipe(fixed)
+        return fixed
     }
 
     /**
