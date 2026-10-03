@@ -49,7 +49,11 @@ class FoodSearchRepository(
         // nicht, weil z.B. "Apfelringe" auch mit "apfel" beginnt und sonst faelschlich
         // als Treffer für die Anfrage "apfel" durchgeht, obwohl kein echter Apfel dabei ist.
         if (cachedDistinct.size >= 5 && cachedDistinct.any { relevance(it, effectiveQuery) == 4 }) {
-            return cachedDistinct.sortedWith(relevanceComparator(effectiveQuery))
+            return cachedDistinct.sortedWith(
+                compareByDescending<FoodItem> { relevance(it, effectiveQuery) }
+                    .thenByDescending { microRichness(it) }
+                    .thenByDescending { sourcePriority(it.source) }
+            )
         }
 
         return coroutineScope {
@@ -124,14 +128,10 @@ class FoodSearchRepository(
                     }
                 }
                 .sortedWith(
+                    // 1) Namens-Relevanz, 2) Mikro-Fülle (Vit.D/B12/…), 3) vertrauenswürdige Quelle
                     compareByDescending<FoodItem> { relevance(it, effectiveQuery) }
-                        .thenByDescending {
-                            when (it.source) {
-                                ch.nutrisnap.app.data.model.FoodSource.SWISS_FSVO -> 3
-                                ch.nutrisnap.app.data.model.FoodSource.MANUAL -> 2
-                                else -> 0
-                            }
-                        }
+                        .thenByDescending { microRichness(it) }
+                        .thenByDescending { sourcePriority(it.source) }
                 )
 
             foodItemDao.insertAll(result.filter { it.source != FoodSource.MANUAL }.take(40))
@@ -146,6 +146,43 @@ class FoodSearchRepository(
         val c = item.carbs ?: 0f
         val f = item.fat ?: 0f
         return kcal > 0f || p > 0f || c > 0f || f > 0f
+    }
+
+    /**
+     * Wie viele Mikronährstoffe sind befüllt? USDA/Swiss schlagen OFF oft um Längen,
+     * weil OFF bei Markenprodukten Vitamine meist weglässt → Priority-Home zeigte 0 µg.
+     */
+    private fun microRichness(item: FoodItem): Int {
+        var n = 0
+        // Kern-Vitamine/Minerale stärker gewichten
+        if (item.vitaminD != null) n += 3
+        if (item.vitaminB12 != null) n += 2
+        if (item.vitaminA != null) n += 1
+        if (item.vitaminC != null) n += 1
+        if (item.vitaminE != null) n += 1
+        if (item.vitaminK != null) n += 1
+        if (item.vitaminB1 != null) n += 1
+        if (item.vitaminB2 != null) n += 1
+        if (item.vitaminB6 != null) n += 1
+        if (item.vitaminB11 != null) n += 1
+        if (item.calcium != null) n += 1
+        if (item.iron != null) n += 1
+        if (item.magnesium != null) n += 1
+        if (item.zinc != null) n += 1
+        if (item.potassium != null) n += 1
+        if (item.selenium != null) n += 1
+        if (item.fiber != null) n += 1
+        return n
+    }
+
+    /** USDA/Swiss/Nutritionix vor OFF – OFF hat selten Vitamine. */
+    private fun sourcePriority(source: FoodSource): Int = when (source) {
+        FoodSource.USDA -> 5
+        FoodSource.SWISS_FSVO -> 4
+        FoodSource.NUTRITIONIX -> 3
+        FoodSource.MANUAL -> 3
+        FoodSource.OPEN_FOOD_FACTS -> 1
+        else -> 0
     }
 
     /**

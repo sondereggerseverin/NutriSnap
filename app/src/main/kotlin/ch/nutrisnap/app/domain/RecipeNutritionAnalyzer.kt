@@ -19,12 +19,11 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
- * Analyzes recipe ingredients by looking up macros for each line, in order:
+ * Analyzes recipe ingredients by looking up macros/micros for each line, in order:
  *  1. Curated local nutrition DB (covers ~200 common generic ingredients)
- *  2. Feature 2: globales Zutaten-Wörterbuch (frühere Treffer aus 1./3., app-weit gecacht)
- *  3. OpenFoodFacts search (covers specific/branded products)
- *  4. AI estimate via Groq (covers anything neither source has — spice
- *     blends, regional ingredients, prepared products, typos, etc.)
+ *  2. Feature 2: globales Zutaten-Wörterbuch (frühere Treffer, app-weit gecacht)
+ *  3. USDA FoodData Central (starke Mikro-Abdeckung) → dann OpenFoodFacts
+ *  4. AI estimate via Groq (nur Makros-Fallback)
  *
  * The AI step is a single batched call for ALL still-unmatched ingredients
  * (not one call per ingredient), so a 14-ingredient recipe with 3 unknown
@@ -499,6 +498,63 @@ object RecipeNutritionAnalyzer {
         return queries.distinct().filter { it.length >= 3 }
     }
 
+    /**
+     * Generische Zutat: zuerst USDA (Labor-Mikros), dann OFF inkl. verfügbarer Micros.
+     * Verhindert, dass Priority-Nährstoffe (z. B. Vitamin D) dauerhaft 0 µg bleiben.
+     */
+    private suspend fun searchReferenceFood(query: String): FoodItem? {
+        searchUsdaBest(query)?.let { return it }
+        return searchOFF(query)
+    }
+
+    private suspend fun searchUsdaBest(query: String): FoodItem? {
+        val key = BuildConfig.USDA_API_KEY
+        if (key.isBlank()) return null
+        return runCatching {
+            val api = ch.nutrisnap.app.data.api.UsdaFoodApi(key)
+            val terms = linkedSetOf<String>()
+            terms += query
+            simplifyForSearch(query).forEach { terms += it }
+            SearchUtils.synonymsOf(SearchUtils.normalize(query)).forEach { terms += it }
+            // USDA ist englisch: englische Synonyme bevorzugen
+            val ordered = terms.filter { it.length >= 3 }.sortedByDescending { t ->
+                val ascii = t.all { ch -> ch in 'a'..'z' || ch in 'A'..'Z' || ch == ' ' }
+                if (ascii) 1 else 0
+            }.take(4)
+            var best: FoodItem? = null
+            var bestScore = -1
+            for (term in ordered) {
+                val hits = api.search(term)
+                for (hit in hits.take(8)) {
+                    val score = usdaPickScore(hit, query)
+                    if (score > bestScore) {
+                        bestScore = score
+                        best = hit
+                    }
+                }
+                // Guter Treffer mit Micros → früh abbrechen
+                if (best != null && bestScore >= 6) break
+            }
+            best
+        }.getOrNull()
+    }
+
+    private fun usdaPickScore(item: FoodItem, query: String): Int {
+        var s = 0
+        val n = SearchUtils.normalize(item.name)
+        val q = SearchUtils.normalize(query)
+        if (n == q) s += 5
+        else if (n.contains(q) || q.contains(n.take(6))) s += 3
+        else if (SearchUtils.fuzzyMatch(query, item.name)) s += 2
+        if (item.vitaminD != null) s += 3
+        if (item.vitaminB12 != null) s += 2
+        if (item.calcium != null) s += 1
+        if (item.iron != null) s += 1
+        if (item.magnesium != null) s += 1
+        if ((item.calories ?: 0f) > 0f) s += 1
+        return s
+    }
+
     private fun searchOFF(query: String): FoodItem? {
         return runCatching {
             val searchQueries = simplifyForSearch(query)
@@ -538,15 +594,34 @@ object RecipeNutritionAnalyzer {
                 fun g(key: String): Float? =
                     if (n.has(key) && !n.isNull(key)) n.optDouble(key, Double.NaN).toFloat().takeIf { !it.isNaN() } else null
                 val offFiber = g("fiber_100g") ?: g("fibers_100g")
+                // OFF speichert Vitamine meist in g/100g (gleiche Einheit wie unsere FoodItem-Felder)
                 return FoodItem(
                     name     = name,
                     calories = kcal,
                     protein  = g("proteins_100g"),
                     carbs    = g("carbohydrates_100g"),
                     fat      = g("fat_100g"),
-                    // OFF liefert bei vielen Produkten keine Fiber → lokale Referenz nachziehen
-                    // (auch 0 g ist ein gültiger Wert, z.B. Käse/Öl)
                     fiber    = offFiber ?: localRef?.fiber,
+                    sugar    = g("sugars_100g"),
+                    saturatedFat = g("saturated-fat_100g"),
+                    salt     = g("salt_100g"),
+                    sodium   = g("sodium_100g"),
+                    vitaminA = g("vitamin-a_100g"),
+                    vitaminB1 = g("vitamin-b1_100g"),
+                    vitaminB2 = g("vitamin-b2_100g"),
+                    vitaminB6 = g("vitamin-b6_100g"),
+                    vitaminB11 = g("vitamin-b9_100g"),
+                    vitaminB12 = g("vitamin-b12_100g"),
+                    vitaminC = g("vitamin-c_100g"),
+                    vitaminD = g("vitamin-d_100g"),
+                    vitaminE = g("vitamin-e_100g"),
+                    vitaminK = g("vitamin-k_100g"),
+                    calcium  = g("calcium_100g"),
+                    iron     = g("iron_100g"),
+                    magnesium = g("magnesium_100g"),
+                    zinc     = g("zinc_100g"),
+                    potassium = g("potassium_100g"),
+                    phosphorus = g("phosphorus_100g"),
                     source   = ch.nutrisnap.app.data.model.FoodSource.OPEN_FOOD_FACTS
                 )
             }
@@ -727,15 +802,16 @@ object RecipeNutritionAnalyzer {
                             )
                         }
                         val food = cachedFood ?: if (allowNetwork) {
-                            searchOFF(parsed.name)?.also { off ->
+                            // USDA (Mikros) vor OFF – sonst bleiben Priority-Nährstoffe oft leer
+                            searchReferenceFood(parsed.name)?.also { found ->
                                 globalDictionary?.save(
                                     originalName    = parsed.name,
                                     offProductId    = "",
-                                    offProductName  = off.name,
-                                    kcalPer100g     = (off.calories ?: 0f).toDouble(),
-                                    proteinPer100g  = (off.protein  ?: 0f).toDouble(),
-                                    carbsPer100g    = (off.carbs    ?: 0f).toDouble(),
-                                    fatPer100g      = (off.fat      ?: 0f).toDouble()
+                                    offProductName  = found.name,
+                                    kcalPer100g     = (found.calories ?: 0f).toDouble(),
+                                    proteinPer100g  = (found.protein  ?: 0f).toDouble(),
+                                    carbsPer100g    = (found.carbs    ?: 0f).toDouble(),
+                                    fatPer100g      = (found.fat      ?: 0f).toDouble()
                                 )
                             }
                         } else null
