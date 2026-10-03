@@ -36,7 +36,9 @@ data class MealOverview(
     val icon:    String,
     val color:   Color,
     val kcal:    Float,
-    val count:   Int
+    val count:   Int,
+    /** Optionaler Mahlzeit-Score 0–100 (null = zu wenig geloggt). */
+    val healthScore: Int? = null
 )
 
 /**
@@ -304,10 +306,36 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             isViewingToday = viewingToday,
             meals         = orderedMealMeta.map { (type, label, icon, color) ->
                 val mealEntries = byMeal[type] ?: emptyList()
+                val mealKcal = mealEntries.sumOf { it.calories.toDouble() }.toFloat()
+                val mealProtein = mealEntries.sumOf { it.protein.toDouble() }.toFloat()
+                val mealCarbs = mealEntries.sumOf { it.carbs.toDouble() }.toFloat()
+                val mealFat = mealEntries.sumOf { it.fat.toDouble() }.toFloat()
+                val mealFiber = mealEntries.sumOf { it.fiber.toDouble() }.toFloat()
+                val share = mealCalorieShare(type)
+                val dayGoal = if (adaptiveTarget != null) finalTarget.toFloat()
+                else profile.dailyCalorieGoal.toFloat().coerceAtLeast(1f)
+                val mealScore = if (mealKcal >= HealthScoreCalculator.MIN_KCAL_FOR_SCORE) {
+                    HealthScoreCalculator.compute(
+                        HealthScoreInput(
+                            caloriesEaten = mealKcal,
+                            calorieGoal = dayGoal * share,
+                            proteinEaten = mealProtein,
+                            proteinGoal = profile.proteinGoalG * share,
+                            carbsEaten = mealCarbs,
+                            carbsGoal = profile.carbsGoalG * share,
+                            fatEaten = mealFat,
+                            fatGoal = profile.fatGoalG * share,
+                            fiberEaten = mealFiber,
+                            fiberGoal = 30f * share,
+                            priorityNutrientPcts = emptyList()
+                        )
+                    ).score
+                } else null
                 MealOverview(
                     type  = type, label = label, icon = icon, color = color,
-                    kcal  = mealEntries.sumOf { it.calories.toDouble() }.toFloat(),
-                    count = mealEntries.size
+                    kcal  = mealKcal,
+                    count = mealEntries.size,
+                    healthScore = mealScore
                 )
             }
         )
@@ -465,6 +493,14 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             hour < 18 -> "Guten Tag"
             else      -> "Guten Abend"
         }
+    }
+
+    /** Anteil am Tagesziel für den Mahlzeit-Score (Kalorien/Makros anteilig). */
+    private fun mealCalorieShare(type: MealType): Float = when (type) {
+        MealType.BREAKFAST -> 0.25f
+        MealType.LUNCH -> 0.35f
+        MealType.DINNER -> 0.30f
+        MealType.SNACK -> 0.10f
     }
 
     companion object {

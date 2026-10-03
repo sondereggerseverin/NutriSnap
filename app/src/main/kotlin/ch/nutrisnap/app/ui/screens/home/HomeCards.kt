@@ -601,6 +601,10 @@ internal fun MealRowItem(meal: MealOverview, onClick: () -> Unit, onQuickAdd: ()
                     )
                 }
             }
+            meal.healthScore?.let { score ->
+                MealScoreBadge(score = score)
+                Spacer(Modifier.width(4.dp))
+            }
             Spacer(Modifier.width(6.dp))
             FilledTonalIconButton(
                 onClick = onQuickAdd,
@@ -617,6 +621,29 @@ internal fun MealRowItem(meal: MealOverview, onClick: () -> Unit, onQuickAdd: ()
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun MealScoreBadge(score: Int) {
+    val color = when {
+        score >= 80 -> Color(0xFF2E7D32)
+        score >= 55 -> Color(0xFFF9A825)
+        else -> Color(0xFFC62828)
+    }
+    Box(
+        modifier = Modifier
+            .size(28.dp)
+            .clip(CircleShape)
+            .background(color.copy(alpha = 0.15f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            "$score",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = color
+        )
     }
 }
 
@@ -668,12 +695,18 @@ internal fun MealTile(
                         maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
-                    Text(
-                        "${meal.kcal.toInt()} kcal",
-                        fontSize = 10.sp,
-                        color = if (meal.count > 0) meal.color
-                        else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "${meal.kcal.toInt()} kcal",
+                            fontSize = 10.sp,
+                            color = if (meal.count > 0) meal.color
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        meal.healthScore?.let { score ->
+                            Spacer(Modifier.width(4.dp))
+                            MealScoreBadge(score = score)
+                        }
+                    }
                 }
             }
             Spacer(Modifier.height(4.dp))
