@@ -38,6 +38,7 @@ import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_RECIPE_CHIP_SIZING
 import ch.nutrisnap.app.ui.components.EmptyState
 import ch.nutrisnap.app.ui.components.SectionHeader
+import ch.nutrisnap.app.ui.components.VoiceInputButton
 import ch.nutrisnap.app.ui.components.rememberNutriButtonStyle
 import ch.nutrisnap.app.ui.screens.barcode.BarcodeScannerScreen
 import ch.nutrisnap.app.ui.screens.scan.PhotoCaptureScreen
@@ -387,6 +388,14 @@ private fun SearchTab(
                 modifier = Modifier.weight(1f),
                 singleLine = true,
                 shape = RoundedCornerShape(NutriRadius.md)
+            )
+            VoiceInputButton(
+                prompt = "Welches Lebensmittel suchst du?",
+                onResult = { spoken ->
+                    query = spoken
+                    vm.searchFood(spoken)
+                },
+                modifier = Modifier.align(Alignment.CenterVertically)
             )
             IconButton(
                 onClick = onOpenScanner,
@@ -775,34 +784,49 @@ private fun AiEstimateTab(
         verticalArrangement = Arrangement.spacedBy(NutriSpacing.md)
     ) {
         Text(
-            "Name eingeben – zuerst Referenzwerte, sonst KI pro 100g",
+            "Name eingeben oder sprechen – zuerst Referenzwerte, sonst KI pro 100g",
             fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            label = { Text("Lebensmittel (z.B. Hähnchenbrust, Reis)") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            shape = RoundedCornerShape(NutriRadius.md),
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Text,
-                imeAction = ImeAction.Search
-            ),
-            keyboardActions = KeyboardActions(
-                onSearch = { runEstimate(query) }
-            ),
-            trailingIcon = {
-                IconButton(
-                    onClick = { runEstimate(query) },
-                    enabled = query.trim().length >= 2 && !isLoading
-                ) {
-                    if (isLoading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                    else Icon(Icons.Default.AutoAwesome, "Schätzen")
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                label = { Text("Lebensmittel (z.B. Hähnchenbrust, Reis)") },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                shape = RoundedCornerShape(NutriRadius.md),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Search
+                ),
+                keyboardActions = KeyboardActions(
+                    onSearch = { runEstimate(query) }
+                ),
+                trailingIcon = {
+                    IconButton(
+                        onClick = { runEstimate(query) },
+                        enabled = query.trim().length >= 2 && !isLoading
+                    ) {
+                        if (isLoading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        else Icon(Icons.Default.AutoAwesome, "Schätzen")
+                    }
                 }
-            }
-        )
+            )
+            VoiceInputButton(
+                enabled = !isLoading,
+                prompt = "Was hast du gegessen?",
+                onResult = { spoken ->
+                    query = spoken
+                    // Text bleibt editierbar; Schätzung manuell oder sofort bei genug Text
+                    if (spoken.trim().length >= 2) runEstimate(spoken)
+                }
+            )
+        }
         Button(
             onClick = { runEstimate(query) },
             enabled = query.trim().length >= 2 && !isLoading,

@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- Sprach-Diktat (System-Recognizer); optional, Flow fällt ohne Mic zurück auf Tastatur -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
@@ -37,6 +39,13 @@
     <!-- Required so Android resolves the Health Connect app -->
     <queries>
         <package android:name="com.google.android.apps.healthdata"/>
+        <!-- Sprach-Diktat: System-Speech-Recognizer sichtbar für package visibility -->
+        <intent>
+            <action android:name="android.speech.RecognitionService"/>
+        </intent>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH"/>
+        </intent>
     </queries>
 
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
