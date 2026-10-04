@@ -640,6 +640,10 @@ private fun SearchTab(
                 Text("P ${((food.protein ?: 0f) * grams / 100f).toInt()}g", fontSize = 13.sp, color = MacroColors.protein)
                 Text("K ${((food.carbs ?: 0f) * grams / 100f).toInt()}g", fontSize = 13.sp, color = MacroColors.carbs)
                 Text("F ${((food.fat ?: 0f) * grams / 100f).toInt()}g", fontSize = 13.sp, color = MacroColors.fat)
+                val fiberG = (food.fiber ?: 0f) * grams / 100f
+                if (fiberG > 0f) {
+                    Text("B ${fiberG.toInt()}g", fontSize = 13.sp, color = MacroColors.fiber)
+                }
             }
         }
         Spacer(Modifier.height(NutriSpacing.lg))
@@ -862,6 +866,10 @@ private fun AiEstimateTab(
                         Text("P ${food.protein?.let { "%.1f".format(it) } ?: "–"} g", fontSize = 13.sp, color = MacroColors.protein)
                         Text("K ${food.carbs?.let { "%.1f".format(it) } ?: "–"} g", fontSize = 13.sp, color = MacroColors.carbs)
                         Text("F ${food.fat?.let { "%.1f".format(it) } ?: "–"} g", fontSize = 13.sp, color = MacroColors.fat)
+                        val fiberVal = food.fiber
+                        if (fiberVal != null && fiberVal > 0f) {
+                            Text("B ${"%.1f".format(fiberVal)} g", fontSize = 13.sp, color = MacroColors.fiber)
+                        }
                     }
                     Text("pro 100 g", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
