@@ -899,8 +899,9 @@ private fun AiEstimateTab(
                 val p = (food.protein ?: 0f) * factor
                 val k = (food.carbs ?: 0f) * factor
                 val f = (food.fat ?: 0f) * factor
+                val b = (food.fiber ?: 0f) * factor
                 Text(
-                    "→ ${kcal.toInt()} kcal · P ${p.toInt()}g · K ${k.toInt()}g · F ${f.toInt()}g",
+                    "→ ${kcal.toInt()} kcal · P ${p.toInt()}g · K ${k.toInt()}g · F ${f.toInt()}g · B ${b.toInt()}g",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium
                 )

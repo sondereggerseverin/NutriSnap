@@ -401,7 +401,7 @@ internal fun EntryRecipeIngredientsSection(
             // Makro-Zusammenfassung der getrackten Menge (bereits im Header, hier als Kontext)
             Spacer(Modifier.height(NutriSpacing.sm))
             Text(
-                "${entry.calories.toInt()} kcal · P ${entry.protein.toInt()} · K ${entry.carbs.toInt()} · F ${entry.fat.toInt()}",
+                "${entry.calories.toInt()} kcal · P ${entry.protein.toInt()} · K ${entry.carbs.toInt()} · F ${entry.fat.toInt()} · B ${entry.fiber.toInt()}",
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

@@ -92,6 +92,7 @@ private fun CompactDayOverview(
     protein: Float,
     carbs: Float,
     fat: Float,
+    fiber: Float = 0f,
     modifier: Modifier = Modifier
 ) {
     val progress  = (calories / goal.coerceAtLeast(1f)).coerceIn(0f, 1f)
@@ -153,6 +154,7 @@ private fun CompactDayOverview(
                 MiniMacroStat("Protein", protein, MacroColors.protein)
                 MiniMacroStat("Kohlenh.", carbs, MacroColors.carbs)
                 MiniMacroStat("Fett", fat, MacroColors.fat)
+                MiniMacroStat("Ballast.", fiber, MacroColors.fiber)
             }
         }
     }
@@ -338,6 +340,7 @@ fun DiaryScreen(
                     protein  = state.totalProtein,
                     carbs = state.totalCarbs,
                     fat      = state.totalFat,
+                    fiber    = state.totalFiber,
                     modifier = Modifier.padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs)
                 )
             }
@@ -932,7 +935,7 @@ private fun DiaryEntryRow(
                         color = MacroColors.calories
                     )
                     Text(
-                        "P ${entry.protein.toInt()}  K ${entry.carbs.toInt()}  F ${entry.fat.toInt()}",
+                        "P ${entry.protein.toInt()}  K ${entry.carbs.toInt()}  F ${entry.fat.toInt()}  B ${entry.fiber.toInt()}",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
