@@ -32,6 +32,13 @@ interface FoodItemDao {
     @Query("SELECT * FROM food_items WHERE ${SearchSql.NORM_NAME} LIKE '%' || ${SearchSql.NORM_QUERY} || '%' ORDER BY timesUsed DESC LIMIT 50")
     suspend fun searchFoods(query: String): List<FoodItem>
 
+    // ── Katalog-Import (Dedup-Schlüssel vorab laden statt 60k Einzelabfragen) ──
+    @Query("SELECT barcode FROM food_items WHERE barcode IS NOT NULL AND barcode != ''")
+    suspend fun getAllBarcodes(): List<String>
+
+    @Query("SELECT lower(name) || '|' || lower(COALESCE(brand, '')) FROM food_items")
+    suspend fun getAllNameBrandKeys(): List<String>
+
     // ── Barcode lookup ────────────────────────────────────────────────────────
     @Query("SELECT * FROM food_items WHERE barcode = :barcode LIMIT 1")
     suspend fun searchByBarcode(barcode: String): FoodItem?

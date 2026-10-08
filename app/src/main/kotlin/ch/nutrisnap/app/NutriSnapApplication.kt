@@ -8,8 +8,13 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
+import ch.nutrisnap.app.data.repository.OffCatalogImporter
 import ch.nutrisnap.app.utils.CrashLogger
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Fängt unbehandelte Exceptions global ab, startet den ANR-Watchdog und
@@ -22,6 +27,12 @@ class NutriSnapApplication : Application() {
         super.onCreate()
 
         CrashLogger.init(this)
+
+        // Lokaler OFF-Katalog (CH/DE/AT) einmalig im Hintergrund importieren.
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            runCatching { OffCatalogImporter.importIfNeeded(applicationContext) }
+                .onFailure { CrashLogger.recordError(this@NutriSnapApplication, "OffCatalogImporter", "Import fehlgeschlagen", it) }
+        }
 
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
