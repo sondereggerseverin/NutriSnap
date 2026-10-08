@@ -85,11 +85,6 @@ class FoodSearchRepository(
             val hyphenDeferred = hyphenVariant?.let { hv ->
                 async { runCatching { openFoodFactsSearch(hv) }.getOrDefault(emptyList()) }
             }
-            // Präfix des Kompositums (z.B. "leinsamen") — fängt Varianten ohne "brot" ab
-            val prefixToken = compoundVariant?.split(" ")?.firstOrNull()?.takeIf { it.length >= 5 }
-            val prefixDeferred = prefixToken?.let { pref ->
-                async { runCatching { openFoodFactsSearch(pref) }.getOrDefault(emptyList()) }
-            }
 
             val off = offDeferred.await()
             val usda = usdaDeferred.await()
@@ -98,9 +93,8 @@ class FoodSearchRepository(
             val synonymRemote = synonymRemoteDeferred.flatMap { it.await() }
             val specificRemote = specificDeferred?.await() ?: emptyList()
             val hyphenRemote = hyphenDeferred?.await() ?: emptyList()
-            val prefixRemote = prefixDeferred?.await() ?: emptyList()
 
-            var combined = (cachedDistinct + swiss + off + usda + compound + synonymRemote + specificRemote + hyphenRemote + prefixRemote)
+            var combined = (cachedDistinct + swiss + off + usda + compound + synonymRemote + specificRemote + hyphenRemote)
 
             // Nutritionix branded immer dazu (Markenprodukte, die OFF oft fehlt).
             // Zusätzlich mit Kompositum-Variante, falls vorhanden.

@@ -3,8 +3,6 @@ package ch.nutrisnap.app.data.api
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.FoodSource
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -42,18 +40,22 @@ object OpenFoodFactsApi {
                     val p = root.optJSONObject("product") ?: return@runCatching emptyList()
                     productToFoodItem(p, barcode = code)?.let { listOf(it) } ?: emptyList()
                 } else {
-                    // DE + CH + World parallel — maximiert Markentreffer (PEMA, Aldi, Lidl, …)
-                    coroutineScope {
-                        val deDef = async { searchOn("https://de.openfoodfacts.org", query, limit) }
-                        val chDef = async { searchOn("https://ch.openfoodfacts.org", query, limit) }
-                        val worldDef = async { searchOn("https://world.openfoodfacts.org", query, limit) }
-                        (deDef.await() + chDef.await() + worldDef.await())
-                            .distinctBy {
-                                it.barcode
-                                    ?: (it.name.lowercase().trim() + "|" + (it.brand?.lowercase()?.trim() ?: ""))
-                            }
-                            .take(limit.coerceAtLeast(10).coerceAtMost(limit * 2))
+                    // DE zuerst (DACH-Marken), World nur nachladen wenn zu wenig Treffer.
+                    // Früher DE+CH+World parallel → viele parallele Calls, OFF rate-limitet/timeoutet
+                    // und die Suche fiel auf den KI-Fallback zurück.
+                    val de = searchOn("https://de.openfoodfacts.org", query, limit)
+                    val merged = if (de.size >= 8) {
+                        de
+                    } else {
+                        val world = searchOn("https://world.openfoodfacts.org", query, limit)
+                        (de + world)
                     }
+                    merged
+                        .distinctBy {
+                            it.barcode
+                                ?: (it.name.lowercase().trim() + "|" + (it.brand?.lowercase()?.trim() ?: ""))
+                        }
+                        .take(limit.coerceAtLeast(10).coerceAtMost(limit * 2))
                 }
             }.getOrDefault(emptyList())
         }

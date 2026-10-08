@@ -362,6 +362,9 @@ object IngredientNutritionDatabase {
         "sunflower seeds"       to Entry(584f, 21f,  20f,  51f,  8.6f),
         "kürbiskerne"           to Entry(559f, 30f,  11f,  49f,  6f),
         "pumpkin seeds"         to Entry(559f, 30f,  11f,  49f,  6f),
+        // Spezifisch vor generisch: Brot ≠ Samen (sonst filtert localRef echte Brote raus)
+        "leinsamenbrot"         to Entry(195f, 5.5f,  31f,  3.2f, 10f),
+        "leinsamen brot"        to Entry(195f, 5.5f,  31f,  3.2f, 10f),
         "leinsamen"             to Entry(534f, 18f,  29f,  42f,  27f),
         "gemahlene leinsamen"   to Entry(534f, 18f,  29f,  42f,  27f),
         "leinsamenmehl"         to Entry(534f, 18f,  29f,  42f,  27f),
