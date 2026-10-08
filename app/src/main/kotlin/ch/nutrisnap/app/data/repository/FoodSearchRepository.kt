@@ -34,7 +34,9 @@ class FoodSearchRepository(
 
         // Synonym-Expansion für lokale DB (z.B. "poulet" → auch "hähnchen"/"chicken")
         val synonymQueries = synonymExpansionQueries(query) + listOfNotNull(swissVariant)
-        val cached = (listOf(query) + synonymQueries).flatMap { q ->
+        // Auch die Komposita-Variante lokal suchen: "leinsamenbrot" findet so den
+        // Katalogeintrag "Leinsamen-Brot" bzw. "Leinsamen Brot" (FTS trennt am Bindestrich).
+        val cached = (listOf(query) + synonymQueries + listOfNotNull(compoundVariant)).distinct().flatMap { q ->
             val fts = SearchUtils.toFtsMatchQuery(q)
             val ftsHits = if (fts.isNotBlank())
                 runCatching { foodItemDao.searchFts(fts) }.getOrDefault(emptyList())
