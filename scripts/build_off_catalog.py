@@ -34,6 +34,42 @@ COUNTRY_TAGS = {
     "germany": "en:germany",
     "austria": "en:austria",
 }
+
+# Generische DACH-Staples, die in OFF-API-Top-Scans oft fehlen (Komposita, Schweizer Namen).
+# Werden immer vor API-Treffer gemerged, damit lokale Suche sie zuverlässig findet.
+STAPLES = [
+    {"name": "Leinsamenbrot", "brand": None, "barcode": None, "caloriesPer100g": 220, "proteinPer100g": 10, "carbsPer100g": 28, "fatPer100g": 8, "fiberPer100g": 9, "sugarPer100g": 1.5, "saltPer100g": 1.1, "category": "bread", "imageUrl": None},
+    {"name": "Leinsamen-Brot", "brand": None, "barcode": None, "caloriesPer100g": 220, "proteinPer100g": 10, "carbsPer100g": 28, "fatPer100g": 8, "fiberPer100g": 9, "sugarPer100g": 1.5, "saltPer100g": 1.1, "category": "bread", "imageUrl": None},
+    {"name": "Vollkornbrot", "brand": None, "barcode": None, "caloriesPer100g": 220, "proteinPer100g": 8, "carbsPer100g": 38, "fatPer100g": 3.5, "fiberPer100g": 7, "sugarPer100g": 2, "saltPer100g": 1.2, "category": "bread", "imageUrl": None},
+    {"name": "Dinkelbrot", "brand": None, "barcode": None, "caloriesPer100g": 230, "proteinPer100g": 9, "carbsPer100g": 40, "fatPer100g": 3, "fiberPer100g": 5, "sugarPer100g": 2, "saltPer100g": 1.1, "category": "bread", "imageUrl": None},
+    {"name": "Proteinbrot", "brand": None, "barcode": None, "caloriesPer100g": 240, "proteinPer100g": 22, "carbsPer100g": 8, "fatPer100g": 12, "fiberPer100g": 10, "sugarPer100g": 1, "saltPer100g": 1.3, "category": "bread", "imageUrl": None},
+    {"name": "Vollkornbrötchen", "brand": None, "barcode": None, "caloriesPer100g": 250, "proteinPer100g": 9, "carbsPer100g": 45, "fatPer100g": 3.5, "fiberPer100g": 6, "sugarPer100g": 3, "saltPer100g": 1.2, "category": "bread", "imageUrl": None},
+    {"name": "Chiasamen", "brand": None, "barcode": None, "caloriesPer100g": 444, "proteinPer100g": 20, "carbsPer100g": 5, "fatPer100g": 31, "fiberPer100g": 34, "sugarPer100g": 0, "saltPer100g": 0, "category": "seeds", "imageUrl": None},
+    {"name": "Leinsamen", "brand": None, "barcode": None, "caloriesPer100g": 534, "proteinPer100g": 18, "carbsPer100g": 2, "fatPer100g": 42, "fiberPer100g": 27, "sugarPer100g": 1.5, "saltPer100g": 0.1, "category": "seeds", "imageUrl": None},
+    {"name": "Walnüsse", "brand": None, "barcode": None, "caloriesPer100g": 654, "proteinPer100g": 15, "carbsPer100g": 7, "fatPer100g": 65, "fiberPer100g": 6, "sugarPer100g": 2.5, "saltPer100g": 0, "category": "nuts", "imageUrl": None},
+    {"name": "Mandeln", "brand": None, "barcode": None, "caloriesPer100g": 579, "proteinPer100g": 21, "carbsPer100g": 9, "fatPer100g": 50, "fiberPer100g": 12, "sugarPer100g": 4, "saltPer100g": 0, "category": "nuts", "imageUrl": None},
+    {"name": "Haferflocken", "brand": None, "barcode": None, "caloriesPer100g": 367, "proteinPer100g": 13, "carbsPer100g": 59, "fatPer100g": 7, "fiberPer100g": 10, "sugarPer100g": 1, "saltPer100g": 0.02, "category": "cereal", "imageUrl": None},
+    {"name": "Magerquark", "brand": None, "barcode": None, "caloriesPer100g": 67, "proteinPer100g": 12, "carbsPer100g": 4, "fatPer100g": 0.3, "fiberPer100g": 0, "sugarPer100g": 4, "saltPer100g": 0.1, "category": "dairy", "imageUrl": None},
+    {"name": "Hüttenkäse", "brand": None, "barcode": None, "caloriesPer100g": 98, "proteinPer100g": 12, "carbsPer100g": 3.5, "fatPer100g": 4, "fiberPer100g": 0, "sugarPer100g": 3.5, "saltPer100g": 0.8, "category": "dairy", "imageUrl": None},
+    {"name": "Cottage Cheese", "brand": None, "barcode": None, "caloriesPer100g": 98, "proteinPer100g": 12, "carbsPer100g": 3.5, "fatPer100g": 4, "fiberPer100g": 0, "sugarPer100g": 3.5, "saltPer100g": 0.8, "category": "dairy", "imageUrl": None},
+    {"name": "Skyr Natur", "brand": None, "barcode": None, "caloriesPer100g": 63, "proteinPer100g": 11, "carbsPer100g": 4, "fatPer100g": 0.2, "fiberPer100g": 0, "sugarPer100g": 4, "saltPer100g": 0.1, "category": "dairy", "imageUrl": None},
+    {"name": "Pouletbrust", "brand": None, "barcode": None, "caloriesPer100g": 110, "proteinPer100g": 23, "carbsPer100g": 0, "fatPer100g": 1.5, "fiberPer100g": 0, "sugarPer100g": 0, "saltPer100g": 0.1, "category": "meat", "imageUrl": None},
+    {"name": "Hähnchenbrust", "brand": None, "barcode": None, "caloriesPer100g": 110, "proteinPer100g": 23, "carbsPer100g": 0, "fatPer100g": 1.5, "fiberPer100g": 0, "sugarPer100g": 0, "saltPer100g": 0.1, "category": "meat", "imageUrl": None},
+    {"name": "Pouletbrustfilet", "brand": None, "barcode": None, "caloriesPer100g": 110, "proteinPer100g": 23, "carbsPer100g": 0, "fatPer100g": 1.5, "fiberPer100g": 0, "sugarPer100g": 0, "saltPer100g": 0.1, "category": "meat", "imageUrl": None},
+    {"name": "Rinderhackfleisch", "brand": None, "barcode": None, "caloriesPer100g": 200, "proteinPer100g": 20, "carbsPer100g": 0, "fatPer100g": 13, "fiberPer100g": 0, "sugarPer100g": 0, "saltPer100g": 0.15, "category": "meat", "imageUrl": None},
+    {"name": "Karotte", "brand": None, "barcode": None, "caloriesPer100g": 41, "proteinPer100g": 1, "carbsPer100g": 7, "fatPer100g": 0.2, "fiberPer100g": 2.8, "sugarPer100g": 4.7, "saltPer100g": 0.07, "category": "vegetables", "imageUrl": None},
+    {"name": "Rüebli", "brand": None, "barcode": None, "caloriesPer100g": 41, "proteinPer100g": 1, "carbsPer100g": 7, "fatPer100g": 0.2, "fiberPer100g": 2.8, "sugarPer100g": 4.7, "saltPer100g": 0.07, "category": "vegetables", "imageUrl": None},
+    {"name": "Süßkartoffel", "brand": None, "barcode": None, "caloriesPer100g": 86, "proteinPer100g": 1.6, "carbsPer100g": 20, "fatPer100g": 0.1, "fiberPer100g": 3, "sugarPer100g": 4.2, "saltPer100g": 0.04, "category": "vegetables", "imageUrl": None},
+    {"name": "Süßkartoffelpommes", "brand": None, "barcode": None, "caloriesPer100g": 180, "proteinPer100g": 2, "carbsPer100g": 28, "fatPer100g": 7, "fiberPer100g": 3.5, "sugarPer100g": 8, "saltPer100g": 0.5, "category": "vegetables", "imageUrl": None},
+    {"name": "Banane", "brand": None, "barcode": None, "caloriesPer100g": 89, "proteinPer100g": 1.1, "carbsPer100g": 20, "fatPer100g": 0.3, "fiberPer100g": 2.6, "sugarPer100g": 12, "saltPer100g": 0, "category": "fruit", "imageUrl": None},
+    {"name": "Apfel", "brand": None, "barcode": None, "caloriesPer100g": 52, "proteinPer100g": 0.3, "carbsPer100g": 11, "fatPer100g": 0.2, "fiberPer100g": 2.4, "sugarPer100g": 10, "saltPer100g": 0, "category": "fruit", "imageUrl": None},
+    {"name": "Ei", "brand": None, "barcode": None, "caloriesPer100g": 155, "proteinPer100g": 13, "carbsPer100g": 1.1, "fatPer100g": 11, "fiberPer100g": 0, "sugarPer100g": 1.1, "saltPer100g": 0.3, "category": "eggs", "imageUrl": None},
+    {"name": "Hühnerei", "brand": None, "barcode": None, "caloriesPer100g": 155, "proteinPer100g": 13, "carbsPer100g": 1.1, "fatPer100g": 11, "fiberPer100g": 0, "sugarPer100g": 1.1, "saltPer100g": 0.3, "category": "eggs", "imageUrl": None},
+    {"name": "Herdöpfel", "brand": None, "barcode": None, "caloriesPer100g": 70, "proteinPer100g": 1.8, "carbsPer100g": 15, "fatPer100g": 0.1, "fiberPer100g": 1.5, "sugarPer100g": 0.8, "saltPer100g": 0.01, "category": "vegetables", "imageUrl": None},
+    {"name": "Olivenöl", "brand": None, "barcode": None, "caloriesPer100g": 884, "proteinPer100g": 0, "carbsPer100g": 0, "fatPer100g": 100, "fiberPer100g": 0, "sugarPer100g": 0, "saltPer100g": 0, "category": "oils", "imageUrl": None},
+    {"name": "Butter", "brand": None, "barcode": None, "caloriesPer100g": 717, "proteinPer100g": 0.7, "carbsPer100g": 0.1, "fatPer100g": 81, "fiberPer100g": 0, "sugarPer100g": 0.1, "saltPer100g": 0.02, "category": "dairy", "imageUrl": None},
+]
+
 PAGE_SIZE = 100
 REQUEST_PAUSE_S = 0.35
 
@@ -212,6 +248,9 @@ def dedup_sort(products: list[dict], max_products: int) -> list[dict]:
             seen_bc.add(bc)
         seen_key.add(key)
         scans = int(m.pop("_scans", 0) or 0)
+        # Staples (kein Barcode, kein _scans) immer behalten → künstlich hohe Prio
+        if not bc and scans == 0 and m.get("brand") is None:
+            scans = 10**9
         ranked.append((scans, m))
     ranked.sort(key=lambda t: t[0], reverse=True)
     if max_products and len(ranked) > max_products:
@@ -261,11 +300,13 @@ def main():
     if not products:
         sys.exit("Keine Produkte gefunden (API und Dump leer/fehlerhaft).")
 
-    final = dedup_sort(products, args.max)
+    # Staples zuerst, dann API/Dump – Dedup behält Staples bei Namensgleichheit
+    products = list(STAPLES) + products
+    final = dedup_sort(products, args.max if args.max else 0)
     with gzip.open(args.out, "wt", encoding="utf-8", compresslevel=9) as out:
         for m in final:
             out.write(json.dumps(m, ensure_ascii=False, separators=(",", ":")) + "\n")
-    print(f"FERTIG: {len(final)} Produkte → {args.out}", flush=True)
+    print(f"FERTIG: {len(final)} Produkte (inkl. {len(STAPLES)} Staples) → {args.out}", flush=True)
 
 
 if __name__ == "__main__":
