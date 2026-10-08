@@ -966,6 +966,26 @@ class FoodItemRepository(db: NutriDatabase) {
         return runCatching { dao.search(q) }.getOrDefault(emptyList())
     }
 
+    /**
+     * Nur lokale DB + Custom Foods (schnell, offline). Für progressive Suche:
+     * UI zeigt diese Treffer sofort, Remote folgt nach.
+     */
+    suspend fun searchLocalOnly(query: String): List<FoodItem> {
+        if (query.isBlank()) return emptyList()
+        val variants = SearchUtils.localQueryVariants(query)
+        val local = variants.flatMap { q ->
+            localFoodSearch(dao, q)
+        }.distinctBy { it.barcode ?: it.name.lowercase().trim() }
+        val custom = variants.flatMap { q ->
+            runCatching { customFoodDao.searchOnce(q) }.getOrDefault(emptyList())
+        }.map { it.toFoodItem() }
+            .distinctBy { it.barcode ?: it.name.lowercase().trim() }
+        return (local + custom)
+            .distinctBy { it.barcode ?: (it.name.lowercase().trim() + "|" + (it.brand?.lowercase()?.trim() ?: "")) }
+            .sortedWith(FoodSearchRepository.relevanceComparator(query))
+            .take(20)
+    }
+
     suspend fun searchAll(query: String): List<FoodItem> {
         // Barcode shortcut: pure digit string 8–14 chars
         if (query.all { it.isDigit() } && query.length in 8..14) {

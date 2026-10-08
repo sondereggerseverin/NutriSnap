@@ -65,12 +65,11 @@ class FoodSearchRepository(
             val compoundDeferred = compoundVariant?.let { cv ->
                 async { runCatching { openFoodFactsSearch(cv) }.getOrDefault(emptyList()) }
             }
-            // Zusätzliche Remote-Suche mit Synonym (z.B. "chicken" bei "poulet")
-            val synonymRemoteDeferred = synonymQueries.take(2).map { sq ->
+            // Ein Synonym reicht (weniger OFF-Calls → weniger Rate-Limits)
+            val synonymRemoteDeferred = synonymQueries.take(1).map { sq ->
                 async { runCatching { openFoodFactsSearch(sq) }.getOrDefault(emptyList()) }
             }
             // Bei Mehrwort-Query auch das spezifischste Token remote suchen
-            // ("kebabfleisch" statt nur "poulet kebabfleisch" → OFF findet mehr)
             val specificToken = effectiveQuery.trim().split(Regex("\\s+"))
                 .map { it.lowercase() }
                 .filter { it.length >= 5 }
@@ -80,10 +79,17 @@ class FoodSearchRepository(
             val specificDeferred = specificToken?.let { tok ->
                 async { runCatching { openFoodFactsSearch(tok) }.getOrDefault(emptyList()) }
             }
-            // Bindestrich-Variante: "leinsamenbrot" → "leinsamen-brot" (viele DE-Labels)
+            // Bindestrich-Variante: "leinsamenbrot" → "leinsamen-brot"
             val hyphenVariant = compoundVariant?.replace(" ", "-")
             val hyphenDeferred = hyphenVariant?.let { hv ->
                 async { runCatching { openFoodFactsSearch(hv) }.getOrDefault(emptyList()) }
+            }
+            // Nutritionix parallel zu OFF (nicht erst danach sequentiell)
+            val nixDeferred = async {
+                runCatching { nutritionixApi.searchBranded(effectiveQuery) }.getOrDefault(emptyList())
+            }
+            val nixCompoundDeferred = compoundVariant?.let { cv ->
+                async { runCatching { nutritionixApi.searchBranded(cv) }.getOrDefault(emptyList()) }
             }
 
             val off = offDeferred.await()
@@ -93,16 +99,11 @@ class FoodSearchRepository(
             val synonymRemote = synonymRemoteDeferred.flatMap { it.await() }
             val specificRemote = specificDeferred?.await() ?: emptyList()
             val hyphenRemote = hyphenDeferred?.await() ?: emptyList()
+            val nutritionix = nixDeferred.await()
+            val nutritionixCompound = nixCompoundDeferred?.await() ?: emptyList()
 
-            var combined = (cachedDistinct + swiss + off + usda + compound + synonymRemote + specificRemote + hyphenRemote)
-
-            // Nutritionix branded immer dazu (Markenprodukte, die OFF oft fehlt).
-            // Zusätzlich mit Kompositum-Variante, falls vorhanden.
-            val nutritionix = runCatching { nutritionixApi.searchBranded(effectiveQuery) }.getOrDefault(emptyList())
-            val nutritionixCompound = compoundVariant?.let { cv ->
-                runCatching { nutritionixApi.searchBranded(cv) }.getOrDefault(emptyList())
-            } ?: emptyList()
-            combined = combined + nutritionix + nutritionixCompound
+            var combined = (cachedDistinct + swiss + off + usda + compound + synonymRemote +
+                specificRemote + hyphenRemote + nutritionix + nutritionixCompound)
 
             // Echte Treffer (Wort- oder Kompositum-/Fuzzy-Match, relevance >= 2) haben
             // immer Vorrang vor der KI-Schätzung. Nur wenn wirklich nichts Ähnliches

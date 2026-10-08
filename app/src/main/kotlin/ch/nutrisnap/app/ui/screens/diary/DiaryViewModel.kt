@@ -197,11 +197,16 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
             _isSearching.value = false
             return
         }
-        // Debounce: nicht bei jedem Tastendruck alle Remote-APIs feuern
+        // Debounce + progressive: lokale Treffer sofort, Remote danach nachladen
         searchJob = viewModelScope.launch {
+            delay(280)
             _isSearching.value = true
-            delay(320)
-            _searchResults.value = runCatching { foodRepo.searchAll(query) }.getOrDefault(emptyList())
+            val local = runCatching { foodRepo.searchLocalOnly(query) }.getOrDefault(emptyList())
+            if (local.isNotEmpty()) {
+                _searchResults.value = local
+            }
+            val all = runCatching { foodRepo.searchAll(query) }.getOrDefault(local)
+            _searchResults.value = all
             _isSearching.value = false
         }
     }
