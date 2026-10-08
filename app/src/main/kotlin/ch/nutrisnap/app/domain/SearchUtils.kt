@@ -168,9 +168,10 @@ object SearchUtils {
                 if (q.endsWith(s) && q.length > s.length + 2) {
                     val head = q.removeSuffix(s).trim()
                     if (head.length >= 2) {
+                        // Nur Kopf + "Kopf Suffix" — NICHT das nackte Suffix ("brot"),
+                        // sonst flutet die lokale Suche mit allen Broten bei "leinsamenbrot".
                         out += "$head $s"
                         out += head
-                        out += s
                     }
                     break
                 }

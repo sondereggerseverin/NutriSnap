@@ -102,8 +102,21 @@ class FoodSearchRepository(
             val nutritionix = nixDeferred.await()
             val nutritionixCompound = nixCompoundDeferred?.await() ?: emptyList()
 
-            var combined = (cachedDistinct + swiss + off + usda + compound + synonymRemote +
-                specificRemote + hyphenRemote + nutritionix + nutritionixCompound)
+            // Compound-/Hyphen-Treffer nur behalten, wenn der spezifische Kopf
+            // (z.B. "leinsamen") im Namen vorkommt — sonst Müll wie Weißbrot.
+            val compoundHead = compoundVariant?.split(" ")?.firstOrNull()?.takeIf { it.length >= 4 }
+            fun hasHead(items: List<FoodItem>): List<FoodItem> {
+                if (compoundHead == null) return items
+                val h = SearchUtils.normalize(compoundHead)
+                return items.filter { item ->
+                    val n = SearchUtils.normalize(item.name).replace(" ", "")
+                    n.contains(h) || relevance(item, effectiveQuery) >= 2
+                }
+            }
+
+            var combined = (cachedDistinct + swiss + off + usda +
+                hasHead(compound) + synonymRemote + specificRemote + hasHead(hyphenRemote) +
+                nutritionix + hasHead(nutritionixCompound))
 
             // Echte Treffer (Wort- oder Kompositum-/Fuzzy-Match, relevance >= 2) haben
             // immer Vorrang vor der KI-Schätzung. Nur wenn wirklich nichts Ähnliches
@@ -131,15 +144,15 @@ class FoodSearchRepository(
                         }
                         if (filtered.isNotEmpty()) filtered else usable
                     } else usable
-                    // Spezifische Treffer (relevance ≥ 2) priorisieren, aber bei wenigen
-                    // Treffern auch relevance ≥ 1 behalten — Ziel: ~10 sichtbare Hits.
+                    // Harte Spezifität: relevance ≥ 2 zuerst. Schwache Treffer (nur
+                    // "brot" o.ä.) nur auffüllen, wenn wirklich zu wenig Spezifisches da ist.
                     val specific = plausible.filter { relevance(it, effectiveQuery) >= 2 }
-                    val weak = plausible.filter { relevance(it, effectiveQuery) >= 1 }
+                    val weak = plausible.filter { relevance(it, effectiveQuery) == 1 }
                     when {
-                        specific.size >= 8 -> specific
-                        specific.size >= 3 -> (specific + weak.filter { it !in specific }).distinct()
-                        weak.size >= 3 -> weak
-                        plausible.isNotEmpty() -> plausible
+                        specific.size >= 5 -> specific
+                        specific.isNotEmpty() -> (specific + weak).distinct().take(15)
+                        weak.isNotEmpty() -> weak.take(10)
+                        plausible.isNotEmpty() -> plausible.take(10)
                         else -> list
                     }
                 }
@@ -286,18 +299,39 @@ class FoodSearchRepository(
                 }
             }
 
-            // Einwort-Query (auch Komposita wie "leinsamenbrot"):
-            // Volltreffer im Namen / kompakt → 2, damit OFF-Markenprodukte
-            // nicht als "schwach" (1) durch den Filter rutschen.
+            // Einwort-Query / Komposita ("leinsamenbrot"):
+            // Voller Substring → 2–3. Nur generisches Suffix ("brot") ohne
+            // spezifischen Kopf → 0, sonst fluten Weißbrot/Toast die Liste.
+            val genericSuffixes = listOf(
+                "brot", "broetchen", "brötchen", "suppe", "salat", "sauce", "sosse",
+                "fleisch", "wurst", "reis", "nudeln", "milch", "kaffee", "tee"
+            )
+            val matchedOnlyGenericSuffix = genericSuffixes.any { suf ->
+                qCompact.endsWith(suf) && qCompact.length > suf.length + 2 &&
+                    (nameCompact.contains(suf) || name.contains(suf)) &&
+                    !nameCompact.contains(qCompact) &&
+                    !nameCompact.contains(qCompact.removeSuffix(suf))
+            }
+            if (matchedOnlyGenericSuffix) return 0
+
             return when {
-                Regex("\\b${Regex.escape(q)}").containsMatchIn(name) -> 2
-                qCompact.length >= 5 && nameCompact.contains(qCompact) -> 2
+                Regex("\\b${Regex.escape(q)}").containsMatchIn(name) -> 3
+                qCompact.length >= 5 && nameCompact.contains(qCompact) -> 3
                 name.contains(q) -> 2
-                // Brand mitzählen (z.B. Query "pema" → "Leinsamenbrot", Brand PEMA)
+                // Spezifischer Kopf des Kompositums steckt im Namen (leinsamen…)
+                qCompact.length >= 8 && genericSuffixes.any { suf ->
+                    qCompact.endsWith(suf) && qCompact.length > suf.length + 2
+                } && run {
+                    val head = genericSuffixes
+                        .firstOrNull { qCompact.endsWith(it) && qCompact.length > it.length + 2 }
+                        ?.let { qCompact.removeSuffix(it) }
+                    head != null && head.length >= 4 && nameCompact.contains(head)
+                } -> 2
                 SearchUtils.normalize(item.brand.orEmpty()).let { b ->
                     b.isNotBlank() && (b.contains(q) || q.contains(b))
                 } -> 1
-                SearchUtils.fuzzyMatch(q, name) -> 1
+                // Fuzzy nur bei kurzen Queries — bei langen Komposita zu ungenau
+                q.length <= 8 && SearchUtils.fuzzyMatch(q, name) -> 1
                 else -> 0
             }
         }
