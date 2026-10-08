@@ -131,7 +131,15 @@ object SearchUtils {
         "fleisch" to listOf("meat"),
         "broetchen" to listOf("bread roll", "bun", "semmel"),
         "zwiebel" to listOf("onion"),
-        "spinat" to listOf("spinach")
+        "spinat" to listOf("spinach"),
+        "chia" to listOf("chiasamen", "chia samen", "chia seeds"),
+        "chiasamen" to listOf("chia", "chia seeds", "chia samen"),
+        "walnuss" to listOf("walnut", "walnuesse", "walnüsse"),
+        "walnuesse" to listOf("walnut", "walnuts", "walnuss"),
+        "haferflocken" to listOf("oats", "oatmeal", "porridge", "hafer"),
+        "huettenkaese" to listOf("cottage cheese", "huttenkase", "hüttenkäse"),
+        "leinsamen" to listOf("flaxseed", "flax seed", "leinsamenbrot"),
+        "karotte" to listOf("carrot", "moehre", "ruebli", "rüebli")
     )
 
     /**
@@ -139,12 +147,17 @@ object SearchUtils {
      * inkl. umgekehrter Map-Richtung. Wird von der Suche genutzt, um die
      * lokale DB mit mehreren LIKE-Queries abzufragen.
      */
-    /** Bekannte Suffix-Wörter für Kompositum-Auftrennung (lokal + remote). */
+    /** Bekannte Suffix-Wörter für Kompositum-Auftrennung (lokal + remote).
+     *  Längere zuerst. Nur normalisierte (ASCII) Formen – Matching läuft über normalize(). */
     private val COMPOUND_SUFFIXES = listOf(
+        "broetchen", "koerbchen", "semmel",
         "pommes", "kartoffel", "kartoffeln", "curry", "salat", "brot", "suppe",
         "sauce", "sosse", "gemuese", "reis", "nudeln", "wurst", "kaese",
         "brust", "fleisch", "hackfleisch", "schnitzel", "plaetzli", "steak",
-        "filet", "braten", "voressen"
+        "filet", "braten", "voressen", "toast", "bagel", "muffin", "kuchen", "torte",
+        "joghurt", "quark", "milch", "kaffee", "tee", "saft", "smoothie",
+        "nuesse", "samen", "kerne", "flocken", "riegel", "waffel",
+        "chips", "sticks", "wuerstchen"
     )
 
     /**

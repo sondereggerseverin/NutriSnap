@@ -393,10 +393,15 @@ class FoodSearchRepository(
     private val swissGermanRoots = mapOf(
         "poulet" to "hähnchen",
         "gitzi" to "ziege",
+        // "rüebli" normalisiert zu "rueebli" (ü→ue); getippt oft "ruebli"
         "rüebli" to "karotte",
+        "ruebli" to "karotte",
+        "rueebli" to "karotte",
         "herdöpfel" to "kartoffel",
+        "herdoepfel" to "kartoffel",
         "gschwellti" to "pellkartoffel",
         "nüssler" to "feldsalat",
+        "nuessler" to "feldsalat",
         "gipfeli" to "croissant",
         "silserli" to "brötchen",
         "zmorge" to "frühstück",
@@ -418,40 +423,63 @@ class FoodSearchRepository(
      * kein bekannter Regionalismus erkannt wurde.
      */
     private fun swissGermanVariant(query: String): String? {
-        val q = query.trim().lowercase()
-        val (root, standard) = swissGermanRoots.entries.firstOrNull { q.startsWith(it.key) } ?: return null
-        var suffix = q.removePrefix(root)
+        // Umlaut-tolerant matchen: "ruebli" und "rüebli" treffen denselben Root.
+        val qRaw = query.trim().lowercase()
+        val qNorm = SearchUtils.normalize(query.trim())
+        val entry = swissGermanRoots.entries.firstOrNull { (root, _) ->
+            qRaw.startsWith(root) || qNorm.startsWith(SearchUtils.normalize(root))
+        } ?: return null
+        val root = entry.key
+        val standard = entry.value
+        val usedRoot = when {
+            qRaw.startsWith(root) -> root
+            else -> SearchUtils.normalize(root)
+        }
+        val usedQuery = if (qRaw.startsWith(root)) qRaw else qNorm
+        var suffix = usedQuery.removePrefix(usedRoot)
         if (suffix.isBlank()) return standard
         endingCorrections[suffix]?.let { suffix = it }
+        // Auch normalisierte Endungen abfangen (z.B. "brus" bleibt)
+        endingCorrections[SearchUtils.normalize(suffix)]?.let { suffix = it }
         return (standard + suffix).trim()
     }
 
     // Bekannte Lebensmittel-Substantive, an denen ein zusammengeschriebenes
     // Kompositum aufgetrennt werden kann (z.B. "süsskartoffelpommes" ->
-    // "süsskartoffel pommes"). Bei Bedarf einfach ergänzen.
-        private val compoundSplitWords = listOf(
+    // "süsskartoffel pommes"). Längere Suffixe zuerst. Umlaut- und
+    // ASCII-Varianten parallel, damit normalize() und Roh-Query greifen.
+    private val compoundSplitWords = listOf(
         // längere Suffixe zuerst, damit "brötchen" vor "brot" greift
         "brötchen", "broetchen", "körbchen", "koerbchen", "semmel",
-        "pommes", "kartoffel", "kartoffeln", "curry", "salat", "brot", "suppe",
-        "sauce", "sosse", "gemuese", "reis", "nudeln", "wurst", "kaese", "brust",
-        "fleisch", "hackfleisch", "schnitzel", "plaetzli", "steak", "filet",
+        "pommes", "kartoffel", "kartoffeln", "curry", "salat",
+        "brötchen", "broetchen", "brot", "suppe",
+        "sauce", "sosse", "gemuese", "gemüse", "reis", "nudeln",
+        "wurst", "käse", "kaese", "brust",
+        "fleisch", "hackfleisch", "schnitzel", "plätzli", "plaetzli", "steak", "filet",
         "braten", "voressen", "toast", "bagel", "muffin", "kuchen", "torte",
-        "joghurt", "quark", "milch", "kaffee", "tee", "saft", "smoothie"
+        "joghurt", "quark", "milch", "kaffee", "tee", "saft", "smoothie",
+        // Nüsse, Samen, Flocken – häufige Komposita ohne Leerzeichen
+        "nüsse", "nuesse", "samen", "kerne", "flocken", "riegel", "waffel",
+        "chips", "sticks", "würstchen", "wuerstchen"
     )
 
     /**
      * Trennt ein zusammengeschriebenes Kompositum an einem bekannten Suffix-Wort
      * auf ("süsskartoffelpommes" -> "süsskartoffel pommes"), damit die Volltextsuche
      * externer Quellen (OFF etc.) auch bei zusammengeschriebenen Begriffen greift.
+     * Normalisiert Umlaute, damit "hüttenkäse" → "huetten kaese" wird.
      * Gibt null zurück, wenn die Query bereits Leerzeichen enthält oder kein
      * bekanntes Suffix gefunden wird.
      */
     private fun compoundSplitVariant(query: String): String? {
-        val q = query.trim().lowercase()
-        if (q.contains(" ") || q.length < 6) return null
+        val raw = query.trim().lowercase()
+        if (raw.contains(" ") || raw.length < 6) return null
+        val q = SearchUtils.normalize(raw)
         for (suffix in compoundSplitWords) {
-            if (q.endsWith(suffix) && q.length > suffix.length + 2) {
-                return "${q.removeSuffix(suffix)} $suffix"
+            val s = SearchUtils.normalize(suffix)
+            if (q.endsWith(s) && q.length > s.length + 2) {
+                val head = q.removeSuffix(s)
+                if (head.length >= 2) return "$head $s"
             }
         }
         return null
