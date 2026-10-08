@@ -80,6 +80,16 @@ class FoodSearchRepository(
             val specificDeferred = specificToken?.let { tok ->
                 async { runCatching { openFoodFactsSearch(tok) }.getOrDefault(emptyList()) }
             }
+            // Bindestrich-Variante: "leinsamenbrot" → "leinsamen-brot" (viele DE-Labels)
+            val hyphenVariant = compoundVariant?.replace(" ", "-")
+            val hyphenDeferred = hyphenVariant?.let { hv ->
+                async { runCatching { openFoodFactsSearch(hv) }.getOrDefault(emptyList()) }
+            }
+            // Präfix des Kompositums (z.B. "leinsamen") — fängt Varianten ohne "brot" ab
+            val prefixToken = compoundVariant?.split(" ")?.firstOrNull()?.takeIf { it.length >= 5 }
+            val prefixDeferred = prefixToken?.let { pref ->
+                async { runCatching { openFoodFactsSearch(pref) }.getOrDefault(emptyList()) }
+            }
 
             val off = offDeferred.await()
             val usda = usdaDeferred.await()
@@ -87,8 +97,10 @@ class FoodSearchRepository(
             val compound = compoundDeferred?.await() ?: emptyList()
             val synonymRemote = synonymRemoteDeferred.flatMap { it.await() }
             val specificRemote = specificDeferred?.await() ?: emptyList()
+            val hyphenRemote = hyphenDeferred?.await() ?: emptyList()
+            val prefixRemote = prefixDeferred?.await() ?: emptyList()
 
-            var combined = (cachedDistinct + swiss + off + usda + compound + synonymRemote + specificRemote)
+            var combined = (cachedDistinct + swiss + off + usda + compound + synonymRemote + specificRemote + hyphenRemote + prefixRemote)
 
             // Nutritionix branded immer dazu (Markenprodukte, die OFF oft fehlt).
             // Zusätzlich mit Kompositum-Variante, falls vorhanden.
@@ -267,10 +279,17 @@ class FoodSearchRepository(
                 }
             }
 
+            // Einwort-Query (auch Komposita wie "leinsamenbrot"):
+            // Volltreffer im Namen / kompakt → 2, damit OFF-Markenprodukte
+            // nicht als "schwach" (1) durch den Filter rutschen.
             return when {
                 Regex("\\b${Regex.escape(q)}").containsMatchIn(name) -> 2
-                name.contains(q) -> 1
-                qCompact.length >= 3 && nameCompact.contains(qCompact) -> 1
+                qCompact.length >= 5 && nameCompact.contains(qCompact) -> 2
+                name.contains(q) -> 2
+                // Brand mitzählen (z.B. Query "pema" → "Leinsamenbrot", Brand PEMA)
+                SearchUtils.normalize(item.brand.orEmpty()).let { b ->
+                    b.isNotBlank() && (b.contains(q) || q.contains(b))
+                } -> 1
                 SearchUtils.fuzzyMatch(q, name) -> 1
                 else -> 0
             }
