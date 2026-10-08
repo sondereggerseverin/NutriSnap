@@ -63,9 +63,12 @@ object OpenFoodFactsApi {
     /** Fuehrt eine Namenssuche gegen die angegebene OFF-Subdomain aus (z.B. ch./world.). */
     private fun searchOn(baseHost: String, query: String, limit: Int): List<FoodItem> {
         val encoded = java.net.URLEncoder.encode(query.take(60), "UTF-8")
+        // countries= prioritisiert DACH-Produkte in der OFF-Ranking-Pipeline
         val url = "$baseHost/cgi/search.pl" +
                 "?search_terms=$encoded&search_simple=1&action=process&json=1" +
-                "&page_size=$limit&fields=product_name,brands,nutriments,code,serving_size"
+                "&page_size=$limit" +
+                "&countries=Germany,Switzerland,Austria" +
+                "&fields=product_name,brands,nutriments,code,serving_size"
         val req = Request.Builder().url(url)
             .header("User-Agent", "NutriSnap/1.0 (Android)").build()
         val body = try {

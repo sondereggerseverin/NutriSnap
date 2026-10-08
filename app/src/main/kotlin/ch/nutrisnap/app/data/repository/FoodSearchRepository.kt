@@ -143,8 +143,9 @@ class FoodSearchRepository(
                     }
                 }
                 .sortedWith(
-                    // 1) Namens-Relevanz, 2) Mikro-Fülle (Vit.D/B12/…), 3) vertrauenswürdige Quelle
+                    // 1) Namens-Relevanz, 2) Marke/Barcode (Retail), 3) Mikro, 4) Quelle
                     compareByDescending<FoodItem> { relevance(it, effectiveQuery) }
+                        .thenByDescending { retailSignal(it) }
                         .thenByDescending { microRichness(it) }
                         .thenByDescending { sourcePriority(it.source) }
                 )
@@ -162,6 +163,17 @@ class FoodSearchRepository(
         val c = item.carbs ?: 0f
         val f = item.fat ?: 0f
         return kcal > 0f || p > 0f || c > 0f || f > 0f
+    }
+
+    /** Markenprodukte mit Barcode (Retail) vor generischen Einträgen. */
+    private fun retailSignal(item: FoodItem): Int {
+        var s = 0
+        if (!item.brand.isNullOrBlank()) s += 2
+        if (!item.barcode.isNullOrBlank()) s += 2
+        // KI-Schätzung ans Ende
+        val brandLower = item.brand?.lowercase().orEmpty()
+        if (brandLower.contains("ki-geschätzt") || brandLower.contains("ki-gericht")) s -= 5
+        return s
     }
 
     /**

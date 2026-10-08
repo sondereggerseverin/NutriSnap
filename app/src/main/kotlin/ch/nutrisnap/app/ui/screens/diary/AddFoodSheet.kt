@@ -1136,7 +1136,16 @@ private fun FoodResultRow(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                food.brand ?: "${food.calories?.toInt() ?: "–"} kcal/100g",
+                buildString {
+                    val brand = food.brand?.takeIf { it.isNotBlank() }
+                    val kcal = food.calories?.toInt()?.let { "$it kcal/100g" }
+                    when {
+                        brand != null && kcal != null -> append("$brand · $kcal")
+                        brand != null -> append(brand)
+                        kcal != null -> append(kcal)
+                        else -> append("–")
+                    }
+                },
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

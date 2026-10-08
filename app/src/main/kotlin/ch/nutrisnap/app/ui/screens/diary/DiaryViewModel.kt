@@ -23,6 +23,8 @@ import ch.nutrisnap.app.ui.theme.KEY_MANUAL_ACTIVITY_ENABLED
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -186,11 +188,20 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     fun prevDay()                { _date.value = _date.value.minusDays(1) }
     fun nextDay()                { _date.value = _date.value.plusDays(1) }
 
+    private var searchJob: Job? = null
+
     fun searchFood(query: String) {
-        if (query.isBlank()) { _searchResults.value = emptyList(); return }
-        viewModelScope.launch {
+        searchJob?.cancel()
+        if (query.isBlank()) {
+            _searchResults.value = emptyList()
+            _isSearching.value = false
+            return
+        }
+        // Debounce: nicht bei jedem Tastendruck alle Remote-APIs feuern
+        searchJob = viewModelScope.launch {
             _isSearching.value = true
-            _searchResults.value = foodRepo.searchAll(query)
+            delay(320)
+            _searchResults.value = runCatching { foodRepo.searchAll(query) }.getOrDefault(emptyList())
             _isSearching.value = false
         }
     }
