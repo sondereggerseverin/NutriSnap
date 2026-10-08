@@ -7,9 +7,9 @@ on:
         required: true
         default: "switzerland"
       max_products:
-        description: "Maximale Produktzahl (0 = unbegrenzt)"
+        description: "Maximale Produktzahl (API-Pagination, Standard 15000)"
         required: true
-        default: "60000"
+        default: "15000"
 
 permissions:
   contents: write
@@ -17,7 +17,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # API-Pagination ist deutlich schneller als der 13-GB-Dump
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,13 +26,23 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Katalog aus OpenFoodFacts-Dump bauen
+      - name: Katalog über OFF-API bauen
         run: |
           python3 scripts/build_off_catalog.py \
             --countries "${{ inputs.countries }}" \
             --max "${{ inputs.max_products }}" \
             --out app/src/main/assets/off_catalog.jsonl.gz \
             2>&1 | tee off_catalog.log
+          # Mindestens der Seed-Stand muss übrig bleiben
+          python3 - <<'PY'
+          import gzip, sys
+          path = "app/src/main/assets/off_catalog.jsonl.gz"
+          with gzip.open(path, "rt", encoding="utf-8") as f:
+              n = sum(1 for _ in f)
+          print(f"Zeilen im Katalog: {n}")
+          if n < 20:
+              sys.exit(f"Katalog zu klein ({n}) – Abbruch ohne Commit")
+          PY
       - name: Commit result
         run: |
           git config user.email "severin@nutrisnap.dev"
@@ -41,7 +52,6 @@ jobs:
             echo "Keine Änderungen."
           else
             git commit -m "OFF-Katalog aktualisiert (${{ inputs.countries }}, max ${{ inputs.max_products }})"
-            # main kann sich während des langen Dump-Laufs weiterbewegen -> rebase + retry
             for i in 1 2 3; do
               git pull --rebase origin main && git push && break
               echo "Push-Versuch $i fehlgeschlagen, erneut..."
