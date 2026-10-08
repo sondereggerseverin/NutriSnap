@@ -41,5 +41,11 @@ jobs:
             echo "Keine Änderungen."
           else
             git commit -m "OFF-Katalog aktualisiert (${{ inputs.countries }}, max ${{ inputs.max_products }})"
-            git push
+            # main kann sich während des langen Dump-Laufs weiterbewegen -> rebase + retry
+            for i in 1 2 3; do
+              git pull --rebase origin main && git push && break
+              echo "Push-Versuch $i fehlgeschlagen, erneut..."
+              sleep 5
+            done
+            git status -sb
           fi
