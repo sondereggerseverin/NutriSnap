@@ -48,12 +48,14 @@ class FoodSearchRepository(
         // Nur ein EXAKTER Namens-Treffer zählt als "gut genug" — "beginnt mit" reicht
         // nicht, weil z.B. "Apfelringe" auch mit "apfel" beginnt und sonst faelschlich
         // als Treffer für die Anfrage "apfel" durchgeht, obwohl kein echter Apfel dabei ist.
-        if (cachedDistinct.size >= 5 && cachedDistinct.any { relevance(it, effectiveQuery) == 4 }) {
+        // Nur bei vielen exakten Cache-Treffern Remote überspringen — sonst immer
+        // OFF/Nutritionix nachladen, damit Markenprodukte sichtbar werden.
+        if (cachedDistinct.size >= 12 && cachedDistinct.count { relevance(it, effectiveQuery) == 4 } >= 3) {
             return cachedDistinct.sortedWith(
                 compareByDescending<FoodItem> { relevance(it, effectiveQuery) }
                     .thenByDescending { microRichness(it) }
                     .thenByDescending { sourcePriority(it.source) }
-            )
+            ).take(20)
         }
 
         return coroutineScope {
@@ -88,10 +90,13 @@ class FoodSearchRepository(
 
             var combined = (cachedDistinct + swiss + off + usda + compound + synonymRemote + specificRemote)
 
-            if (combined.count { hasUsableNutrition(it) } < 5) {
-                val nutritionix = runCatching { nutritionixApi.searchBranded(effectiveQuery) }.getOrDefault(emptyList())
-                combined = combined + nutritionix
-            }
+            // Nutritionix branded immer dazu (Markenprodukte, die OFF oft fehlt).
+            // Zusätzlich mit Kompositum-Variante, falls vorhanden.
+            val nutritionix = runCatching { nutritionixApi.searchBranded(effectiveQuery) }.getOrDefault(emptyList())
+            val nutritionixCompound = compoundVariant?.let { cv ->
+                runCatching { nutritionixApi.searchBranded(cv) }.getOrDefault(emptyList())
+            } ?: emptyList()
+            combined = combined + nutritionix + nutritionixCompound
 
             // Echte Treffer (Wort- oder Kompositum-/Fuzzy-Match, relevance >= 2) haben
             // immer Vorrang vor der KI-Schätzung. Nur wenn wirklich nichts Ähnliches
@@ -114,16 +119,20 @@ class FoodSearchRepository(
                         val filtered = usable.filter { item ->
                             val kcal = item.calories ?: return@filter true
                             val ratio = kcal / localRef.calories
-                            ratio in 0.4f..2.2f
+                            // etwas toleranter (0.3–2.5), damit Markenbrote nicht rausfallen
+                            ratio in 0.3f..2.5f
                         }
                         if (filtered.isNotEmpty()) filtered else usable
                     } else usable
-                    // Spezifische Treffer (relevance ≥ 2) bevorzugen — sonst
-                    // fluten generische "Hähnchen…" die Liste bei "poulet kebabfleisch"
+                    // Spezifische Treffer (relevance ≥ 2) priorisieren, aber bei wenigen
+                    // Treffern auch relevance ≥ 1 behalten — Ziel: ~10 sichtbare Hits.
                     val specific = plausible.filter { relevance(it, effectiveQuery) >= 2 }
+                    val weak = plausible.filter { relevance(it, effectiveQuery) >= 1 }
                     when {
-                        specific.size >= 3 -> specific
-                        plausible.size >= 3 -> plausible
+                        specific.size >= 8 -> specific
+                        specific.size >= 3 -> (specific + weak.filter { it !in specific }).distinct()
+                        weak.size >= 3 -> weak
+                        plausible.isNotEmpty() -> plausible
                         else -> list
                     }
                 }
@@ -133,6 +142,7 @@ class FoodSearchRepository(
                         .thenByDescending { microRichness(it) }
                         .thenByDescending { sourcePriority(it.source) }
                 )
+                .take(20) // UI soll nicht endlos scrollen, aber ~10+ sind drin
 
             foodItemDao.insertAll(result.filter { it.source != FoodSource.MANUAL }.take(40))
             result
@@ -358,10 +368,13 @@ class FoodSearchRepository(
     // Kompositum aufgetrennt werden kann (z.B. "süsskartoffelpommes" ->
     // "süsskartoffel pommes"). Bei Bedarf einfach ergänzen.
         private val compoundSplitWords = listOf(
+        // längere Suffixe zuerst, damit "brötchen" vor "brot" greift
+        "brötchen", "broetchen", "körbchen", "koerbchen", "semmel",
         "pommes", "kartoffel", "kartoffeln", "curry", "salat", "brot", "suppe",
         "sauce", "sosse", "gemuese", "reis", "nudeln", "wurst", "kaese", "brust",
         "fleisch", "hackfleisch", "schnitzel", "plaetzli", "steak", "filet",
-        "braten", "voressen"
+        "braten", "voressen", "toast", "bagel", "muffin", "kuchen", "torte",
+        "joghurt", "quark", "milch", "kaffee", "tee", "saft", "smoothie"
     )
 
     /**

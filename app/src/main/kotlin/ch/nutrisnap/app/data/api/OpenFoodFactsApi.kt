@@ -3,6 +3,8 @@ package ch.nutrisnap.app.data.api
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.FoodSource
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -25,7 +27,7 @@ object OpenFoodFactsApi {
      * For barcode lookups, pass "barcode:<code>" — the function detects this prefix
      * and hits the product lookup endpoint instead.
      */
-    suspend fun search(query: String, limit: Int = 15): List<FoodItem> =
+    suspend fun search(query: String, limit: Int = 25): List<FoodItem> =
         withContext(Dispatchers.IO) {
             runCatching {
                 // Barcode lookup
@@ -40,13 +42,18 @@ object OpenFoodFactsApi {
                     val p = root.optJSONObject("product") ?: return@runCatching emptyList()
                     productToFoodItem(p, barcode = code)?.let { listOf(it) } ?: emptyList()
                 } else {
-                    // Name search: CH-Subdomain zuerst (Migros/Coop/Aldi/Lidl ranken vorne),
-                    // danach immer world dazu mergen — maximiert die lokal gecachten Produkte.
-                    val chResults = searchOn("https://ch.openfoodfacts.org", query, limit)
-                    val worldResults = searchOn("https://world.openfoodfacts.org", query, limit)
-                    (chResults + worldResults)
-                        .distinctBy { it.barcode ?: (it.name.lowercase().trim() + "|" + (it.brand?.lowercase()?.trim() ?: "")) }
-                        .take(limit.coerceAtLeast(chResults.size).coerceAtMost(limit * 2))
+                    // DE + CH + World parallel — maximiert Markentreffer (PEMA, Aldi, Lidl, …)
+                    coroutineScope {
+                        val deDef = async { searchOn("https://de.openfoodfacts.org", query, limit) }
+                        val chDef = async { searchOn("https://ch.openfoodfacts.org", query, limit) }
+                        val worldDef = async { searchOn("https://world.openfoodfacts.org", query, limit) }
+                        (deDef.await() + chDef.await() + worldDef.await())
+                            .distinctBy {
+                                it.barcode
+                                    ?: (it.name.lowercase().trim() + "|" + (it.brand?.lowercase()?.trim() ?: ""))
+                            }
+                            .take(limit.coerceAtLeast(10).coerceAtMost(limit * 2))
+                    }
                 }
             }.getOrDefault(emptyList())
         }
@@ -59,8 +66,16 @@ object OpenFoodFactsApi {
                 "&page_size=$limit&fields=product_name,brands,nutriments,code,serving_size"
         val req = Request.Builder().url(url)
             .header("User-Agent", "NutriSnap/1.0 (Android)").build()
-        val body = client.newCall(req).execute().use { it.body?.string() } ?: return emptyList()
-        val products = JSONObject(body).optJSONArray("products") ?: return emptyList()
+        val body = try {
+            client.newCall(req).execute().use { it.body?.string() }
+        } catch (_: Exception) {
+            return emptyList()
+        } ?: return emptyList()
+        val products = try {
+            JSONObject(body).optJSONArray("products")
+        } catch (_: Exception) {
+            return emptyList()
+        } ?: return emptyList()
         return (0 until products.length())
             .mapNotNull { productToFoodItem(products.getJSONObject(it)) }
     }
