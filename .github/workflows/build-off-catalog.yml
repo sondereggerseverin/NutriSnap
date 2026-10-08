@@ -1,0 +1,45 @@
+name: OFF-Katalog bauen (CH/DE/AT)
+on:
+  workflow_dispatch:
+    inputs:
+      countries:
+        description: "Kommagetrennt: switzerland,germany,austria"
+        required: true
+        default: "switzerland"
+      max_products:
+        description: "Maximale Produktzahl (0 = unbegrenzt)"
+        required: true
+        default: "60000"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Katalog aus OpenFoodFacts-Dump bauen
+        run: |
+          python3 scripts/build_off_catalog.py \
+            --countries "${{ inputs.countries }}" \
+            --max "${{ inputs.max_products }}" \
+            --out app/src/main/assets/off_catalog.jsonl.gz \
+            2>&1 | tee off_catalog.log
+      - name: Commit result
+        run: |
+          git config user.email "severin@nutrisnap.dev"
+          git config user.name "Severin Sonderegger"
+          git add app/src/main/assets/off_catalog.jsonl.gz
+          if git diff --cached --quiet; then
+            echo "Keine Änderungen."
+          else
+            git commit -m "OFF-Katalog aktualisiert (${{ inputs.countries }}, max ${{ inputs.max_products }})"
+            git push
+          fi
