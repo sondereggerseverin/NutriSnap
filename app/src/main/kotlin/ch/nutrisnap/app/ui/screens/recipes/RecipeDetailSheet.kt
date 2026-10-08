@@ -1082,6 +1082,7 @@ internal fun NutritionAnalysisCard(
                     protPerServ?.let { MacroItem("P", "${(it * ratio).toInt()}", "g") }
                     carbPerServ?.let { MacroItem("K", "${(it * ratio).toInt()}", "g") }
                     fatPerServ?.let { MacroItem("F", "${(it * ratio).toInt()}", "g") }
+                    fiberPerServ?.let { MacroItem("B", "${(it * ratio).toInt()}", "g") }
                 }
                 // Mikro + Details nur aufklappbar — spart Platz
                 if (hasDetails) {
@@ -1174,13 +1175,15 @@ internal fun NutrientSummaryStrip(recipe: Recipe) {
     val prot = recipe.proteinPerServingEffective()
     val carb = recipe.carbsPerServingEffective()
     val fat  = recipe.fatPerServingEffective()
-    if (calsPerServ == null && prot == null && carb == null && fat == null) return
+    val fiber = recipe.fiberPerServingEffective()
+    if (calsPerServ == null && prot == null && carb == null && fat == null && fiber == null) return
 
     val parts = buildList {
         calsPerServ?.let { add("${it.toInt()} kcal") }
         fat?.let { add("${it.toInt()} g Fett") }
         carb?.let { add("${it.toInt()} g Kohlenhydrate") }
         prot?.let { add("${it.toInt()} g Eiweiss") }
+        fiber?.let { add("${it.toInt()} g Ballaststoffe") }
     }
     if (parts.isEmpty()) return
 
