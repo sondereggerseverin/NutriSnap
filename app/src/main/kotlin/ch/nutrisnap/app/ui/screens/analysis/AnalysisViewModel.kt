@@ -13,6 +13,7 @@ import ch.nutrisnap.app.data.repository.StatsRepository
 import ch.nutrisnap.app.data.repository.UserProfile
 import ch.nutrisnap.app.data.repository.UserProfileRepository
 import ch.nutrisnap.app.data.repository.WeightRepository
+import ch.nutrisnap.app.domain.AdaptiveTdeeCalculator
 import ch.nutrisnap.app.health.HealthConnectManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
@@ -71,6 +72,10 @@ data class DayOverviewRow(
     val calories: Int,
     val caloriesChangePct: Float?,
     val activityCalories: Int,
+    /** Tagesziel (kcal) = Erhaltung − Defizit + Aktivitäts-Anpassung, wie auf der Startseite. */
+    val targetKcal: Int,
+    /** kcal − Tagesziel (negativ = unter Ziel); null, wenn für den Tag nichts geloggt ist. */
+    val balanceKcal: Int?,
     val zone: String
 )
 
@@ -349,7 +354,7 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Lädt die letzten [days] Kalendertage für die Tagesübersicht-Tabelle.
-     * Zone relativ zum Kalorienziel (±8 %), Δ% vs. Vortag.
+     * Zone relativ zum Tagesziel (Erhaltung − Defizit, aktivitätsbereinigt), Δ = kcal − Ziel.
      */
     fun loadDayOverview(days: Int = 30) {
         viewModelScope.launch {
@@ -364,11 +369,30 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
             val hcCache = healthRepo.getRange(from, to).first()
             val weightEntries = weightRepo.getAll().first()
             val profile = profileRepo.get().first()
-            val tdee = profile.computedTdee()?.toInt() ?: profile.dailyCalorieGoal
 
             val summaryByDate = summaries.associateBy { it.dateStr }
             val hcByDate = hcCache.associateBy { it.date }
-            val weightByDate = weightEntries.associateBy { LocalDate.parse(it.dateStr) }
+            val manualWeightByDate = weightEntries.associate { LocalDate.parse(it.dateStr) to it.weightKg }
+            val hcWeightByDate = hcCache
+                .mapNotNull { c -> c.weightKg?.let { kg -> c.date to kg.toFloat() } }
+                .toMap()
+            val weightByDate = AdaptiveTdeeCalculator.mergeWeightByDate(manualWeightByDate, hcWeightByDate)
+
+            // Gleiche Ziel-Logik wie auf der Startseite: Erhaltung (Trend bevorzugt) − Defizit
+            // (Wochenziel in kg oder 500 kcal) + Aktivitäts-Anpassung pro Tag.
+            val intakeByDate = summaries.associate { LocalDate.parse(it.dateStr) to it.calories }
+            val trend = AdaptiveTdeeCalculator.computeTrendTdee(
+                weightByDate.filterKeys { !it.isBefore(from) },
+                intakeByDate
+            )
+            val avgActive = hcCache
+                .mapNotNull { it.activeCaloriesKcal }
+                .filter { it > 0.0 }
+                .takeIf { it.isNotEmpty() }
+                ?.average()
+            val weeklyLoss = profile.weeklyTargetLossKg?.takeIf { it > 0f }
+            val deficitKcal = weeklyLoss?.let { it * AdaptiveTdeeCalculator.KCAL_PER_KG / 7.0 }
+                ?: AdaptiveTdeeCalculator.DEFAULT_DEFICIT_KCAL
 
             val rows = ArrayList<DayOverviewRow>(days)
             var prevCal: Int? = null
@@ -380,7 +404,7 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
                 val cal = if (s != null && s.calories > 0f) s.calories.toInt() else 0
                 val hc = hcByDate[d]
                 val act = (hc?.activeCaloriesKcal?.toFloat() ?: 0f).toInt().coerceAtLeast(0)
-                val w = hc?.weightKg?.toFloat() ?: weightByDate[d]?.weightKg
+                val w = hc?.weightKg?.toFloat() ?: manualWeightByDate[d]
 
                 val calChange = if (prevCal != null && prevCal > 0 && cal > 0) {
                     ((cal - prevCal).toFloat() / prevCal) * 100f
@@ -389,11 +413,27 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
                     ((w - prevWeight) / prevWeight) * 100f
                 } else null
 
+                val dayTarget = AdaptiveTdeeCalculator.computeDailyTarget(
+                    trend = trend,
+                    formulaTdee = profile.computedTdee(),
+                    todayActiveKcal = act.toDouble().takeIf { it > 0.0 },
+                    avgActiveKcal = avgActive,
+                    deficitKcal = deficitKcal,
+                    formulaBmr = profile.computedBmr()
+                )
+                val target = dayTarget?.targetKcal ?: profile.dailyCalorieGoal
+                // Erhaltung des Tages = Ziel + Defizit (inkl. Aktivitäts-Anpassung)
+                val maintenanceDay = target + (dayTarget?.deficitKcal ?: 0)
+
+                // Abnehm-Zonen: "Im Ziel" = Defizit eingehalten, "Erhalt" = kein Defizit,
+                // "Plus" = über Erhaltung, "Zu tief" = unnötig tiefes Loch (Recovery/Muskelerhalt).
                 val zone = when {
                     cal <= 0 -> "—"
-                    cal < tdee * 0.92f -> "Defizit"
-                    cal > tdee * 1.08f -> "Überschuss"
-                    else -> "Erhalt"
+                    d == today && cal < target -> "Offen"
+                    cal < target * 0.85f -> "Zu tief"
+                    cal <= target * 1.05f -> "Im Ziel"
+                    cal <= maintenanceDay * 1.05f -> "Erhalt"
+                    else -> "Plus"
                 }
 
                 rows += DayOverviewRow(
@@ -403,6 +443,8 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
                     calories = cal,
                     caloriesChangePct = calChange,
                     activityCalories = act,
+                    targetKcal = target,
+                    balanceKcal = if (cal > 0) cal - target else null,
                     zone = zone
                 )
                 if (cal > 0) prevCal = cal

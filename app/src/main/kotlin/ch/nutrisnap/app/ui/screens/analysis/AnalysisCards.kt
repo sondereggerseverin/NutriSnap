@@ -578,7 +578,7 @@ internal fun WeekOverviewSheet(
                 if (mode == OverviewMode.WOCHE)
                     "Ø-Werte pro Kalenderwoche (Mo–So). Zone relativ zum Kalorienziel (±8 %)."
                 else
-                    "Werte pro Tag. Zone relativ zum Kalorienziel (±8 %). Δ% vs. Vortag.",
+                    "Zone relativ zum Tagesziel (Erhaltung − Defizit, aktivitätsbereinigt). Δ Ziel = kcal − Tagesziel.",
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
@@ -740,7 +740,7 @@ internal fun DayOverviewHeaderRow() {
         Text("kg", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
         Text("Δ%", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
         Text("kcal", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(52.dp))
-        Text("Δ%", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
+        Text("Δ Ziel", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
         Text("Aktiv.", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
         Text("Zone", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
     }
@@ -748,7 +748,8 @@ internal fun DayOverviewHeaderRow() {
 
 @Composable
 internal fun DayOverviewDataRow(row: DayOverviewRow) {
-    val calHighlight = row.caloriesChangePct?.let { kotlin.math.abs(it) >= 10f } == true
+    // Hervorgehoben werden Tage, die dem Abnehm-Ziel widersprechen (zu viel oder zu wenig).
+    val calHighlight = row.zone == "Plus" || row.zone == "Zu tief"
     val dayLabel = "%02d.%02d.".format(row.date.dayOfMonth, row.date.monthValue)
     Row(
         Modifier
@@ -769,13 +770,20 @@ internal fun DayOverviewDataRow(row: DayOverviewRow) {
             fontWeight = if (calHighlight) FontWeight.Bold else FontWeight.Normal,
             modifier = Modifier.width(52.dp)
         )
-        Text(formatPct(row.caloriesChangePct), fontSize = 11.sp, color = pctColor(row.caloriesChangePct), modifier = Modifier.width(48.dp))
+        Text(
+            row.balanceKcal?.let { if (it > 0) "+$it" else "$it" } ?: "—",
+            fontSize = 11.sp,
+            color = zoneColor(row.zone),
+            modifier = Modifier.width(48.dp)
+        )
         Text(if (row.activityCalories > 0) row.activityCalories.toString() else "—", fontSize = 12.sp, modifier = Modifier.width(48.dp))
         Text(
             row.zone,
             fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
             color = zoneColor(row.zone),
+            maxLines = 1,
+            softWrap = false,
             modifier = Modifier.weight(1f)
         )
     }
@@ -783,8 +791,9 @@ internal fun DayOverviewDataRow(row: DayOverviewRow) {
 
 @Composable
 internal fun zoneColor(zone: String): Color = when (zone) {
-    "Defizit" -> Color(0xFF2E7D32)
-    "Überschuss" -> Color(0xFFC62828)
+    "Defizit", "Im Ziel" -> Color(0xFF2E7D32)
+    "Überschuss", "Plus" -> Color(0xFFC62828)
+    "Zu tief" -> Color(0xFFEF6C00)
     "Erhalt" -> MaterialTheme.colorScheme.primary
     else -> MaterialTheme.colorScheme.onSurfaceVariant
 }
