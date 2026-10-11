@@ -578,7 +578,7 @@ internal fun WeekOverviewSheet(
                 if (mode == OverviewMode.WOCHE)
                     "Ø-Werte pro Kalenderwoche (Mo–So). Zone relativ zum Kalorienziel (±8 %)."
                 else
-                    "Zone relativ zum Tagesziel (Erhaltung − Defizit, aktivitätsbereinigt). Δ Ziel = kcal − Tagesziel.",
+                    "Zone relativ zum Tagesziel (Erhaltung − Defizit, aktivitätsbereinigt). Δ Ziel = kcal − Tagesziel. Trend = geglättetes Gewicht (EWMA).",
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
@@ -738,7 +738,7 @@ internal fun DayOverviewHeaderRow() {
     ) {
         Text("Tag", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(56.dp))
         Text("kg", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
-        Text("Δ%", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
+        Text("Trend", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
         Text("kcal", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(52.dp))
         Text("Δ Ziel", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
         Text("Aktiv.", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
@@ -763,7 +763,12 @@ internal fun DayOverviewDataRow(row: DayOverviewRow) {
     ) {
         Text(dayLabel, fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.width(56.dp))
         Text(row.weightKg?.let { "%.1f".format(it) } ?: "—", fontSize = 12.sp, modifier = Modifier.width(48.dp))
-        Text(formatPct(row.weightChangePct), fontSize = 11.sp, color = pctColor(row.weightChangePct), modifier = Modifier.width(48.dp))
+        Text(
+            row.trendWeightKg?.let { "%.1f".format(it) } ?: "—",
+            fontSize = 11.sp,
+            color = trendColor(row.trendChangeKg),
+            modifier = Modifier.width(48.dp)
+        )
         Text(
             if (row.calories > 0) row.calories.toString() else "—",
             fontSize = 12.sp,
@@ -797,6 +802,16 @@ internal fun zoneColor(zone: String): Color = when (zone) {
     "Erhalt" -> MaterialTheme.colorScheme.primary
     else -> MaterialTheme.colorScheme.onSurfaceVariant
 }
+
+/** Trendgewicht: fallend = grün (Abnehmen), steigend = rot, ±0.02 kg/Tag gilt als flach. */
+@Composable
+internal fun trendColor(deltaKg: Float?): Color =
+    when {
+        deltaKg == null -> MaterialTheme.colorScheme.onSurfaceVariant
+        deltaKg > 0.02f -> Color(0xFFC62828)
+        deltaKg < -0.02f -> Color(0xFF2E7D32)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
 
 internal fun formatPct(v: Float?): String =
     when {

@@ -69,6 +69,10 @@ data class DayOverviewRow(
     val date: LocalDate,
     val weightKg: Float?,
     val weightChangePct: Float?,
+    /** EWMA-geglättetes Trendgewicht (ohne Wasser-/Verdauungsrauschen); null vor der ersten Messung. */
+    val trendWeightKg: Float? = null,
+    /** Änderung des Trendgewichts ggü. dem Vortag in kg (negativ = Abnahme). */
+    val trendChangeKg: Float? = null,
     val calories: Int,
     val caloriesChangePct: Float?,
     val activityCalories: Int,
@@ -397,6 +401,9 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
             val rows = ArrayList<DayOverviewRow>(days)
             var prevCal: Int? = null
             var prevWeight: Float? = null
+            // Trendgewicht: EWMA über alle Messungen im Fenster, an Tagen ohne Messung fortgeschrieben.
+            var trendW: Double? = null
+            var prevTrendW: Double? = null
 
             var d = from
             while (!d.isAfter(to)) {
@@ -405,6 +412,12 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
                 val hc = hcByDate[d]
                 val act = (hc?.activeCaloriesKcal?.toFloat() ?: 0f).toInt().coerceAtLeast(0)
                 val w = hc?.weightKg?.toFloat() ?: manualWeightByDate[d]
+
+                prevTrendW = trendW
+                if (w != null && w > 0f) {
+                    trendW = trendW?.let { it + AdaptiveTdeeCalculator.WEIGHT_EWMA_ALPHA * (w - it) }
+                        ?: w.toDouble()
+                }
 
                 val calChange = if (prevCal != null && prevCal > 0 && cal > 0) {
                     ((cal - prevCal).toFloat() / prevCal) * 100f
@@ -440,6 +453,8 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
                     date = d,
                     weightKg = w?.takeIf { it > 0f },
                     weightChangePct = wChange,
+                    trendWeightKg = trendW?.toFloat(),
+                    trendChangeKg = if (trendW != null && prevTrendW != null) (trendW - prevTrendW).toFloat() else null,
                     calories = cal,
                     caloriesChangePct = calChange,
                     activityCalories = act,
