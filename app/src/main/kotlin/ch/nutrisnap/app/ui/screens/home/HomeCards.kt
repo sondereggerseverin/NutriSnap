@@ -1320,7 +1320,7 @@ internal fun CalorieBreakdownCard(state: HomeUiState) {
             } ?: "−${b.deficitKcal} kcal (Standard ~0,5 kg/Woche)"
             BreakdownLine("Defizit", deficitNote)
             val act = b.activityBonusKcal
-            val pct = if (state.aggressiveSportDay) "100%" else "50%"
+            val pct = if (state.aggressiveSportDay) "100%" else "75%"
             val actLabel = when {
                 act > 0 -> "+$act kcal (über Ø, $pct)"
                 act < 0 -> "$act kcal (unter Ø, $pct)"
@@ -1342,8 +1342,8 @@ internal fun CalorieBreakdownCard(state: HomeUiState) {
             Spacer(Modifier.height(NutriSpacing.sm))
             Text(
                 "Erhaltung aus Verlauf (Zufuhr vs. Gewicht) oder Formel-TDEE. " +
-                    "Sport: Abweichung vom Ø-Aktiv × ${if (state.aggressiveSportDay) "100" else "50"}%. " +
-                    "Normaler Tag ≈ 2500, großer Sporttag deutlich mehr. " +
+                    "Sport: Abweichung vom Ø-Aktiv × ${if (state.aggressiveSportDay) "100" else "75"}%. " +
+                    "Bei hartem Tag (viel mehr als Ø) wird das Defizit stark reduziert (Recovery). " +
                     "Konfidenz ${b.confidencePercent}%.",
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

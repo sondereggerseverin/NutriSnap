@@ -70,16 +70,27 @@ object AdaptiveTdeeCalculator {
     const val DEFAULT_DEFICIT_KCAL = 500.0
 
     /**
-     * Basis ist BMR (Ruhe), nicht TDEE×PAL. Aktivität (HC + manuell) kommt
-     * als Tageszuschlag dazu — Ferientag wenig, Radtag viel.
-     * Faktor 0.5 = Standard (Wearable-Unsicherheit ~20–30%);
-     * 1.0 = „Aggressiver Sporttag“.
+     * Aktivität (HC + manuell) als Tageszuschlag auf die kalibrierte Erhaltung.
+     * Faktor 0.75 = Standard: Wearables überschätzen typisch 15–25 % (Meta-Analysen
+     * zu Consumer-Geräten), deshalb nicht 1.0, aber auch nicht mehr 0.5 (zu defensiv
+     * bei echten langen Touren mit Höhenmetern).
+     * 1.0 = „Aggressiver Sporttag“ (Toggle in Einstellungen).
      */
-    const val ACTIVITY_ADJUSTMENT_FACTOR = 0.5
+    const val ACTIVITY_ADJUSTMENT_FACTOR = 0.75
+
+    /**
+     * Ab diesem Excess (heute − Ø-Aktiv) gilt der Tag als harter Trainingstag:
+     * Defizit wird stark reduziert (Recovery / kein tiefes Loch an langen Endurance-Tagen).
+     * 800 kcal ≈ z.B. 1,5–2 h zügiges Radfahren oder eine solide Bergtour.
+     */
+    const val HARD_DAY_EXCESS_KCAL = 800.0
+
+    /** Anteil des Defizits, der an einem Hard-Day noch bleibt (0.25 = 75 % weniger Cut). */
+    const val HARD_DAY_DEFICIT_FACTOR = 0.25
 
     /** Nur für Fallback ohne BMR (Abweichung vom Ø). */
     const val ACTIVITY_BONUS_MIN_KCAL = -600.0
-    const val ACTIVITY_BONUS_MAX_KCAL = 2000.0
+    const val ACTIVITY_BONUS_MAX_KCAL = 2500.0
 
     /** EWMA-α für Gewichtsglättung im Trendfenster (0.1–0.25 üblich). */
     const val WEIGHT_EWMA_ALPHA = 0.15
@@ -170,18 +181,17 @@ object AdaptiveTdeeCalculator {
     /**
      * Tagesziel:
      *
-     *   Ziel = Erhaltung − Defizit + Aktivitäts-Anpassung
+     *   Ziel = Erhaltung − (ggf. reduziertes) Defizit + Aktivitäts-Anpassung
      *
      * Erhaltung (Priorität):
      *   1) Trend-TDEE aus Gewicht + Essen (echte Kalibrierung)
      *   2) Formel-TDEE (BMR × Aktivitätsfaktor)
      *   3) BMR × 1.2 (minimale Alltagsbewegung), falls nichts anderes
      *
-     * Rein BMR − Defizit + Tracker war zu tief: Wearables erfassen NEAT
-     * unvollständig; bei Ø-Essen ~2850 und Trend ~3100 ist 1700 unsinnig.
-     *
-     * Aktivität: nur (heute − Ø) × Faktor — großer Sporttag hoch, normaler
-     * Tag nahe dem kalibrierten Ziel (~2500 bei deinem Profil).
+     * Aktivität: nur (heute − Ø) × Faktor (Standard 0.75). Großer Sporttag
+     * (Excess ≥ 800 kcal) → Defizit wird auf 25 % gedrosselt (Recovery-Tag).
+     * So bleibt ein normaler Tag nahe am kalibrierten Ziel, ein 19-km-Bergtag
+     * bekommt spürbar mehr Budget statt „500 Grundbedarf + Tracker“.
      */
     fun computeDailyTarget(
         trend: TrendTdeeResult?,
@@ -209,22 +219,37 @@ object AdaptiveTdeeCalculator {
             else -> return null
         }
 
-        val safeDeficit = deficitKcal.coerceIn(0.0, maintenance * 0.25)
-        val base = maintenance - safeDeficit
+        val requestedDeficit = deficitKcal.coerceIn(0.0, maintenance * 0.25)
 
         val factor = activityFactor.coerceIn(0.25, 1.0)
         val today = (todayActiveKcal ?: 0.0).coerceAtLeast(0.0)
 
         // Abweichung vom Ø: Radtag ↑, Couch-Tag ↓ — TDEE enthält schon Ø-Bewegung
+        val excess = if (avgActiveKcal != null && avgActiveKcal > 0) {
+            today - avgActiveKcal
+        } else {
+            today
+        }
         val rawBonus = if (avgActiveKcal != null && avgActiveKcal > 0) {
-            (today - avgActiveKcal) * factor
+            excess * factor
         } else if (today > 0) {
-            // kein Ø bekannt: vorsichtiger Anteil der heutigen Tracker-kcal
-            today * factor * 0.5
+            // kein Ø bekannt: etwas vorsichtiger Anteil der heutigen Tracker-kcal
+            today * factor * 0.6
         } else {
             0.0
         }
         val bonus = rawBonus.coerceIn(ACTIVITY_BONUS_MIN_KCAL, ACTIVITY_BONUS_MAX_KCAL)
+
+        // Harter Trainingstag (langer Ausdauer-Tag): Defizit stark drosseln.
+        // Wissenschaftlich: an Tagen mit hohem EE will man Recovery unterstützen,
+        // nicht das Defizit maximieren (ISSN / Praxis bei Endurance).
+        val isHardDay = excess >= HARD_DAY_EXCESS_KCAL
+        val safeDeficit = if (isHardDay) {
+            requestedDeficit * HARD_DAY_DEFICIT_FACTOR
+        } else {
+            requestedDeficit
+        }
+        val base = maintenance - safeDeficit
 
         val target = (base + bonus).coerceAtLeast(SAFETY_FLOOR_KCAL)
 

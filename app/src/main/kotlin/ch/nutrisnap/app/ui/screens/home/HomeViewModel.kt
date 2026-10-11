@@ -96,7 +96,7 @@ data class HomeUiState(
     val manualActivityEnabled: Boolean = false,
     /** Heute manuell eingetragene Aktivitätskalorien (null = kein Eintrag). */
     val manualActivityKcal: Float? = null,
-    /** true = Aktivitätsabweichung ×100% statt ×50%. */
+    /** true = Aktivitätsabweichung ×100% statt ×75%. */
     val aggressiveSportDay: Boolean = false,
     /** Angezeigter Tag (heute oder gestern). */
     val selectedDate: LocalDate = LocalDate.now(),

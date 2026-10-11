@@ -62,4 +62,39 @@ class AdaptiveTdeeCalculatorTest {
         assertNotNull(target)
         assertTrue(target!!.targetKcal >= AdaptiveTdeeCalculator.SAFETY_FLOOR_KCAL.toInt())
     }
+
+    @Test
+    fun `hard day reduces deficit and applies higher activity factor`() {
+        // Normaler Tag: Ø 400 aktiv, heute 400 → kein Bonus, volles Defizit
+        val normal = AdaptiveTdeeCalculator.computeDailyTarget(
+            formulaBmr = 1800.0,
+            formulaTdee = 2800.0,
+            trend = null,
+            deficitKcal = 500.0,
+            todayActiveKcal = 400.0,
+            avgActiveKcal = 400.0
+        )
+        assertNotNull(normal)
+        assertEquals(500, normal!!.deficitKcal)
+        assertEquals(0, normal.activityBonusKcal)
+        // 2800 - 500 = 2300
+        assertEquals(2300, normal.targetKcal)
+
+        // Harter Tag: heute 2400, Ø 400 → Excess 2000 ≥ 800
+        // Defizit 500 × 0.25 = 125, Bonus 2000 × 0.75 = 1500
+        // Ziel ≈ 2800 - 125 + 1500 = 4175
+        val hard = AdaptiveTdeeCalculator.computeDailyTarget(
+            formulaBmr = 1800.0,
+            formulaTdee = 2800.0,
+            trend = null,
+            deficitKcal = 500.0,
+            todayActiveKcal = 2400.0,
+            avgActiveKcal = 400.0
+        )
+        assertNotNull(hard)
+        assertEquals(125, hard!!.deficitKcal)
+        assertEquals(1500, hard.activityBonusKcal)
+        assertEquals(4175, hard.targetKcal)
+        assertTrue(hard.targetKcal > normal.targetKcal + 1500)
+    }
 }

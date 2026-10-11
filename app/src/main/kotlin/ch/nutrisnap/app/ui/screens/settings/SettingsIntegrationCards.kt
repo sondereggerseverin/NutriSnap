@@ -192,7 +192,7 @@ fun AggressiveSportDayCard() {
                     fontSize = 14.sp
                 )
                 Text(
-                    "Tracker-Aktivkcal zählen 100% statt 50% auf die BMR-Basis. Für lange Einheiten (z.B. 100 km Rad), wenn du bewusst mehr essen willst.",
+                    "Tracker-Aktivkcal zählen 100% statt 75% (Abweichung vom Ø). Für sehr lange Einheiten, wenn du bewusst noch mehr essen willst. Harte Tage drosseln das Defizit ohnehin bereits.",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
