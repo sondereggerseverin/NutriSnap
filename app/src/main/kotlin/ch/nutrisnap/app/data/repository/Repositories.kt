@@ -554,8 +554,16 @@ class RecipeRepository(db: NutriDatabase, private val context: Context) {
      */
     suspend fun applyGermanMetricIfNeeded(recipe: Recipe, enabled: Boolean, force: Boolean = false): Recipe {
         if (!enabled && !force) return recipe
-        val converted = ch.nutrisnap.app.domain.RecipeGermanMetricConverter
-            .convertWithAi(recipe).getOrNull() ?: return recipe
+        val converter = ch.nutrisnap.app.domain.RecipeGermanMetricConverter
+        // Schneller Pfad: schon deutsch + metrisch (z. B. Server-Import) → nur Offline-Bereinigung.
+        // Sonst KI mit hartem Zeitlimit; bei Timeout bleibt die Offline-Variante.
+        val converted = if (!converter.needsAiConversion(recipe)) {
+            converter.convertOffline(recipe)
+        } else {
+            kotlinx.coroutines.withTimeoutOrNull(8_000L) {
+                converter.convertWithAi(recipe).getOrNull()
+            } ?: converter.convertOffline(recipe)
+        }
         val updated = recipe.copy(
             title = converted.title.ifBlank { recipe.title },
             description = converted.description.ifBlank { recipe.description },

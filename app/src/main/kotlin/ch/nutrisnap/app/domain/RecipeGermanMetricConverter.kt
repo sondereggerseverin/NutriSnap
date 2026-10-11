@@ -678,6 +678,29 @@ Antworte NUR mit JSON:
 }
 """.trimIndent()
 
+    private val IMPERIAL_RE = Regex(
+        "\\b(cups?|tbsps?|tablespoons?|tsps?|teaspoons?|oz|ounces?|lbs?|pounds?|sticks?|fahrenheit)\\b|°\\s?F\\b",
+        RegexOption.IGNORE_CASE
+    )
+    private val ENGLISH_WORDS_RE = Regex(
+        "\\b(the|and|with|add|until|minutes?|stir|bake|cook|heat|chopped|sliced|large|small|cloves?|onion|chicken|flour|bowl|oven|serve|mix)\\b",
+        RegexOption.IGNORE_CASE
+    )
+
+    /**
+     * true, wenn das Rezept noch englisch bzw. imperial ist und der (langsame) KI-Aufruf
+     * wirklich nötig ist. Server-/Parser-Ergebnisse sind meist schon deutsch + metrisch –
+     * dann reicht die Offline-Bereinigung (Millisekunden statt mehrere Sekunden LLM).
+     */
+    fun needsAiConversion(recipe: Recipe): Boolean {
+        val text = listOf(recipe.title, recipe.ingredients, recipe.instructions).joinToString("\n")
+        if (IMPERIAL_RE.containsMatchIn(text)) return true
+        return ENGLISH_WORDS_RE.findAll(text).count() >= 4
+    }
+
+    /** Nur Einheiten + Namensmap, ohne KI. */
+    fun convertOffline(recipe: Recipe): ConvertedRecipe = offlineFallback(recipe)
+
     private fun offlineFallback(recipe: Recipe): ConvertedRecipe = ConvertedRecipe(
         title = translateNamesToGerman(recipe.title),
         description = translateNamesToGerman(recipe.description),
