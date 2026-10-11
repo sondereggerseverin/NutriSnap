@@ -310,9 +310,26 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
                 val r = result.recipe
                 val platform = (r.platform ?: "").lowercase()
                 val forceGerman = platform in setOf("instagram", "tiktok", "bild")
-                val updated = repo.applyGermanMetricIfNeeded(
+                // Ist der Text schon deutsch + metrisch, läuft nur die schnelle Offline-Bereinigung.
+                // Braucht es die KI-Übersetzung (englisch/imperial), zeigen wir das Rezept sofort
+                // und ziehen die Übersetzung im Hintergrund nach (Rezept ist bereits gespeichert).
+                val aiNeeded = (forceGerman || shouldAutoGermanMetric()) &&
+                    ch.nutrisnap.app.domain.RecipeGermanMetricConverter.needsAiConversion(r)
+                val updated = if (aiNeeded) r else repo.applyGermanMetricIfNeeded(
                     r, enabled = shouldAutoGermanMetric(), force = forceGerman
                 )
+                if (aiNeeded) {
+                    viewModelScope.launch {
+                        val converted = repo.applyGermanMetricIfNeeded(
+                            r, enabled = shouldAutoGermanMetric(), force = forceGerman
+                        )
+                        if (converted != r) {
+                            _importState.update { st ->
+                                if (st.lastImport?.id == r.id) st.copy(lastImport = converted) else st
+                            }
+                        }
+                    }
+                }
                 val weak = isWeakRecipeContent(updated.ingredients, updated.instructions)
                 val social = platform in setOf("instagram", "tiktok") || isSocialRecipeUrl(url)
                 _importState.update {
