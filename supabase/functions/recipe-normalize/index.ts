@@ -20,7 +20,9 @@ const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 // strukturierte Caption→Rezept-Extraktion; 120b war unnötig langsam.
 // Fallback-Kette siehe groqChat().
 // https://console.groq.com/docs/models
-const MODEL_FAST = "llama-3.1-8b-instant";
+// llama-3.1-8b-instant / llama-3.3-70b-versatile wurden von Groq am 16.08.2026 abgeschaltet
+// (Ersatz laut https://console.groq.com/docs/deprecations).
+const MODEL_FAST = "openai/gpt-oss-20b";
 const MODEL_QUALITY = "openai/gpt-oss-120b";
 
 const SYSTEM = `You are a recipe extraction assistant for a German nutrition app (NutriSnap).
@@ -410,6 +412,7 @@ async function groqChat(apiKey: string, userMsg: string): Promise<string | null>
     try {
       const resp = await fetch(GROQ_URL, {
         method: "POST",
+        signal: AbortSignal.timeout(model === MODEL_FAST ? 6000 : 9000),
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
@@ -417,7 +420,10 @@ async function groqChat(apiKey: string, userMsg: string): Promise<string | null>
         body: JSON.stringify({
           model,
           temperature: 0.1,
-          max_tokens: 1600,
+          // gpt-oss ist ein Reasoning-Modell: "low" spart Sekunden; Reasoning-Tokens zählen
+          // zum Limit, daher grosszügiger als früher (1600).
+          reasoning_effort: "low",
+          max_tokens: 3000,
           messages: [
             { role: "system", content: SYSTEM },
             { role: "user", content: userMsg },

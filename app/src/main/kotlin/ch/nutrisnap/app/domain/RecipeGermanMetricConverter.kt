@@ -753,8 +753,9 @@ Antworte NUR mit JSON:
             // Ersatz laut Groq: https://console.groq.com/docs/deprecations
             val requestJson = JSONObject().apply {
                 put("model", "openai/gpt-oss-120b")
+                put("reasoning_effort", "low")
                 put("temperature", 0.2)
-                put("max_tokens", 3000)
+                put("max_tokens", 4000)
                 put("messages", JSONArray().apply {
                     put(JSONObject().apply {
                         put("role", "user")

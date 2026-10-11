@@ -1259,7 +1259,9 @@ Rules:
 
         val body = JSONObject().apply {
             put("model", modelId)
-            put("max_tokens", 2000)
+            // gpt-oss denkt standardmässig mit mittlerem Aufwand → "low" ist deutlich schneller.
+            put("reasoning_effort", "low")
+            put("max_tokens", 3000)
             put("temperature", 0.1)
             put("messages", JSONArray().apply {
                 put(JSONObject().apply { put("role", "system"); put("content", recipeSystemPrompt) })
