@@ -935,7 +935,7 @@ private fun DiaryEntryRow(
                         color = MacroColors.calories
                     )
                     Text(
-                        "P ${entry.protein.toInt()}  K ${entry.carbs.toInt()}  F ${entry.fat.toInt()}  B ${entry.fiber.toInt()}",
+                        "P ${fmtMacroShort(entry.protein)}  K ${fmtMacroShort(entry.carbs)}  F ${fmtMacroShort(entry.fat)}  B ${fmtMacroShort(entry.fiber)}",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1057,4 +1057,15 @@ private fun ReorderableMealEntries(
             )
         }
     }
+}
+
+/**
+ * Kurzanzeige für Makros pro Eintrag: ab 10 g gerundet, darunter eine Nachkommastelle.
+ * Vorher wurde mit toInt() abgeschnitten – 0.8 g Ballaststoffe in 20 g Maiswaffeln wurden
+ * so als "0" angezeigt, obwohl sie getrackt waren.
+ */
+internal fun fmtMacroShort(v: Float): String = when {
+    v <= 0f -> "0"
+    v >= 10f -> Math.round(v).toString()
+    else -> "%.1f".format(v)
 }
