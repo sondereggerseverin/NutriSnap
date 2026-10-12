@@ -3,8 +3,10 @@ package ch.nutrisnap.app.ui.screens.recipes
 import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -358,6 +360,7 @@ private fun UnknownBarcodeScreen(
 
 // ── Food Search Screen ────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FoodSearchScreen(
     query: String,
@@ -372,6 +375,27 @@ private fun FoodSearchScreen(
     var isSearching by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
     val looksLikeBarcode = query.all { it.isDigit() } && query.length in 8..14
+
+    // Long-Press: Bearbeiten / Löschen
+    var menuFood by remember { mutableStateOf<FoodItem?>(null) }
+    var editFood by remember { mutableStateOf<FoodItem?>(null) }
+    var deleteFood by remember { mutableStateOf<FoodItem?>(null) }
+
+    fun refreshSearch() {
+        scope.launch {
+            isSearching = true; errorMsg = null
+            runCatching {
+                val repo = FoodItemRepository(NutriDatabase.getInstance(context))
+                val q = searchText.trim()
+                results = if (q.all { it.isDigit() } && q.length in 8..14) {
+                    listOfNotNull(repo.searchBarcode(q))
+                } else {
+                    repo.searchAll(q)
+                }
+            }.onFailure { errorMsg = it.message }
+            isSearching = false
+        }
+    }
 
     // Auto-search on open – bei reinem Barcode zuerst searchBarcode, sonst searchAll
     LaunchedEffect(Unit) {
@@ -403,24 +427,12 @@ private fun FoodSearchScreen(
             label = { Text("Lebensmittel suchen") },
             leadingIcon = { Icon(Icons.Default.Search, null) },
             trailingIcon = {
-                IconButton(onClick = {
-                    scope.launch {
-                        isSearching = true; errorMsg = null
-                        runCatching {
-                            val repo = FoodItemRepository(NutriDatabase.getInstance(context))
-                            val q = searchText.trim()
-                            results = if (q.all { it.isDigit() } && q.length in 8..14) {
-                                listOfNotNull(repo.searchBarcode(q))
-                            } else {
-                                repo.searchAll(q)
-                            }
-                        }.onFailure { errorMsg = it.message }
-                        isSearching = false
-                    }
-                }) { Icon(Icons.Default.Send, "Suchen") }
+                IconButton(onClick = { refreshSearch() }) {
+                    Icon(Icons.Default.Send, "Suchen")
+                }
             },
-            modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp)
         )
 
@@ -454,27 +466,203 @@ private fun FoodSearchScreen(
             }
             else -> {
                 results.forEach { food ->
+                    val canManage = food.id > 0 || food.source == FoodSource.MANUAL
                     Card(
-                        onClick = { onFoodSelected(food) },
                         shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 3.dp)
+                            .combinedClickable(
+                                onClick = { onFoodSelected(food) },
+                                onLongClick = { if (canManage) menuFood = food }
+                            )
                     ) {
-                        Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            Modifier.padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Column(Modifier.weight(1f)) {
                                 Text(food.name, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                                Text("${food.calories?.toInt() ?: "–"} kcal · ${food.protein?.toInt() ?: "–"}g P · ${food.carbs?.toInt() ?: "–"}g K",
-                                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    formatFoodMacrosLine(food),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
-                            Icon(Icons.Default.Add, "Auswählen", Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.primary)
+                            Icon(
+                                Icons.Default.Add, "Auswählen", Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
                 }
             }
         }
     }
+
+    // Kontextmenü nach Long-Press
+    menuFood?.let { food ->
+        AlertDialog(
+            onDismissRequest = { menuFood = null },
+            title = { Text(food.name, maxLines = 2) },
+            text = { Text("Was möchtest du tun?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    menuFood = null
+                    editFood = food
+                }) { Text("Bearbeiten") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(
+                        onClick = {
+                            menuFood = null
+                            deleteFood = food
+                        },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) { Text("Löschen") }
+                    TextButton(onClick = { menuFood = null }) { Text("Abbrechen") }
+                }
+            }
+        )
+    }
+
+    // Makros bearbeiten
+    editFood?.let { food ->
+        FoodMacroEditDialog(
+            food = food,
+            onDismiss = { editFood = null },
+            onSave = { updated ->
+                scope.launch {
+                    runCatching {
+                        val repo = FoodItemRepository(NutriDatabase.getInstance(context))
+                        repo.saveCustomFood(updated)
+                    }
+                    editFood = null
+                    // Liste lokal aktualisieren
+                    results = results.map { if (it.id == updated.id && it.name == food.name) updated else it }
+                    refreshSearch()
+                }
+            }
+        )
+    }
+
+    // Löschen bestätigen
+    deleteFood?.let { food ->
+        AlertDialog(
+            onDismissRequest = { deleteFood = null },
+            title = { Text("Eintrag löschen?") },
+            text = {
+                Text("„${food.name}“ wird aus der lokalen Lebensmittel-DB entfernt. Das lässt sich nicht rückgängig machen.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            runCatching {
+                                val repo = FoodItemRepository(NutriDatabase.getInstance(context))
+                                repo.deleteFood(food)
+                            }
+                            deleteFood = null
+                            results = results.filterNot {
+                                (it.id > 0 && it.id == food.id) ||
+                                    (it.name == food.name && it.brand == food.brand)
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) { Text("Löschen") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteFood = null }) { Text("Abbrechen") }
+            }
+        )
+    }
 }
+
+/** kcal · P · K · F · B – alle Makros inkl. Fett und Ballaststoffe. */
+private fun formatFoodMacrosLine(food: FoodItem): String {
+    fun g(v: Float?) = v?.toInt()?.toString() ?: "–"
+    return "${g(food.calories)} kcal · ${g(food.protein)}g P · ${g(food.carbs)}g K · ${g(food.fat)}g F · ${g(food.fiber)}g B"
+}
+
+@Composable
+private fun FoodMacroEditDialog(
+    food: FoodItem,
+    onDismiss: () -> Unit,
+    onSave: (FoodItem) -> Unit
+) {
+    var cal by remember { mutableStateOf(food.calories?.let { if (it == it.toInt().toFloat()) it.toInt().toString() else it.toString() } ?: "") }
+    var prot by remember { mutableStateOf(food.protein?.let { if (it == it.toInt().toFloat()) it.toInt().toString() else it.toString() } ?: "") }
+    var carb by remember { mutableStateOf(food.carbs?.let { if (it == it.toInt().toFloat()) it.toInt().toString() else it.toString() } ?: "") }
+    var fat by remember { mutableStateOf(food.fat?.let { if (it == it.toInt().toFloat()) it.toInt().toString() else it.toString() } ?: "") }
+    var fiber by remember { mutableStateOf(food.fiber?.let { if (it == it.toInt().toFloat()) it.toInt().toString() else it.toString() } ?: "") }
+
+    fun parse(s: String): Float? = s.trim().replace(',', '.').toFloatOrNull()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Makros bearbeiten") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(food.name, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                Text("Werte pro 100 g", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(
+                    value = cal, onValueChange = { cal = it },
+                    label = { Text("kcal") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = prot, onValueChange = { prot = it },
+                    label = { Text("Protein (g)") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = carb, onValueChange = { carb = it },
+                    label = { Text("Kohlenhydrate (g)") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = fat, onValueChange = { fat = it },
+                    label = { Text("Fett (g)") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = fiber, onValueChange = { fiber = it },
+                    label = { Text("Ballaststoffe (g)") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onSave(
+                    food.copy(
+                        calories = parse(cal) ?: food.calories,
+                        protein = parse(prot) ?: food.protein,
+                        carbs = parse(carb) ?: food.carbs,
+                        fat = parse(fat) ?: food.fat,
+                        fiber = parse(fiber) ?: food.fiber
+                    )
+                )
+            }) { Text("Speichern") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Abbrechen") }
+        }
+    )
+}
+
 
 // ── KI-Schätzung Screen ───────────────────────────────────────────────────────
 // Strategie gegen Halluzinationen:

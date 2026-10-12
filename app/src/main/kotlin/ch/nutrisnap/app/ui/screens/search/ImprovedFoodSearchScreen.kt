@@ -167,7 +167,7 @@ private fun FoodListItem(food: FoodItem, onClick: () -> Unit) {
         modifier = Modifier.clickable(onClick = onClick),
         headlineContent = { Text(food.name, fontWeight = FontWeight.Medium) },
         supportingContent = {
-            Text("${food.calories?.toInt() ?: "–"} kcal | P: ${food.protein?.toInt() ?: "–"}g | K: ${food.carbs?.toInt() ?: "–"}g | F: ${food.fat?.toInt() ?: "–"}g",
+            Text("${food.calories?.toInt() ?: "–"} kcal · ${food.protein?.toInt() ?: "–"}g P · ${food.carbs?.toInt() ?: "–"}g K · ${food.fat?.toInt() ?: "–"}g F · ${food.fiber?.toInt() ?: "–"}g B",
                 style = MaterialTheme.typography.bodySmall)
         },
         trailingContent = {
