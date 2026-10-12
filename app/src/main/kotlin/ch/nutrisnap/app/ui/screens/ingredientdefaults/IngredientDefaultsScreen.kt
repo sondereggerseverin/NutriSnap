@@ -6,6 +6,8 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,12 +36,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.db.entity.GlobalIngredientMatch
 import ch.nutrisnap.app.data.model.FoodItem
+import ch.nutrisnap.app.data.repository.FoodItemRepository
 import ch.nutrisnap.app.data.repository.FoodSearchRepository
 import ch.nutrisnap.app.data.repository.GlobalIngredientDictionary
 import ch.nutrisnap.app.ui.screens.barcode.BarcodeScannerScreen
 import ch.nutrisnap.app.ui.theme.NutriRadius
 import ch.nutrisnap.app.ui.theme.NutriSpacing
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -72,6 +76,11 @@ class IngredientDefaultsViewModel(app: Application) : AndroidViewModel(app) {
         ),
         openFoodFactsSearch = { q -> ch.nutrisnap.app.data.api.OpenFoodFactsApi.search(q) }
     )
+    private val foodItemRepo = FoodItemRepository(db)
+
+    /** Lokale DB + Custom Foods (offline, schnell) für Standard-Zuweisung. */
+    suspend fun searchLocalFoods(query: String): List<FoodItem> =
+        withContext(Dispatchers.IO) { foodItemRepo.searchLocalOnly(query) }
 
     val standards = dict.getAllVerified()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -457,11 +466,33 @@ fun IngredientDefaultsScreen(
     }
 
     if (showAdd) {
+        var productQuery by remember { mutableStateOf("") }
+        var localResults by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
+        var searchingLocal by remember { mutableStateOf(false) }
+
+        // Debounced lokale Suche
+        LaunchedEffect(productQuery) {
+            val q = productQuery.trim()
+            if (q.length < 2) {
+                localResults = emptyList()
+                return@LaunchedEffect
+            }
+            searchingLocal = true
+            kotlinx.coroutines.delay(280)
+            localResults = runCatching { vm.searchLocalFoods(q) }.getOrDefault(emptyList()).take(8)
+            searchingLocal = false
+        }
+
         AlertDialog(
             onDismissRequest = { showAdd = false },
             title = { Text("Standard setzen") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp)
+                ) {
                     OutlinedTextField(
                         value = aliasName,
                         onValueChange = { aliasName = it },
@@ -469,6 +500,80 @@ fun IngredientDefaultsScreen(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    OutlinedTextField(
+                        value = productQuery,
+                        onValueChange = { productQuery = it },
+                        label = { Text("Produkt in lokaler DB suchen") },
+                        leadingIcon = { Icon(Icons.Default.Search, null) },
+                        trailingIcon = {
+                            if (searchingLocal) {
+                                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                            }
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (localResults.isNotEmpty()) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 180.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            localResults.forEach { food ->
+                                val selected = scannedFood?.let {
+                                    it.name == food.name && it.brand == food.brand && it.barcode == food.barcode
+                                } == true
+                                Surface(
+                                    onClick = {
+                                        scannedFood = food
+                                        if (aliasName.isBlank()) aliasName = food.name
+                                    },
+                                    shape = RoundedCornerShape(NutriRadius.sm),
+                                    color = if (selected)
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    else
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                                        Text(
+                                            food.name,
+                                            fontWeight = FontWeight.Medium,
+                                            fontSize = 13.sp,
+                                            maxLines = 1
+                                        )
+                                        val brand = food.brand?.takeIf { it.isNotBlank() }
+                                        Text(
+                                            buildString {
+                                                if (brand != null) append("$brand · ")
+                                                append("%.0f kcal · P %.0f · K %.0f · F %.0f".format(
+                                                    food.calories ?: 0f,
+                                                    food.protein ?: 0f,
+                                                    food.carbs ?: 0f,
+                                                    food.fat ?: 0f
+                                                ))
+                                                food.fiber?.takeIf { it > 0f }?.let {
+                                                    append(" · B %.0f".format(it))
+                                                }
+                                                append(" / 100 g")
+                                            },
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else if (productQuery.trim().length >= 2 && !searchingLocal) {
+                        Text(
+                            "Keine Treffer in der lokalen DB",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     OutlinedButton(
                         onClick = { showScanner = true; showAdd = false },
                         modifier = Modifier.fillMaxWidth()
@@ -478,14 +583,21 @@ fun IngredientDefaultsScreen(
                         Text(if (scannedFood == null) "Barcode scannen" else "Anderen Barcode scannen")
                     }
                     scannedFood?.let { f ->
+                        HorizontalDivider()
+                        Text("Ausgewählt:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
                             "${f.name}${f.brand?.let { " · $it" } ?: ""}",
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp
                         )
                         Text(
-                            "%.0f kcal · P %.1f · K %.1f · F %.1f (pro 100 g)".format(
-                                f.calories ?: 0f, f.protein ?: 0f, f.carbs ?: 0f, f.fat ?: 0f
-                            ),
+                            buildString {
+                                append("%.0f kcal · P %.1f · K %.1f · F %.1f".format(
+                                    f.calories ?: 0f, f.protein ?: 0f, f.carbs ?: 0f, f.fat ?: 0f
+                                ))
+                                f.fiber?.takeIf { it > 0f }?.let { append(" · B %.1f".format(it)) }
+                                append(" (pro 100 g)")
+                            },
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
