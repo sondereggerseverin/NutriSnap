@@ -1,7 +1,10 @@
 package ch.nutrisnap.app.ui.screens.ingredientdefaults
 
 import android.app.Application
+import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,6 +15,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.*
@@ -151,7 +156,14 @@ class IngredientDefaultsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Korrigiert die Nährwerte (pro 100 g) eines bestehenden Standards. */
-    fun updateValues(row: GlobalIngredientMatch, kcal: Double, protein: Double, carbs: Double, fat: Double) {
+    fun updateValues(
+        row: GlobalIngredientMatch,
+        kcal: Double,
+        protein: Double,
+        carbs: Double,
+        fat: Double,
+        fiber: Double = 0.0
+    ) {
         viewModelScope.launch {
             dict.save(
                 originalName = row.originalName,
@@ -160,9 +172,64 @@ class IngredientDefaultsViewModel(app: Application) : AndroidViewModel(app) {
                 kcalPer100g = kcal,
                 proteinPer100g = protein,
                 carbsPer100g = carbs,
-                fatPer100g = fat
+                fatPer100g = fat,
+                fiberPer100g = fiber
             )
         }
+    }
+
+    suspend fun buildExportJson(): String = withContext(Dispatchers.IO) {
+        val items = dict.exportAll()
+        val arr = org.json.JSONArray()
+        for (m in items) {
+            arr.put(org.json.JSONObject().apply {
+                put("alias", m.originalName)
+                put("normalizedName", m.normalizedName)
+                put("productName", m.offProductName)
+                put("barcode", m.offProductId)
+                put("kcal", m.kcalPer100g)
+                put("protein", m.proteinPer100g)
+                put("carbs", m.carbsPer100g)
+                put("fat", m.fatPer100g)
+                put("fiber", m.fiberPer100g)
+                put("verified", m.isVerifiedByUser)
+            })
+        }
+        org.json.JSONObject().apply {
+            put("nutrisnap_ingredient_standards", 1)
+            put("exportedAt", java.time.Instant.now().toString())
+            put("count", items.size)
+            put("items", arr)
+        }.toString(2)
+    }
+
+    /** Importiert Standards aus JSON. REPLACE pro Eintrag. Gibt Anzahl zurück. */
+    suspend fun importFromJson(raw: String): Int = withContext(Dispatchers.IO) {
+        val root = org.json.JSONObject(raw.trim())
+        if (!root.has("nutrisnap_ingredient_standards") && !root.has("items")) {
+            error("Kein gültiges NutriSnap-Standards-JSON (fehlt nutrisnap_ingredient_standards / items)")
+        }
+        val arr = root.getJSONArray("items")
+        val list = mutableListOf<GlobalIngredientMatch>()
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            val alias = o.optString("alias").ifBlank { o.optString("originalName") }
+            if (alias.isBlank()) continue
+            val normalized = o.optString("normalizedName").ifBlank { alias.trim().lowercase() }
+            list += GlobalIngredientMatch(
+                normalizedName = normalized,
+                originalName = alias.trim(),
+                offProductId = o.optString("barcode").ifBlank { o.optString("offProductId") },
+                offProductName = o.optString("productName").ifBlank { o.optString("offProductName").ifBlank { alias } },
+                kcalPer100g = o.optDouble("kcal", o.optDouble("kcalPer100g", 0.0)),
+                proteinPer100g = o.optDouble("protein", o.optDouble("proteinPer100g", 0.0)),
+                carbsPer100g = o.optDouble("carbs", o.optDouble("carbsPer100g", 0.0)),
+                fatPer100g = o.optDouble("fat", o.optDouble("fatPer100g", 0.0)),
+                fiberPer100g = o.optDouble("fiber", o.optDouble("fiberPer100g", 0.0)),
+                isVerifiedByUser = true
+            )
+        }
+        dict.importAll(list)
     }
 }
 
@@ -200,6 +267,22 @@ fun IngredientDefaultsScreen(
     var query by remember { mutableStateOf("") }
     var editRow by remember { mutableStateOf<GlobalIngredientMatch?>(null) }
     val scope = rememberCoroutineScope()
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                val raw = context.contentResolver.openInputStream(uri)?.use { it.reader().readText() }
+                    ?: error("Datei leer oder nicht lesbar")
+                vm.importFromJson(raw)
+            }.onSuccess { n ->
+                Toast.makeText(context, "$n Standards importiert", Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(context, "Import fehlgeschlagen: ${it.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
     val filtered = remember(standards, query) {
         val q = query.trim().lowercase()
         if (q.isEmpty()) standards
@@ -235,6 +318,27 @@ fun IngredientDefaultsScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = {
+                        scope.launch {
+                            runCatching { vm.buildExportJson() }
+                                .onSuccess { json ->
+                                    val intent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "application/json"
+                                        putExtra(Intent.EXTRA_TEXT, json)
+                                        putExtra(Intent.EXTRA_SUBJECT, "NutriSnap-Zutaten-Standards.json")
+                                    }
+                                    context.startActivity(Intent.createChooser(intent, "Standards exportieren"))
+                                }
+                                .onFailure {
+                                    Toast.makeText(context, "Export fehlgeschlagen: ${it.message}", Toast.LENGTH_LONG).show()
+                                }
+                        }
+                    }) { Icon(Icons.Default.Share, "Exportieren") }
+                    IconButton(onClick = { importLauncher.launch("application/json") }) {
+                        Icon(Icons.Default.UploadFile, "Importieren")
                     }
                 }
             )
@@ -413,8 +517,8 @@ fun IngredientDefaultsScreen(
         EditStandardDialog(
             row = row,
             onDismiss = { editRow = null },
-            onSave = { kcal, p, c, f ->
-                vm.updateValues(row, kcal, p, c, f)
+            onSave = { kcal, p, c, f, fiber ->
+                vm.updateValues(row, kcal, p, c, f, fiber)
                 editRow = null
                 Toast.makeText(context, "Werte gespeichert", Toast.LENGTH_SHORT).show()
             }
@@ -426,31 +530,35 @@ fun IngredientDefaultsScreen(
 private fun EditStandardDialog(
     row: GlobalIngredientMatch,
     onDismiss: () -> Unit,
-    onSave: (Double, Double, Double, Double) -> Unit
+    onSave: (Double, Double, Double, Double, Double) -> Unit
 ) {
     fun fmt(v: Double) = if (v == v.toLong().toDouble()) v.toLong().toString() else "%.1f".format(java.util.Locale.US, v)
     var kcal by remember { mutableStateOf(fmt(row.kcalPer100g)) }
     var protein by remember { mutableStateOf(fmt(row.proteinPer100g)) }
     var carbs by remember { mutableStateOf(fmt(row.carbsPer100g)) }
     var fat by remember { mutableStateOf(fmt(row.fatPer100g)) }
-    fun num(t: String) = t.replace(',', '.').toDoubleOrNull()
-    val values = listOf(num(kcal), num(protein), num(carbs), num(fat))
+    var fiber by remember { mutableStateOf(fmt(row.fiberPer100g)) }
+    fun parse(s: String) = s.trim().replace(',', '.').toDoubleOrNull()
+    val values = listOf(parse(kcal), parse(protein), parse(carbs), parse(fat), parse(fiber))
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Werte pro 100 g – ${row.originalName}") },
+        title = { Text("Werte bearbeiten") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(row.offProductName, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(row.originalName, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                Text(row.offProductName, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                Text("pro 100 g", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedTextField(kcal, { kcal = it }, label = { Text("kcal") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(protein, { protein = it }, label = { Text("Protein (g)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(carbs, { carbs = it }, label = { Text("Kohlenhydrate (g)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(fat, { fat = it }, label = { Text("Fett (g)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(fiber, { fiber = it }, label = { Text("Ballaststoffe (g)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
             TextButton(
                 enabled = values.all { it != null && it >= 0.0 },
-                onClick = { onSave(values[0]!!, values[1]!!, values[2]!!, values[3]!!) }
+                onClick = { onSave(values[0]!!, values[1]!!, values[2]!!, values[3]!!, values[4]!!) }
             ) { Text("Speichern") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } }
@@ -482,8 +590,8 @@ private fun StandardRow(
                     maxLines = 2
                 )
                 Text(
-                    "%.0f kcal · P %.1f · K %.1f · F %.1f / 100 g".format(
-                        match.kcalPer100g, match.proteinPer100g, match.carbsPer100g, match.fatPer100g
+                    "%.0f kcal · P %.1f · K %.1f · F %.1f · B %.1f / 100 g".format(
+                        match.kcalPer100g, match.proteinPer100g, match.carbsPer100g, match.fatPer100g, match.fiberPer100g
                     ),
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.primary

@@ -27,10 +27,17 @@ interface GlobalIngredientMatchDao {
 
     @Query("""UPDATE global_ingredient_matches
         SET isVerifiedByUser = 1, offProductId = :offId, offProductName = :offName,
-            kcalPer100g = :kcal, proteinPer100g = :protein, carbsPer100g = :carbs, fatPer100g = :fat
+            kcalPer100g = :kcal, proteinPer100g = :protein, carbsPer100g = :carbs, fatPer100g = :fat,
+            fiberPer100g = :fiber
         WHERE normalizedName = :normalizedName""")
     suspend fun verifyAndUpdate(normalizedName: String, offId: String, offName: String,
-        kcal: Double, protein: Double, carbs: Double, fat: Double)
+        kcal: Double, protein: Double, carbs: Double, fat: Double, fiber: Double = 0.0)
+
+    @Query("SELECT * FROM global_ingredient_matches ORDER BY originalName ASC")
+    suspend fun getAllOnce(): List<GlobalIngredientMatch>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(match: GlobalIngredientMatch): Long
 
     @Query("DELETE FROM global_ingredient_matches WHERE normalizedName = :normalizedName")
     suspend fun deleteByName(normalizedName: String)

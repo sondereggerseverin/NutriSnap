@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.data.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -22,6 +23,7 @@ data class GlobalIngredientMatch(
     val proteinPer100g: Double,
     val carbsPer100g: Double,
     val fatPer100g: Double,
+    @ColumnInfo(defaultValue = "0") val fiberPer100g: Double = 0.0,
     val matchConfidence: Float = 1.0f,
     val usageCount: Int = 1,
     val lastUsedAt: Long = System.currentTimeMillis(),

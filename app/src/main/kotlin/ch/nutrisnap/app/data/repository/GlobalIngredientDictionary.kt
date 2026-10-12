@@ -26,6 +26,7 @@ class GlobalIngredientDictionary(private val dao: GlobalIngredientMatchDao) {
         proteinPer100g: Double,
         carbsPer100g: Double,
         fatPer100g: Double,
+        fiberPer100g: Double = 0.0,
         verifiedByUser: Boolean = true
     ) {
         val normalized = originalName.trim().lowercase()
@@ -34,7 +35,7 @@ class GlobalIngredientDictionary(private val dao: GlobalIngredientMatchDao) {
         // Nutzer-Standard nie durch automatischen Netzwerk-Cache überschreiben
         if (existing?.isVerifiedByUser == true && !verifiedByUser) return
         if (existing != null && verifiedByUser) {
-            dao.verifyAndUpdate(normalized, offProductId, offProductName, kcalPer100g, proteinPer100g, carbsPer100g, fatPer100g)
+            dao.verifyAndUpdate(normalized, offProductId, offProductName, kcalPer100g, proteinPer100g, carbsPer100g, fatPer100g, fiberPer100g)
         } else if (existing != null && !verifiedByUser) {
             // bereits gecacht – nicht erneut schreiben (würde verified-Flag falsch setzen)
             return
@@ -49,6 +50,7 @@ class GlobalIngredientDictionary(private val dao: GlobalIngredientMatchDao) {
                     proteinPer100g = proteinPer100g,
                     carbsPer100g = carbsPer100g,
                     fatPer100g = fatPer100g,
+                    fiberPer100g = fiberPer100g,
                     isVerifiedByUser = verifiedByUser
                 )
             )
@@ -64,8 +66,29 @@ class GlobalIngredientDictionary(private val dao: GlobalIngredientMatchDao) {
             kcalPer100g = (food.calories ?: 0f).toDouble(),
             proteinPer100g = (food.protein ?: 0f).toDouble(),
             carbsPer100g = (food.carbs ?: 0f).toDouble(),
-            fatPer100g = (food.fat ?: 0f).toDouble()
+            fatPer100g = (food.fat ?: 0f).toDouble(),
+            fiberPer100g = (food.fiber ?: 0f).toDouble()
         )
+    }
+
+    suspend fun exportAll(): List<GlobalIngredientMatch> = dao.getAllOnce()
+
+    /** Import: upsert aller Einträge (REPLACE). Gibt Anzahl geschriebener Zeilen zurück. */
+    suspend fun importAll(items: List<GlobalIngredientMatch>): Int {
+        var n = 0
+        for (item in items) {
+            val normalized = item.normalizedName.ifBlank { item.originalName.trim().lowercase() }
+            if (normalized.isBlank()) continue
+            dao.upsert(
+                item.copy(
+                    normalizedName = normalized,
+                    originalName = item.originalName.trim().ifBlank { normalized },
+                    isVerifiedByUser = true
+                )
+            )
+            n++
+        }
+        return n
     }
 
     suspend fun delete(normalizedName: String) {
