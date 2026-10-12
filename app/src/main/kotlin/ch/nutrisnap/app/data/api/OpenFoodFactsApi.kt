@@ -87,9 +87,13 @@ object OpenFoodFactsApi {
 
     private fun productToFoodItem(p: org.json.JSONObject, barcode: String? = null): FoodItem? {
         val n = p.optJSONObject("nutriments") ?: return null
-        val kcal = (n.optDouble("energy-kcal_100g", -1.0).toFloat().takeIf { it > 0 }
+        val rawKcal = (n.optDouble("energy-kcal_100g", -1.0).toFloat().takeIf { it > 0 }
             ?: n.optDouble("energy_kcal_100g", -1.0).toFloat().takeIf { it > 0 })
             ?: return null
+        // kJ-statt-kcal-Fehler in OFF abfangen (z. B. Honig 1284 "kcal")
+        val kcal = ch.nutrisnap.app.domain.NutritionSanity.fixKcal(
+            rawKcal, n.g("proteins_100g"), n.g("carbohydrates_100g"), n.g("fat_100g")
+        ) ?: return null
         val name = p.optString("product_name", "").ifBlank { return null }
         val (servingSize, servingUnit) = parseServingSize(p.optString("serving_size", ""))
         return FoodItem(

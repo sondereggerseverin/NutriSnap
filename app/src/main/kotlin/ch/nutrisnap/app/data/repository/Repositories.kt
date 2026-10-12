@@ -990,6 +990,7 @@ class FoodItemRepository(db: NutriDatabase) {
             .distinctBy { it.barcode ?: it.name.lowercase().trim() }
         return (local + custom)
             .distinctBy { it.barcode ?: (it.name.lowercase().trim() + "|" + (it.brand?.lowercase()?.trim() ?: "")) }
+            .mapNotNull { with(ch.nutrisnap.app.domain.NutritionSanity) { it.sanitized() } }
             .sortedWith(FoodSearchRepository.relevanceComparator(query))
             .take(20)
     }
@@ -1015,6 +1016,7 @@ class FoodItemRepository(db: NutriDatabase) {
         val combined = local + custom + remoteList.filter { it.name.lowercase() !in names }
         return combined
             .distinctBy { it.barcode ?: (it.name.lowercase().trim() + "|" + (it.brand?.lowercase()?.trim() ?: "")) }
+            .mapNotNull { with(ch.nutrisnap.app.domain.NutritionSanity) { it.sanitized() } }
             .sortedWith(FoodSearchRepository.relevanceComparator(query))
     }
 
@@ -1028,9 +1030,9 @@ class FoodItemRepository(db: NutriDatabase) {
             customFoodDao.getByBarcode(barcode.trim())?.let { return it.toFoodItem() }
         }
         // 2) Lokaler food_items-Cache
-        dao.searchByBarcode(bc)?.let { return it }
+        dao.searchByBarcode(bc)?.let { return with(ch.nutrisnap.app.domain.NutritionSanity) { it.sanitized() } ?: it }
         if (bc != barcode) {
-            dao.searchByBarcode(barcode.trim())?.let { return it }
+            dao.searchByBarcode(barcode.trim())?.let { return with(ch.nutrisnap.app.domain.NutritionSanity) { it.sanitized() } ?: it }
         }
         // 3) Remote (OFF / Swiss / …)
         return remoteRepo.searchByBarcode(bc) ?: remoteRepo.searchByBarcode(barcode.trim())
