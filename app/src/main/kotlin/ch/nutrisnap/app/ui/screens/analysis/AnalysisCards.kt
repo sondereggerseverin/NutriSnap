@@ -576,7 +576,7 @@ internal fun WeekOverviewSheet(
             )
             Text(
                 if (mode == OverviewMode.WOCHE)
-                    "Ø-Werte pro Kalenderwoche (Mo–So). Zone relativ zum Kalorienziel (±8 %)."
+                    "Ø-Werte pro Kalenderwoche (Mo–So, ohne den heutigen Tag). Zone relativ zum Abnehm-Tagesziel. Δ kg = Ø-Gewicht ggü. Vorwoche, Δ Ziel = Ø kcal − Ø Tagesziel."
                 else
                     "Zone relativ zum Tagesziel (Erhaltung − Defizit, aktivitätsbereinigt). Δ Ziel = kcal − Tagesziel. Trend = geglättetes Gewicht (EWMA).",
                 fontSize = 12.sp,
@@ -686,9 +686,9 @@ internal fun WeekOverviewHeaderRow() {
     ) {
         Text("KW", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(36.dp))
         Text("Ø kg", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(52.dp))
-        Text("Δ%", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
+        Text("Δ kg", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
         Text("Ø kcal", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(56.dp))
-        Text("Δ%", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
+        Text("Δ Ziel", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
         Text("Aktiv.", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
         Text("Zone", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
     }
@@ -696,7 +696,7 @@ internal fun WeekOverviewHeaderRow() {
 
 @Composable
 internal fun WeekOverviewDataRow(row: WeekOverviewRow) {
-    val calHighlight = row.caloriesChangePct?.let { kotlin.math.abs(it) >= 10f } == true
+    val calHighlight = row.zone == "Plus" || row.zone == "Zu tief"
     Row(
         Modifier
             .fillMaxWidth()
@@ -709,20 +709,32 @@ internal fun WeekOverviewDataRow(row: WeekOverviewRow) {
     ) {
         Text("${row.weekNumber}", fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.width(36.dp))
         Text(row.avgWeightKg?.let { "%.1f".format(it) } ?: "—", fontSize = 12.sp, modifier = Modifier.width(52.dp))
-        Text(formatPct(row.weightChangePct), fontSize = 11.sp, color = pctColor(row.weightChangePct), modifier = Modifier.width(48.dp))
+        Text(
+            row.weightChangeKg?.let { (if (it > 0f) "+" else "") + "%.1f".format(it) } ?: "—",
+            fontSize = 11.sp,
+            color = trendColor(row.weightChangeKg?.div(7f)),
+            modifier = Modifier.width(48.dp)
+        )
         Text(
             if (row.avgCalories > 0) row.avgCalories.toString() else "—",
             fontSize = 12.sp,
             fontWeight = if (calHighlight) FontWeight.Bold else FontWeight.Normal,
             modifier = Modifier.width(56.dp)
         )
-        Text(formatPct(row.caloriesChangePct), fontSize = 11.sp, color = pctColor(row.caloriesChangePct), modifier = Modifier.width(48.dp))
+        Text(
+            row.balanceKcal?.let { if (it > 0) "+$it" else "$it" } ?: "—",
+            fontSize = 11.sp,
+            color = zoneColor(row.zone),
+            modifier = Modifier.width(48.dp)
+        )
         Text(if (row.avgActivityCalories > 0) row.avgActivityCalories.toString() else "—", fontSize = 12.sp, modifier = Modifier.width(48.dp))
         Text(
             row.zone,
             fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
             color = zoneColor(row.zone),
+            maxLines = 1,
+            softWrap = false,
             modifier = Modifier.weight(1f)
         )
     }

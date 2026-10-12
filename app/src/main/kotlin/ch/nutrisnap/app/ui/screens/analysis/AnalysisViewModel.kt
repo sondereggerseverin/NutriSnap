@@ -58,9 +58,15 @@ data class WeekOverviewRow(
     val to: LocalDate,
     val avgWeightKg: Float?,
     val weightChangePct: Float?,
+    /** Änderung des Ø-Gewichts ggü. der Vorwoche in kg (negativ = Abnahme). */
+    val weightChangeKg: Float? = null,
     val avgCalories: Int,
     val caloriesChangePct: Float?,
     val avgActivityCalories: Int,
+    /** Ø-Tagesziel der geloggten Tage (Erhaltung − Defizit, aktivitätsbereinigt). */
+    val targetKcal: Int = 0,
+    /** Ø kcal − Ø Tagesziel (negativ = unter Ziel); null ohne geloggte Tage. */
+    val balanceKcal: Int? = null,
     val zone: String
 )
 
@@ -270,11 +276,33 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
             val hcCache = healthRepo.getRange(from, to).first()
             val weightEntries = weightRepo.getAll().first()
             val profile = profileRepo.get().first()
-            val tdee = profile.computedTdee()?.toInt() ?: profile.dailyCalorieGoal
 
             val summaryByDate = summaries.associateBy { it.dateStr }
             val hcByDate = hcCache.associateBy { it.date }
             val weightByDate = weightEntries.associateBy { LocalDate.parse(it.dateStr) }
+
+            // Gleiche Ziel-Logik wie Startseite/Tagesübersicht: Erhaltung (Trend bevorzugt)
+            // − Defizit + Aktivitäts-Anpassung pro Tag.
+            val hcWeightByDate = hcCache
+                .mapNotNull { c -> c.weightKg?.let { kg -> c.date to kg.toFloat() } }
+                .toMap()
+            val mergedWeights = AdaptiveTdeeCalculator.mergeWeightByDate(
+                weightEntries.associate { LocalDate.parse(it.dateStr) to it.weightKg },
+                hcWeightByDate
+            )
+            val intakeByDate = summaries.associate { LocalDate.parse(it.dateStr) to it.calories }
+            val trend = AdaptiveTdeeCalculator.computeTrendTdee(
+                mergedWeights.filterKeys { !it.isBefore(from) },
+                intakeByDate
+            )
+            val avgActive = hcCache
+                .mapNotNull { it.activeCaloriesKcal }
+                .filter { it > 0.0 }
+                .takeIf { it.isNotEmpty() }
+                ?.average()
+            val weeklyLoss = profile.weeklyTargetLossKg?.takeIf { it > 0f }
+            val deficitKcal = weeklyLoss?.let { it * AdaptiveTdeeCalculator.KCAL_PER_KG / 7.0 }
+                ?: AdaptiveTdeeCalculator.DEFAULT_DEFICIT_KCAL
 
             val rows = ArrayList<WeekOverviewRow>(weeks)
             var prevAvgCal: Int? = null
@@ -285,6 +313,8 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
                 val weekEnd = weekStart.plusDays(6)
                 var calSum = 0.0
                 var calDays = 0
+                var targetSum = 0.0
+                var maintenanceSum = 0.0
                 var actSum = 0.0
                 var actDays = 0
                 var weightSum = 0.0
@@ -293,12 +323,24 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
                 var d = weekStart
                 while (!d.isAfter(weekEnd)) {
                     val s = summaryByDate[d.toString()]
-                    if (s != null && s.calories > 0f) {
-                        calSum += s.calories
-                        calDays++
-                    }
                     val hc = hcByDate[d]
                     val act = hc?.activeCaloriesKcal?.toFloat() ?: 0f
+                    // Der heutige Tag ist meist unvollständig geloggt und würde den Ø nach unten ziehen.
+                    if (s != null && s.calories > 0f && d != today) {
+                        calSum += s.calories
+                        calDays++
+                        val dayTarget = AdaptiveTdeeCalculator.computeDailyTarget(
+                            trend = trend,
+                            formulaTdee = profile.computedTdee(),
+                            todayActiveKcal = act.toDouble().takeIf { it > 0.0 },
+                            avgActiveKcal = avgActive,
+                            deficitKcal = deficitKcal,
+                            formulaBmr = profile.computedBmr()
+                        )
+                        val t = dayTarget?.targetKcal ?: profile.dailyCalorieGoal
+                        targetSum += t
+                        maintenanceSum += t + (dayTarget?.deficitKcal ?: 0)
+                    }
                     if (act > 0f) {
                         actSum += act
                         actDays++
@@ -322,11 +364,15 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
                     ((avgW - prevAvgWeight) / prevAvgWeight) * 100f
                 } else null
 
+                val avgTarget = if (calDays > 0) (targetSum / calDays).toInt() else 0
+                val avgMaintenance = if (calDays > 0) (maintenanceSum / calDays).toInt() else 0
+                // Gleiche Abnehm-Zonen wie in der Tagesübersicht, auf Wochenschnitt angewendet.
                 val zone = when {
                     avgCal <= 0 -> "—"
-                    avgCal < tdee * 0.92f -> "Defizit"
-                    avgCal > tdee * 1.08f -> "Überschuss"
-                    else -> "Erhalt"
+                    avgCal < avgTarget * 0.85f -> "Zu tief"
+                    avgCal <= avgTarget * 1.05f -> "Im Ziel"
+                    avgCal <= avgMaintenance * 1.05f -> "Erhalt"
+                    else -> "Plus"
                 }
 
                 val weekFields = java.time.temporal.WeekFields.ISO
@@ -337,9 +383,12 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
                     to = weekEnd,
                     avgWeightKg = avgW,
                     weightChangePct = wChange,
+                    weightChangeKg = if (prevAvgWeight != null && avgW != null) avgW - prevAvgWeight else null,
                     avgCalories = avgCal,
                     caloriesChangePct = calChange,
                     avgActivityCalories = avgAct,
+                    targetKcal = avgTarget,
+                    balanceKcal = if (calDays > 0) avgCal - avgTarget else null,
                     zone = zone
                 )
                 if (avgCal > 0) prevAvgCal = avgCal
