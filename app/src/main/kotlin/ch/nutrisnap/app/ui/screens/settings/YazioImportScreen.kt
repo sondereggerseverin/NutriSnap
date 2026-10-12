@@ -108,6 +108,23 @@ fun YazioImportScreen(
                         Spacer(Modifier.height(8.dp))
                         Text(it, color = MaterialTheme.colorScheme.primary)
                     }
+                    Spacer(Modifier.height(12.dp))
+                    var fiberMsg by remember { mutableStateOf<String?>(null) }
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.backfillDiaryFiber { n ->
+                                fiberMsg = if (n == 0) "Keine Einträge mit nachfüllbaren Ballaststoffen gefunden"
+                                else "$n Einträge mit Ballaststoffen ergänzt"
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Fehlende Ballaststoffe nachfüllen")
+                    }
+                    fiberMsg?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, color = MaterialTheme.colorScheme.primary)
+                    }
                 }
                 is YazioImportState.Loading -> {
                     CircularProgressIndicator()

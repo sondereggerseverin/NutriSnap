@@ -125,6 +125,33 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Die Yazio-Tagebuch-CSV enthält keine Ballaststoffe → importierte Einträge haben 0 g.
+     * Füllt Ballaststoffe nachträglich nur dort, wo ein verknüpftes eigenes Lebensmittel
+     * oder die Referenz-Datenbank einen Wert > 0 liefert (Menge × Wert/100 g).
+     * Unberührt bleiben: Einträge mit vorhandenen Ballaststoffen, manuelle Overrides,
+     * Rezept-Einträge und kcal/Makros (nur das Ballaststoff-Feld wird gesetzt).
+     */
+    fun backfillDiaryFiber(onDone: (updated: Int) -> Unit) {
+        viewModelScope.launch {
+            val updated = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val customById = db.customFoodDao().getAllOnce().associateBy { it.id }
+                var n = 0
+                for (e in db.diaryDao().getAllOnce()) {
+                    if (e.fiber > 0f || e.isGloballyOverridden || e.matchedRecipeId != null ||
+                        e.recipeGrams != null || e.amountGrams < 5f) continue
+                    val per100 = e.matchedCustomFoodId?.let { customById[it]?.fiber }?.takeIf { it > 0f }
+                        ?: IngredientNutritionDatabase.lookup(e.foodName)?.fiber?.takeIf { it > 0f }
+                        ?: continue
+                    db.diaryDao().update(e.copy(fiber = per100 * e.amountGrams / 100f))
+                    n++
+                }
+                n
+            }
+            onDone(updated)
+        }
+    }
+
     fun importNutritionLog(uri: Uri) {
         viewModelScope.launch {
             _state.value = YazioImportState.Loading
