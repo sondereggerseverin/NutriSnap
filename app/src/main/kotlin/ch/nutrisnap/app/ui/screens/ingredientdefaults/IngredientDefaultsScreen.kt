@@ -34,9 +34,24 @@ import ch.nutrisnap.app.data.repository.GlobalIngredientDictionary
 import ch.nutrisnap.app.ui.screens.barcode.BarcodeScannerScreen
 import ch.nutrisnap.app.ui.theme.NutriRadius
 import ch.nutrisnap.app.ui.theme.NutriSpacing
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+/** Häufig geloggtes Lebensmittel mit Ø-Nährwerten pro 100 g aus dem eigenen Tagebuch. */
+data class DiarySuggestion(
+    val alias: String,
+    val count: Int,
+    val kcal: Double,
+    val protein: Double,
+    val carbs: Double,
+    val fat: Double
+)
 
 class IngredientDefaultsViewModel(app: Application) : AndroidViewModel(app) {
     private val db = NutriDatabase.getInstance(app)
@@ -55,6 +70,71 @@ class IngredientDefaultsViewModel(app: Application) : AndroidViewModel(app) {
 
     val standards = dict.getAllVerified()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val _suggestions = MutableStateFlow<List<DiarySuggestion>>(emptyList())
+    val suggestions: StateFlow<List<DiarySuggestion>> = _suggestions
+
+    init { refreshSuggestions() }
+
+    /**
+     * Vorschläge aus den letzten 180 Tagen: Lebensmittel, die mind. 3× geloggt wurden und
+     * noch kein Standard sind. Werte = Median pro 100 g über alle Einträge (robust gegen
+     * einzelne Ausreißer). Rezept-Einträge, manuelle Overrides und unplausible Werte
+     * werden ausgelassen.
+     */
+    fun refreshSuggestions() {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                val since = java.time.LocalDate.now().minusDays(180).toString()
+                val known = dict.getAllVerified().first().map { it.normalizedName }.toSet()
+                fun median(v: List<Double>): Double {
+                    val sorted = v.sorted()
+                    return if (sorted.size % 2 == 1) sorted[sorted.size / 2]
+                    else (sorted[sorted.size / 2 - 1] + sorted[sorted.size / 2]) / 2.0
+                }
+                db.diaryDao().getEntriesSince(since)
+                    .filter { it.matchedRecipeId == null && it.recipeGrams == null &&
+                        !it.isGloballyOverridden && it.amountGrams >= 5f && it.calories > 0f }
+                    .groupBy { it.foodName.substringBefore(" (").substringBefore(" - ").trim() }
+                    .filter { (alias, list) -> alias.length >= 3 && list.size >= 3 && alias.lowercase() !in known }
+                    .map { (alias, list) ->
+                        fun per100(sel: (ch.nutrisnap.app.data.model.DiaryEntry) -> Float) =
+                            median(list.map { sel(it).toDouble() / it.amountGrams * 100.0 })
+                        DiarySuggestion(
+                            alias = alias, count = list.size,
+                            kcal = per100 { it.calories }, protein = per100 { it.protein },
+                            carbs = per100 { it.carbs }, fat = per100 { it.fat }
+                        )
+                    }
+                    .filter { sug ->
+                        GlobalIngredientMatch(
+                            normalizedName = sug.alias.lowercase(), originalName = sug.alias,
+                            offProductId = "diary", offProductName = sug.alias,
+                            kcalPer100g = sug.kcal, proteinPer100g = sug.protein,
+                            carbsPer100g = sug.carbs, fatPer100g = sug.fat
+                        ).plausibilityWarning() == null
+                    }
+                    .sortedByDescending { it.count }
+                    .take(15)
+            }
+            _suggestions.value = result
+        }
+    }
+
+    fun addSuggestions(list: List<DiarySuggestion>) {
+        viewModelScope.launch {
+            list.forEach {
+                dict.save(
+                    originalName = it.alias,
+                    offProductId = "diary",
+                    offProductName = "${it.alias} (Ø aus deinem Tagebuch)",
+                    kcalPer100g = it.kcal, proteinPer100g = it.protein,
+                    carbsPer100g = it.carbs, fatPer100g = it.fat
+                )
+            }
+            refreshSuggestions()
+        }
+    }
 
     suspend fun lookupBarcode(barcode: String): FoodItem? =
         foodRepo.searchByBarcode(barcode)
@@ -110,6 +190,7 @@ fun IngredientDefaultsScreen(
     vm: IngredientDefaultsViewModel = viewModel()
 ) {
     val standards by vm.standards.collectAsStateWithLifecycle()
+    val suggestions by vm.suggestions.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showAdd by remember { mutableStateOf(false) }
     var showScanner by remember { mutableStateOf(false) }
@@ -222,6 +303,50 @@ fun IngredientDefaultsScreen(
                     onEdit = { editRow = row },
                     onDelete = { vm.delete(row.normalizedName) }
                 )
+            }
+            if (suggestions.isNotEmpty() && query.isBlank()) {
+                item {
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Vorschläge aus deinem Tagebuch",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 15.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = {
+                            vm.addSuggestions(suggestions)
+                            Toast.makeText(context, "${suggestions.size} Standards übernommen", Toast.LENGTH_SHORT).show()
+                        }) { Text("Alle übernehmen") }
+                    }
+                    Text(
+                        "Häufig geloggt (letzte 180 Tage), Ø-Werte pro 100 g aus deinen eigenen Einträgen.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                items(suggestions, key = { "sug_" + it.alias }) { sug ->
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(NutriRadius.md)) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(NutriSpacing.md),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(sug.alias, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                                Text(
+                                    "%d× geloggt · %.0f kcal · P %.1f · K %.1f · F %.1f / 100 g".format(
+                                        sug.count, sug.kcal, sug.protein, sug.carbs, sug.fat
+                                    ),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            IconButton(onClick = { vm.addSuggestions(listOf(sug)) }) {
+                                Icon(Icons.Default.Add, "Als Standard übernehmen", tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                }
             }
             item { Spacer(Modifier.height(72.dp)) }
         }
