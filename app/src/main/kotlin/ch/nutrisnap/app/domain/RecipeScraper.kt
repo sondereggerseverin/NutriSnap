@@ -55,6 +55,8 @@ class RecipeScraper(private val context: Context) {
         if (t.length < 40) return false
         // HTML/JS-Müll von Jina/Mirrors niemals als Caption akzeptieren
         if (looksLikeHtmlOrCode(t)) return false
+        // Instagram 403 AbuseAlleviationError / API-Fehler-JSON nie als Caption
+        if (looksLikeInstagramApiError(t)) return false
         val lc = t.lowercase()
         // Login-Wall / CSP-Müll
         if ("log in" in lc && "sign up" in lc && t.length < 200) return false
@@ -190,6 +192,34 @@ class RecipeScraper(private val context: Context) {
         if ("window._shareddata" in t || ("document." in t && "cookie" in t)) return true
         val tagCount = Regex("""<[a-zA-Z/!][^>]*>""").findAll(text).count()
         return tagCount >= 5
+    }
+
+    /**
+     * Instagram liefert bei Bot-/Rate-Limit-Erkennung oft JSON statt Caption, z. B.:
+     * {"data":null,"code":403,"name":"AbuseAlleviationError","status":"..."}
+     * Das wurde fälschlich als Caption akzeptiert und landete als Rezept-Titel.
+     */
+    private fun looksLikeInstagramApiError(text: String): Boolean {
+        val t = text.trimStart()
+        if (t.isEmpty()) return false
+        val lc = t.lowercase()
+        if ("abusealleviationerror" in lc) return true
+        if ("checkpoint_required" in lc || "challenge_required" in lc) return true
+        if ("please wait a few minutes" in lc && "try again" in lc) return true
+        // Typisches IG-Fehler-JSON: {"data":null,"code":403,"name":"..."}
+        if (t.startsWith("{") && ("\"code\"" in t || "'code'" in t)) {
+            if ("\"data\":null" in lc || "\"data\": null" in lc) return true
+            if (Regex(""""code"\s*:\s*4\d\d""").containsMatchIn(t)) return true
+            if ("\"name\"" in t && ("error" in lc || "fail" in lc || "block" in lc)) return true
+        }
+        // Reines API-Fehler-Objekt ohne Rezept-Hinweise
+        if (t.startsWith("{") && t.endsWith("}") &&
+            "zutaten" !in lc && "ingredient" !in lc && "recipe" !in lc && "rezept" !in lc &&
+            ("\"status\"" in t || "\"message\"" in t) && t.length < 900
+        ) {
+            return true
+        }
+        return false
     }
 
     private val client = OkHttpClient.Builder()
@@ -1013,11 +1043,12 @@ class RecipeScraper(private val context: Context) {
                 )
             }.getOrNull() ?: continue
             if (body.isBlank() || !body.trimStart().startsWith("{")) continue
+            if (looksLikeInstagramApiError(body)) continue
             val caption = Regex(""""text"\s*:\s*"((?:[^"\\]|\\.){40,})"""")
                 .findAll(body)
                 .map { RecipeAiParser.unescapeSocialText(it.groupValues[1]) }
                 .maxByOrNull { it.length }
-            if (!caption.isNullOrBlank()) return caption
+            if (!caption.isNullOrBlank() && isGoodCaption(caption)) return caption
         }
         return null
     }
@@ -1037,14 +1068,16 @@ class RecipeScraper(private val context: Context) {
             )
         }.getOrNull() ?: return null
         if (body.isBlank() || "login" in body.lowercase().take(300)) return null
-        return Regex(""""text"\s*:\s*"((?:[^"\\]|\\.){40,})"""")
+        if (looksLikeInstagramApiError(body)) return null
+        val caption = Regex(""""text"\s*:\s*"((?:[^"\\]|\\.){40,})"""")
             .findAll(body)
             .map { RecipeAiParser.unescapeSocialText(it.groupValues[1]) }
             .maxByOrNull { it.length }
+        return caption?.takeIf { isGoodCaption(it) }
     }
 
     private fun extractCaptionFromHtml(html: String, baseUri: String): String? {
-        if (html.isBlank()) return null
+        if (html.isBlank() || looksLikeInstagramApiError(html)) return null
         val doc = Jsoup.parse(html, baseUri)
         val candidates = listOf(
             doc.select(".Caption, .CaptionContent, [class*=Caption]").text(),
@@ -1055,7 +1088,9 @@ class RecipeScraper(private val context: Context) {
                 .maxByOrNull { it.length }
                 .orEmpty()
         )
-        return candidates.map { it.trim() }.filter { it.length >= 40 }.maxByOrNull { it.length }
+        return candidates.map { it.trim() }
+            .filter { it.length >= 40 && !looksLikeInstagramApiError(it) }
+            .maxByOrNull { it.length }
     }
 
     /**

@@ -980,6 +980,15 @@ object RecipeAiParser {
     /** "Tag 12/30: … - Bueno Overnight Oats" → "Bueno Overnight Oats" */
     fun cleanDishTitle(title: String, ingredients: String = ""): String {
         var t = title.trim()
+        // Instagram/API-Fehler-JSON niemals als Titel anzeigen
+        val tl = t.lowercase()
+        if (t.startsWith("{") ||
+            "abusealleviationerror" in tl ||
+            ("\"code\"" in t && "\"data\"" in t) ||
+            (t.startsWith("{\"") && "error" in tl)
+        ) {
+            return inventTitleFromIngredients(ingredients, fallback = "Rezept")
+        }
         // Serien-Prefix weg
         t = t.replace(Regex("""(?i)^tag\s*\d+\s*/\s*\d+\s*:\s*"""), "")
         t = t.replace(Regex("""(?i)^rezepte\s+unter\s+2\s*€?\s*-?\s*"""), "")
