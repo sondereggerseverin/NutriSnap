@@ -894,10 +894,10 @@ class RecipeScraper(private val context: Context) {
 
             val desktopUa =
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-            // Race-Timeout >= WebView-Budget (Fast 10s / gründlich 18s).
+            // Race-Timeout: Fast eng am WebView-Budget (6,5 s), gründlich 16 s.
             val raceTimeoutMs = if (fastScrape) {
-                stageBudget(10_000L, deadlineAtMs, reserveMs = NORMALIZE_RESERVE_MS)
-            } else 18_000L
+                stageBudget(7_000L, deadlineAtMs, reserveMs = NORMALIZE_RESERVE_MS)
+            } else 16_000L
 
             suspend fun awaitFirstGood(
                 jobs: MutableList<kotlinx.coroutines.Deferred<Cap?>>,
@@ -1099,6 +1099,8 @@ class RecipeScraper(private val context: Context) {
 
             if (!winner.isNullOrBlank()) {
                 jobs.forEach { it.cancel() }
+                // Gewinner sofort zurück — nicht auf Cancel-Abschluss der Verlierer warten
+                // (WebView-Cancel läuft parallel auf dem Main-Thread).
                 return@coroutineScope winner
             }
 

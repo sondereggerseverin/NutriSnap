@@ -37,11 +37,22 @@ object InstagramWebViewScraper {
      */
     @SuppressLint("SetJavaScriptEnabled")
     suspend fun extractCaption(context: Context, url: String, fast: Boolean = false): String? {
-        // Zuverlässige Timeouts: zu kurze Delays lieferten leere/Müll-Captions.
-        val overallTimeoutMs = if (fast) 12_000L else 18_000L
+        // Fast-Pfad: hart unter dem Import-Budget (10–13 s) bleiben.
+        // Früher 12 s + 2–3 s Delay → Import hing 15–20 s auf „Caption von webview“.
+        val overallTimeoutMs = if (fast) 6_500L else 14_000L
         return withTimeout(overallTimeoutMs) {
             suspendCancellableCoroutine { cont ->
                 val mainHandler = Handler(Looper.getMainLooper())
+                val pendingRunnables = mutableListOf<Runnable>()
+                fun postDelayed(delayMs: Long, block: () -> Unit) {
+                    val r = Runnable { block() }
+                    pendingRunnables += r
+                    mainHandler.postDelayed(r, delayMs)
+                }
+                fun clearPending() {
+                    pendingRunnables.forEach { mainHandler.removeCallbacks(it) }
+                    pendingRunnables.clear()
+                }
                 mainHandler.post {
                     val webView = WebView(context.applicationContext)
                     val isEmbed = "/embed" in url
@@ -72,37 +83,39 @@ object InstagramWebViewScraper {
                     fun finish(caption: String?) {
                         if (finished) return
                         finished = true
+                        clearPending()
+                        runCatching { webView.stopLoading() }
                         runCatching { webView.destroy() }
-                        cont.resume(caption)
+                        if (cont.isActive) cont.resume(caption)
                     }
 
                     webView.webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView, loadedUrl: String) {
                             if (finished) return
-                            // Bewährte Delays: Caption muss gerendert sein (0,9s war zu aggressiv).
+                            // Embed rendert Caption schneller; Hauptseite braucht etwas mehr.
                             val delayMs = when {
-                                fast && isEmbed -> 2_000L
-                                fast -> 3_000L
-                                isEmbed -> 2_500L
-                                else -> 4_000L
+                                fast && isEmbed -> 900L
+                                fast -> 1_400L
+                                isEmbed -> 2_000L
+                                else -> 3_000L
                             }
-                            val retryMs = if (fast) 1_500L else 2_000L
-                            mainHandler.postDelayed({
+                            val retryMs = if (fast) 800L else 1_500L
+                            postDelayed(delayMs) {
                                 if (finished) return@postDelayed
                                 view.evaluateJavascript(EXTRACT_JS) { rawResult ->
                                     val caption = decodeJsString(rawResult)
                                     if (!caption.isNullOrBlank() && caption.length >= 40) {
                                         finish(caption)
                                     } else {
-                                        mainHandler.postDelayed({
+                                        postDelayed(retryMs) {
                                             if (finished) return@postDelayed
                                             view.evaluateJavascript(EXTRACT_JS) { raw2 ->
                                                 finish(decodeJsString(raw2))
                                             }
-                                        }, retryMs)
+                                        }
                                     }
                                 }
-                            }, delayMs)
+                            }
                         }
 
                         override fun onReceivedError(
@@ -115,7 +128,12 @@ object InstagramWebViewScraper {
                     webView.loadUrl(url)
 
                     cont.invokeOnCancellation {
-                        mainHandler.post { finish(null) }
+                        // Sofort abbrechen — kein Warten auf Delay-Handler (sonst blockiert
+                        // coroutineScope den Race-Gewinner bis zu 12 s).
+                        mainHandler.post {
+                            clearPending()
+                            finish(null)
+                        }
                     }
                 }
             }
