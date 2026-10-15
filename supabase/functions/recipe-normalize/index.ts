@@ -484,6 +484,8 @@ async function groqChat(
       });
       const text = await resp.text();
       if (resp.ok) return text;
+      // Rate-Limit: das Qualitäts-Modell hängt am selben Limit, Fallback würde nur Zeit kosten.
+      if (resp.status === 429) break;
     } catch {
       /* try next model */
     }
