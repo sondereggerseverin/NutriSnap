@@ -18,9 +18,10 @@ import java.util.concurrent.TimeUnit
 object VideoTranscriptService {
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(90, TimeUnit.SECONDS)
-        .writeTimeout(60, TimeUnit.SECONDS)
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(14, TimeUnit.SECONDS)
+        .writeTimeout(14, TimeUnit.SECONDS)
+        .callTimeout(15, TimeUnit.SECONDS)
         .followRedirects(true)
         .build()
 

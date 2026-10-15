@@ -28,9 +28,9 @@ import java.util.concurrent.TimeUnit
 object RecipeAiParser {
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(8, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .callTimeout(20, TimeUnit.SECONDS)
+        .connectTimeout(6, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .callTimeout(12, TimeUnit.SECONDS)
         .build()
 
     private const val GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -1271,7 +1271,7 @@ Rules:
             put("model", modelId)
             // gpt-oss denkt standardmässig mit mittlerem Aufwand → "low" ist deutlich schneller.
             put("reasoning_effort", "low")
-            put("max_tokens", 3000)
+            put("max_tokens", 1500)
             put("temperature", 0.1)
             put("messages", JSONArray().apply {
                 put(JSONObject().apply { put("role", "system"); put("content", recipeSystemPrompt) })

@@ -475,7 +475,7 @@ async function groqChat(
           // gpt-oss ist ein Reasoning-Modell: "low" spart Sekunden; Reasoning-Tokens zählen
           // zum Limit, daher grosszügiger als früher (1600).
           reasoning_effort: "low",
-          max_tokens: 3000,
+          max_tokens: 1500,
           messages: [
             { role: "system", content: SYSTEM },
             { role: "user", content: userMsg },

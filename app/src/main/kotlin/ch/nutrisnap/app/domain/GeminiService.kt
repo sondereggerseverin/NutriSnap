@@ -33,8 +33,9 @@ object GeminiService {
     // Kurze Timeouts: Gemini soll bei Problemen schnell an Groq (Parallel-Race)
     // abgeben statt die UI 30s+ blockieren zu lassen.
     private val client = OkHttpClient.Builder()
-        .connectTimeout(8, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(9, TimeUnit.SECONDS)
+        .callTimeout(10, TimeUnit.SECONDS)
         .build()
 
     @Volatile
