@@ -483,10 +483,10 @@ class RecipeScraper(private val context: Context) {
         val canonicalUrls = instagramCanonicalUrls(url, shortcode)
         val key = shortcode?.let { "ig:$it" } ?: cacheKey(url)
 
-        // ── AMM-Fast-Pfad: Server + Caption-Race PARALLEL ────────────────────
-        // Früher: Server max. 6s sequentiell, DANN WebView-Race (bis 14s) → oft 10–20s.
-        // Jetzt: beides ab t=0; sobald Server brauchbare Zutaten hat → sofort fertig.
-        // WebView/HTTP-Race läuft parallel als Fallback (wie AMM: erster brauchbarer Pfad gewinnt).
+        // ── AMM-Konzept (Fast-Pfad): NUR Server zuerst ───────────────────────
+        // All My Meals: Client schickt nur die URL → Server scraped+parsed → fertig (~2 s).
+        // Kein WebView parallel starten — der hat uns 15–20 s auf „Caption von webview“ gekostet.
+        // Client-Caption-Race erst, wenn der Server scheitert oder zu dünn antwortet.
         var bestServerCandidate: Recipe? = null
         var serverUrlError: String? = null
         var serverCapError: String? = null
@@ -501,50 +501,18 @@ class RecipeScraper(private val context: Context) {
             }
         }
 
-        val serverBudgetMs = stageBudget(if (fastScrape) 6_000L else 28_000L, deadlineAtMs)
-        val serverJob = if (RecipeNormalizeServer.isConfigured()) {
-            async {
-                progress("Server-Import…")
-                withTimeoutOrNull(serverBudgetMs) {
-                    RecipeNormalizeServer.importFromUrl(url, "instagram")
-                }
-            }
-        } else null
-
-        val cachedCap = if (forceRefresh) "" else loadCachedCaption(key)
-        val captionJob = async {
-            if (isGoodCaption(cachedCap)) {
-                progress("Caption aus Cache…")
-                cachedCap
-            } else {
-                progress("Caption holen…")
-                raceInstagramCaption(canonicalUrls.first(), shortcode, fastScrape, deadlineAtMs).also { c ->
-                    if (isGoodCaption(c)) saveCachedCaption(key, c)
-                }
-            }
-        }
-
-        // Server und Caption-Race konkurrieren: liefert der Race zuerst eine gute Caption,
-        // wird nicht mehr auf den URL-Server gewartet (er liefe sonst bis zum Budget-Ende).
-        var serverSkipped = false
-        val serverRecipe = serverJob?.let { sj ->
-            select<Recipe?> {
-                sj.onAwait { it }
-                captionJob.onAwait { cap ->
-                    if (isGoodCaption(cap)) {
-                        serverSkipped = true
-                        sj.cancel()
-                        null
-                    } else {
-                        sj.await()
-                    }
-                }
+        // Fast: 4,5 s Server-Budget (AMM-ähnlich). Gründlich: länger.
+        val serverBudgetMs = stageBudget(if (fastScrape) 4_500L else 28_000L, deadlineAtMs)
+        var serverRecipe: Recipe? = null
+        if (RecipeNormalizeServer.isConfigured()) {
+            progress("Server-Import…")
+            serverRecipe = withTimeoutOrNull(serverBudgetMs) {
+                RecipeNormalizeServer.importFromUrl(url, "instagram")
             }
         }
         val tServerMs = SystemClock.elapsedRealtime() - t0
         serverUrlError = when {
-            serverJob == null -> "not_configured"
-            serverSkipped -> "skipped_caption_first"
+            !RecipeNormalizeServer.isConfigured() -> "not_configured"
             serverRecipe == null && RecipeNormalizeServer.lastError == null ->
                 "server_timeout_${serverBudgetMs}ms"
             else -> RecipeNormalizeServer.lastError
@@ -553,13 +521,12 @@ class RecipeScraper(private val context: Context) {
             val acceptFast = fastScrape && hasUsableIngredients(serverRecipe)
             val acceptStrict = isAmmQuality(serverRecipe)
             if (acceptFast || acceptStrict) {
-                captionJob.cancel()
                 publishReport(
                     "path=amm-server-only score=${ingredientQualityScore(serverRecipe)} " +
                         "ing=${serverRecipe.ingredients.lines().count { it.isNotBlank() }} " +
-                        "fast=$fastScrape url=$url"
+                        "tServerMs=$tServerMs fast=$fastScrape url=$url"
                 )
-                val thumb = withTimeoutOrNull(800L) {
+                val thumb = withTimeoutOrNull(600L) {
                     oEmbedJobs.firstNotNullOfOrNull { d ->
                         runCatching { d.await()?.get("thumbnail_url") }.getOrNull()
                             ?.takeIf { !it.isNullOrBlank() }
@@ -576,7 +543,17 @@ class RecipeScraper(private val context: Context) {
             if (hasUsableIngredients(serverRecipe)) bestServerCandidate = serverRecipe
         }
 
-        var caption = captionJob.await()
+        // Fallback: Caption lokal (WebView/HTTP) — nur wenn Server nicht gereicht hat.
+        val cachedCap = if (forceRefresh) "" else loadCachedCaption(key)
+        var caption = if (isGoodCaption(cachedCap)) {
+            progress("Caption aus Cache…")
+            cachedCap
+        } else {
+            progress("Caption holen…")
+            raceInstagramCaption(canonicalUrls.first(), shortcode, fastScrape, deadlineAtMs).also { c ->
+                if (isGoodCaption(c)) saveCachedCaption(key, c)
+            }
+        }
         val tCaptionMs = SystemClock.elapsedRealtime() - t0
 
         // Gründlich: Caption an Server-Kandidat mergen, wenn vorhanden
