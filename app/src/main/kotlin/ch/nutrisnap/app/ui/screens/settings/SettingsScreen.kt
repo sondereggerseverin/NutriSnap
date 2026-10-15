@@ -1143,7 +1143,12 @@ private fun SettingsSwitchRow(
     }
 }
 
-/** Design-Backlog-Toggle: liest/schreibt Boolean-Preference mit explizitem Default. */
+/**
+ * Design-Backlog-Toggle: liest/schreibt Boolean-Preference mit explizitem Default.
+ *
+ * Optimistischer UI-State: DataStore-Writes sind asynchron; ohne lokalen State
+ * sprang der Switch oft zurück, bis der Flow neu emittierte.
+ */
 @Composable
 private fun DesignToggleRow(
     title: String,
@@ -1154,12 +1159,15 @@ private fun DesignToggleRow(
     scope: kotlinx.coroutines.CoroutineScope,
     context: android.content.Context
 ) {
-    val checked = prefs?.get(key) ?: defaultOn
+    val stored = prefs?.get(key) ?: defaultOn
+    var checked by remember(key.name) { mutableStateOf(stored) }
+    LaunchedEffect(stored) { checked = stored }
     SettingsSwitchRow(
         title = title,
         subtitle = subtitle,
         checked = checked,
         onCheckedChange = { newValue ->
+            checked = newValue
             scope.launch {
                 context.notifDataStore.edit { it[key] = newValue }
             }
