@@ -57,6 +57,8 @@ class RecipeScraper(private val context: Context) {
         if (looksLikeHtmlOrCode(t)) return false
         // Instagram 403 AbuseAlleviationError / API-Fehler-JSON nie als Caption
         if (looksLikeInstagramApiError(t)) return false
+        // Jina/Mirror-Profil-Dumps (CDN-URLs, ![Image, Follower-Zähler) nie akzeptieren
+        if (looksLikeScrapeJunk(t)) return false
         val lc = t.lowercase()
         // Login-Wall / CSP-Müll
         if ("log in" in lc && "sign up" in lc && t.length < 200) return false
@@ -64,16 +66,19 @@ class RecipeScraper(private val context: Context) {
         val recipeHints = listOf(
             "zutaten", "ingredient", "ingrédient", "ingredienti", "rezept", "recipe", "recette",
             "anleitung", "instructions", "préparation", "procedimento", "zubereitung", "method",
+            "füllung", "topping", "teig",
             " tbsp", " tsp", " el ", " tl ", " c. à", "gramm", " ml", " cup",
             "päckchen", "paeckchen", "backpulver", "portionen", "farine", "œuf", "oeuf", "skyr"
         )
         // Mindestens 2 Mengenangaben (380g / 1 EL / 1 c. à café)
         val qtyCount = Regex(
-            """\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tsp|tbsp|cup|oz|lb|stück|stk|päckchen|paeckchen|c\.\s*à)\b""",
+            """\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tsp|tbsp|cup|oz|lb|stück|stk|päckchen|paeckchen|c\.\s*à|scoops?)\b""",
             RegexOption.IGNORE_CASE
         ).findAll(t).count()
         if (qtyCount >= 2) return true
-        return t.length >= 80 || recipeHints.any { it in lc }
+        // Nur Länge reicht nicht – sonst gewinnen Jina-Profil-Dumps den Race
+        val hasHint = recipeHints.any { it in lc }
+        return hasHint && t.length >= 60
     }
 
     /** true wenn das geparste Rezept brauchbare Zutaten hat (nicht Platzhalter/leer). */
@@ -192,6 +197,29 @@ class RecipeScraper(private val context: Context) {
         if ("window._shareddata" in t || ("document." in t && "cookie" in t)) return true
         val tagCount = Regex("""<[a-zA-Z/!][^>]*>""").findAll(text).count()
         return tagCount >= 5
+    }
+
+    /**
+     * Jina/Mirror liefern oft Markdown mit CDN-Bild-URLs und Profil-Metadaten
+     * statt der Post-Caption. Das sah aus wie „lange Caption“ und gewann den Race.
+     */
+    private fun looksLikeScrapeJunk(text: String): Boolean {
+        val t = text
+        val lc = t.lowercase()
+        if ("cdninstagram.com" in lc || "scontent-" in lc) return true
+        if ("![image" in lc || "![[image" in lc) return true
+        // Profil-Dump: "183 posts · 5K followers"
+        if (Regex("""\d+\s*posts?\s*[·•|]\s*[\d.,]+\s*[kmb]?\s*followers?""", RegexOption.IGNORE_CASE)
+                .containsMatchIn(t)
+        ) return true
+        if ("followers" in lc && "posts" in lc && "zutaten" !in lc && "ingredient" !in lc) return true
+        // Viele absolute Bild-/Media-URLs → Seiten-Dump, keine Caption
+        val httpCount = Regex("""https?://\S+""").findAll(t).count()
+        if (httpCount >= 3 && "zutaten" !in lc && "ingredient" !in lc) return true
+        // Überwiegend URL-/Token-Zeichen ohne Rezeptwörter
+        val urlish = t.count { it == '?' || it == '=' || it == '&' || it == '%' }
+        if (urlish > 40 && "zutaten" !in lc && "ingredient" !in lc && "rezept" !in lc) return true
+        return false
     }
 
     /**
@@ -998,34 +1026,45 @@ class RecipeScraper(private val context: Context) {
             jinaUrl,
             "Mozilla/5.0 (compatible; NutriSnap/1.0; +https://nutrisnap.dev)"
         ) ?: return null
-        if (body.length < 40 || looksLikeHtmlOrCode(body)) return null
+        if (body.length < 40 || looksLikeHtmlOrCode(body) || looksLikeScrapeJunk(body)) return null
         // Login-Wall / leere IG-Seiten herausfiltern
         val lc = body.lowercase()
         if ("log in" in lc && "sign up" in lc && body.length < 400) return null
-        // Caption aus Markdown/Text extrahieren
+        // Caption aus Markdown/Text extrahieren — Bild-/Meta-Zeilen hart raus
         val cleaned = body
             .lineSequence()
             .filterNot { line ->
                 val l = line.trim()
+                val ll = l.lowercase()
                 l.startsWith("Title:") || l.startsWith("URL Source:") ||
                     l.startsWith("Markdown Content:") || l.startsWith("Warning:") ||
                     l.startsWith("======") || l.startsWith("------") ||
-                    l.startsWith("<") // HTML-Zeilen verwerfen
+                    l.startsWith("<") ||
+                    l.startsWith("![") ||
+                    "cdninstagram.com" in ll || "scontent-" in ll ||
+                    ll.startsWith("http://") || ll.startsWith("https://") ||
+                    Regex("""\d+\s*posts?\b""", RegexOption.IGNORE_CASE).containsMatchIn(l)
             }
             .joinToString("\n")
             .trim()
-        if (looksLikeHtmlOrCode(cleaned)) return null
-        // Längsten zusammenhängenden Block mit Rezept-Hinweisen nehmen
+        if (looksLikeHtmlOrCode(cleaned) || looksLikeScrapeJunk(cleaned)) return null
+        // Nur Blöcke mit echten Rezept-Hinweisen — kein „längster Block gewinnt“
         val blocks = cleaned.split(Regex("\n{2,}")).map { it.trim() }
-            .filter { it.length >= 40 && !looksLikeHtmlOrCode(it) }
-        val recipeHints = listOf("zutaten", "ingredient", "rezept", "recipe", "anleitung", " tbsp", " el ", "g ", "ml ")
+            .filter { it.length >= 40 && !looksLikeHtmlOrCode(it) && !looksLikeScrapeJunk(it) }
+        val recipeHints = listOf(
+            "zutaten", "ingredient", "rezept", "recipe", "anleitung", "zubereitung",
+            "füllung", "topping", " tbsp", " el ", "tl ", "backpulver"
+        )
         val best = blocks
             .filter { b ->
                 val l = b.lowercase()
-                recipeHints.any { it in l } || b.length >= 120
+                recipeHints.any { it in l } ||
+                    Regex(
+                        """\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tsp|tbsp)\b""",
+                        RegexOption.IGNORE_CASE
+                    ).findAll(b).count() >= 2
             }
             .maxByOrNull { it.length }
-        // Kein Fallback auf zufälligen langen Block ohne Rezept-Hinweise
         return best?.take(6000)?.takeIf { isGoodCaption(it) }
     }
 
