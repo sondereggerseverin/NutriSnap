@@ -172,6 +172,13 @@ serve(async (req) => {
       }
     }
 
+    if (!String(parsed.title ?? "").trim() && ingredientLines.length === 0) {
+      return json({
+        error: "no recipe found",
+        detail: "Text enthielt kein erkennbares Rezept (Caption evtl. leer/Fehlerseite)",
+      }, 422);
+    }
+
     const servings = Math.max(1, Number(parsed.servings) || 1);
 
     const mealCat = String(parsed.meal_category ?? "").toUpperCase().trim();
@@ -217,6 +224,7 @@ serve(async (req) => {
 /** Score: recipe-like text beats mere length (oEmbed title alone scores low). */
 function scoreCaption(text: string): number {
   if (!text || text.length < 30) return 0;
+  if (isApiErrorPayload(text)) return 0;
   let s = Math.min(text.length / 20, 40);
   const qty = (text.match(
     /\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|cas|cac|tbsp|tsp|cup|stück|c\.\s*à)/gi,
@@ -278,7 +286,32 @@ async function fetchCaptionFromUrl(
       },
     });
     const text = await r.text();
+    // Jina antwortet bei Abuse-/Rate-Limit mit 403 + JSON (AbuseAlleviationError).
+    // Das darf niemals als Caption durchgehen -> Job schlägt fehl und wird ignoriert.
+    if (!r.ok || isApiErrorPayload(text)) {
+      throw new Error(`jina_http_${r.status}`);
+    }
     return { caption: cleanFetchedText(text), imageUrl: null as string | null };
+  };
+
+  // Direkter Abruf der Instagram-Embed-Seite (ohne Jina, das von Supabase-IPs oft 403 liefert)
+  const directEmbed = async (target: string, ms = 4000) => {
+    const r = await fetch(target, {
+      signal: timeout(ms),
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
+      },
+    });
+    if (!r.ok) throw new Error(`embed_http_${r.status}`);
+    const html = await r.text();
+    const img = html.match(/<img[^>]+class="EmbeddedMediaImage"[^>]+src="([^"]+)"/i)
+      ?.[1];
+    return {
+      caption: cleanFetchedText(extractIgEmbedCaption(html)),
+      imageUrl: img ? decodeHtmlEntities(img) : null,
+    };
   };
 
   type CapResult = { caption: string; imageUrl: string | null };
@@ -314,6 +347,8 @@ async function fetchCaptionFromUrl(
         `https://ddinstagram.com/reel/${code}/`,
         `https://imginn.com/p/${code}/`,
       ];
+      jobs.push(directEmbed(`https://www.instagram.com/p/${code}/embed/captioned/`));
+      jobs.push(directEmbed(`https://www.instagram.com/reel/${code}/embed/captioned/`));
       for (const v of variants) {
         jobs.push(jina(v, 4000));
       }
@@ -472,4 +507,47 @@ function json(data: unknown, status = 200) {
     status,
     headers: { ...cors, "Content-Type": "application/json" },
   });
+}
+
+/** true bei JSON-Fehlerantworten von Reader-/Proxy-Diensten (z. B. Jina AbuseAlleviationError). */
+function isApiErrorPayload(text: string): boolean {
+  const t = text.trimStart();
+  if (!t.startsWith("{") && !t.startsWith("[")) return false;
+  const lc = t.toLowerCase();
+  return lc.includes("abusealleviationerror") ||
+    /"code"\s*:\s*[45]\d\d/.test(lc) ||
+    /"data"\s*:\s*null/.test(lc) ||
+    lc.includes('"error"');
+}
+
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)));
+}
+
+/** Caption aus der Instagram-Embed-HTML (div.Caption, sonst og:description). */
+function extractIgEmbedCaption(html: string): string {
+  const m = html.match(
+    /<div class="Caption"[^>]*>([\s\S]*?)<div class="CaptionComments"/i,
+  ) ?? html.match(/<div class="Caption"[^>]*>([\s\S]*?)<\/div>/i);
+  if (m) {
+    const txt = decodeHtmlEntities(
+      m[1]
+        .replace(/<a[^>]*class="CaptionUsername"[\s\S]*?<\/a>/i, "")
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<[^>]+>/g, "")
+        .replace(/^\s*View all \d+ comments.*$/gim, ""),
+    ).trim();
+    if (txt.length >= 40) return txt;
+  }
+  const og = html.match(/<meta[^>]+property="og:description"[^>]+content="([^"]*)"/i)
+    ?.[1];
+  return og ? decodeHtmlEntities(og).trim() : "";
 }
