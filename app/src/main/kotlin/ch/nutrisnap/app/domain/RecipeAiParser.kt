@@ -28,8 +28,9 @@ import java.util.concurrent.TimeUnit
 object RecipeAiParser {
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .callTimeout(20, TimeUnit.SECONDS)
         .build()
 
     private const val GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -1258,7 +1259,7 @@ Rules:
         }
     }
 
-    private fun callGroq(caption: String, apiKey: String, fastModel: Boolean = false): Recipe {
+    private suspend fun callGroq(caption: String, apiKey: String, fastModel: Boolean = false): Recipe {
         val userMessage = "Extract recipe from this caption:\n\n$caption"
         // llama-3.1-8b-instant/llama-3.3-70b-versatile von Groq am 17.06.2026 deprecated
         // (model_not_found seit Shutdown). Offizielle Ersatzmodelle:
@@ -1285,7 +1286,7 @@ Rules:
             .header("Content-Type", "application/json")
             .build()
 
-        val responseText = client.newCall(req).execute().use { resp ->
+        val responseText = client.newCall(req).await { resp ->
             val bodyStr = resp.body?.string() ?: throw Exception("Empty Groq response")
             if (!resp.isSuccessful) throw Exception("Groq error ${resp.code}: $bodyStr")
             bodyStr

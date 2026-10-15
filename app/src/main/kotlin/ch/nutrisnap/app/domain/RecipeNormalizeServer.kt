@@ -44,6 +44,7 @@ object RecipeNormalizeServer {
         .connectTimeout(5, TimeUnit.SECONDS)
         // Fast-Pfad: Server sollte in <5s antworten; 14s Read ließ hängende Calls den Import blockieren.
         .readTimeout(8, TimeUnit.SECONDS)
+        .callTimeout(9, TimeUnit.SECONDS)
         .build()
 
     fun isConfigured(): Boolean =
@@ -98,7 +99,7 @@ object RecipeNormalizeServer {
         )
     }
 
-    private fun postNormalize(
+    private suspend fun postNormalize(
         caption: String?,
         sourceUrl: String?,
         platform: String,
@@ -125,7 +126,7 @@ object RecipeNormalizeServer {
                 .header("Content-Type", "application/json")
                 .build()
 
-            client.newCall(req).execute().use { resp ->
+            client.newCall(req).await { resp ->
                 val text = resp.body?.string().orEmpty()
                 if (!resp.isSuccessful) {
                     // Die Edge Function reicht bei einem Groq-Fehler {error, detail} durch
@@ -143,7 +144,7 @@ object RecipeNormalizeServer {
                         TAG,
                         "recipe-normalize[$mode] HTTP ${resp.code}: ${text.take(300)}"
                     )
-                    return@runCatching null
+                    return@await null
                 }
                 val recipe = parseResponse(text, sourceUrl, platform, imageUrl)
                 if (recipe == null && lastError == null) {
@@ -153,6 +154,7 @@ object RecipeNormalizeServer {
                 recipe
             }
         }.onFailure { e ->
+            if (e is kotlinx.coroutines.CancellationException) throw e
             lastError = "exception_${e.javaClass.simpleName}"
             Log.e(TAG, "recipe-normalize[$mode] Aufruf fehlgeschlagen (${e.javaClass.simpleName}): ${e.message}", e)
         }.getOrNull()

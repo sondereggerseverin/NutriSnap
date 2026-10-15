@@ -56,9 +56,9 @@ object VideoTranscriptService {
                     .post(body)
                     .build()
 
-                client.newCall(req).execute().use { resp ->
+                client.newCall(req).await { resp ->
                     val str = resp.body?.string().orEmpty()
-                    if (!resp.isSuccessful) return@runCatching null
+                    if (!resp.isSuccessful) return@await null
                     val text = JSONObject(str).optString("text").trim()
                     text.takeIf { it.length >= 30 }
                 }
@@ -68,14 +68,14 @@ object VideoTranscriptService {
     /**
      * Holt eine abspielbare Media-URL von TikTok (tikwm) oder null.
      */
-    fun resolveTikTokMediaUrl(expandedUrl: String): String? {
+    suspend fun resolveTikTokMediaUrl(expandedUrl: String): String? {
         return runCatching {
             val apiUrl = "https://www.tikwm.com/api/?url=${java.net.URLEncoder.encode(expandedUrl, "UTF-8")}&hd=1"
             val req = Request.Builder()
                 .url(apiUrl)
                 .header("User-Agent", "Mozilla/5.0 (compatible; NutriSnap/1.0)")
                 .build()
-            val raw = client.newCall(req).execute().use { it.body?.string().orEmpty() }
+            val raw = client.newCall(req).await { it.body?.string().orEmpty() }
             if (raw.isBlank()) return null
             // data.play / data.hdplay / data.wmplay
             val candidates = listOf("hdplay", "play", "wmplay", "music")
@@ -95,7 +95,7 @@ object VideoTranscriptService {
      * Versucht eine IG-Video-URL über öffentliche Embed-/Mirror-Seiten.
      * Oft null – dann wird Transkript übersprungen.
      */
-    fun resolveInstagramMediaUrl(shortcode: String): String? {
+    suspend fun resolveInstagramMediaUrl(shortcode: String): String? {
         val desktopUa =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
         val urls = listOf(
@@ -109,7 +109,7 @@ object VideoTranscriptService {
                     .header("User-Agent", desktopUa)
                     .header("Accept", "text/html")
                     .build()
-                client.newCall(req).execute().use { it.body?.string().orEmpty() }
+                client.newCall(req).await { it.body?.string().orEmpty() }
             }.getOrNull().orEmpty()
             if (html.isBlank()) continue
             // video_url / contentUrl / <video src=
@@ -129,7 +129,7 @@ object VideoTranscriptService {
         return null
     }
 
-    private fun downloadBytes(url: String): ByteArray? {
+    private suspend fun downloadBytes(url: String): ByteArray? {
         val req = Request.Builder()
             .url(url)
             .header(
@@ -138,8 +138,8 @@ object VideoTranscriptService {
             )
             .header("Accept", "*/*")
             .build()
-        return client.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) return null
+        return client.newCall(req).await { resp ->
+            if (!resp.isSuccessful) return@await null
             resp.body?.bytes()
         }
     }

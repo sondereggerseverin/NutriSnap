@@ -127,12 +127,12 @@ object GeminiService {
                 .post(requestBody.toRequestBody("application/json".toMediaType()))
                 .build()
 
-            val response = client.newCall(request).execute()
-            val bodyStr = response.body?.string() ?: return@withContext Result.failure(Exception("Leere Gemini-Antwort"))
+            val (httpCode, bodyStr) = client.newCall(request).await { it.code to it.body?.string() }
+            if (bodyStr == null) return@withContext Result.failure(Exception("Leere Gemini-Antwort"))
 
-            if (!response.isSuccessful) {
-                Log.w(TAG, "Gemini API Fehler ${response.code}: ${bodyStr.take(200)}")
-                return@withContext Result.failure(Exception(friendlyError(response.code, bodyStr)))
+            if (httpCode !in 200..299) {
+                Log.w(TAG, "Gemini API Fehler $httpCode: ${bodyStr.take(200)}")
+                return@withContext Result.failure(Exception(friendlyError(httpCode, bodyStr)))
             }
 
             val text = extractText(bodyStr)
@@ -141,6 +141,8 @@ object GeminiService {
             }
 
             Result.success(text.trim())
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "Gemini text call fehlgeschlagen: ${e.message}")
             Result.failure(Exception(e.message?.take(120) ?: "Gemini-Anfrage fehlgeschlagen"))

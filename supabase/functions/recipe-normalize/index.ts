@@ -85,7 +85,13 @@ const cors = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// Gesamtbudget pro Request: der Client (RecipeScraper) bricht den URL-Import nach ~6 s ab,
+// alles danach ist verschwendete Groq-Zeit. Fetch + Groq teilen sich dieses Budget.
+const REQUEST_BUDGET_MS = 8000;
+const MIN_GROQ_ATTEMPT_MS = 2000;
+
 serve(async (req) => {
+  const deadline = Date.now() + REQUEST_BUDGET_MS;
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: cors });
   }
@@ -143,7 +149,7 @@ serve(async (req) => {
     const userMsg =
       `Platform: ${platform}\nSource: ${sourceUrl || "n/a"}\nExtract recipe from this ${sourceLabel}:\n\n${clipped}`;
 
-    const groqText = await groqChat(apiKey, userMsg);
+    const groqText = await groqChat(apiKey, userMsg, deadline);
     if (!groqText) {
       return json({ error: "Groq failed for all models" }, 502);
     }
@@ -395,7 +401,7 @@ async function fetchCaptionFromUrl(
     );
   }
 
-  // Erste Caption mit Score ≥ 25 gewinnt; max. 5s Gesamtbudget
+  // Erste Caption mit Score ≥ 25 gewinnt; max. 4s Gesamtbudget (Rest gehört Groq)
   const GOOD = 25;
   let best = { caption: "", imageUrl: null as string | null, score: -1 };
 
@@ -408,7 +414,7 @@ async function fetchCaptionFromUrl(
     const hardStop = setTimeout(() => {
       abortAll();
       resolve();
-    }, 5000);
+    }, 4000);
 
     for (const job of jobs) {
       job.then((c) => {
@@ -444,12 +450,21 @@ async function fetchCaptionFromUrl(
 }
 
 /** Schnelles Modell zuerst, Qualitäts-Modell nur bei Fehler. */
-async function groqChat(apiKey: string, userMsg: string): Promise<string | null> {
+async function groqChat(
+  apiKey: string,
+  userMsg: string,
+  deadline: number,
+): Promise<string | null> {
   for (const model of [MODEL_FAST, MODEL_QUALITY]) {
+    // Versuch nur starten, wenn im Request-Budget noch genug Zeit dafür ist.
+    const remaining = deadline - Date.now();
+    if (remaining < MIN_GROQ_ATTEMPT_MS) break;
     try {
       const resp = await fetch(GROQ_URL, {
         method: "POST",
-        signal: AbortSignal.timeout(model === MODEL_FAST ? 6000 : 9000),
+        signal: AbortSignal.timeout(
+          Math.min(model === MODEL_FAST ? 6000 : 9000, remaining),
+        ),
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
