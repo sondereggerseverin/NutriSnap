@@ -173,4 +173,29 @@ class IngredientLineParserTest {
         assertEquals("g", p.unit)
         assertTrue("name=${p.name}", p.name.contains("Mehl", ignoreCase = true))
     }
+
+    @Test
+    fun `scoops protein powder wird zu 30 g pro scoop`() {
+        assertEquals("90 g chocolate protein powder", normalizeCulinaryUnits("3 scoops chocolate protein powder"))
+        assertEquals("90 g Schokoladen-Proteinpulver", normalizeCulinaryUnits("3 Portionen Schokoladen-Proteinpulver"))
+        assertEquals("30 g Vanille-Proteinpulver", normalizeCulinaryUnits("1 Portion Vanille-Proteinpulver"))
+        assertEquals("30 g vanilla protein powder", normalizeCulinaryUnits("1 scoop vanilla protein powder"))
+        assertEquals("45 g Whey Protein", normalizeCulinaryUnits("1.5 Scoops Whey Protein"))
+        assertEquals("15 g Proteinpulver", normalizeCulinaryUnits("1/2 Scoop Proteinpulver"))
+        assertEquals("• 60 g Vanille-Proteinpulver", normalizeCulinaryUnits("• 2 Stück Portionen Vanille-Proteinpulver"))
+    }
+
+    @Test
+    fun `portion ohne proteinpulver bleibt unveraendert`() {
+        assertEquals("1 Portion Reis", normalizeCulinaryUnits("1 Portion Reis"))
+        assertEquals("2 scoops ice cream", normalizeCulinaryUnits("2 scoops ice cream"))
+    }
+
+    @Test
+    fun `scoop proteinpulver wird beim parsen zu gramm`() {
+        val p = parseIngredientLine("3 Portionen Schokoladen-Proteinpulver")
+        assertEquals("90", p.amount)
+        assertEquals("g", p.unit)
+        assertTrue(p.name.contains("Proteinpulver"))
+    }
 }

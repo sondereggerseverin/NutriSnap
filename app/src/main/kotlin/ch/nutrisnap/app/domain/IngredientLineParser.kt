@@ -60,6 +60,42 @@ private val INGREDIENT_RANGE_REGEX = Regex(
     RegexOption.IGNORE_CASE
 )
 
+/** 1 Scoop Proteinpulver = 30 g (Standard-Messlöffel). */
+private const val SCOOP_GRAMS = 30f
+
+/** "3 scoops chocolate protein powder", "1 Portion Vanille-Proteinpulver", "2 Stück Portionen Whey". */
+private val SCOOP_PROTEIN_REGEX = Regex(
+    "^([•\\-*\\s]*)" +
+        "(\\d+(?:[.,]\\d+)?\\s+\\d+/\\d+|\\d+/\\d+|\\d+(?:[.,]\\d+)?|[$FRACTION_CHARS])" +
+        "\\s*(?:stück\\s+|stueck\\s+)?(?:scoops?|portionen|portion|messlöffel|messloeffel)\\b\\s*" +
+        "(?:\\([^)]*\\)\\s*)?(?:of\\s+|von\\s+)?" +
+        "(.*(?:protein|whey|casein|kasein|eiweiss|eiweiß).*)$",
+    RegexOption.IGNORE_CASE
+)
+
+private fun scoopAmountToFloat(raw: String): Float? {
+    val t = raw.trim()
+    if (t.length == 1) UNICODE_FRACTION_VALUES[t[0]]?.let { return it }
+    var sum = 0f
+    for (part in t.split(Regex("\\s+"))) {
+        if ("/" in part) {
+            val pieces = part.split("/")
+            val a = pieces[0].toFloatOrNull()
+            val b = pieces.getOrNull(1)?.toFloatOrNull()
+            if (a == null || b == null || b == 0f) return null
+            sum += a / b
+        } else {
+            sum += part.replace(',', '.').toFloatOrNull() ?: return null
+        }
+    }
+    return sum
+}
+
+private fun formatScoopGrams(g: Float): String {
+    val rounded = Math.round(g * 10f) / 10f
+    return if (rounded % 1f == 0f) rounded.toInt().toString() else rounded.toString()
+}
+
 /**
  * FR/IT/EN-Löffelmaße und Zählwaren vor dem Parsen normalisieren.
  * "4 c. à soupe de Skyr" → "4 EL Skyr"
@@ -83,6 +119,13 @@ fun normalizeCulinaryUnits(line: String): String {
     r = Regex(
         """(?i)(\d+[.,]?\d*)\s*(?:c\.\s*à\s*café|c\s*à\s*café|c\.\s*à\s*cafe|cuillères?\s*à\s*café|c\.a\.c\.?|cac)\b"""
     ).replace(r) { "${it.groupValues[1]} TL" }
+    // Scoops/Portionen Proteinpulver → Gramm (1 Scoop = 30 g):
+    // "3 scoops chocolate protein powder" / "3 Portionen Schokoladen-Proteinpulver" → "90 g …"
+    r = SCOOP_PROTEIN_REGEX.replace(r) { m ->
+        val n = scoopAmountToFloat(m.groupValues[2])
+        if (n == null || n <= 0f) m.value
+        else "${m.groupValues[1]}${formatScoopGrams(n * SCOOP_GRAMS)} g ${m.groupValues[3].trim()}"
+    }
     // FR/IT Präposition nach Einheit: "de " / "di "
     r = Regex("""(?i)(\d+[.,]?\d*\s*(?:EL|TL|g|kg|ml|l|Stück))\s+(?:de|di)\s+""").replace(r) {
         "${it.groupValues[1]} "

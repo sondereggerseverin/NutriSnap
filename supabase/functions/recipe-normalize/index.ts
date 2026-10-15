@@ -55,6 +55,8 @@ Rules:
   IT: cucchiaio/i → EL; cucchiaino/i → TL; "di" after unit → drop.
   FR: c. à soupe → EL; c. à café → TL; galettes → Stück.
   EN: tbsp→EL, tsp→TL.
+  SCOOPS: 1 scoop (or 1 "Portion") protein powder = 30 g. Output grams, never "Portion"/"Stück":
+  "3 scoops chocolate protein powder" → "90 g Schokoladen-Proteinpulver".
 - Extract EVERY ingredient line (including baking powder / lievito AND fluids):
   "ca. 150 ml ungesüßte Mandelmilch" MUST appear — never drop milk/water/ml lines.
 - NEVER output "1 Portion" / "1 g Portion" as an ingredient. Headers like
