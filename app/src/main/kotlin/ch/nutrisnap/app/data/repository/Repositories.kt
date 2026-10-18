@@ -991,6 +991,7 @@ class FoodItemRepository(db: NutriDatabase) {
         return (local + custom)
             .distinctBy { it.barcode ?: (it.name.lowercase().trim() + "|" + (it.brand?.lowercase()?.trim() ?: "")) }
             .mapNotNull { with(ch.nutrisnap.app.domain.NutritionSanity) { it.sanitized() } }
+            .let { FoodSearchRepository.cleanSearchResults(it) }
             .sortedWith(FoodSearchRepository.relevanceComparator(query))
             .take(20)
     }
@@ -1017,6 +1018,7 @@ class FoodItemRepository(db: NutriDatabase) {
         return combined
             .distinctBy { it.barcode ?: (it.name.lowercase().trim() + "|" + (it.brand?.lowercase()?.trim() ?: "")) }
             .mapNotNull { with(ch.nutrisnap.app.domain.NutritionSanity) { it.sanitized() } }
+            .let { FoodSearchRepository.cleanSearchResults(it) }
             .sortedWith(FoodSearchRepository.relevanceComparator(query))
     }
 
