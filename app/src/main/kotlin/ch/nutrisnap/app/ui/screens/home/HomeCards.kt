@@ -1203,6 +1203,48 @@ internal fun ManualActivityDialog(
 }
 
 
+/**
+ * Einklappbarer Kopf für "Details" (Tages-Score + Nährstoffe im Blick).
+ * Zeigt zugeklappt eine Kurzfassung, damit die Startseite ruhiger bleibt.
+ */
+@Composable
+internal fun HomeDetailsHeader(
+    summary: String,
+    expanded: Boolean,
+    onToggle: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.sm),
+        shape = RoundedCornerShape(NutriRadius.lg),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggle)
+                .padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.md),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Tages-Details", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                Text(
+                    summary,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(
+                if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = if (expanded) "Details einklappen" else "Details ausklappen",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
 @Composable
 internal fun CalorieBreakdownCard(state: HomeUiState) {
     val b = state.calorieBreakdown

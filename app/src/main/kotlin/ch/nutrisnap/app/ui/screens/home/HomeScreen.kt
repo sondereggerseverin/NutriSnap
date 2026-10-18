@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +55,7 @@ fun HomeScreen(
     val macroSuggestions by vm.macroSuggestions.collectAsStateWithLifecycle()
     val priorityNutrients by vm.priorityNutrients.collectAsStateWithLifecycle()
     val healthScore by vm.healthScore.collectAsStateWithLifecycle()
+    var detailsExpanded by rememberSaveable { mutableStateOf(false) }
     var showWeightDialog by remember { mutableStateOf(false) }
     var showActivityDialog by remember { mutableStateOf(false) }
     var snackMessage by remember { mutableStateOf<String?>(null) }
@@ -89,16 +91,32 @@ fun HomeScreen(
                     onQuickAdd = { meal -> onNavigateToDiary(meal.type, true) }
                 )
             }
-            if (priorityNutrients.isNotEmpty()) {
+            val nutrientsWithData = priorityNutrients.count { it.hasData }
+            if (healthScore != null || nutrientsWithData > 0) {
                 item {
-                    PriorityNutrientsSection(
-                        allItems = priorityNutrients,
-                        onClick = { status -> onNavigateToNutrientDetail(status.key) }
+                    val summary = buildList {
+                        healthScore?.let { add("Score ${it.score}") }
+                        if (nutrientsWithData > 0) add("$nutrientsWithData Nährstoffe")
+                    }.joinToString(" · ")
+                    HomeDetailsHeader(
+                        summary = summary,
+                        expanded = detailsExpanded,
+                        onToggle = { detailsExpanded = !detailsExpanded }
                     )
                 }
-            }
-            healthScore?.let { score ->
-                item { DailyHealthScoreCard(breakdown = score) }
+                if (detailsExpanded) {
+                    if (nutrientsWithData > 0) {
+                        item {
+                            PriorityNutrientsSection(
+                                allItems = priorityNutrients,
+                                onClick = { status -> onNavigateToNutrientDetail(status.key) }
+                            )
+                        }
+                    }
+                    healthScore?.let { score ->
+                        item { DailyHealthScoreCard(breakdown = score) }
+                    }
+                }
             }
             // Gemeinsame Abschnitte (vorher in beiden Layout-Zweigen dupliziert).
             val activityItems: LazyListScope.() -> Unit = {
