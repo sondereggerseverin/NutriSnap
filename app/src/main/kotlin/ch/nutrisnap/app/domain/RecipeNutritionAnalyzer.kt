@@ -755,8 +755,11 @@ object RecipeNutritionAnalyzer {
                         // 1) Persönliche Standards (gescannt/verifiziert) vor generischer DB
                         val personal = globalDictionary?.lookup(parsed.name)
                         if (personal != null) {
-                            val localFiber = IngredientNutritionDatabase.lookup(parsed.name)?.fiber
-                                ?.takeIf { it > 0f }
+                            // Fiber: zuerst Wert aus dem Standard, sonst lokale Referenz-DB
+                            val personalFiber = personal.fiberPer100g
+                                .takeIf { it > 0.0 }?.toFloat()
+                                ?: IngredientNutritionDatabase.lookup(parsed.name)?.fiber
+                                    ?.takeIf { it > 0f }
                                 ?: IngredientNutritionDatabase.lookup(personal.offProductName)?.fiber
                                     ?.takeIf { it > 0f }
                             val personalFood = FoodItem(
@@ -767,7 +770,7 @@ object RecipeNutritionAnalyzer {
                                 protein  = personal.proteinPer100g.toFloat(),
                                 carbs    = personal.carbsPer100g.toFloat(),
                                 fat      = personal.fatPer100g.toFloat(),
-                                fiber    = localFiber,
+                                fiber    = personalFiber,
                                 source   = if (personal.isVerifiedByUser)
                                     ch.nutrisnap.app.data.model.FoodSource.MANUAL
                                 else
@@ -829,6 +832,7 @@ object RecipeNutritionAnalyzer {
                                     proteinPer100g  = (found.protein  ?: 0f).toDouble(),
                                     carbsPer100g    = (found.carbs    ?: 0f).toDouble(),
                                     fatPer100g      = (found.fat      ?: 0f).toDouble(),
+                                    fiberPer100g    = (found.fiber    ?: 0f).toDouble(),
                                     verifiedByUser  = false
                                 )
                             }

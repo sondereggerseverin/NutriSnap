@@ -240,6 +240,12 @@ object IngredientNutritionDatabase {
         "peanuts"               to Entry(567f, 26f,   16f,  49f, 8.5f),
         "chiasamen"             to Entry(486f, 17f,   42f,  31f, 34f),
         "chia seeds"            to Entry(486f, 17f,   42f,  31f, 34f),
+        // Flohsamenschalen / Psyllium: USDA ~208 kcal, ~80 g Ballaststoffe
+        "flohsamenschalen"      to Entry(208f, 3.8f,  88f,  0.6f, 85f),
+        "flohsamenschale"       to Entry(208f, 3.8f,  88f,  0.6f, 85f),
+        "flohsamen"             to Entry(208f, 3.8f,  88f,  0.6f, 85f),
+        "psyllium"              to Entry(208f, 3.8f,  88f,  0.6f, 85f),
+        "psyllium husk"         to Entry(208f, 3.8f,  88f,  0.6f, 85f),
         "sesam"                 to Entry(573f, 18f,   23f,  50f, 12f),
         "sesame"                to Entry(573f, 18f,   23f,  50f, 12f),
         "kokosmilch"            to Entry(230f, 2.3f,  5.5f, 24f, 2.2f),

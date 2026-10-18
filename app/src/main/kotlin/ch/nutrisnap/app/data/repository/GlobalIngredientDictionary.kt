@@ -31,6 +31,9 @@ class GlobalIngredientDictionary(private val dao: GlobalIngredientMatchDao) {
     ) {
         val normalized = originalName.trim().lowercase()
         if (normalized.isBlank()) return
+        // Automatischen Cache für offensichtlichen Rezept-Müll ablehnen
+        // (Anweisungen, Hashtags, Satzfragmente) – manuelle Standards bleiben erlaubt
+        if (!verifiedByUser && looksLikeJunkAlias(normalized)) return
         val existing = dao.findByName(normalized)
         // Nutzer-Standard nie durch automatischen Netzwerk-Cache überschreiben
         if (existing?.isVerifiedByUser == true && !verifiedByUser) return
@@ -55,6 +58,24 @@ class GlobalIngredientDictionary(private val dao: GlobalIngredientMatchDao) {
                 )
             )
         }
+    }
+
+    /** Heuristik: Alias sieht aus wie Anweisungstext / Hashtag / Satzfragment, kein Lebensmittelname. */
+    private fun looksLikeJunkAlias(normalized: String): Boolean {
+        if (normalized.length > 60) return true
+        if (normalized.startsWith("#") || normalized.contains("#")) return true
+        if (normalized.startsWith(".") || normalized.startsWith("-") || normalized.startsWith("(")) return true
+        // Viele Wörter → oft Anweisungssätze
+        val words = normalized.split(Regex("\\s+")).filter { it.isNotBlank() }
+        if (words.size >= 6) return true
+        // Typische Anweisungs-Wörter
+        val instructionHints = listOf(
+            "divide", "finish", "let set", "chill", "refrigerate", "bake", "preheat",
+            "ingredients for", "servings", "portionen", "nach wahl", "oder nach",
+            "for 4", "for 5", "zwischen", "zwischen den"
+        )
+        if (instructionHints.any { normalized.contains(it) }) return true
+        return false
     }
 
     /** Speichert ein gescanntes/gewähltes FoodItem als persönlichen Standard für [aliasName]. */
