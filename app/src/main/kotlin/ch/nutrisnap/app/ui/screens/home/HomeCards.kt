@@ -1491,9 +1491,13 @@ internal fun RemainingMacroSuggestionsCard(
 
 @Composable
 internal fun PriorityNutrientsSection(
-    items: List<ch.nutrisnap.app.domain.PriorityNutrientStatus>,
+    allItems: List<ch.nutrisnap.app.domain.PriorityNutrientStatus>,
     onClick: (ch.nutrisnap.app.domain.PriorityNutrientStatus) -> Unit = {}
 ) {
+    // Nur Nährstoffe mit echten Messwerten anzeigen; "keine Daten" ist nicht "0 %".
+    val items = allItems.filter { it.hasData }
+    val missing = allItems.size - items.size
+    // Keine Kachel mit Messwerten (z. B. nur manuelle Einträge) -> Bereich ausblenden.
     if (items.isEmpty()) return
     Column(
         Modifier
@@ -1505,8 +1509,16 @@ internal fun PriorityNutrientsSection(
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(bottom = NutriSpacing.sm)
+            modifier = Modifier.padding(bottom = if (missing > 0) 2.dp else NutriSpacing.sm)
         )
+        if (missing > 0) {
+            Text(
+                "$missing weitere ohne Messwerte (z. B. manuelle Einträge)",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = NutriSpacing.sm)
+            )
+        }
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1555,6 +1567,7 @@ private fun PriorityNutrientCard(
             MaterialTheme.colorScheme.onSurfaceVariant
     }
     val progress = (status.pctOfGoal ?: 0).coerceIn(0, 100) / 100f
+    val noData = !status.hasData
 
     Card(
         modifier = modifier.clickable(onClick = onClick),
@@ -1585,12 +1598,21 @@ private fun PriorityNutrientCard(
                 else -> "0"
             }
             Text(
-                "$amountText ${status.unit}",
+                if (noData) "–" else "$amountText ${status.unit}",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                color = levelColor,
+                color = if (noData) MaterialTheme.colorScheme.onSurfaceVariant else levelColor,
                 maxLines = 1
             )
+            if (noData) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Keine Daten",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
             status.pctOfGoal?.let { pct ->
                 Spacer(Modifier.height(6.dp))
                 LinearProgressIndicator(

@@ -91,7 +91,7 @@ fun HomeScreen(
             if (priorityNutrients.isNotEmpty()) {
                 item {
                     PriorityNutrientsSection(
-                        items = priorityNutrients,
+                        allItems = priorityNutrients,
                         onClick = { status -> onNavigateToNutrientDetail(status.key) }
                     )
                 }

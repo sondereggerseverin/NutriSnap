@@ -57,7 +57,13 @@ data class PriorityNutrientStatus(
     val goalDisplay: Float?,
     /** 0–100+ Prozent des Ziels, null wenn kein Ziel. */
     val pctOfGoal: Int?,
-    val level: PriorityNutrientLevel
+    val level: PriorityNutrientLevel,
+    /**
+     * false = für diesen Nährstoff liegt an diesem Tag kein einziger Messwert vor
+     * (manuelle Einträge, Lebensmittel/Rezepte ohne Mikro-Daten). Das ist NICHT dasselbe
+     * wie "0 mg gegessen" und darf weder rot noch als 0 % angezeigt werden.
+     */
+    val hasData: Boolean = true
 )
 
 /**
@@ -92,6 +98,7 @@ fun buildPriorityStatuses(
         val label = meta?.first ?: key
         val unit = meta?.second ?: "g"
         val factor = meta?.third ?: 1f
+        val hasData = totalsGrams.containsKey(key)
         val grams = totalsGrams[key] ?: 0f
         val amountDisplay = grams * factor
 
@@ -100,7 +107,9 @@ fun buildPriorityStatuses(
             else -> NRV_REFERENCE[key]
         }
         val goalDisplay = goalGrams?.let { it * factor }
-        val pct = goalGrams?.let { g ->
+        // Ohne Messwerte kein Prozentwert: sonst würde "keine Daten" als 0 % gewertet
+        // (rote Kachel + Abzug im Tages-Score).
+        val pct = if (!hasData) null else goalGrams?.let { g ->
             if (g <= 0f) null else ((grams / g) * 100f).toInt().coerceAtLeast(0)
         }
         val level = when {
@@ -116,7 +125,8 @@ fun buildPriorityStatuses(
             amountDisplay = amountDisplay,
             goalDisplay = goalDisplay,
             pctOfGoal = pct,
-            level = level
+            level = level,
+            hasData = hasData
         )
     }
 }
