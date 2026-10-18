@@ -1015,6 +1015,10 @@ internal fun NutritionAnalysisCard(
     val hasMacros = calsPerServ != null || protPerServ != null
 
     var showDetails by remember { mutableStateOf(false) }
+    // Orange Buttons auf orangem primaryContainer waren kaum lesbar -> Inhaltsfarbe des Containers
+    val onContainerButtonColors = ButtonDefaults.textButtonColors(
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+    )
     val hasDetails = fiberPerServ != null || sugarPerServ != null || satFatPerServ != null ||
         saltPerServ != null || microsPerServ.isNotEmpty() || result != null
 
@@ -1038,23 +1042,23 @@ internal fun NutritionAnalysisCard(
                 if (!isAnalyzing) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (hasStoredOverrides && isForThis) {
-                            TextButton(onClick = onRecalculateFromOverrides, contentPadding = PaddingValues(2.dp)) {
+                            TextButton(onClick = onRecalculateFromOverrides, contentPadding = PaddingValues(2.dp), colors = onContainerButtonColors) {
                                 Text("Auswahl", fontSize = 11.sp)
                             }
                         }
                         if (hasMacros) {
-                            TextButton(onClick = onViewIngredients, contentPadding = PaddingValues(2.dp)) {
+                            TextButton(onClick = onViewIngredients, contentPadding = PaddingValues(2.dp), colors = onContainerButtonColors) {
                                 Icon(Icons.Default.Visibility, null, Modifier.size(13.dp))
                                 Spacer(Modifier.width(2.dp))
                                 Text("Einsehen", fontSize = 11.sp)
                             }
-                            TextButton(onClick = onVerify, contentPadding = PaddingValues(2.dp)) {
+                            TextButton(onClick = onVerify, contentPadding = PaddingValues(2.dp), colors = onContainerButtonColors) {
                                 Icon(Icons.Default.QrCodeScanner, null, Modifier.size(13.dp))
                                 Spacer(Modifier.width(2.dp))
                                 Text("Verify", fontSize = 11.sp)
                             }
                         }
-                        TextButton(onClick = onAnalyze, contentPadding = PaddingValues(2.dp)) {
+                        TextButton(onClick = onAnalyze, contentPadding = PaddingValues(2.dp), colors = onContainerButtonColors) {
                             Text(if (hasMacros) "Neu" else "Berechnen", fontSize = 11.sp)
                         }
                     }
@@ -1089,6 +1093,7 @@ internal fun NutritionAnalysisCard(
                     TextButton(
                         onClick = { showDetails = !showDetails },
                         contentPadding = PaddingValues(0.dp),
+                        colors = onContainerButtonColors,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(
