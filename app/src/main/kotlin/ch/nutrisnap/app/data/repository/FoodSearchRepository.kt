@@ -7,6 +7,7 @@ import ch.nutrisnap.app.data.api.UsdaFoodApi
 import ch.nutrisnap.app.data.db.FoodItemDao
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.FoodSource
+import ch.nutrisnap.app.domain.NutritionSanity
 import ch.nutrisnap.app.domain.SearchUtils
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -350,15 +351,48 @@ class FoodSearchRepository(
          * lokale DB-Treffer und Remote-Treffer separat zusammenführt) dieselbe
          * Sortierung anwenden können statt lokale Treffer unsortiert voranzustellen.
          */
-        fun relevanceComparator(query: String): Comparator<FoodItem> =
-            compareByDescending<FoodItem> { relevance(it, query) }
+        fun relevanceComparator(query: String): Comparator<FoodItem> {
+            val q = SearchUtils.normalize(query)
+            // 0 = Name beginnt mit Anfrage, 1 = Anfrage als späteres Wort, 2 = sonst
+            fun matchPos(item: FoodItem): Int {
+                val n = SearchUtils.normalize(item.name)
+                return when {
+                    n.startsWith(q) -> 0
+                    n.contains(" $q") || n.contains("-$q") -> 1
+                    else -> 2
+                }
+            }
+            fun wordCount(item: FoodItem): Int =
+                SearchUtils.normalize(item.name).split(Regex("[\\s,\\-]+")).count { it.isNotBlank() }
+            return compareByDescending<FoodItem> { relevance(it, query) }
+                // Einträge ohne jegliche Nährwerte ganz nach unten
                 .thenByDescending {
                     val kcal = it.calories ?: 0f
                     val p = it.protein ?: 0f
-                    // Einträge ohne jegliche Nährwerte ganz nach unten
                     if (kcal <= 0f && p <= 0f) 0 else 1
                 }
+                // "Kakaopulver" vor "Milchgetränk mit fettarmer Kakaomasse"
+                .thenBy { matchPos(it) }
+                // Generische Lebensmittel (ohne Marke/Barcode) vor Markenprodukten
+                .thenBy { if (it.brand.isNullOrBlank() && it.barcode.isNullOrBlank()) 0 else 1 }
+                // Kürzere, spezifischere Namen zuerst
+                .thenBy { wordCount(it) }
+                .thenBy { it.name.length }
                 .thenByDescending { it.completenessScore }
+        }
+
+        /**
+         * Räumt Suchergebnisse auf: Einträge ganz ohne Nährwerte raus, und Einträge, deren
+         * kcal den Makros widersprechen, nur dann raus, wenn genug brauchbare Alternativen
+         * bleiben (sonst würden z. B. Süssstoffe/Polyole mit 0 kcal aber hohen "Kohlenhydraten"
+         * komplett verschwinden). Nie leer, solange die Eingabe nicht leer ist.
+         */
+        fun cleanSearchResults(items: List<FoodItem>): List<FoodItem> = with(NutritionSanity) {
+            val usable = items.filter { it.hasSearchableNutrition() }
+            val base = if (usable.isNotEmpty()) usable else items
+            val consistent = base.filterNot { it.looksInconsistent() }
+            if (consistent.size >= 3) consistent else base
+        }
     }
 
     suspend fun searchNaturalLanguage(query: String): List<FoodItem> {

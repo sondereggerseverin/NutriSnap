@@ -40,6 +40,38 @@ object NutritionSanity {
         return kcal
     }
 
+    /**
+     * Energie laut Makros (4P + 4K + 9F, Alkohol 7/g) oder null, wenn P/K/F fehlen.
+     */
+    private fun macroEstimate(protein: Float?, carbs: Float?, fat: Float?, alcohol: Float?): Float? {
+        if (protein == null || carbs == null || fat == null) return null
+        return 4f * protein + 4f * carbs + 9f * fat + 7f * (alcohol ?: 0f)
+    }
+
+    /**
+     * true, wenn kcal und Makros sich klar widersprechen (z. B. "64 kcal bei 82 g Kohlenhydraten":
+     * meist Pulver- und zubereitet-Werte vermischt oder Tippfehler in der Quelle) und auch die
+     * kJ-Umrechnung nichts rettet. Grosszügige Toleranz, da Ballaststoffe/Polyole/Rundung
+     * legitime Abweichungen erzeugen.
+     */
+    fun isMacroInconsistent(
+        kcal: Float, protein: Float?, carbs: Float?, fat: Float?, alcohol: Float? = null
+    ): Boolean {
+        val est = macroEstimate(protein, carbs, fat, alcohol) ?: return false
+        if (est < 20f && kcal < 20f) return false
+        return abs(kcal - est) > maxOf(60f, 0.4f * maxOf(est, kcal))
+    }
+
+    /** Eintrag widerspricht sich selbst (kcal vs. Makros). */
+    fun FoodItem.looksInconsistent(): Boolean {
+        val k = calories ?: return false
+        return isMacroInconsistent(k, protein, carbs, fat, alcohol)
+    }
+
+    /** Mindestens kcal oder eine Makro-Angabe vorhanden (0 kcal, z. B. Wasser/Tee, zählt). */
+    fun FoodItem.hasSearchableNutrition(): Boolean =
+        calories != null || (protein ?: 0f) > 0f || (carbs ?: 0f) > 0f || (fat ?: 0f) > 0f
+
     /** FoodItem mit korrigierten kcal oder null, wenn der Eintrag nicht plausibel zu retten ist. */
     fun FoodItem.sanitized(): FoodItem? {
         val kcal = calories ?: return this
