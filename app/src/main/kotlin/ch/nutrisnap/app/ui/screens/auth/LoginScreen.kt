@@ -70,7 +70,7 @@ fun LoginScreen(onLoggedIn: () -> Unit) {
                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
                     Icon(
                         if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                        contentDescription = null
+                        contentDescription = if (passwordVisible) "Passwort verbergen" else "Passwort anzeigen"
                     )
                 }
             },
