@@ -82,6 +82,8 @@ data class HomeUiState(
     val streak:        Int     = 0,
     val lastWeightKg:  Float?  = null,
     val previousWeightKg: Float? = null,
+    /** Gewichtstrend in kg/Woche (negativ = Abnahme); null bei zu wenig Daten. */
+    val weeklyWeightRateKg: Float? = null,
     val meals:         List<MealOverview> = emptyList(),
     // Wenn true, ist calorieGoal bereits das fertige AdaptiveTdeeCalculator-Ziel
     // (inkl. gedämpftem Aktivitätsbonus) — burnedKcal wird dann nur noch angezeigt,
@@ -295,6 +297,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             streak        = streak,
             lastWeightKg  = mergedLastWeightKg ?: profile.weightKg.takeIf { it > 0f },
             previousWeightKg = mergedPreviousWeightKg,
+            weeklyWeightRateKg = ch.nutrisnap.app.domain.WeightTrend.weeklyRateKg(weightByDate, LocalDate.now()),
             isAdaptiveTarget = adaptiveTarget != null,
             tdeeConfidence   = adaptiveTarget?.confidencePercent ?: 0,
             calorieBreakdown = breakdown,

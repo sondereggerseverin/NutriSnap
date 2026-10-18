@@ -308,8 +308,12 @@ internal fun HomeHeader(
                 add(Triple("Aktiv", aktivLabel, Color(0xFFFFF3C4)))
                 add(Triple("Ziel", "${state.adjustedGoal.toInt()} kcal", Color.White))
                 state.lastWeightKg?.let { kg ->
+                    // Bevorzugt Wochentrend (Regression über ~3 Wochen): sagt etwas über das Tempo.
+                    // Fallback: Differenz zur vorletzten Messung (kann beliebig lange her sein).
+                    val rate = state.weeklyWeightRateKg
                     val delta = state.previousWeightKg?.let { prev -> kg - prev }
                     val deltaText = when {
+                        rate != null -> " · ${ch.nutrisnap.app.domain.WeightTrend.formatWeeklyRate(rate)}"
                         delta == null -> null
                         delta > 0.05f -> " · +${"%.1f".format(delta)} kg"
                         delta < -0.05f -> " · ${"%.1f".format(delta)} kg"
