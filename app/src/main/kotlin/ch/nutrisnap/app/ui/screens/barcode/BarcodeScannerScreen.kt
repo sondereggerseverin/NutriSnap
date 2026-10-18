@@ -29,6 +29,8 @@ import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.FlashOff
+import androidx.compose.material.icons.filled.FlashOn
 
 /**
  * NEU: Barcode-Scanner Screen mit ML Kit.
@@ -64,6 +66,8 @@ fun BarcodeScannerScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     var hasPermission by remember { mutableStateOf(false) }
     var isScanning by remember { mutableStateOf(true) }
+    var camera by remember { mutableStateOf<Camera?>(null) }
+    var torchOn by remember { mutableStateOf(false) }
 
     // Permission-Check
     LaunchedEffect(Unit) {
@@ -81,6 +85,7 @@ fun BarcodeScannerScreen(
         // Kamera-Vorschau
         CameraPreview(
             modifier = Modifier.fillMaxSize(),
+            onCameraReady = { camera = it },
             onBarcodeDetected = { barcode ->
                 if (isScanning) {
                     isScanning = false // einmalig scannen, dann pausieren
@@ -94,13 +99,32 @@ fun BarcodeScannerScreen(
 
         // Info-Text
         Text(
-            text = "Halte die Kamera auf einen Barcode",
+            text = "Barcode im Bild halten · Antippen zum Fokussieren",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onPrimary,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 64.dp)
         )
+
+        // Taschenlampe (nur wenn die Kamera einen Blitz hat) – hilft bei dunklen Küchen/Autos
+        if (camera?.cameraInfo?.hasFlashUnit() == true) {
+            IconButton(
+                onClick = {
+                    torchOn = !torchOn
+                    camera?.cameraControl?.enableTorch(torchOn)
+                },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+            ) {
+                Icon(
+                    imageVector = if (torchOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                    contentDescription = if (torchOn) "Taschenlampe aus" else "Taschenlampe an",
+                    tint = MaterialTheme.colorScheme.onPrimary
+                )
+            }
+        }
 
         // Zurück-Button
         IconButton(
@@ -121,6 +145,7 @@ fun BarcodeScannerScreen(
 @Composable
 private fun CameraPreview(
     modifier: Modifier = Modifier,
+    onCameraReady: (Camera) -> Unit = {},
     onBarcodeDetected: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -187,12 +212,25 @@ private fun CameraPreview(
                 boundProvider = cameraProvider
                 try {
                     cameraProvider.unbindAll()
-                    cameraProvider.bindToLifecycle(
+                    val cam = cameraProvider.bindToLifecycle(
                         lifecycleOwner,
                         CameraSelector.DEFAULT_BACK_CAMERA,
                         preview,
                         imageAnalysis
                     )
+                    onCameraReady(cam)
+
+                    // Tap-to-Focus: gewölbte Flaschen und Nahdistanz brauchen oft manuellen Fokus
+                    previewView.setOnTouchListener { v, event ->
+                        if (event.action == android.view.MotionEvent.ACTION_UP) {
+                            val point = previewView.meteringPointFactory.createPoint(event.x, event.y)
+                            cam.cameraControl.startFocusAndMetering(
+                                FocusMeteringAction.Builder(point).build()
+                            )
+                            v.performClick()
+                        }
+                        true
+                    }
                 } catch (e: Exception) {
                     // Kamera nicht verfügbar
                 }
