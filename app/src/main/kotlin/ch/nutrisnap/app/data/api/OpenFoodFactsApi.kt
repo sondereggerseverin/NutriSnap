@@ -67,6 +67,8 @@ object OpenFoodFactsApi {
         val url = "$baseHost/cgi/search.pl" +
                 "?search_terms=$encoded&search_simple=1&action=process&json=1" +
                 "&page_size=$limit" +
+                // Beliebteste Produkte zuerst (OFF liefert sonst keine feste Reihenfolge)
+                "&sort_by=unique_scans_n" +
                 "&countries=Germany,Switzerland,Austria" +
                 "&fields=product_name,brands,nutriments,code,serving_size"
         val req = Request.Builder().url(url)
@@ -94,6 +96,11 @@ object OpenFoodFactsApi {
         val kcal = ch.nutrisnap.app.domain.NutritionSanity.fixKcal(
             rawKcal, n.g("proteins_100g"), n.g("carbohydrates_100g"), n.g("fat_100g")
         ) ?: return null
+        // kcal passen nicht zu Protein/Kohlenhydraten/Fett (z. B. Pulver vs. zubereitet) → verwerfen
+        if (ch.nutrisnap.app.domain.NutritionSanity.isMacroInconsistent(
+                kcal, n.g("proteins_100g"), n.g("carbohydrates_100g"), n.g("fat_100g"), n.g("alcohol_100g")
+            )
+        ) return null
         val name = p.optString("product_name", "").ifBlank { return null }
         val (servingSize, servingUnit) = parseServingSize(p.optString("serving_size", ""))
         return FoodItem(
