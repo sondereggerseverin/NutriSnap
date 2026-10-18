@@ -627,7 +627,64 @@ class RecipeRepository(db: NutriDatabase, private val context: Context) {
             description = newDesc
         )
         updateRecipe(updated)
+        // Bestehende IngredientMatches um Fiber/Makros ergänzen, manuelle Overrides behalten
+        softFillMatchesFromAnalysis(recipe.id, analysis)
         return updated to analysis
+    }
+
+    /**
+     * Alle Rezepte neu analysieren (Standards, Referenz-DB, optional KI für unmatched).
+     * @return Anzahl erfolgreich aktualisierter Rezepte
+     */
+    suspend fun reanalyzeAllRecipes(
+        onProgress: (done: Int, total: Int, title: String) -> Unit = { _, _, _ -> }
+    ): Int {
+        val all = dao.getAllOnce()
+        var ok = 0
+        all.forEachIndexed { index, recipe ->
+            onProgress(index, all.size, recipe.title)
+            val result = runCatching { analyzeAndPersistNutrition(recipe) }.getOrNull()
+            if (result != null) ok++
+        }
+        onProgress(all.size, all.size, "")
+        return ok
+    }
+
+    /**
+     * Ergänzt fehlende matchedFiber (und ggf. Makros) an bestehenden Matches aus der
+     * Analyse – überschreibt keine manualFiberG / manualAmountG und löscht nichts.
+     */
+    private suspend fun softFillMatchesFromAnalysis(
+        recipeId: Long,
+        analysis: ch.nutrisnap.app.domain.RecipeNutritionAnalyzer.AnalysisResult
+    ) {
+        val existing = matchDao.getMatchesForRecipeOnce(recipeId)
+        if (existing.isEmpty()) return
+        fun norm(s: String) = s.trim().lowercase()
+        val byName = analysis.ingredients
+            .mapNotNull { r -> r.parsed?.let { norm(it.name) to r } }
+            .toMap()
+        for (m in existing) {
+            if (m.isDeleted) continue
+            val r = byName[norm(m.ingredientName)] ?: continue
+            val fiberAbs = r.micros["fiber"]
+            val needsFiber = m.manualFiberG == null && (m.matchedFiber == null || m.matchedFiber == 0f) &&
+                fiberAbs != null && fiberAbs > 0f
+            val needsMacros = m.matchedCalories == null && r.matched
+            if (!needsFiber && !needsMacros) continue
+            matchDao.updateMatch(
+                m.copy(
+                    matchedFiber = if (needsFiber) fiberAbs else m.matchedFiber,
+                    matchedCalories = if (needsMacros) r.calories else m.matchedCalories,
+                    matchedProtein = if (needsMacros) r.protein else m.matchedProtein,
+                    matchedCarbs = if (needsMacros) r.carbs else m.matchedCarbs,
+                    matchedFat = if (needsMacros) r.fat else m.matchedFat,
+                    matchedFoodName = m.matchedFoodName ?: r.foodItem?.name,
+                    matchSource = if (m.matchSource == MatchSource.UNMATCHED && r.matched)
+                        MatchSource.DATABASE else m.matchSource
+                )
+            )
+        }
     }
 
     /**

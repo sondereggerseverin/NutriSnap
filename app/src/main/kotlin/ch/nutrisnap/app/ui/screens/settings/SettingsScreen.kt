@@ -161,6 +161,7 @@ fun SettingsScreen(
     onNavigateToCrashLog: () -> Unit = {}
 ) {
     val state   by vm.uiState.collectAsStateWithLifecycle()
+    val reanalyze by vm.reanalyze.collectAsStateWithLifecycle()
     val profile  = state.profile
 
     var weightText  by remember(profile.weightKg)         { mutableStateOf(if (profile.weightKg > 0f) profile.weightKg.toInt().toString() else "") }
@@ -1023,6 +1024,51 @@ fun SettingsScreen(
                     Button(onClick = onNavigateToExport, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Default.Download, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(NutriSpacing.sm)); Text("Daten exportieren (CSV)")
+                    }
+                    OutlinedButton(
+                        onClick = { if (!reanalyze.running) vm.reanalyzeAllRecipes() },
+                        enabled = !reanalyze.running,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.AutoFixHigh, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(NutriSpacing.sm))
+                        Text(
+                            if (reanalyze.running) {
+                                val t = reanalyze.total.coerceAtLeast(1)
+                                "Analysiere ${reanalyze.done}/$t …"
+                            } else {
+                                "Alle Rezepte neu analysieren"
+                            }
+                        )
+                    }
+                    if (reanalyze.running && reanalyze.currentTitle.isNotBlank()) {
+                        Text(
+                            reanalyze.currentTitle,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
+                    reanalyze.finishedOk?.let { n ->
+                        Text(
+                            "✓ $n Rezepte aktualisiert (Standards, Fiber, KI)",
+                            fontSize = 12.sp,
+                            color = MacroColors.calories,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier
+                                .clickable { vm.clearReanalyzeMessage() }
+                                .padding(top = 4.dp)
+                        )
+                    }
+                    reanalyze.error?.let { err ->
+                        Text(
+                            "Fehler: $err",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier
+                                .clickable { vm.clearReanalyzeMessage() }
+                                .padding(top = 4.dp)
+                        )
                     }
                     OutlinedButton(onClick = onNavigateToYazioImport, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Default.UploadFile, null, Modifier.size(18.dp))
