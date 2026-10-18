@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -99,122 +100,77 @@ fun HomeScreen(
             healthScore?.let { score ->
                 item { DailyHealthScoreCard(breakdown = score) }
             }
+            // Gemeinsame Abschnitte (vorher in beiden Layout-Zweigen dupliziert).
+            val activityItems: LazyListScope.() -> Unit = {
+                if (mergeActivityCards) {
+                    item {
+                        ActivityCombinedCard(
+                            data = hcState.todayData,
+                            hasPermission = hcState.hasPermission,
+                            onOpenHealth = onNavigateToHealth,
+                            onEditWeight = { showWeightDialog = true },
+                            manualTodayKcal = state.manualActivityKcal,
+                            manualTotalActive = state.burnedKcal,
+                            onOpenManualActivity = { showActivityDialog = true }
+                        )
+                    }
+                } else {
+                    item { HealthCard(hcState.todayData, hcState.hasPermission, onNavigateToHealth) { showWeightDialog = true } }
+                    if (state.manualActivityEnabled) {
+                        item {
+                            ManualActivityCard(
+                                todayKcal = state.manualActivityKcal,
+                                totalActive = state.burnedKcal,
+                                onClick = { showActivityDialog = true }
+                            )
+                        }
+                    }
+                }
+            }
+            val extraItems: LazyListScope.() -> Unit = {
+                item {
+                    HomeScanQuickAccess(
+                        onFoodScan = onNavigateToFoodScan,
+                        onBarcode = onNavigateToBarcode,
+                        onLabelScan = onNavigateToLabelScan
+                    )
+                }
+                if (showNavShortcuts) {
+                    item { HomeNavShortcuts(onNavigateToCustomFoods, onNavigateToMealTemplates) }
+                }
+                if (state.isViewingToday) {
+                    item {
+                        WhatToCookHomeCard(onClick = onNavigateToCookSuggestions)
+                    }
+                }
+                if (macroSuggestions.isNotEmpty() && state.isViewingToday) {
+                    item {
+                        RemainingMacroSuggestionsCard(
+                            remainingKcal = state.remaining,
+                            remainingProtein = state.remainingProtein,
+                            suggestions = macroSuggestions,
+                            onAdd = { suggestion ->
+                                vm.applyMacroSuggestion(suggestion) { ok ->
+                                    snackMessage = if (ok) "„${suggestion.title}“ hinzugefügt"
+                                    else "Konnte nicht hinzufügen"
+                                }
+                            }
+                        )
+                    }
+                }
+            }
             if (reorderHome) {
                 // Design-Toggle #16 "Home-Reihenfolge neu": Ring → Meals → Makros → Activity.
                 // Scan-Zugriff und Makro-Vorschläge sind Zusatz-Widgets, keine der vier
                 // Kern-Sektionen – rücken hinter Activity, vor dem Streak.
                 item { CalorieBreakdownCard(state) }
-                if (mergeActivityCards) {
-                    item {
-                        ActivityCombinedCard(
-                            data = hcState.todayData,
-                            hasPermission = hcState.hasPermission,
-                            onOpenHealth = onNavigateToHealth,
-                            onEditWeight = { showWeightDialog = true },
-                            manualTodayKcal = state.manualActivityKcal,
-                            manualTotalActive = state.burnedKcal,
-                            onOpenManualActivity = { showActivityDialog = true }
-                        )
-                    }
-                } else {
-                    item { HealthCard(hcState.todayData, hcState.hasPermission, onNavigateToHealth) { showWeightDialog = true } }
-                    if (state.manualActivityEnabled) {
-                        item {
-                            ManualActivityCard(
-                                todayKcal = state.manualActivityKcal,
-                                totalActive = state.burnedKcal,
-                                onClick = { showActivityDialog = true }
-                            )
-                        }
-                    }
-                }
-                item {
-                    HomeScanQuickAccess(
-                        onFoodScan = onNavigateToFoodScan,
-                        onBarcode = onNavigateToBarcode,
-                        onLabelScan = onNavigateToLabelScan
-                    )
-                }
-                if (showNavShortcuts) {
-                    item { HomeNavShortcuts(onNavigateToCustomFoods, onNavigateToMealTemplates) }
-                }
-                if (state.isViewingToday) {
-                    item {
-                        WhatToCookHomeCard(onClick = onNavigateToCookSuggestions)
-                    }
-                }
-                if (macroSuggestions.isNotEmpty() && state.isViewingToday) {
-                    item {
-                        RemainingMacroSuggestionsCard(
-                            remainingKcal = state.remaining,
-                            remainingProtein = state.remainingProtein,
-                            suggestions = macroSuggestions,
-                            onAdd = { suggestion ->
-                                vm.applyMacroSuggestion(suggestion) { ok ->
-                                    snackMessage = if (ok) "„${suggestion.title}“ hinzugefügt"
-                                    else "Konnte nicht hinzufügen"
-                                }
-                            }
-                        )
-                    }
-                }
+                activityItems()
+                extraItems()
             } else {
-                item {
-                    HomeScanQuickAccess(
-                        onFoodScan = onNavigateToFoodScan,
-                        onBarcode = onNavigateToBarcode,
-                        onLabelScan = onNavigateToLabelScan
-                    )
-                }
-                if (showNavShortcuts) {
-                    item { HomeNavShortcuts(onNavigateToCustomFoods, onNavigateToMealTemplates) }
-                }
-                if (state.isViewingToday) {
-                    item {
-                        WhatToCookHomeCard(onClick = onNavigateToCookSuggestions)
-                    }
-                }
-                if (macroSuggestions.isNotEmpty() && state.isViewingToday) {
-                    item {
-                        RemainingMacroSuggestionsCard(
-                            remainingKcal = state.remaining,
-                            remainingProtein = state.remainingProtein,
-                            suggestions = macroSuggestions,
-                            onAdd = { suggestion ->
-                                vm.applyMacroSuggestion(suggestion) { ok ->
-                                    snackMessage = if (ok) "„${suggestion.title}“ hinzugefügt"
-                                    else "Konnte nicht hinzufügen"
-                                }
-                            }
-                        )
-                    }
-                }
+                extraItems()
                 // Breakdown unter den Mahlzeiten, damit Ring + 4 Kacheln ohne Scrollen passen
                 item { CalorieBreakdownCard(state) }
-                if (mergeActivityCards) {
-                    item {
-                        ActivityCombinedCard(
-                            data = hcState.todayData,
-                            hasPermission = hcState.hasPermission,
-                            onOpenHealth = onNavigateToHealth,
-                            onEditWeight = { showWeightDialog = true },
-                            manualTodayKcal = state.manualActivityKcal,
-                            manualTotalActive = state.burnedKcal,
-                            onOpenManualActivity = { showActivityDialog = true }
-                        )
-                    }
-                } else {
-                    item { HealthCard(hcState.todayData, hcState.hasPermission, onNavigateToHealth) { showWeightDialog = true } }
-                    if (state.manualActivityEnabled) {
-                        item {
-                            ManualActivityCard(
-                                todayKcal = state.manualActivityKcal,
-                                totalActive = state.burnedKcal,
-                                onClick = { showActivityDialog = true }
-                            )
-                        }
-                    }
-                }
+                activityItems()
             }
             item { StreakCard(state.streak) }
         }
