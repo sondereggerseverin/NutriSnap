@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -269,8 +270,10 @@ internal fun HomeHeader(
                         },
                         fontSize = primaryNumberFontSize(20.sp),
                         fontWeight = FontWeight.Bold,
+                        // Auf dem orangen Header ist reines Grün kaum lesbar -> stark
+                        // aufgehellter Grünton (Hervorhebung bleibt, Kontrast passt).
                         color = if (highlightRemaining) {
-                            if (overGoal) Color(0xFFFFD67A) else macros.calories
+                            if (overGoal) Color(0xFFFFF3C4) else lerp(macros.calories, Color.White, 0.8f)
                         } else {
                             Color.White
                         }
@@ -279,7 +282,7 @@ internal fun HomeHeader(
                         if (overGoal) "über" else "übrig",
                         fontSize = secondaryNumberFontSize(10.sp),
                         color = if (highlightRemaining && !overGoal) {
-                            macros.calories.copy(alpha = 0.85f)
+                            lerp(macros.calories, Color.White, 0.8f).copy(alpha = 0.9f)
                         } else {
                             Color.White.copy(alpha = 0.75f)
                         }
@@ -300,7 +303,7 @@ internal fun HomeHeader(
                         "+${state.burnedKcal.toInt()} kcal"
                     else -> "anpassen"
                 }
-                add(Triple("Aktiv", aktivLabel, Color(0xFFFFE08A)))
+                add(Triple("Aktiv", aktivLabel, Color(0xFFFFF3C4)))
                 add(Triple("Ziel", "${state.adjustedGoal.toInt()} kcal", Color.White))
                 state.lastWeightKg?.let { kg ->
                     val delta = state.previousWeightKg?.let { prev -> kg - prev }
