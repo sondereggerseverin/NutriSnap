@@ -16,6 +16,9 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import ch.nutrisnap.app.domain.BarcodeStabilityGate
+import ch.nutrisnap.app.domain.BarcodeValidator
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
@@ -119,7 +122,20 @@ private fun CameraPreview(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val executor = remember { Executors.newSingleThreadExecutor() }
-    val barcodeScanner = remember { BarcodeScanning.getClient() }
+    // Nur Lebensmittel-Codes (EAN-13/EAN-8/UPC-A). Ohne Filter werden auch Code 128/ITF/Codabar
+    // erkannt und liefern auf gewölbten Flaschen Fehllesungen (z. B. "104812").
+    val barcodeScanner = remember {
+        BarcodeScanning.getClient(
+            BarcodeScannerOptions.Builder()
+                .setBarcodeFormats(
+                    Barcode.FORMAT_EAN_13,
+                    Barcode.FORMAT_EAN_8,
+                    Barcode.FORMAT_UPC_A
+                )
+                .build()
+        )
+    }
+    val stabilityGate = remember { BarcodeStabilityGate(required = 2) }
 
     AndroidView(
         factory = { ctx ->
@@ -138,7 +154,7 @@ private fun CameraPreview(
                     .build()
                     .also { analysis ->
                         analysis.setAnalyzer(executor) { imageProxy ->
-                            processImageProxy(barcodeScanner, imageProxy, onBarcodeDetected)
+                            processImageProxy(barcodeScanner, stabilityGate, imageProxy, onBarcodeDetected)
                         }
                     }
 
@@ -164,6 +180,7 @@ private fun CameraPreview(
 @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
 private fun processImageProxy(
     scanner: com.google.mlkit.vision.barcode.BarcodeScanner,
+    gate: BarcodeStabilityGate,
     imageProxy: ImageProxy,
     onBarcodeDetected: (String) -> Unit
 ) {
@@ -172,8 +189,11 @@ private fun processImageProxy(
 
     scanner.process(image)
         .addOnSuccessListener { barcodes ->
-            barcodes.firstOrNull { it.format != Barcode.FORMAT_UNKNOWN }
-                ?.rawValue
+            // Erster Treffer mit gültiger Länge + Prüfziffer, der in 2 Frames in Folge identisch ist
+            barcodes.asSequence()
+                .mapNotNull { it.rawValue }
+                .firstOrNull { BarcodeValidator.isValidFoodBarcode(it) }
+                ?.let { gate.offer(it) }
                 ?.let { onBarcodeDetected(it) }
         }
         .addOnCompleteListener { imageProxy.close() }
