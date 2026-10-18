@@ -4,6 +4,10 @@ import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
+import android.util.Size
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.*
@@ -136,6 +140,17 @@ private fun CameraPreview(
         )
     }
     val stabilityGate = remember { BarcodeStabilityGate(required = 2) }
+    var boundProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+
+    // Kamera, Scanner und Executor beim Verlassen freigeben. Der Screen wird auch inline in
+    // Sheets genutzt; ohne unbind blieb die Kamera an den Activity-Lifecycle gebunden.
+    DisposableEffect(Unit) {
+        onDispose {
+            boundProvider?.unbindAll()
+            barcodeScanner.close()
+            executor.shutdown()
+        }
+    }
 
     AndroidView(
         factory = { ctx ->
@@ -149,7 +164,18 @@ private fun CameraPreview(
                     it.setSurfaceProvider(previewView.surfaceProvider)
                 }
 
+                // Standard-Analyse läuft nur in ~640x480: zu grob für Barcodes auf gewölbten Flaschen.
+                val resolutionSelector = ResolutionSelector.Builder()
+                    .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
+                    .setResolutionStrategy(
+                        ResolutionStrategy(
+                            Size(1920, 1080),
+                            ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
+                        )
+                    )
+                    .build()
                 val imageAnalysis = ImageAnalysis.Builder()
+                    .setResolutionSelector(resolutionSelector)
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
                     .also { analysis ->
@@ -158,6 +184,7 @@ private fun CameraPreview(
                         }
                     }
 
+                boundProvider = cameraProvider
                 try {
                     cameraProvider.unbindAll()
                     cameraProvider.bindToLifecycle(
