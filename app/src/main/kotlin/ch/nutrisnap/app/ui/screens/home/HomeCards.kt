@@ -17,6 +17,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -403,8 +405,13 @@ internal fun MacroColumn(
 ) {
     val pct = (value / goal.coerceAtLeast(1f)).coerceIn(0f, 1f)
     val valueText = if (decimals > 0) "%.${decimals}f".format(value) else value.toInt().toString()
+    val goalText = goal.toInt().toString()
     Column(
-        modifier = modifier.padding(horizontal = 2.dp),
+        modifier = modifier
+            .padding(horizontal = 2.dp)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "$label: $valueText von $goalText Gramm"
+            },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(
@@ -418,17 +425,24 @@ internal fun MacroColumn(
                     .background(accent)
             )
             Text(
-                "${valueText}g",
-                fontSize = 11.sp,
+                valueText,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
+                maxLines = 1
+            )
+            // Ziel sichtbar machen: "33/120g" statt nur "33g"
+            Text(
+                "/${goalText}g",
+                fontSize = 10.sp,
+                color = Color.White.copy(alpha = 0.75f),
                 maxLines = 1
             )
         }
         Text(
             label,
-            fontSize = 9.sp,
-            color = Color.White.copy(alpha = 0.6f),
+            fontSize = 10.sp,
+            color = Color.White.copy(alpha = 0.85f),
             maxLines = 1
         )
         Spacer(Modifier.height(3.dp))
