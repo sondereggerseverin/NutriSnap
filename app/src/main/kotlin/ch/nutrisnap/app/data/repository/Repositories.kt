@@ -148,7 +148,8 @@ class DiaryRepository(db: NutriDatabase) {
                 snapshotProteinPer100g = food.protein,
                 snapshotCarbsPer100g = food.carbs,
                 snapshotFatPer100g = food.fat,
-                snapshotSource = food.source.name
+                snapshotSource = food.source.name,
+                snapshotImageUrl = food.imageUrl
             )
         )
         dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }

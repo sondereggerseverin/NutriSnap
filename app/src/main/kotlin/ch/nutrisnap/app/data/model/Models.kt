@@ -67,7 +67,9 @@ data class DiaryEntry(
     @ColumnInfo(defaultValue = "NULL") val snapshotProteinPer100g: Float? = null,
     @ColumnInfo(defaultValue = "NULL") val snapshotCarbsPer100g: Float? = null,
     @ColumnInfo(defaultValue = "NULL") val snapshotFatPer100g: Float? = null,
-    @ColumnInfo(defaultValue = "NULL") val snapshotSource: String? = null
+    @ColumnInfo(defaultValue = "NULL") val snapshotSource: String? = null,
+    /** Packungs-/Produktfoto zum Log-Zeitpunkt (OFF-URL oder lokal). */
+    @ColumnInfo(defaultValue = "NULL") val snapshotImageUrl: String? = null
 )
 
 enum class MealType { BREAKFAST, LUNCH, DINNER, SNACK }

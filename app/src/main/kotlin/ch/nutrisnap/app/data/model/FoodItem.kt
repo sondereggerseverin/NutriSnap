@@ -86,6 +86,8 @@ data class FoodItem(
     val vanadium: Float? = null,
 
     // Metadaten
+    /** Packungsfoto (z.B. Open Food Facts front image URL). */
+    val imageUrl: String? = null,
     val source: FoodSource = FoodSource.MANUAL,
     val completenessScore: Int = 0,
     val timesUsed: Int = 0

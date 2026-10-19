@@ -81,7 +81,7 @@ interface UserProfileDao {
         RecipeComponent::class,
         FrozenMeal::class
     ],
-    version = 39,
+    version = 40,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -799,6 +799,14 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // Produktbilder: OFF-Front-URL an FoodItem + Snapshot am Tagebuch-Eintrag
+        private val MIGRATION_39_40 = object : Migration(39, 40) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE food_items ADD COLUMN imageUrl TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE diary_entries ADD COLUMN snapshotImageUrl TEXT DEFAULT NULL")
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -816,7 +824,7 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28,
                         MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32,
                         MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36,
-                        MIGRATION_36_37, MIGRATION_37_38, MIGRATION_38_39
+                        MIGRATION_36_37, MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40
                     )
                     .build()
                     .also { INSTANCE = it }

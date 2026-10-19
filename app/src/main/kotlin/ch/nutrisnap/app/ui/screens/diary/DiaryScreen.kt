@@ -23,6 +23,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -50,6 +51,7 @@ import android.graphics.Bitmap
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import androidx.compose.ui.graphics.Color
 import ch.nutrisnap.app.ui.theme.MacroColors
+import coil.compose.AsyncImage
 import ch.nutrisnap.app.ui.theme.NutriRadius
 import ch.nutrisnap.app.ui.theme.NutriSpacing
 import java.time.LocalDate
@@ -911,6 +913,35 @@ private fun DiaryEntryRow(
                 Modifier.padding(horizontal = NutriSpacing.md, vertical = NutriSpacing.sm),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val imageUrl = entry.snapshotImageUrl
+                if (!imageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = entry.foodName,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(10.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(Modifier.width(NutriSpacing.sm))
+                } else {
+                    // Platzhalter: Tag-Icon wenn kein Produktfoto
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Restaurant,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(NutriSpacing.sm))
+                }
                 Column(Modifier.weight(1f)) {
                     Text(
                         entry.foodName,

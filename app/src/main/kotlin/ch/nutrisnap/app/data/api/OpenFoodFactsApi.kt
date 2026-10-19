@@ -31,7 +31,7 @@ object OpenFoodFactsApi {
                 // Barcode lookup
                 if (query.startsWith("barcode:")) {
                     val code = query.removePrefix("barcode:")
-                    val url = "https://world.openfoodfacts.org/api/v0/product/$code.json?fields=product_name,brands,nutriments,code,serving_size"
+                    val url = "https://world.openfoodfacts.org/api/v0/product/$code.json?fields=product_name,brands,nutriments,code,serving_size,image_front_small_url,image_url,image_front_url"
                     val req = Request.Builder().url(url)
                         .header("User-Agent", "NutriSnap/1.0 (Android)").build()
                     val body = client.newCall(req).execute().use { it.body?.string() ?: return@runCatching emptyList() }
@@ -70,7 +70,7 @@ object OpenFoodFactsApi {
                 // Beliebteste Produkte zuerst (OFF liefert sonst keine feste Reihenfolge)
                 "&sort_by=unique_scans_n" +
                 "&countries=Germany,Switzerland,Austria" +
-                "&fields=product_name,brands,nutriments,code,serving_size"
+                "&fields=product_name,brands,nutriments,code,serving_size,image_front_small_url,image_url,image_front_url"
         val req = Request.Builder().url(url)
             .header("User-Agent", "NutriSnap/1.0 (Android)").build()
         val body = try {
@@ -153,6 +153,11 @@ object OpenFoodFactsApi {
             molybdenum        = n.g("molybdenum_100g"),
             chloride          = n.g("chloride_100g"),
             choline           = n.g("choline_100g"),
+            imageUrl          = listOf(
+                p.optString("image_front_small_url", ""),
+                p.optString("image_url", ""),
+                p.optString("image_front_url", "")
+            ).firstOrNull { it.isNotBlank() },
             source            = FoodSource.OPEN_FOOD_FACTS,
             completenessScore = 50
         )
