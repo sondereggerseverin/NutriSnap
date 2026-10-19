@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import kotlin.math.roundToInt
+import java.io.File
 import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.*
@@ -915,8 +916,15 @@ private fun DiaryEntryRow(
             ) {
                 val imageUrl = entry.snapshotImageUrl
                 if (!imageUrl.isNullOrBlank()) {
+                    val coilModel: Any = when {
+                        imageUrl.startsWith("file://") ->
+                            File(imageUrl.removePrefix("file://")).takeIf { it.exists() } ?: imageUrl
+                        imageUrl.startsWith("/") && !imageUrl.startsWith("http") ->
+                            File(imageUrl).takeIf { it.exists() } ?: imageUrl
+                        else -> imageUrl
+                    }
                     AsyncImage(
-                        model = imageUrl,
+                        model = coilModel,
                         contentDescription = entry.foodName,
                         modifier = Modifier
                             .size(48.dp)

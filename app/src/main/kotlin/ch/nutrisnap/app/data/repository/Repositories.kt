@@ -307,7 +307,8 @@ class DiaryRepository(db: NutriDatabase) {
         sodium: Float = 0f,
         amountGrams: Float = 0f,
         matchedCustomFoodId: Int? = null,
-        matchedRecipeId: Long? = null
+        matchedRecipeId: Long? = null,
+        snapshotImageUrl: String? = null
     ): Long {
         val id = dao.insert(
             DiaryEntry(
@@ -326,7 +327,8 @@ class DiaryRepository(db: NutriDatabase) {
                 salt         = salt,
                 sodium       = sodium,
                 matchedCustomFoodId = matchedCustomFoodId,
-                matchedRecipeId     = matchedRecipeId
+                matchedRecipeId     = matchedRecipeId,
+                snapshotImageUrl    = snapshotImageUrl
             )
         )
         dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }

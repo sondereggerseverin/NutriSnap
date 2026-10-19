@@ -29,6 +29,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.io.File
+import java.io.FileOutputStream
 
 /** Sichtbare Stufen der mehrstufigen KI-Foto-Analyse — jede Stufe wird im UI
  *  mit eigenem Status-Text angezeigt, damit der Prozess transparent bleibt. */
@@ -83,6 +85,9 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
     fun getOverrides(): Map<String, IngredientOverride> = overrides
     fun setOverrides(o: Map<String, IngredientOverride>) { overrides = o }
 
+    /** Letztes Scan-Foto — wird beim Speichern als Tagebuch-Thumbnail abgelegt. */
+    private var lastScanBitmap: Bitmap? = null
+
     /** Mindestdauer pro Stufe, damit der Prozess für den User sichtbar/nachvollziehbar
      *  bleibt statt sofort durchzurauschen (Stufen ohne eigenen Netzwerk-Call). */
     private suspend fun showStage(
@@ -96,6 +101,7 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
 
     fun analyzePhoto(bitmap: Bitmap, userNote: String = "") {
         overrides = emptyMap()
+        lastScanBitmap = bitmap
         viewModelScope.launch {
             val online = NetworkMonitor(getApplication()).isCurrentlyOnline()
             var usedOnDevice = false
@@ -351,6 +357,7 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
 
     fun retake() {
         overrides = emptyMap()
+        lastScanBitmap = null
         _state.value = FoodScanState.Capturing
     }
 
@@ -363,12 +370,14 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
         mealType: MealType
     ) {
         viewModelScope.launch {
+            val photoPath = lastScanBitmap?.let { bmp -> persistScanPhoto(bmp) }
             diaryRepo.addManualEntry(
                 name = dishName,
                 kcal = kcal, protein = protein, carbs = carbs, fat = fat,
                 mealType = mealType, date = LocalDate.now(),
                 fiber = fiber ?: 0f, sugar = sugar ?: 0f,
-                saturatedFat = saturatedFat ?: 0f, salt = salt ?: 0f, sodium = sodium ?: 0f
+                saturatedFat = saturatedFat ?: 0f, salt = salt ?: 0f, sodium = sodium ?: 0f,
+                snapshotImageUrl = photoPath
             )
             ch.nutrisnap.app.health.HealthConnectNutritionSync.pushMeal(
                 context = getApplication(),
@@ -383,7 +392,18 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                 saturatedFatG = saturatedFat ?: 0f,
                 sodiumG = sodium ?: 0f
             )
+            lastScanBitmap = null
             _state.value = FoodScanState.Saved
         }
     }
+
+    /** Speichert das Scan-Foto unter filesDir/diary_photos/ und gibt den absoluten Pfad zurück. */
+    private fun persistScanPhoto(bitmap: Bitmap): String? = runCatching {
+        val dir = File(getApplication<Application>().filesDir, "diary_photos").apply { mkdirs() }
+        val out = File(dir, "scan_${System.currentTimeMillis()}.jpg")
+        FileOutputStream(out).use { fos ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 85, fos)
+        }
+        out.absolutePath
+    }.getOrNull()
 }
