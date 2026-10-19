@@ -1,13 +1,35 @@
-# Build errors - run 1113
+# Build errors - run 1172
 
 ## Unit Tests (test_output.log) - Error lines
 ```
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/Repositories.kt:188:17 Cannot infer type for type parameter 'R'. Specify it explicitly.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/Repositories.kt:188:31 Unresolved reference 'updateRecipe'.
 > Task :app:compileDebugKotlin FAILED
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeCookSuggester.kt:60:20 Unresolved reference 'MacroRemaining'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeCookSuggester.kt:111:20 Unresolved reference 'MacroRemaining'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeCookSuggester.kt:140:20 Unresolved reference 'MacroRemaining'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeCookSuggester.kt:194:49 Unresolved reference 'protein'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeCookSuggester.kt:211:44 Unresolved reference 'hasMeaningfulGap'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeCookSuggester.kt:246:58 Unresolved reference 'MacroRemaining'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeCookSuggester.kt:252:37 Unresolved reference 'kcal'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeCookSuggester.kt:253:40 Unresolved reference 'protein'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeCookSuggester.kt:262:47 Unresolved reference 'protein'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeCookSuggester.kt:273:70 Unresolved reference 'kcal'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeCookSuggester.kt:278:30 Unresolved reference 'kcal'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeCookSuggester.kt:278:55 Unresolved reference 'kcal'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/domain/RecipeListFilter.kt:21:20 Unresolved reference 'MacroRemaining'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipeActionSheets.kt:311:40 Unresolved reference 'MacroRemaining'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipeActionSheets.kt:350:52 Unresolved reference 'hasMeaningfulGap'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipeActionSheets.kt:351:82 Unresolved reference 'kcal'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipeActionSheets.kt:351:117 Unresolved reference 'protein'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:1000:49 Unresolved reference 'MacroRemaining'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:1008:35 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:1008:42 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:1008:47 Unresolved reference 'hasMeaningfulGap'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:1009:25 Argument type mismatch: actual type is '() -> Unit', but '() -> Unit' was expected.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:1010:28 Argument type mismatch: actual type is '(Recipe) -> Unit', but '(Recipe) -> Unit' was expected.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/recipes/RecipesScreen.kt:1014:24 Argument type mismatch: actual type is '(String, RecipeCategory?, Float?) -> Unit', but '(String, RecipeCategory?, Float?) -> Unit' was expected.
    > Compilation error. See log for more details
 Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilation error. See log for more details
-BUILD FAILED in 1m 21s
+BUILD FAILED in 51s
 ```
 
 ## Unit Tests (test_output.log) - Last 150 lines
@@ -160,7 +182,7 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilat
 	... 2 more
 
 
-BUILD FAILED in 1m 21s
+BUILD FAILED in 51s
 18 actionable tasks: 18 executed
 ```
 
