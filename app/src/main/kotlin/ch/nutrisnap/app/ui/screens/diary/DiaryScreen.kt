@@ -916,6 +916,7 @@ private fun DiaryEntryRow(
             Modifier
                 .fillMaxWidth()
                 .animateContentSize()
+                .then(dragHandleModifier ?: Modifier)
                 .clickable { onEdit() },
             shape  = RoundedCornerShape(NutriRadius.md),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -966,18 +967,23 @@ private fun DiaryEntryRow(
                         entry.foodName,
                         fontWeight = FontWeight.Medium,
                         fontSize   = 14.sp,
-                        maxLines   = 1,
-                        overflow   = TextOverflow.Ellipsis
+                        maxLines   = 2,
+                        overflow   = TextOverflow.Ellipsis,
+                        lineHeight = 18.sp
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
                         amountLabel,
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
                     )
                 }
                 Spacer(Modifier.width(NutriSpacing.sm))
-                Column(horizontalAlignment = Alignment.End) {
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    modifier = Modifier.widthIn(min = 72.dp)
+                ) {
                     Text(
                         "${entry.calories.toInt()} kcal",
                         fontWeight = FontWeight.SemiBold,
@@ -985,11 +991,13 @@ private fun DiaryEntryRow(
                         color = MacroColors.calories
                     )
                     Text(
-                        "P ${fmtMacroShort(entry.protein)}  K ${fmtMacroShort(entry.carbs)}  F ${fmtMacroShort(entry.fat)}  B ${fmtMacroShort(entry.fiber)}",
+                        "P ${fmtMacroShort(entry.protein)} · K ${fmtMacroShort(entry.carbs)} · F ${fmtMacroShort(entry.fat)}",
                         fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
                     )
                 }
+                // Aktionen nur noch über ⋮ — Drag-Handle entfernt (Umsortieren per Long-Press)
                 Box {
                     IconButton(
                         onClick = { showMenu = true },
@@ -1026,16 +1034,6 @@ private fun DiaryEntryRow(
                         )
                     }
                 }
-                if (dragHandleModifier != null) {
-                    Icon(
-                        Icons.Default.DragHandle, "Reihenfolge ändern",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier
-                            .padding(start = NutriSpacing.xs)
-                            .size(20.dp)
-                            .then(dragHandleModifier)
-                    )
-                }
             }
         }
     }
@@ -1061,7 +1059,7 @@ private fun DiaryEntryRow(
     }
 }
 
-private const val DIARY_ROW_HEIGHT_DP = 62
+private const val DIARY_ROW_HEIGHT_DP = 72
 
 @Composable
 private fun ReorderableMealEntries(
