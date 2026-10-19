@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,13 +25,17 @@ fun FoodScanScreen(
     vm: FoodScanViewModel = viewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    // "Foto + Notiz": optionaler Zusatzhinweis (Öl, Sauce, Portionsanteil …) für die KI
+    var photoNote by rememberSaveable { mutableStateOf("") }
 
     when (val s = state) {
         is FoodScanState.Capturing -> PhotoCaptureScreen(
             title = "Essen scannen",
             instructions = "Auslösen → scharfes Foto → KI analysiert danach (nicht halten)",
-            onPhotoCaptured = { bitmap -> vm.analyzePhoto(bitmap) },
-            onNavigateBack = onNavigateBack
+            onPhotoCaptured = { bitmap -> vm.analyzePhoto(bitmap, photoNote) },
+            onNavigateBack = onNavigateBack,
+            note = photoNote,
+            onNoteChange = { photoNote = it }
         )
         is FoodScanState.Analyzing -> AnalysisProgressView(stage = s.stage, onDevice = s.onDevice)
         is FoodScanState.Verify -> VerifyAndSaveFlow(

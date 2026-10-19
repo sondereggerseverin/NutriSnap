@@ -94,7 +94,7 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
         delay(minDelayMs)
     }
 
-    fun analyzePhoto(bitmap: Bitmap) {
+    fun analyzePhoto(bitmap: Bitmap, userNote: String = "") {
         overrides = emptyMap()
         viewModelScope.launch {
             val online = NetworkMonitor(getApplication()).isCurrentlyOnline()
@@ -131,11 +131,11 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                 // Parallel: Zutaten zerlegen + optional Meal-Summary (Yazio-ähnlich)
                 val (dishResult, summary) = coroutineScope {
                     val dishJob = async {
-                        visionService.analyzeDishIngredients(base64).getOrNull()
+                        visionService.analyzeDishIngredients(base64, userNote).getOrNull()
                     }
                     val summaryJob = async {
                         if (mealSummaryEnabled) {
-                            visionService.analyzeMealSummary(base64).getOrNull()
+                            visionService.analyzeMealSummary(base64, userNote).getOrNull()
                         } else null
                     }
                     dishJob.await() to summaryJob.await()

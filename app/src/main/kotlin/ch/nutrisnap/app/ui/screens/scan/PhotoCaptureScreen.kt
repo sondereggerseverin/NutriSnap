@@ -48,7 +48,10 @@ fun PhotoCaptureScreen(
     instructions: String,
     onPhotoCaptured: (Bitmap) -> Unit,
     onNavigateBack: () -> Unit,
-    enableCrop: Boolean = false
+    enableCrop: Boolean = false,
+    /** Optional: "Foto + Notiz" – Textfeld über dem Auslöser, nur sichtbar wenn [onNoteChange] gesetzt. */
+    note: String = "",
+    onNoteChange: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -208,6 +211,31 @@ fun PhotoCaptureScreen(
                     fontSize = 14.sp
                 )
             }
+        }
+
+        if (onNoteChange != null && !isCapturing) {
+            OutlinedTextField(
+                value = note,
+                onValueChange = { if (it.length <= 200) onNoteChange(it) },
+                placeholder = { Text("Notiz (optional): z. B. 1 EL Öl, halbe Portion", fontSize = 13.sp) },
+                maxLines = 2,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .imePadding()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 112.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedContainerColor = Color.Black.copy(alpha = 0.55f),
+                    unfocusedContainerColor = Color.Black.copy(alpha = 0.55f),
+                    focusedBorderColor = Color.White,
+                    unfocusedBorderColor = Color.White.copy(alpha = 0.6f),
+                    cursorColor = Color.White,
+                    focusedPlaceholderColor = Color.White.copy(alpha = 0.75f),
+                    unfocusedPlaceholderColor = Color.White.copy(alpha = 0.75f)
+                )
+            )
         }
 
         FloatingActionButton(

@@ -137,6 +137,20 @@ class GroqVisionService {
         private val SINGLE_QUOTED_JSON = Regex("""'((?:[^'\\]|\\.)*)'""")
     }
 
+    /**
+     * "Foto + Notiz": Freitext des Nutzers (z. B. "mit 1 EL Olivenöl, halbe Portion") wird
+     * dem Vision-Prompt angehängt. Die Notiz hat Vorrang vor der reinen Bildinterpretation,
+     * weil Öl, Saucen, Portionsanteile usw. auf dem Foto oft nicht erkennbar sind.
+     */
+    private fun userNoteBlock(note: String?): String {
+        val n = note.orEmpty().replace(Regex("[\\r\\n\\t]+"), " ").replace('"', '\'').trim().take(200)
+        if (n.isEmpty()) return ""
+        return "\n\nHINWEIS DES NUTZERS (verbindlich, hat Vorrang vor deiner Bildinterpretation): \"$n\"\n" +
+            "Nennt der Hinweis zusätzliche Zutaten (z. B. Öl, Sauce, Dressing) oder Mengen/Portionsanteile, " +
+            "übernimm sie: füge fehlende Zutaten als eigene Zutat mit realistischer Gramm-Menge hinzu bzw. " +
+            "skaliere die Mengen entsprechend. Erfinde darüber hinaus nichts."
+    }
+
     /** Komprimiert ein Foto auf eine fuer die API geeignete Groesse und kodiert es als Base64-JPEG. */
     fun bitmapToBase64Jpeg(bitmap: Bitmap, quality: Int = 70): String {
         val scaled = scaleDown(bitmap, MAX_DIMENSION)
@@ -206,7 +220,10 @@ class GroqVisionService {
      * leicht überlappenden Komponenten. Deckt gleichzeitig die Stufen "Zutaten erkennen"
      * und "Zutaten trennen" ab, da beides ein einzelner Vision-Call ist.
      */
-    suspend fun analyzeDishIngredients(base64Jpeg: String): Result<DishScanResult> = withContext(Dispatchers.IO) {
+    suspend fun analyzeDishIngredients(
+        base64Jpeg: String,
+        userNote: String? = null
+    ): Result<DishScanResult> = withContext(Dispatchers.IO) {
         val prompt = """
 Du bist ein erfahrener Schweizer Ernährungsberater und Food-Vision-Experte. Analysiere das Foto eines Gerichts und zerlege es in seine einzelnen sichtbaren Bestandteile. Schätze die Portionsgrösse jeder Zutat in Gramm.
 
@@ -240,7 +257,7 @@ Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
 }
 
 confidence ist "hoch", "mittel" oder "niedrig". Erfinde keine Zutaten, die nicht sichtbar sind. Liste jede Zutat nur einmal.
-""".trimIndent()
+""".trimIndent() + userNoteBlock(userNote)
         // Hoeheres Token-Limit als Standard-1000: bei vielen kleinen Zutaten (Bowls, Mezze-Teller)
         // braucht die JSON-Antwort mit einem Eintrag pro Zutat mehr Platz als eine einzelne Schaetzung.
         callVisionRaw(prompt, listOf(base64Jpeg), maxTokens = 2000).mapCatching {
@@ -252,7 +269,10 @@ confidence ist "hoch", "mittel" oder "niedrig". Erfinde keine Zutaten, die nicht
      * Yazio-ähnliche Gesamtschätzung: ein Tellerfoto → Gerichtname + Makros der Portion.
      * Schneller Shortcut ohne Zutaten-Zerlegung; optional danach weiter in Zutaten trennen.
      */
-    suspend fun analyzeMealSummary(base64Jpeg: String): Result<MealSummaryResult> = withContext(Dispatchers.IO) {
+    suspend fun analyzeMealSummary(
+        base64Jpeg: String,
+        userNote: String? = null
+    ): Result<MealSummaryResult> = withContext(Dispatchers.IO) {
         val prompt = """
 Du bist Ernährungsberater. Analysiere das Foto einer Mahlzeit auf dem Teller.
 Schätze die Nährwerte der gesamten sichtbaren Portion (nicht pro 100g).
@@ -273,7 +293,7 @@ Regeln:
 - calories ≈ 4*protein + 4*carbs + 9*fat (±20%)
 - servingGrams: geschätztes Gesamtgewicht in Gramm
 - Keine erfundenen Zutaten im Namen; beschreibe nur was sichtbar ist
-""".trimIndent()
+""".trimIndent() + userNoteBlock(userNote)
         callVisionRaw(prompt, listOf(base64Jpeg), maxTokens = 800).mapCatching {
             json.decodeFromString<MealSummaryResult>(sanitizeLlmJson(it))
         }
