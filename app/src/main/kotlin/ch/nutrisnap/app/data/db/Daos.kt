@@ -213,6 +213,21 @@ interface ManualActivityDao {
 }
 
 @Dao
+interface WaterDao {
+    @Query("SELECT * FROM water_entries WHERE dateStr = :dateStr LIMIT 1")
+    fun getForDate(dateStr: String): Flow<WaterEntry?>
+
+    @Query("SELECT * FROM water_entries WHERE dateStr = :dateStr LIMIT 1")
+    suspend fun getForDateOnce(dateStr: String): WaterEntry?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entry: WaterEntry)
+
+    @Query("DELETE FROM water_entries WHERE dateStr = :dateStr")
+    suspend fun delete(dateStr: String)
+}
+
+@Dao
 interface FavoriteFoodDao {
     @Query("SELECT * FROM favorite_foods ORDER BY addedAt DESC")
     fun getAll(): Flow<List<FavoriteFoodEntity>>

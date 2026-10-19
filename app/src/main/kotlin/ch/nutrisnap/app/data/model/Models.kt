@@ -623,6 +623,13 @@ data class ManualActivityEntry(
     val activeCaloriesKcal: Float
 )
 
+/** Tages-Summe getrunkenes Wasser in ml (ein Eintrag pro Datum). */
+@Entity(tableName = "water_entries")
+data class WaterEntry(
+    @PrimaryKey val dateStr: String,  // yyyy-MM-dd
+    val amountMl: Int
+)
+
 // ─── Favorites ───────────────────────────────────────────────────────────────
 // Note: DB column names kept as-is for backward compatibility with Migration 2→3 SQL
 @Entity(tableName = "favorite_foods")

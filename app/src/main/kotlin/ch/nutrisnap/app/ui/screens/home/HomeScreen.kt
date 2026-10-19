@@ -163,12 +163,26 @@ fun HomeScreen(
                 // Kern-Sektionen – rücken hinter Activity, vor dem Streak.
                 item { CalorieBreakdownCard(state) }
                 activityItems()
+                item {
+                    WaterTrackerCard(
+                        waterMl = state.waterMl,
+                        goalMl = state.waterGoalMl,
+                        onAdd250 = { vm.addWater(250) }
+                    )
+                }
                 extraItems()
             } else {
                 extraItems()
                 // Breakdown unter den Mahlzeiten, damit Ring + 4 Kacheln ohne Scrollen passen
                 item { CalorieBreakdownCard(state) }
                 activityItems()
+                item {
+                    WaterTrackerCard(
+                        waterMl = state.waterMl,
+                        goalMl = state.waterGoalMl,
+                        onAdd250 = { vm.addWater(250) }
+                    )
+                }
             }
             item { StreakCard(state.streak) }
         }

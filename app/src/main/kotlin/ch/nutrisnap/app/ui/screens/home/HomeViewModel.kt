@@ -17,6 +17,7 @@ import ch.nutrisnap.app.ui.theme.KEY_MANUAL_ACTIVITY_ENABLED
 import ch.nutrisnap.app.ui.theme.KEY_AGGRESSIVE_SPORT_DAY
 import ch.nutrisnap.app.ui.theme.KEY_PRIORITY_NUTRIENTS
 import ch.nutrisnap.app.data.model.ManualActivityEntry
+import ch.nutrisnap.app.data.model.WaterEntry
 import ch.nutrisnap.app.data.repository.FoodItemRepository
 import ch.nutrisnap.app.data.repository.RecipeRepository
 import ch.nutrisnap.app.domain.DailyMicronutrientAggregator
@@ -102,7 +103,11 @@ data class HomeUiState(
     val aggressiveSportDay: Boolean = false,
     /** Angezeigter Tag (heute oder gestern). */
     val selectedDate: LocalDate = LocalDate.now(),
-    val isViewingToday: Boolean = true
+    val isViewingToday: Boolean = true,
+    /** Getrunkenes Wasser heute in ml. */
+    val waterMl: Int = 0,
+    /** Tagesziel Wasser in ml. */
+    val waterGoalMl: Int = DEFAULT_WATER_GOAL_ML
 ) {
     /** Budget = Basis-Ziel + verbrannte Aktivitätskalorien (nur wenn nicht schon im adaptiven Ziel enthalten) */
     val adjustedGoal: Float get() = if (isAdaptiveTarget) calorieGoal else calorieGoal + burnedKcal
@@ -116,6 +121,9 @@ data class HomeUiState(
 /** D-A-CH-Richtwert Ballaststoffe ≥30 g/Tag. */
 const val FIBER_GOAL_G = 30f
 
+/** Standard-Trinkziel (2,5 l), orientiert an D-A-CH-Empfehlungen. */
+const val DEFAULT_WATER_GOAL_ML = 2500
+
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val db          = NutriDatabase.getInstance(app)
     private val diaryRepo   = DiaryRepository(db)
@@ -124,6 +132,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val statsRepo   = StatsRepository(db)
     private val hcDao       = db.healthConnectDao()
     private val manualActivityDao = db.manualActivityDao()
+    private val waterDao = db.waterDao()
     private val microAggregator = DailyMicronutrientAggregator(
         FoodItemRepository(db),
         RecipeRepository(db, app)
@@ -179,7 +188,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             diaryRepo.getWeeklySummary(selected.minusDays(trendWindowDays.toLong())),
             hcDao.getLast30Days(),
             app.notifDataStore.data,
-            manualActivityDao.getSince(selected.minusDays(29).toString())
+            manualActivityDao.getSince(selected.minusDays(29).toString()),
+            waterDao.getForDate(selected.toString())
         ) { args ->
         val entries       = args[0] as List<ch.nutrisnap.app.data.model.DiaryEntry>
         val viewingToday  = selected == LocalDate.now()
@@ -192,6 +202,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         val prefs          = args[7] as androidx.datastore.preferences.core.Preferences
         @Suppress("UNCHECKED_CAST")
         val manualActivities = args[8] as List<ManualActivityEntry>
+        val waterEntry     = args[9] as WaterEntry?
 
         val mealOrder = ch.nutrisnap.app.data.model.parseMealOrder(prefs[KEY_MEAL_ORDER])
         val orderedMealMeta = mealOrder.map { type -> MEAL_META.first { it.first == type } }
@@ -306,6 +317,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             aggressiveSportDay = aggressiveSport,
             selectedDate = selected,
             isViewingToday = viewingToday,
+            waterMl = waterEntry?.amountMl ?: 0,
+            waterGoalMl = DEFAULT_WATER_GOAL_ML,
             meals         = orderedMealMeta.map { (type, label, icon, color) ->
                 val mealEntries = byMeal[type] ?: emptyList()
                 val mealKcal = mealEntries.sumOf { it.calories.toDouble() }.toFloat()
@@ -403,6 +416,18 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                     )
                 )
             }
+        }
+    }
+
+    /** +[deltaMl] ml Wasser für den angezeigten Tag (Standard +250). */
+    fun addWater(deltaMl: Int = 250, date: LocalDate = _selectedDate.value) {
+        if (deltaMl == 0) return
+        viewModelScope.launch {
+            val key = date.toString()
+            val current = waterDao.getForDateOnce(key)?.amountMl ?: 0
+            val next = (current + deltaMl).coerceAtLeast(0)
+            if (next == 0) waterDao.delete(key)
+            else waterDao.upsert(WaterEntry(dateStr = key, amountMl = next))
         }
     }
 

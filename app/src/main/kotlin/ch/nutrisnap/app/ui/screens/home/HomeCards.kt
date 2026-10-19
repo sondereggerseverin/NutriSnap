@@ -1705,3 +1705,55 @@ internal fun DailyHealthScoreCard(
         )
     }
 }
+
+
+/** Schnell-Wassertracker: Fortschritt + Tap +250 ml (Fud-ähnliche Alltagsfunktion). */
+@Composable
+internal fun WaterTrackerCard(
+    waterMl: Int,
+    goalMl: Int,
+    onAdd250: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val progress = (waterMl.toFloat() / goalMl.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(NutriRadius.lg),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(NutriSpacing.md),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Wasser",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "${waterMl} / ${goalMl} ml",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+                    color = Color(0xFF4FC3F7),
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            }
+            Spacer(Modifier.width(NutriSpacing.md))
+            FilledTonalButton(onClick = onAdd250) {
+                Text("+250 ml", fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
