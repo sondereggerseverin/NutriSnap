@@ -101,7 +101,7 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
 
     fun analyzePhoto(bitmap: Bitmap, userNote: String = "") {
         overrides = emptyMap()
-        lastScanBitmap = bitmap
+        lastScanBitmap = downscaleForDiary(bitmap)
         viewModelScope.launch {
             val online = NetworkMonitor(getApplication()).isCurrentlyOnline()
             var usedOnDevice = false
@@ -397,12 +397,30 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Tagebuch-Thumbnail: max. 800 px Kantenlänge statt Kamera-Vollauflösung (spart RAM im
+     * ViewModel und ~3–5 MB pro Mahlzeit im Speicher; die KI-Analyse nutzt weiterhin das Original).
+     */
+    private fun downscaleForDiary(src: Bitmap, maxEdge: Int = 800): Bitmap {
+        val longest = maxOf(src.width, src.height)
+        if (longest <= maxEdge) return src
+        val scale = maxEdge.toFloat() / longest
+        return runCatching {
+            Bitmap.createScaledBitmap(
+                src,
+                (src.width * scale).toInt().coerceAtLeast(1),
+                (src.height * scale).toInt().coerceAtLeast(1),
+                true
+            )
+        }.getOrDefault(src)
+    }
+
     /** Speichert das Scan-Foto unter filesDir/diary_photos/ und gibt den absoluten Pfad zurück. */
     private fun persistScanPhoto(bitmap: Bitmap): String? = runCatching {
         val dir = File(getApplication<Application>().filesDir, "diary_photos").apply { mkdirs() }
         val out = File(dir, "scan_${System.currentTimeMillis()}.jpg")
         FileOutputStream(out).use { fos ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 85, fos)
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 80, fos)
         }
         out.absolutePath
     }.getOrNull()
