@@ -83,15 +83,16 @@ import kotlinx.coroutines.launch
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Home      : Screen("home",       "Start",    Icons.Default.Home)
     object Diary     : Screen("diary",      "Tagebuch", Icons.Default.MenuBook)
+    object Coach     : Screen("coach",      "Coach",    Icons.Default.AutoAwesome)
     object Recipes   : Screen("recipes",    "Rezepte",  Icons.Default.RestaurantMenu)
     object Analysis  : Screen("analysis",   "Analyse",  Icons.Default.BarChart)
     object Settings  : Screen("settings",   "Mehr",     Icons.Default.Settings)
 }
 
-// "KI-Koch" ist als zweiter Tab in RecipesHubScreen (Screen.Recipes) untergebracht,
-// dadurch nur noch 5 statt 6 Bottom-Nav-Items (Material-Empfehlung: max. 5).
+// 5 Tabs (Material-Empfehlung). Analyse bleibt als Stack-Screen unter «Mehr» erreichbar.
+// KI-Koch weiter als zweiter Tab in RecipesHubScreen.
 val bottomNavItems = listOf(
-    Screen.Home, Screen.Diary, Screen.Recipes, Screen.Analysis, Screen.Settings
+    Screen.Home, Screen.Diary, Screen.Coach, Screen.Recipes, Screen.Settings
 )
 
 @AndroidEntryPoint
@@ -467,13 +468,27 @@ fun MainScaffold(
                 )
             }
             composable(
-                Screen.Analysis.route,
+                Screen.Coach.route,
                 enterTransition = { tabEnter }, exitTransition = { tabExit },
                 popEnterTransition = { tabEnter }, popExitTransition = { tabExit }
             ) {
+                DataChatScreen(onBack = null)
+            }
+            composable(
+                Screen.Analysis.route,
+                enterTransition = { pushEnter }, exitTransition = { pushExit },
+                popEnterTransition = { popEnter }, popExitTransition = { popExit }
+            ) {
                 AnalysisScreen(
+                    onBack = { navController.popBackStack() },
                     onNavigateToInsights = { navController.navigate("insights") },
-                    onNavigateToChat      = { navController.navigate("chat") },
+                    onNavigateToChat      = {
+                        navController.navigate(Screen.Coach.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
                     onNavigateToDeficiencyTrend = { navController.navigate("deficiency_trend") }
                 )
             }
@@ -485,6 +500,7 @@ fun MainScaffold(
                 SettingsScreen(
                     onNavigateToNotifSettings = { navController.navigate("notif_settings") },
                     onNavigateToStats         = { navController.navigate("stats") },
+                    onNavigateToAnalysis      = { navController.navigate(Screen.Analysis.route) },
                     onNavigateToExport        = { navController.navigate("export") },
                     onNavigateToCustomFoods   = { navController.navigate("custom_foods") },
                     onNavigateToIngredientDefaults = { navController.navigate("ingredient_defaults") },
@@ -562,6 +578,7 @@ fun MainScaffold(
                 enterTransition = { pushEnter }, exitTransition = { pushExit },
                 popEnterTransition = { popEnter }, popExitTransition = { popExit }
             ) {
+                // Legacy-Route: weiter mit Zurück-Button (z.B. Deep Links)
                 DataChatScreen(onBack = { navController.popBackStack() })
             }
             composable(

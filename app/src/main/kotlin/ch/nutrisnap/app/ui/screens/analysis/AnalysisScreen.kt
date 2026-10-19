@@ -40,6 +40,7 @@ import java.time.ZoneOffset
 @Composable
 fun AnalysisScreen(
     vm: AnalysisViewModel = viewModel(),
+    onBack: (() -> Unit)? = null,
     onNavigateToInsights: () -> Unit = {},
     onNavigateToChat: () -> Unit = {},
     onNavigateToDeficiencyTrend: () -> Unit = {}
@@ -86,7 +87,16 @@ fun AnalysisScreen(
         verticalArrangement = Arrangement.spacedBy(NutriSpacing.md)
     ) {
         item {
-            Text("Analyse", fontWeight = FontWeight.Bold, fontSize = 24.sp)
+            if (onBack != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                    }
+                    Text("Analyse", fontWeight = FontWeight.Bold, fontSize = 24.sp)
+                }
+            } else {
+                Text("Analyse", fontWeight = FontWeight.Bold, fontSize = 24.sp)
+            }
         }
 
         item {
@@ -109,7 +119,7 @@ fun AnalysisScreen(
                     Column(Modifier.padding(NutriSpacing.md)) {
                         Icon(Icons.Default.Chat, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.height(NutriSpacing.xs))
-                        Text("Frag deine App", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Text("Coach", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                         Text("Chat über deine Daten", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }

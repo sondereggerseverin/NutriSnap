@@ -44,7 +44,7 @@ private val COACH_STARTER_CHIPS = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DataChatScreen(
-    onBack: () -> Unit = {},
+    onBack: (() -> Unit)? = null,
     vm: DataChatViewModel = viewModel()
 ) {
     val messages by vm.messages.collectAsStateWithLifecycle()
@@ -77,8 +77,10 @@ fun DataChatScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                        }
                     }
                 },
                 actions = {
@@ -124,7 +126,6 @@ fun DataChatScreen(
                             colors = SuggestionChipDefaults.suggestionChipColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
                                 labelColor = MaterialTheme.colorScheme.primary
-                            )
                             )
                         )
                     }

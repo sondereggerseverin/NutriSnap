@@ -149,6 +149,7 @@ fun SettingsScreen(
     vm: SettingsViewModel = viewModel(),
     onNavigateToNotifSettings: () -> Unit = {},
     onNavigateToStats: () -> Unit = {},
+    onNavigateToAnalysis: () -> Unit = {},
     onNavigateToExport: () -> Unit = {},
     onNavigateToCustomFoods: () -> Unit = {},
     onNavigateToIngredientDefaults: () -> Unit = {},
@@ -285,11 +286,19 @@ fun SettingsScreen(
                         Spacer(Modifier.width(6.dp))
                         Text("Statistik", fontSize = 12.sp)
                     }
+                    OutlinedButton(onClick = onNavigateToAnalysis, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.Insights, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Analyse", fontSize = 12.sp)
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
                     OutlinedButton(onClick = onNavigateToNotifSettings, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.Notifications, null, Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("Reminder", fontSize = 12.sp)
                     }
+                    Spacer(Modifier.weight(1f))
                 }
             }
 
@@ -763,10 +772,17 @@ fun SettingsScreen(
                             Icon(Icons.Default.BarChart, null, Modifier.size(16.dp))
                             Spacer(Modifier.width(NutriSpacing.xs)); Text("Statistik", fontSize = 12.sp)
                         }
+                        OutlinedButton(onClick = onNavigateToAnalysis, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.Insights, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Analyse", fontSize = 12.sp)
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
                         OutlinedButton(onClick = onNavigateToNotifSettings, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.Notifications, null, Modifier.size(16.dp))
                             Spacer(Modifier.width(NutriSpacing.xs)); Text("Reminder", fontSize = 12.sp)
                         }
+                        Spacer(Modifier.weight(1f))
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
                         OutlinedButton(onClick = onNavigateToMealOrder, modifier = Modifier.weight(1f)) {
