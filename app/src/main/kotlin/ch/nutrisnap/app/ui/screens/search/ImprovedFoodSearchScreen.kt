@@ -11,6 +11,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
+import coil.compose.AsyncImage
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -165,6 +170,33 @@ private fun SearchResultsList(items: List<FoodItem>, query: String, onFoodSelect
 private fun FoodListItem(food: FoodItem, onClick: () -> Unit) {
     ListItem(
         modifier = Modifier.clickable(onClick = onClick),
+        leadingContent = {
+            val url = food.imageUrl
+            if (!url.isNullOrBlank()) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = food.name,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        food.name.firstOrNull()?.uppercase() ?: "?",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
         headlineContent = { Text(food.name, fontWeight = FontWeight.Medium) },
         supportingContent = {
             Text("${food.calories?.toInt() ?: "–"} kcal · ${food.protein?.toInt() ?: "–"}g P · ${food.carbs?.toInt() ?: "–"}g K · ${food.fat?.toInt() ?: "–"}g F · ${food.fiber?.toInt() ?: "–"}g B",

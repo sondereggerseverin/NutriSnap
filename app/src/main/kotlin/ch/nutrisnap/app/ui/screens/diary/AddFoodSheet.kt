@@ -43,6 +43,8 @@ import ch.nutrisnap.app.ui.components.rememberNutriButtonStyle
 import ch.nutrisnap.app.ui.screens.barcode.BarcodeScannerScreen
 import ch.nutrisnap.app.ui.screens.scan.PhotoCaptureScreen
 import ch.nutrisnap.app.ui.theme.MacroColors
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import ch.nutrisnap.app.ui.theme.NutriRadius
 import ch.nutrisnap.app.ui.theme.NutriSpacing
 import java.time.LocalTime
@@ -1102,19 +1104,31 @@ private fun FoodResultRow(
     food: FoodItem,
     onClick: () -> Unit,
     leading: @Composable () -> Unit = {
-        Box(
-            Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(NutriRadius.sm))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                food.name.firstOrNull()?.uppercase() ?: "?",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+        val url = food.imageUrl
+        if (!url.isNullOrBlank()) {
+            AsyncImage(
+                model = url,
+                contentDescription = food.name,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(NutriRadius.sm)),
+                contentScale = ContentScale.Crop
             )
+        } else {
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(NutriRadius.sm))
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    food.name.firstOrNull()?.uppercase() ?: "?",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     },
     trailingAction: (@Composable () -> Unit)? = null

@@ -400,14 +400,21 @@ class FoodSearchRepository(
     }
 
     suspend fun searchByBarcode(barcode: String): FoodItem? {
-        foodItemDao.searchByBarcode(barcode)?.let { return it }
+        val cached = foodItemDao.searchByBarcode(barcode)
+        // Cache ohne Bild: OFF nachladen und imageUrl nachziehen (ältere DB-Zeilen)
+        if (cached != null && !cached.imageUrl.isNullOrBlank()) return cached
         val remote = runCatching { SwissFoodApi.search("barcode:$barcode").firstOrNull() }.getOrNull()
             ?: runCatching { openFoodFactsSearch("barcode:$barcode").firstOrNull() }.getOrNull()
-            ?: return null
-        // Remote-Treffer (OFF/Swiss) dauerhaft lokal cachen → DB wächst mit jedem Scan
+        if (remote == null) return cached
         return runCatching {
-            val id = foodItemDao.insert(remote.copy(id = 0)).toInt()
-            foodItemDao.getById(id) ?: remote.copy(id = id)
+            if (cached != null) {
+                val merged = cached.copy(imageUrl = remote.imageUrl ?: cached.imageUrl)
+                foodItemDao.update(merged)
+                merged
+            } else {
+                val id = foodItemDao.insert(remote.copy(id = 0)).toInt()
+                foodItemDao.getById(id) ?: remote.copy(id = id)
+            }
         }.getOrDefault(remote)
     }
 
