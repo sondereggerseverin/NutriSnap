@@ -1478,6 +1478,52 @@ internal fun WhatToCookHomeCard(onClick: () -> Unit) {
     }
 }
 
+/** Einstieg zur Analyse (Trends, Insights, Coach-Link) direkt vom Startbildschirm. */
+@Composable
+internal fun AnalysisHomeCard(onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)
+        )
+    ) {
+        Row(
+            Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.BarChart,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier
+                    .padding(end = 10.dp)
+                    .size(24.dp)
+            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Analyse",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    "Trends, Insights und Wochenübersicht",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.secondary
+            )
+        }
+    }
+}
+
 @Composable
 internal fun PriorityNutrientsSection(
     allItems: List<ch.nutrisnap.app.domain.PriorityNutrientStatus>,

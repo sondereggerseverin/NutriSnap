@@ -45,7 +45,8 @@ fun HomeScreen(
     onNavigateToCustomFoods: () -> Unit = {},
     onNavigateToMealTemplates: () -> Unit = {},
     onNavigateToNutrientDetail: (String) -> Unit = {},
-    onNavigateToCookSuggestions: () -> Unit = {}
+    onNavigateToCookSuggestions: () -> Unit = {},
+    onNavigateToAnalysis: () -> Unit = {}
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val hcState by hcVm.uiState.collectAsStateWithLifecycle()
@@ -155,6 +156,9 @@ fun HomeScreen(
                     item {
                         WhatToCookHomeCard(onClick = onNavigateToCookSuggestions)
                     }
+                }
+                item {
+                    AnalysisHomeCard(onClick = onNavigateToAnalysis)
                 }
             }
             if (reorderHome) {

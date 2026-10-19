@@ -413,6 +413,9 @@ fun MainScaffold(
                             launchSingleTop = true
                             restoreState = false
                         }
+                    },
+                    onNavigateToAnalysis = {
+                        navController.navigate(Screen.Analysis.route)
                     }
                 )
             }
