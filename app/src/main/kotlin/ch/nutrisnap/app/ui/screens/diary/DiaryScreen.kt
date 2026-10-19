@@ -499,6 +499,16 @@ fun DiaryScreen(
                                 }
                             },
                             onSchedule = { scheduleEntry = it },
+                            onSaveTemplate = { entry ->
+                                vm.saveEntryAsTemplate(entry) { ok ->
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            if (ok) "\"${entry.foodName}\" als Vorlage gespeichert"
+                                            else "Vorlage konnte nicht gespeichert werden"
+                                        )
+                                    }
+                                }
+                            },
                             onReorder = { ids -> vm.reorderEntries(ids) }
                         )
                     }
@@ -852,6 +862,7 @@ private fun DiaryEntryRow(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onSchedule: () -> Unit = {},
+    onSaveTemplate: () -> Unit = {},
     modifier: Modifier = Modifier,
     dragHandleModifier: Modifier? = null
 ) {
@@ -1002,6 +1013,11 @@ private fun DiaryEntryRow(
                             leadingIcon = { Icon(Icons.Default.Event, null) }
                         )
                         DropdownMenuItem(
+                            text = { Text("Als Vorlage speichern") },
+                            onClick = { showMenu = false; onSaveTemplate() },
+                            leadingIcon = { Icon(Icons.Default.BookmarkAdd, null) }
+                        )
+                        DropdownMenuItem(
                             text = { Text("Löschen") },
                             onClick = { showMenu = false; showConfirm = true },
                             leadingIcon = {
@@ -1053,6 +1069,7 @@ private fun ReorderableMealEntries(
     onEdit: (DiaryEntry) -> Unit,
     onDelete: (DiaryEntry) -> Unit,
     onSchedule: (DiaryEntry) -> Unit = {},
+    onSaveTemplate: (DiaryEntry) -> Unit = {},
     onReorder: (List<Long>) -> Unit
 ) {
     var items by remember(entries.map { it.id }) { mutableStateOf(entries) }
@@ -1068,6 +1085,7 @@ private fun ReorderableMealEntries(
                 onEdit   = { onEdit(entry) },
                 onDelete = { onDelete(entry) },
                 onSchedule = { onSchedule(entry) },
+                onSaveTemplate = { onSaveTemplate(entry) },
                 modifier = Modifier
                     .zIndex(if (isDragging) 1f else 0f)
                     .graphicsLayer { translationY = if (isDragging) dragOffset else 0f },

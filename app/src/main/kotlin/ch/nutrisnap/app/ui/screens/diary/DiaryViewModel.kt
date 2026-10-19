@@ -43,6 +43,18 @@ data class DiaryUiState(
     val isLoading:     Boolean          = false
 )
 
+/** Gespeicherte Mahlzeit (Vorlage + Items) mit Summen für die Anzeige im "Hinzufügen"-Sheet. */
+data class SavedMealUi(
+    val template: MealTemplate,
+    val items: List<MealTemplateItem>
+) {
+    val calories: Float get() = items.sumOf { it.calories.toDouble() }.toFloat()
+    val protein: Float get() = items.sumOf { it.protein.toDouble() }.toFloat()
+    val carbs: Float get() = items.sumOf { it.carbs.toDouble() }.toFloat()
+    val fat: Float get() = items.sumOf { it.fat.toDouble() }.toFloat()
+    val imageUrl: String? get() = items.firstNotNullOfOrNull { it.imageUrl?.takeIf { u -> u.isNotBlank() } }
+}
+
 class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     private val db          = NutriDatabase.getInstance(app)
     private val repo        = DiaryRepository(db)
@@ -646,7 +658,9 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
                     carbs = item.carbs,
                     fat = item.fat,
                     mealType = template.mealType,
-                    date = _date.value
+                    date = _date.value,
+                    fiber = item.fiber,
+                    snapshotImageUrl = item.imageUrl
                 )
                 repo.getById(id)?.let { entry ->
                     ch.nutrisnap.app.health.HealthConnectNutritionSync.pushEntry(getApplication(), entry)
@@ -680,7 +694,9 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
                     protein = e.protein,
                     carbs = e.carbs,
                     fat = e.fat,
-                    quantityGrams = e.amountGrams
+                    quantityGrams = e.amountGrams,
+                    fiber = e.fiber,
+                    imageUrl = e.snapshotImageUrl
                 )
             }
             val fallbackName = when (mealType) {
@@ -694,6 +710,86 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
             }.getOrNull()
             onDone(id)
         }
+    }
+
+    // ── Gespeicherte Mahlzeiten (Vorlagen) für Schnell-Logging ───────────────
+    private fun savedMealsFlow(): Flow<List<SavedMealUi>> = combine(
+        templateRepo.getAll(),
+        templateRepo.getAllItems()
+    ) { templates, items ->
+        val byTemplate = items.groupBy { it.templateId }
+        templates
+            .map { SavedMealUi(it, byTemplate[it.id].orEmpty()) }
+            .filter { it.items.isNotEmpty() }
+    }
+
+    /** Alle Vorlagen mit Einträgen (leere "+"-Vorlagen werden ausgeblendet), neueste zuerst. */
+    val savedMeals: StateFlow<List<SavedMealUi>> = savedMealsFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * Einzelnen Tagebuch-Eintrag (z. B. ein gescanntes Gericht) als Ein-Item-Vorlage speichern.
+     * Gleicher Name + gleiche Kalorien (±1 kcal) wird nicht doppelt angelegt.
+     * @param onDone true, wenn die Vorlage jetzt existiert (neu oder bereits vorhanden)
+     */
+    fun saveEntryAsTemplate(entry: DiaryEntry, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val name = entry.foodName.trim().ifBlank { "Mahlzeit" }
+            val ok = runCatching {
+                val exists = savedMealsFlow().first().any { m ->
+                    m.template.name.equals(name, ignoreCase = true) &&
+                        m.items.size == 1 &&
+                        kotlin.math.abs(m.calories - entry.calories) < 1f
+                }
+                if (!exists) {
+                    templateRepo.saveTemplate(
+                        name, entry.mealType,
+                        listOf(
+                            ch.nutrisnap.app.data.model.MealTemplateItem(
+                                templateId = 0,
+                                foodName = entry.foodName,
+                                calories = entry.calories,
+                                protein = entry.protein,
+                                carbs = entry.carbs,
+                                fat = entry.fat,
+                                quantityGrams = entry.amountGrams,
+                                fiber = entry.fiber,
+                                imageUrl = entry.snapshotImageUrl
+                            )
+                        )
+                    )
+                }
+                true
+            }.getOrDefault(false)
+            onDone(ok)
+        }
+    }
+
+    /** Vorlage mit einem Tipp in [meal] am aktuell gewählten Tag loggen. */
+    fun addSavedMeal(saved: SavedMealUi, meal: MealType, onDone: (Int) -> Unit = {}) {
+        viewModelScope.launch {
+            for (item in saved.items) {
+                val id = repo.addManualEntry(
+                    name = item.foodName,
+                    kcal = item.calories,
+                    protein = item.protein,
+                    carbs = item.carbs,
+                    fat = item.fat,
+                    mealType = meal,
+                    date = _date.value,
+                    fiber = item.fiber,
+                    snapshotImageUrl = item.imageUrl
+                )
+                repo.getById(id)?.let { entry ->
+                    ch.nutrisnap.app.health.HealthConnectNutritionSync.pushEntry(getApplication(), entry)
+                }
+            }
+            onDone(saved.items.size)
+        }
+    }
+
+    fun deleteSavedMeal(saved: SavedMealUi) {
+        viewModelScope.launch { runCatching { templateRepo.delete(saved.template) } }
     }
 
     // ── Automatisch erkannte Mahlzeit-Muster (1-Tap-Relog) ───────────────────

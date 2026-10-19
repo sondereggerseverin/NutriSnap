@@ -68,7 +68,7 @@ internal fun parseGramsInput(text: String): Float? {
     return cleaned.toFloatOrNull()?.takeIf { it > 0f }
 }
 
-enum class AddFoodTab { SEARCH, AI, MANUAL }
+enum class AddFoodTab { SEARCH, AI, MANUAL, SAVED }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -273,6 +273,12 @@ fun AddFoodSheet(
                     text     = { Text("Manuell") },
                     icon     = { Icon(Icons.Default.Edit, null, Modifier.size(16.dp)) }
                 )
+                Tab(
+                    selected = activeTab == AddFoodTab.SAVED,
+                    onClick  = { activeTab = AddFoodTab.SAVED },
+                    text     = { Text("Vorlagen") },
+                    icon     = { Icon(Icons.Default.Bookmarks, null, Modifier.size(16.dp)) }
+                )
             }
 
             Spacer(Modifier.height(NutriSpacing.md))
@@ -330,6 +336,11 @@ fun AddFoodSheet(
                     initialMeal = initialMeal,
                     onDismiss = { requestDismiss() }
                 )
+                AddFoodTab.SAVED -> SavedMealsTab(
+                    vm = vm,
+                    initialMeal = initialMeal,
+                    onDismiss = { requestDismiss() }
+                )
                 AddFoodTab.MANUAL -> ManualEntryTab(
                     initialMeal = initialMeal,
                     onSave = { name, kcal, protein, carbs, fat, meal ->
@@ -341,6 +352,132 @@ fun AddFoodSheet(
 
             Spacer(Modifier.height(NutriSpacing.xxxl))
         }
+    }
+}
+
+/**
+ * "Vorlagen": gespeicherte Mahlzeiten (aus "Als Vorlage speichern" im Tagebuch) mit Foto.
+ * Ein Tipp auf die Karte loggt alle Einträge der Vorlage in die gewählte Mahlzeit.
+ * Kein eigenes Scrolling: der Parent in [AddFoodSheet] scrollt bereits.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SavedMealsTab(
+    vm: DiaryViewModel,
+    initialMeal: MealType?,
+    onDismiss: () -> Unit
+) {
+    val saved by vm.savedMeals.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    var meal by remember { mutableStateOf(initialMeal ?: defaultMealForNow()) }
+    var toDelete by remember { mutableStateOf<SavedMealUi?>(null) }
+
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            MealType.values().forEach { m ->
+                FilterChip(
+                    selected = meal == m,
+                    onClick = { meal = m },
+                    label = { Text(m.label()) }
+                )
+            }
+        }
+        Spacer(Modifier.height(NutriSpacing.sm))
+
+        if (saved.isEmpty()) {
+            Text(
+                "Noch keine Vorlagen. Tippe im Tagebuch bei einem Eintrag auf ⋮ → \"Als Vorlage speichern\" " +
+                    "(z. B. nach einem Foto-Scan), dann kannst du es hier mit einem Tipp erneut loggen.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = NutriSpacing.md)
+            )
+        } else {
+            saved.forEach { m ->
+                Card(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                        .clickable {
+                            vm.addSavedMeal(m, meal) { n ->
+                                android.widget.Toast.makeText(
+                                    context,
+                                    if (n == 1) "\"${m.template.name}\" hinzugefügt"
+                                    else "\"${m.template.name}\" ($n Einträge) hinzugefügt",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                            onDismiss()
+                        },
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                ) {
+                    Row(
+                        Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val img = m.imageUrl
+                        val model: Any? = when {
+                            img.isNullOrBlank() -> null
+                            img.startsWith("file://") ->
+                                java.io.File(img.removePrefix("file://")).takeIf { it.exists() } ?: img
+                            img.startsWith("/") && !img.startsWith("http") ->
+                                java.io.File(img).takeIf { it.exists() } ?: img
+                            else -> img
+                        }
+                        if (model != null) {
+                            AsyncImage(
+                                model = model,
+                                contentDescription = m.template.name,
+                                modifier = Modifier.size(52.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Box(
+                                Modifier
+                                    .size(52.dp)
+                                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.surface),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Restaurant, null, Modifier.size(22.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(m.template.name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, maxLines = 2)
+                            Text(
+                                "${m.calories.toInt()} kcal · P ${fmtMacroShort(m.protein)}  K ${fmtMacroShort(m.carbs)}  F ${fmtMacroShort(m.fat)}" +
+                                    if (m.items.size > 1) " · ${m.items.size} Einträge" else "",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(onClick = { toDelete = m }) {
+                            Icon(Icons.Default.DeleteOutline, "Vorlage löschen",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    toDelete?.let { m ->
+        AlertDialog(
+            onDismissRequest = { toDelete = null },
+            title = { Text("Vorlage löschen?") },
+            text = { Text(m.template.name) },
+            confirmButton = {
+                TextButton(onClick = { vm.deleteSavedMeal(m); toDelete = null }) {
+                    Text("Löschen", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { toDelete = null }) { Text("Abbrechen") } }
+        )
     }
 }
 

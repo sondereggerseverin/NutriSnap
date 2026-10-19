@@ -16,6 +16,9 @@ interface MealTemplateDao {
     @Delete
     suspend fun deleteTemplate(template: MealTemplate)
 
+    @Query("SELECT * FROM meal_template_items")
+    fun getAllItems(): Flow<List<MealTemplateItem>>
+
     @Query("SELECT * FROM meal_template_items WHERE templateId = :templateId")
     suspend fun getItems(templateId: Int): List<MealTemplateItem>
 

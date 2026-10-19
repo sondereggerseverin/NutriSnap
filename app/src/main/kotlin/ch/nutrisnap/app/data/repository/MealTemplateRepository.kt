@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.Flow
 class MealTemplateRepository(private val dao: MealTemplateDao) {
     fun getAll(): Flow<List<MealTemplate>> = dao.getAll()
 
+    fun getAllItems(): Flow<List<MealTemplateItem>> = dao.getAllItems()
+
     suspend fun getItems(templateId: Int): List<MealTemplateItem> = dao.getItems(templateId)
 
     suspend fun saveTemplate(name: String, mealType: MealType, items: List<MealTemplateItem>): Long {
