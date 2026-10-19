@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.selects.select
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -126,6 +127,11 @@ class GroqVisionService {
             "qwen/qwen3.6-27b",
             "meta-llama/llama-4-scout-17b-16e-instruct"
         )
+        /**
+         * Essensfotos: so lange wartet die App auf Gemini, bevor sie das (schnellere, aber
+         * ungenauere) Groq-Ergebnis nimmt. Gemini erkennt Gerichte/Portionen deutlich besser.
+         */
+        private const val GEMINI_PREFERRED_TIMEOUT_MS = 12_000L
         /** Standard für Food-/Fridge-Fotos – hält Base64 unter typischen API-Limits. */
         private const val MAX_DIMENSION = 1024
         /**
@@ -136,6 +142,19 @@ class GroqVisionService {
         /** Einfache Anführungszeichen als JSON-String-Delimiter → doppelte. */
         private val SINGLE_QUOTED_JSON = Regex("""'((?:[^'\\]|\\.)*)'""")
     }
+
+    /**
+     * Schätz-Regeln gegen die typische Unterschätzung bei Foto-Analysen (Fud-AI-Niveau):
+     * Referenzgrössen, zubereiteter Zustand, versteckte Fette/Saucen, realistische Portionen.
+     */
+    private val PORTION_GUIDANCE = """
+
+SCHÄTZ-REGELN (für realistische Gramm- und Kalorienwerte):
+- Nutze Referenzgrössen im Bild: Standard-Essteller ≈ 26 cm, Gabel ≈ 19 cm, Handfläche ≈ 100 g Fleisch. Schätze das Gewicht im ZUBEREITETEN Zustand (gekochte Pasta/Reis, gebratenes Fleisch), nicht roh.
+- Versteckte Kalorien: Erkennst du Glanz, Bratspuren, Panade, Überbackenes, Saucen, Dressings oder Käse, füge Zubereitungsfett bzw. die Sauce als EIGENE Zutat mit realistischer Menge hinzu (z. B. gebratenes Gemüse/Fleisch 8–15 g Öl, Salatdressing 15–30 g, Pastasauce 80–150 g, Rahmsauce 60–100 g). Das gilt auch dann, wenn das Fett selbst nicht separat sichtbar ist.
+- Typische Portionen (zubereitet): Pasta/Reis/Kartoffeln 180–300 g, Fleisch/Fisch 120–200 g, Gemüsebeilage 100–200 g, Brotscheibe 35–50 g, Ei ≈ 55 g, Suppe 250–350 ml. Restaurant-Portionen sind meist grösser als Haushaltsportionen – lieber realistisch als zu klein schätzen.
+- Prüfe die Summe: Gesamtgewicht und Gericht müssen zusammenpassen (ein Teller wiegt selten unter 250 g oder über 900 g).
+"""
 
     /**
      * "Foto + Notiz": Freitext des Nutzers (z. B. "mit 1 EL Olivenöl, halbe Portion") wird
@@ -256,11 +275,11 @@ Antworte NUR mit folgendem JSON (kein Markdown, keine Erklärungen):
   ]
 }
 
-confidence ist "hoch", "mittel" oder "niedrig". Erfinde keine Zutaten, die nicht sichtbar sind. Liste jede Zutat nur einmal.
-""".trimIndent() + userNoteBlock(userNote)
+confidence ist "hoch", "mittel" oder "niedrig". Erfinde keine Zutaten, die nicht sichtbar sind (Zubereitungsfett/Sauce gemäss SCHÄTZ-REGELN ist erlaubt). Liste jede Zutat nur einmal.
+""".trimIndent() + PORTION_GUIDANCE + userNoteBlock(userNote)
         // Hoeheres Token-Limit als Standard-1000: bei vielen kleinen Zutaten (Bowls, Mezze-Teller)
         // braucht die JSON-Antwort mit einem Eintrag pro Zutat mehr Platz als eine einzelne Schaetzung.
-        callVisionRaw(prompt, listOf(base64Jpeg), maxTokens = 2000).mapCatching {
+        callVisionPreferGemini(prompt, listOf(base64Jpeg), maxTokens = 2000).mapCatching {
             json.decodeFromString<DishScanResult>(sanitizeLlmJson(it))
         }
     }
@@ -293,8 +312,8 @@ Regeln:
 - calories ≈ 4*protein + 4*carbs + 9*fat (±20%)
 - servingGrams: geschätztes Gesamtgewicht in Gramm
 - Keine erfundenen Zutaten im Namen; beschreibe nur was sichtbar ist
-""".trimIndent() + userNoteBlock(userNote)
-        callVisionRaw(prompt, listOf(base64Jpeg), maxTokens = 800).mapCatching {
+""".trimIndent() + PORTION_GUIDANCE + userNoteBlock(userNote)
+        callVisionPreferGemini(prompt, listOf(base64Jpeg), maxTokens = 800).mapCatching {
             json.decodeFromString<MealSummaryResult>(sanitizeLlmJson(it))
         }
     }
@@ -677,6 +696,57 @@ JSON-Schema:
         geminiDeferred.cancel()
         groqDeferred.cancel()
         // Beide fehlgeschlagen: kurze, lesbare Meldung statt API-JSON
+        if (result.isFailure) {
+            val msg = result.exceptionOrNull()?.message.orEmpty()
+            if (msg.contains("{") || msg.length > 180) {
+                return@coroutineScope Result.failure(
+                    Exception("Analyse fehlgeschlagen. Bitte erneut versuchen.")
+                )
+            }
+        }
+        result
+    }
+
+    /**
+     * Essensfotos: Gemini hat Vorrang (deutlich bessere Gericht-/Portionserkennung), Groq läuft
+     * parallel als Backup. Das erste Groq-Ergebnis wird NICHT mehr sofort übernommen – sonst
+     * gewinnt fast immer das schnellere, kleinere Modell. Gemini bekommt
+     * [GEMINI_PREFERRED_TIMEOUT_MS]; bei Fehler, Quota-Pause oder Timeout gilt das Groq-Ergebnis.
+     */
+    private suspend fun callVisionPreferGemini(
+        prompt: String,
+        base64Jpegs: List<String>,
+        maxTokens: Int = 1000
+    ): Result<String> = coroutineScope {
+        val images = base64Jpegs.filter { it.isNotBlank() }
+        if (images.isEmpty()) {
+            return@coroutineScope Result.failure(IllegalArgumentException("Keine Bilder"))
+        }
+        val groqDeferred: Deferred<Result<String>> =
+            async(Dispatchers.IO) { callGroqVision(prompt, images, maxTokens) }
+        if (!GeminiService.isUsable()) return@coroutineScope groqDeferred.await()
+
+        val geminiDeferred: Deferred<Result<String>> = async(Dispatchers.IO) {
+            GeminiService.generateVision(
+                prompt = prompt,
+                base64Jpegs = images,
+                temperature = 0.2,
+                maxTokens = maxTokens
+            )
+        }
+        val gemini = withTimeoutOrNull(GEMINI_PREFERRED_TIMEOUT_MS) { geminiDeferred.await() }
+        val result = if (gemini != null && gemini.isSuccess) {
+            gemini
+        } else {
+            val groq = groqDeferred.await()
+            when {
+                groq.isSuccess -> groq
+                // Groq gescheitert, Gemini evtl. nur langsam: noch auf das späte Ergebnis warten
+                else -> gemini ?: geminiDeferred.await()
+            }
+        }
+        geminiDeferred.cancel()
+        groqDeferred.cancel()
         if (result.isFailure) {
             val msg = result.exceptionOrNull()?.message.orEmpty()
             if (msg.contains("{") || msg.length > 180) {
