@@ -1,5 +1,7 @@
 package ch.nutrisnap.app.data.repository
 
+import ch.nutrisnap.app.domain.FudCalorieCalculator
+
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.db.toDomain
 import ch.nutrisnap.app.data.db.toEntity
@@ -42,12 +44,8 @@ data class UserProfile(
      */
     fun computedBmr(): Double? {
         if (weightKg <= 0f || heightCm <= 0 || ageYears <= 0) return null
-        val base = 10.0 * weightKg + 6.25 * heightCm - 5.0 * ageYears
-        return when (sex) {
-            Sex.MALE        -> base + 5.0
-            Sex.FEMALE      -> base - 161.0
-            Sex.UNSPECIFIED -> base - 78.0
-        }
+        // Identisch zu FudCalorieCalculator.bmrMifflin
+        return FudCalorieCalculator.bmrMifflin(weightKg, heightCm, ageYears, sex)
     }
 
     fun computedTdee(): Double? = computedBmr()?.let { it * activityFactor }

@@ -26,6 +26,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.repository.Sex
+import ch.nutrisnap.app.domain.FudCalorieCalculator
 import ch.nutrisnap.app.data.repository.UserProfile
 import ch.nutrisnap.app.health.HealthConnectManager
 import ch.nutrisnap.app.health.HealthConnectStatus
@@ -89,46 +90,47 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 
 enum class FitnessGoal(val label: String, val emoji: String, val desc: String) {
-    LOSE_WEIGHT("Abnehmen",        "\uD83D\uDD25", "–500 kcal vom TDEE · mehr Protein"),
-    MAINTAIN(   "Halten",          "\u2696\uFE0F", "TDEE als Ziel · ausgewogene Makros"),
-    BUILD_MUSCLE("Muskeln",        "\uD83D\uDCAA", "+250 kcal über TDEE · viel Protein"),
-    GAIN_WEIGHT( "Zunehmen",       "\uD83D\uDCC8", "+500 kcal über TDEE"),
-    SPORT(       "Sport & Leistung","\uD83C\uDFC3", "TDEE+300 · hohe Kohlenhydrate"),
+    LOSE_WEIGHT("Abnehmen",         "\uD83D\uDD25", "–0,5 kg/Woche · Fud-Formel"),
+    MAINTAIN(   "Halten",           "\u2696\uFE0F", "TDEE · Fett 0,6 g/kg · Rest KH"),
+    BUILD_MUSCLE("Muskeln",         "\uD83D\uDCAA", "+0,25 kg/Woche · hohes Protein"),
+    GAIN_WEIGHT( "Zunehmen",        "\uD83D\uDCC8", "+0,5 kg/Woche"),
+    SPORT(       "Sport & Leistung","\uD83C\uDFC3", "TDEE halten · Aktivität entscheidet"),
 }
 
+/**
+ * Ziele nach Fud AI (Mifflin/Katch, 6 Aktivitätsstufen, 7700 kcal/kg, Fett 0,6 g/kg).
+ * @return kcal, proteinG, fatG, carbsG
+ */
 private fun computeGoals(
     weightKg: Float, heightCm: Int, ageYears: Int,
-    activityFactor: Float, goal: FitnessGoal, sex: Sex
-): Triple<Int, Float, Float> {
-    if (weightKg <= 0 || heightCm <= 0 || ageYears <= 0) return Triple(2000, 120f, 65f)
-    val base = 10f * weightKg + 6.25f * heightCm - 5f * ageYears
-    val bmr  = when (sex) {
-        Sex.MALE        -> base + 5f
-        Sex.FEMALE      -> base - 161f
-        Sex.UNSPECIFIED -> base - 78f
+    activityFactor: Float, goal: FitnessGoal, sex: Sex,
+    weeklyTargetLossKg: Float? = null
+): Quadruple {
+    val weekly = when (goal) {
+        FitnessGoal.LOSE_WEIGHT -> -(weeklyTargetLossKg?.takeIf { it > 0f } ?: 0.5f)
+        FitnessGoal.GAIN_WEIGHT -> (weeklyTargetLossKg?.takeIf { it > 0f } ?: 0.5f)
+        FitnessGoal.BUILD_MUSCLE -> 0.25f
+        FitnessGoal.MAINTAIN, FitnessGoal.SPORT -> 0f
     }
-    val tdee = bmr * activityFactor
-    val kcal = when (goal) {
-        FitnessGoal.LOSE_WEIGHT  -> (tdee - 500).toInt().coerceAtLeast(1200)
-        FitnessGoal.MAINTAIN     -> tdee.toInt()
-        FitnessGoal.BUILD_MUSCLE -> (tdee + 250).toInt()
-        FitnessGoal.GAIN_WEIGHT  -> (tdee + 500).toInt()
-        FitnessGoal.SPORT        -> (tdee + 300).toInt()
-    }
-    // Literatur: 1.6–2.4 g/kg KG für Aktive; im Defizit eher am oberen Ende.
-    val proteinG = when (goal) {
-        FitnessGoal.LOSE_WEIGHT  -> weightKg * 2.2f
-        FitnessGoal.BUILD_MUSCLE -> weightKg * 2.4f
-        FitnessGoal.SPORT        -> weightKg * 2.0f
-        FitnessGoal.GAIN_WEIGHT  -> weightKg * 1.8f
-        FitnessGoal.MAINTAIN     -> weightKg * 1.6f
-    }
-    val fatG = when (goal) {
-        FitnessGoal.SPORT -> kcal * 0.20f / 9f
-        else              -> kcal * 0.25f / 9f
-    }
-    return Triple(kcal, proteinG, fatG)
+    val g = FudCalorieCalculator.compute(
+        weightKg = weightKg,
+        heightCm = heightCm,
+        ageYears = ageYears,
+        sex = sex,
+        activityFactor = activityFactor,
+        weeklyChangeKg = weekly,
+        bodyFatPercent = null
+    )
+    return Quadruple(g.calories, g.proteinG, g.fatG, g.carbsG)
 }
+
+/** Einfaches 4-Tupel ohne Extra-Dependency. */
+private data class Quadruple(
+    val first: Int,
+    val second: Float,
+    val third: Float,
+    val fourth: Float
+)
 
 /** Unterseiten im Mehr-Tab – Hub statt endloser Scroll-Liste. */
 private enum class SettingsHubSection(
@@ -191,12 +193,11 @@ fun SettingsScreen(
         val w = weightText.toFloatOrNull() ?: return
         val h = heightText.toIntOrNull()   ?: return
         val a = ageText.toIntOrNull()      ?: return
-        val (kcal, prot, fat) = computeGoals(w, h, a, activity, selectedGoal, sex)
-        val carbs = ((kcal - prot * 4 - fat * 9) / 4f).coerceAtLeast(50f)
-        calorieText = kcal.toString()
-        proteinText = prot.toInt().toString()
-        carbsText   = carbs.toInt().toString()
-        fatText     = fat.toInt().toString()
+        val q = computeGoals(w, h, a, activity, selectedGoal, sex, profile.weeklyTargetLossKg)
+        calorieText = q.first.toString()
+        proteinText = q.second.toInt().toString()
+        fatText     = q.third.toInt().toString()
+        carbsText   = q.fourth.toInt().toString()
     }
 
     val window = ch.nutrisnap.app.ui.rememberWindowInfo()
@@ -897,9 +898,8 @@ fun SettingsScreen(
                     GoalField("Kalorienziel (kcal)",  calorieText, KeyboardType.Number) { calorieText = it }
                     GoalField("Proteinziel (g)",      proteinText, KeyboardType.Number) { proteinText = it }
                     Text(
-                        "Empfehlung Aktiv: 1,6–2,4 g/kg KG (bei ${weightText.toFloatOrNull()?.let { "%.0f".format(it) } ?: "—"} kg ≈ "
-                            + "${weightText.toFloatOrNull()?.let { (it * 1.6f).toInt() } ?: "—"}–"
-                            + "${weightText.toFloatOrNull()?.let { (it * 2.4f).toInt() } ?: "—"} g)",
+                        "Fud-Formel: Protein nach Aktivität (0,8–2,2 g/kg, +0,2 bei Abnehmen), "
+                            + "Fett 0,6 g/kg, KH = Rest. Mifflin-St Jeor + 6 Aktivitätsstufen.",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1289,25 +1289,23 @@ fun GoalField(
 
 @Composable
 fun ActivitySlider(value: Float, onValueChange: (Float) -> Unit) {
-    val levels = listOf(
-        1.2f to "Sitzend (kein Sport)",
-        1.375f to "Leicht aktiv (1-3x/Woche)",
-        1.55f  to "Mässig aktiv (3-5x/Woche)",
-        1.725f to "Sehr aktiv (6-7x/Woche)",
-        1.9f   to "Extrem aktiv (2x täglich)"
-    )
+    // Fud AI: 1.2 / 1.375 / 1.465 / 1.55 / 1.725 / 1.9
+    val levels = FudCalorieCalculator.ACTIVITY_LEVELS.map { it.multiplier to it.labelDe }
+    val snapped = FudCalorieCalculator.nearestActivity(value).multiplier
     val currentLabel = levels.minByOrNull { kotlin.math.abs(it.first - value) }?.second ?: ""
     Column(verticalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
         Text(
-            currentLabel,
+            "$currentLabel · Faktor ${"%.3f".format(snapped).trimEnd('0').trimEnd('.')}",
             fontSize = 13.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Slider(
-            value = value,
-            onValueChange = onValueChange,
+            value = value.coerceIn(1.2f, 1.9f),
+            onValueChange = { raw ->
+                onValueChange(FudCalorieCalculator.nearestActivity(raw).multiplier)
+            },
             valueRange = 1.2f..1.9f,
-            steps = 3,
+            steps = 4, // 6 Stufen → 5 Intervalle → 4 steps
             modifier = Modifier.fillMaxWidth()
         )
         Row(
@@ -1315,7 +1313,7 @@ fun ActivitySlider(value: Float, onValueChange: (Float) -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text("Sitzend", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("Sehr aktiv", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Extrem", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
