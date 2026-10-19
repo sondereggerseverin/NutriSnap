@@ -1,5 +1,11 @@
 package ch.nutrisnap.app.ui.screens.chat
 
+import ch.nutrisnap.app.ui.components.VoiceInputButton
+import androidx.compose.ui.platform.LocalContext
+import android.graphics.BitmapFactory
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -15,7 +21,6 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -63,6 +68,24 @@ fun DataChatScreen(
         if (q.isEmpty() || isLoading) return
         question = ""
         vm.sendMessage(q)
+    }
+
+    val context = LocalContext.current
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri == null || isLoading) return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream)
+            }
+        }.getOrNull()?.let { bmp -> vm.sendPhoto(bmp) }
+    }
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bmp ->
+        if (bmp == null || isLoading) return@rememberLauncherForActivityResult
+        vm.sendPhoto(bmp)
     }
 
     Scaffold(
@@ -139,8 +162,12 @@ fun DataChatScreen(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     IconButton(
-                        onClick = { /* Foto-Anhang folgt */ },
-                        enabled = false,
+                        onClick = {
+                            galleryLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        enabled = !isLoading,
                         modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
@@ -150,8 +177,8 @@ fun DataChatScreen(
                         )
                     }
                     IconButton(
-                        onClick = { /* Kamera-Anhang folgt */ },
-                        enabled = false,
+                        onClick = { cameraLauncher.launch(null) },
+                        enabled = !isLoading,
                         modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
@@ -175,17 +202,15 @@ fun DataChatScreen(
                             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
                         )
                     )
-                    IconButton(
-                        onClick = { /* Sprach-Eingabe folgt */ },
-                        enabled = false,
+                    VoiceInputButton(
+                        onResult = { spoken ->
+                            question = spoken
+                            send(spoken)
+                        },
+                        enabled = !isLoading,
+                        prompt = "Coach fragen…",
                         modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Mic,
-                            contentDescription = "Spracheingabe",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    )
                     FilledIconButton(
                         onClick = { send() },
                         enabled = !isLoading && question.isNotBlank(),

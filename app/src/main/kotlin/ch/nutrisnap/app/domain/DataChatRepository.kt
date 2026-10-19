@@ -153,6 +153,36 @@ class DataChatViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Essensfoto → kurze Vision-Schätzung → als Coach-Frage mit Tageskontext.
+     */
+    fun sendPhoto(bitmap: android.graphics.Bitmap, userNote: String? = null) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val vision = GroqVisionService()
+            val b64 = vision.bitmapToBase64Jpeg(bitmap, quality = 70)
+            val summary = vision.analyzeMealSummary(b64, userNote).getOrNull()
+            val question = if (summary != null) {
+                buildString {
+                    append("Ich habe ein Foto geschickt: ${summary.dishName}")
+                    append(" (~${summary.calories.toInt()} kcal,")
+                    append(" P ${summary.protein.toInt()}g,")
+                    append(" K ${summary.carbs.toInt()}g,")
+                    append(" F ${summary.fat.toInt()}g).")
+                    if (!userNote.isNullOrBlank()) append(" Hinweis: $userNote.")
+                    append(" Bitte kurz kommentieren und sagen, was ich heute noch essen sollte,")
+                    append(" um meine Ziele zu treffen.")
+                }
+            } else {
+                "Ich habe ein Essensfoto geschickt, die automatische Schätzung ist fehlgeschlagen. " +
+                    "Kannst du mir anhand meiner heutigen Makros trotzdem einen Tipp geben?"
+            }
+            chatRepository.ask(question)
+            _messages.value = chatRepository.messages.toList()
+            _isLoading.value = false
+        }
+    }
+
     fun clearChat() {
         chatRepository.clearHistory()
         _messages.value = emptyList()
