@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -14,7 +13,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -23,7 +21,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.domain.ACTIVITY_PRESETS
@@ -52,13 +49,11 @@ fun HomeScreen(
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val hcState by hcVm.uiState.collectAsStateWithLifecycle()
-    val macroSuggestions by vm.macroSuggestions.collectAsStateWithLifecycle()
     val priorityNutrients by vm.priorityNutrients.collectAsStateWithLifecycle()
     val healthScore by vm.healthScore.collectAsStateWithLifecycle()
     var detailsExpanded by rememberSaveable { mutableStateOf(false) }
     var showWeightDialog by remember { mutableStateOf(false) }
     var showActivityDialog by remember { mutableStateOf(false) }
-    var snackMessage by remember { mutableStateOf<String?>(null) }
     val window = ch.nutrisnap.app.ui.rememberWindowInfo()
     val homeContext = LocalContext.current
     val homePrefs by homeContext.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
@@ -161,25 +156,10 @@ fun HomeScreen(
                         WhatToCookHomeCard(onClick = onNavigateToCookSuggestions)
                     }
                 }
-                if (macroSuggestions.isNotEmpty() && state.isViewingToday) {
-                    item {
-                        RemainingMacroSuggestionsCard(
-                            remainingKcal = state.remaining,
-                            remainingProtein = state.remainingProtein,
-                            suggestions = macroSuggestions,
-                            onAdd = { suggestion ->
-                                vm.applyMacroSuggestion(suggestion) { ok ->
-                                    snackMessage = if (ok) "„${suggestion.title}“ hinzugefügt"
-                                    else "Konnte nicht hinzufügen"
-                                }
-                            }
-                        )
-                    }
-                }
             }
             if (reorderHome) {
                 // Design-Toggle #16 "Home-Reihenfolge neu": Ring → Meals → Makros → Activity.
-                // Scan-Zugriff und Makro-Vorschläge sind Zusatz-Widgets, keine der vier
+                // Scan-Zugriff und Kochvorschläge sind Zusatz-Widgets, keine der vier
                 // Kern-Sektionen – rücken hinter Activity, vor dem Streak.
                 item { CalorieBreakdownCard(state) }
                 activityItems()
@@ -216,27 +196,6 @@ fun HomeScreen(
             },
             onDismiss = { showActivityDialog = false }
         )
-    }
-    snackMessage?.let { msg ->
-        LaunchedEffect(msg) {
-            kotlinx.coroutines.delay(2200)
-            snackMessage = null
-        }
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.inverseSurface,
-                tonalElevation = 4.dp,
-                modifier = Modifier.padding(bottom = 96.dp, start = 24.dp, end = 24.dp)
-            ) {
-                Text(
-                    msg,
-                    color = MaterialTheme.colorScheme.inverseOnSurface,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    fontSize = 14.sp
-                )
-            }
-        }
     }
 }
 

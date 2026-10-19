@@ -124,7 +124,6 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val statsRepo   = StatsRepository(db)
     private val hcDao       = db.healthConnectDao()
     private val manualActivityDao = db.manualActivityDao()
-    private val macroSuggester = ch.nutrisnap.app.domain.RemainingMacroSuggester(db)
     private val microAggregator = DailyMicronutrientAggregator(
         FoodItemRepository(db),
         RecipeRepository(db, app)
@@ -346,30 +345,6 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
     /**
-     * „Was passt noch?“ – Vorschläge aus eigenen Rezepten, Custom Foods und
-     * häufigen Tagebuch-Lebensmitteln, gerankt nach offenen Makros.
-     * Nur für „heute“ und wenn sinnvoller Rest übrig ist.
-     */
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val macroSuggestions: StateFlow<List<ch.nutrisnap.app.domain.MacroSuggestion>> =
-        uiState
-            .map { state ->
-                if (!state.isViewingToday) return@map ch.nutrisnap.app.domain.MacroRemaining(0f, 0f, 0f, 0f)
-                ch.nutrisnap.app.domain.MacroRemaining(
-                    kcal = state.remaining,
-                    protein = state.remainingProtein,
-                    carbs = state.remainingCarbs,
-                    fat = state.remainingFat
-                )
-            }
-            .distinctUntilChanged()
-            .mapLatest { remaining ->
-                if (!remaining.hasMeaningfulGap) emptyList()
-                else runCatching { macroSuggester.suggest(remaining) }.getOrDefault(emptyList())
-            }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    /**
      * Priority-Mikronährstoffe für den angezeigten Tag (bis zu 6 sticky Cards).
      * Keys aus DataStore [KEY_PRIORITY_NUTRIENTS], sonst Default-Liste.
      */
@@ -407,60 +382,6 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 )
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-    /**
-     * Ein-Tap: Vorschlag ins heutige Tagebuch (Snack, falls unklar).
-     * @return true wenn eingetragen
-     */
-    fun applyMacroSuggestion(
-        suggestion: ch.nutrisnap.app.domain.MacroSuggestion,
-        mealType: MealType = MealType.SNACK,
-        onDone: (Boolean) -> Unit = {}
-    ) {
-        viewModelScope.launch {
-            val ok = runCatching {
-                when (suggestion.kind) {
-                    ch.nutrisnap.app.domain.MacroSuggestionKind.RECIPE -> {
-                        val id = suggestion.recipeId ?: return@runCatching false
-                        val recipe = db.recipeDao().getById(id) ?: return@runCatching false
-                        diaryRepo.addRecipeAsMeal(
-                            recipe = recipe,
-                            servingsFactor = suggestion.servings.coerceAtLeast(0.25f),
-                            mealType = mealType,
-                            date = LocalDate.now()
-                        )
-                        true
-                    }
-                    ch.nutrisnap.app.domain.MacroSuggestionKind.FREQUENT_FOOD -> {
-                        val foodId = suggestion.foodItemId ?: return@runCatching false
-                        val food = db.foodItemDao().getById(foodId) ?: return@runCatching false
-                        val grams = suggestion.amountGrams ?: food.servingSize
-                        diaryRepo.addEntry(food, grams, mealType, LocalDate.now())
-                        true
-                    }
-                    ch.nutrisnap.app.domain.MacroSuggestionKind.CUSTOM_FOOD -> {
-                        val customId = suggestion.customFoodId ?: return@runCatching false
-                        val custom = db.customFoodDao().getById(customId) ?: return@runCatching false
-                        val grams = suggestion.amountGrams ?: custom.portionSizeG.coerceAtLeast(1f)
-                        // Custom → manueller Eintrag mit skalierten Makros (pro hinterlegter Basis)
-                        val baseG = if (custom.portionSizeG > 0f && custom.portionSizeG != 100f) 100f else 100f
-                        val factor = grams / baseG
-                        diaryRepo.addManualEntry(
-                            name = custom.name,
-                            kcal = custom.calories * factor,
-                            protein = custom.protein * factor,
-                            carbs = custom.carbs * factor,
-                            fat = custom.fat * factor,
-                            mealType = mealType,
-                            date = LocalDate.now()
-                        )
-                        true
-                    }
-                }
-            }.getOrDefault(false)
-            onDone(ok)
-        }
-    }
 
     fun logWeight(kg: Float) {
         viewModelScope.launch {
