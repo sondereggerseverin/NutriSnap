@@ -238,7 +238,8 @@ class DiaryRepository(db: NutriDatabase) {
                 salt        = salt,
                 sodium      = sodium,
                 recipeGrams = storedRecipeGrams,
-                matchedRecipeId = recipe.id
+                matchedRecipeId = recipe.id,
+                snapshotImageUrl = recipe.imageUrl?.takeIf { it.isNotBlank() }
             )
         )
         dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }
@@ -278,7 +279,8 @@ class DiaryRepository(db: NutriDatabase) {
                     fat = scaled.fat,
                     fiber = scaled.fiber,
                     recipeGrams = grams,
-                    matchedRecipeId = recipe.id
+                    matchedRecipeId = recipe.id,
+                    snapshotImageUrl = recipe.imageUrl?.takeIf { it.isNotBlank() }
                 )
             )
             dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }

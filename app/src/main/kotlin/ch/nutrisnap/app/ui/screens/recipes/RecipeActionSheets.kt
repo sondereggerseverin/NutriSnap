@@ -46,6 +46,8 @@ fun AddToDiarySheet(
     var selectedMeal by remember { mutableStateOf(MealType.LUNCH) }
     var selectedDate by remember { mutableStateOf(java.time.LocalDate.now()) }
     var freezeQtyText by remember { mutableStateOf("1") }
+    // Packungen = N× aktuelle Menge; Gramm = freier Gramm-Wert als eine Packung
+    var freezeUnitIsGrams by remember { mutableStateOf(false) }
 
     // Effektives g/Portion: analysiert oder aus Gesamt-Yield abgeleitet
     val effectiveGPerServing = gramsPerServing
@@ -184,7 +186,8 @@ fun AddToDiarySheet(
                 }
             }
             if (onFreeze != null) {
-                val freezeGrams: Float? = when (unit) {
+                // Basis-Gramm aus der aktuellen Tagebuch-Menge (eine Packung)
+                val portionFreezeGrams: Float? = when (unit) {
                     DiaryQuantityUnit.GRAM ->
                         gramsText.replace(',', '.').toFloatOrNull()?.takeIf { it >= 1f }
                     DiaryQuantityUnit.SERVING -> {
@@ -201,19 +204,71 @@ fun AddToDiarySheet(
                 ) {
                     OutlinedTextField(
                         value = freezeQtyText,
-                        onValueChange = { freezeQtyText = it.filter { c -> c.isDigit() } },
-                        label = { Text("Packungen") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        onValueChange = {
+                            freezeQtyText = if (freezeUnitIsGrams)
+                                it.filter { c -> c.isDigit() || c == ',' || c == '.' }
+                            else
+                                it.filter { c -> c.isDigit() }
+                        },
+                        label = { Text(if (freezeUnitIsGrams) "Gramm" else "Packungen") },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = if (freezeUnitIsGrams) KeyboardType.Decimal else KeyboardType.Number
+                        ),
                         singleLine = true,
                         modifier = Modifier.width(110.dp)
                     )
+                    var freezeUnitExpanded by remember { mutableStateOf(false) }
+                    Box {
+                        OutlinedButton(
+                            onClick = { freezeUnitExpanded = true },
+                            modifier = Modifier.height(56.dp)
+                        ) {
+                            Text(if (freezeUnitIsGrams) "g" else "Pk.")
+                            Icon(Icons.Default.ArrowDropDown, null)
+                        }
+                        DropdownMenu(
+                            expanded = freezeUnitExpanded,
+                            onDismissRequest = { freezeUnitExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Packungen") },
+                                onClick = {
+                                    freezeUnitIsGrams = false
+                                    freezeQtyText = "1"
+                                    freezeUnitExpanded = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Gramm") },
+                                onClick = {
+                                    freezeUnitIsGrams = true
+                                    // Vorbelegung: aktuelle Menge in g, falls bekannt
+                                    freezeQtyText = portionFreezeGrams?.toInt()?.toString()
+                                        ?: gramsText.ifBlank { "" }
+                                    freezeUnitExpanded = false
+                                }
+                            )
+                        }
+                    }
+                    val freezeReady = if (freezeUnitIsGrams) {
+                        freezeQtyText.replace(',', '.').toFloatOrNull()?.let { it >= 1f } == true
+                    } else {
+                        portionFreezeGrams != null &&
+                            (freezeQtyText.toIntOrNull()?.coerceAtLeast(1) ?: 1) >= 1
+                    }
                     OutlinedButton(
                         onClick = {
-                            val g = freezeGrams ?: return@OutlinedButton
-                            val q = freezeQtyText.toIntOrNull()?.coerceAtLeast(1) ?: 1
-                            onFreeze(g, q)
+                            if (freezeUnitIsGrams) {
+                                val g = freezeQtyText.replace(',', '.').toFloatOrNull()
+                                    ?.takeIf { it >= 1f } ?: return@OutlinedButton
+                                onFreeze(g, 1)
+                            } else {
+                                val g = portionFreezeGrams ?: return@OutlinedButton
+                                val q = freezeQtyText.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                                onFreeze(g, q)
+                            }
                         },
-                        enabled = freezeGrams != null,
+                        enabled = freezeReady,
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(Icons.Default.AcUnit, null, Modifier.size(16.dp))
@@ -221,10 +276,10 @@ fun AddToDiarySheet(
                         Text("Einfrieren")
                     }
                 }
-                if (freezeGrams == null) {
+                if (!freezeUnitIsGrams && portionFreezeGrams == null) {
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Einfrieren braucht ein Gewicht (Gramm oder analysierte Portionsgröße).",
+                        "Packungen brauchen ein Gewicht (Gramm-Menge oben oder analysierte Portionsgröße). Alternativ Einheit „Gramm“ wählen.",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
