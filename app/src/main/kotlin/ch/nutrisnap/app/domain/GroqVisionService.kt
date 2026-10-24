@@ -131,7 +131,7 @@ class GroqVisionService {
          * Essensfotos: so lange wartet die App auf Gemini, bevor sie das (schnellere, aber
          * ungenauere) Groq-Ergebnis nimmt. Gemini erkennt Gerichte/Portionen deutlich besser.
          */
-        private const val GEMINI_PREFERRED_TIMEOUT_MS = 12_000L
+        private const val GEMINI_PREFERRED_TIMEOUT_MS = 13_000L
         /** Standard für Food-/Fridge-Fotos – hält Base64 unter typischen API-Limits. */
         private const val MAX_DIMENSION = 1024
         /**

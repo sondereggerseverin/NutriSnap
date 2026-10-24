@@ -29,6 +29,8 @@ private class FakeDiaryDao(private val datesWithEntries: Set<String>) : DiaryDao
     override suspend fun getEntriesSince(fromDate: String): List<DiaryEntry> = emptyList()
     override suspend fun getById(id: Long): DiaryEntry? = null
     override suspend fun deleteAll() {}
+    override suspend fun backfillImagesFromRecipes(): Int = 0
+    override suspend fun backfillImagesFromFoods(): Int = 0
 }
 
 class StatsRepositoryTest {

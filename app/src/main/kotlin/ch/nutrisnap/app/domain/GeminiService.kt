@@ -38,6 +38,15 @@ object GeminiService {
         .callTimeout(10, TimeUnit.SECONDS)
         .build()
 
+    /**
+     * Vision-Calls (Bild + längere JSON-Antwort) brauchen länger als Text-Calls. Mit dem globalen
+     * 10-s-Limit wurde Gemini bei Essensfotos oft abgebrochen und Groq gewann trotz Gemini-Vorrang.
+     */
+    private val visionClient = client.newBuilder()
+        .readTimeout(13, TimeUnit.SECONDS)
+        .callTimeout(14, TimeUnit.SECONDS)
+        .build()
+
     @Volatile
     private var quotaBlockedUntilMs: Long = 0L
 
@@ -217,7 +226,7 @@ object GeminiService {
                 .post(requestBody.toRequestBody("application/json".toMediaType()))
                 .build()
 
-            val response = client.newCall(request).execute()
+            val response = visionClient.newCall(request).execute()
             val bodyStr = response.body?.string() ?: return@withContext Result.failure(Exception("Leere Gemini-Antwort"))
 
             if (!response.isSuccessful) {
