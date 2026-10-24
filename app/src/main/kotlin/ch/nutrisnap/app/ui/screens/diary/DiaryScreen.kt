@@ -979,7 +979,7 @@ private fun DiaryEntryRow(
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        "$amountLabel · ${fmtMacroShort(entry.fiber)} g Ballast.",
+                        amountLabel,
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1
@@ -997,7 +997,7 @@ private fun DiaryEntryRow(
                         color = MacroColors.calories
                     )
                     Text(
-                        "P ${fmtMacroShort(entry.protein)} · K ${fmtMacroShort(entry.carbs)} · F ${fmtMacroShort(entry.fat)}",
+                        "P ${fmtMacroShort(entry.protein)} · K ${fmtMacroShort(entry.carbs)} · F ${fmtMacroShort(entry.fat)} · B ${fmtMacroShort(entry.fiber)}",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1
