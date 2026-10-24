@@ -4,6 +4,7 @@ import android.util.Log
 import ch.nutrisnap.app.BuildConfig
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.FoodSource
+import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.domain.GeminiService
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -252,5 +253,156 @@ object GroqFoodEstimatorApi {
             source = FoodSource.MANUAL,
             completenessScore = 20 // niedrig gewichtet — nur Fallback, keine verifizierte Quelle
         )
+    }
+
+    /**
+     * Parst freie Mahlzeiten-Beschreibungen in mehrere trackbare Positionen.
+     * Beispiel: «2 Eier, 30 g Haferflocken und einen Latte zum Frühstück».
+     * Werte sind **absolut** für die genannte Menge (nicht pro 100 g).
+     */
+    data class MealParseItem(
+        val name: String,
+        val grams: Float,
+        val calories: Float,
+        val protein: Float,
+        val carbs: Float,
+        val fat: Float,
+        val fiber: Float = 0f
+    )
+
+    data class MealParseResult(
+        val items: List<MealParseItem>,
+        val mealType: MealType? = null
+    )
+
+    fun looksLikeMultiItemMeal(query: String): Boolean {
+        val q = query.trim().lowercase()
+        if (q.length < 6) return false
+        val multiHints = listOf(",", " und ", " & ", " plus ", " mit ", " dazu ")
+        val hasSeparator = multiHints.any { it in q }
+        val hasAmount = Regex("""\d+\s*(g|gramm|ml|stk|stück|ei|eier|scheibe|scheiben)?""").containsMatchIn(q)
+        val mealWords = listOf("frühstück", "mittag", "abend", "snack", "breakfast", "lunch", "dinner")
+        val hasMeal = mealWords.any { it in q }
+        return (hasSeparator && (hasAmount || q.split(Regex("""\s+""")).size >= 4)) ||
+            (hasAmount && hasMeal) ||
+            (hasSeparator && hasMeal)
+    }
+
+    suspend fun parseMealDescription(query: String): MealParseResult? = withContext(Dispatchers.IO) {
+        val prompt = """
+            Zerlege die Mahlzeit-Beschreibung in einzelne Lebensmittel mit geschätzten Nährwerten.
+            Text: "$query"
+
+            Regeln:
+            - Jede Position: name, grams (geschätztes Gewicht), calories/protein/carbs/fat/fiber für GENAU diese Menge (absolut, nicht pro 100g)
+            - calories ≈ 4*protein + 4*carbs + 9*fat (±25%)
+            - Mengen aus dem Text übernehmen (z.B. «2 Eier» ≈ 100–120 g, «30 g Hafer»)
+            - Ohne Mengenangabe realistische Portionsgrösse schätzen
+            - mealType nur wenn klar: BREAKFAST, LUNCH, DINNER, SNACK – sonst null
+            - Maximal 8 Positionen; Getränke mitzählen
+            - Unverständlich → {"items":[]}
+
+            NUR JSON, kein Markdown:
+            {"mealType":"BREAKFAST","items":[{"name":"Ei","grams":100,"calories":155,"protein":13,"carbs":1.1,"fat":11,"fiber":0}]}
+        """.trimIndent()
+
+        val raw = if (!GeminiService.isUsable()) {
+            runCatching { parseMealViaGroq(prompt) }.getOrNull()
+        } else {
+            coroutineScope {
+                val geminiJob = async { runCatching { parseMealViaGemini(prompt) }.getOrNull() }
+                val groqJob = async { runCatching { parseMealViaGroq(prompt) }.getOrNull() }
+                select {
+                    geminiJob.onAwait { it }
+                    groqJob.onAwait { it }
+                } ?: geminiJob.await() ?: groqJob.await()
+            }
+        } ?: return@withContext null
+
+        if (raw.items.isEmpty()) return@withContext null
+        raw
+    }
+
+    private suspend fun parseMealViaGemini(prompt: String): MealParseResult? {
+        val result = GeminiService.generateText(prompt = prompt, temperature = 0.2, maxTokens = 800)
+        if (result.isFailure) return null
+        val content = result.getOrThrow()
+            .trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+        return parseMealJson(content)
+    }
+
+    private fun parseMealViaGroq(prompt: String): MealParseResult? {
+        val apiKey = BuildConfig.GROQ_API_KEY
+        if (apiKey.isBlank()) return null
+        val requestJson = JSONObject().apply {
+            put("model", "openai/gpt-oss-120b")
+            put("temperature", 0.2)
+            put("max_tokens", 800)
+            put("reasoning_effort", "low")
+            put("messages", org.json.JSONArray().apply {
+                put(JSONObject().apply { put("role", "user"); put("content", prompt) })
+            })
+        }.toString()
+        val request = Request.Builder()
+            .url("https://api.groq.com/openai/v1/chat/completions")
+            .addHeader("Authorization", "Bearer $apiKey")
+            .post(requestJson.toRequestBody("application/json".toMediaType()))
+            .build()
+        val response = client.newCall(request).execute()
+        val bodyStr = response.body?.string()
+        if (!response.isSuccessful || bodyStr == null) {
+            Log.w(TAG, "parseMeal HTTP ${response.code}")
+            return null
+        }
+        val content = JSONObject(bodyStr)
+            .optJSONArray("choices")
+            ?.optJSONObject(0)
+            ?.optJSONObject("message")
+            ?.optString("content")
+            ?.trim()
+            ?.removePrefix("```json")?.removePrefix("```")?.removeSuffix("```")?.trim()
+            ?: return null
+        return parseMealJson(content)
+    }
+
+    private fun parseMealJson(content: String): MealParseResult? {
+        return runCatching {
+            val root = JSONObject(content)
+            val arr = root.optJSONArray("items") ?: return null
+            val items = mutableListOf<MealParseItem>()
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                val name = o.optString("name", "").trim()
+                if (name.isBlank()) continue
+                val grams = o.optDouble("grams", 0.0).toFloat().takeIf { it >= 1f } ?: continue
+                val cal = o.optDouble("calories", 0.0).toFloat()
+                if (cal <= 0f || cal > 2500f) continue
+                val protein = o.optDouble("protein", 0.0).toFloat().coerceAtLeast(0f)
+                val carbs = o.optDouble("carbs", 0.0).toFloat().coerceAtLeast(0f)
+                val fat = o.optDouble("fat", 0.0).toFloat().coerceAtLeast(0f)
+                val fiber = o.optDouble("fiber", 0.0).toFloat().coerceAtLeast(0f)
+                items.add(
+                    MealParseItem(
+                        name = name,
+                        grams = grams,
+                        calories = cal,
+                        protein = protein,
+                        carbs = carbs,
+                        fat = fat,
+                        fiber = fiber
+                    )
+                )
+            }
+            if (items.isEmpty()) return null
+            val mealStr = root.optString("mealType", "").uppercase()
+            val meal = when (mealStr) {
+                "BREAKFAST" -> MealType.BREAKFAST
+                "LUNCH" -> MealType.LUNCH
+                "DINNER" -> MealType.DINNER
+                "SNACK" -> MealType.SNACK
+                else -> null
+            }
+            MealParseResult(items = items, mealType = meal)
+        }.onFailure { Log.w(TAG, "parseMealJson: ${it.message}") }.getOrNull()
     }
 }

@@ -471,13 +471,55 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         protein: Float,
         carbs: Float,
         fat: Float,
-        meal: MealType
+        meal: MealType,
+        fiber: Float = 0f,
+        amountGrams: Float = 0f
     ) {
         viewModelScope.launch {
-            val id = repo.addManualEntry(name, kcal, protein, carbs, fat, meal, _date.value)
+            val id = repo.addManualEntry(
+                name = name,
+                kcal = kcal,
+                protein = protein,
+                carbs = carbs,
+                fat = fat,
+                mealType = meal,
+                date = _date.value,
+                fiber = fiber,
+                amountGrams = amountGrams
+            )
             repo.getById(id)?.let { entry ->
                 ch.nutrisnap.app.health.HealthConnectNutritionSync.pushEntry(getApplication(), entry)
             }
+        }
+    }
+
+    /** Mehrere KI-geparste Positionen auf einmal ins Tagebuch (nach Review). */
+    fun addParsedMealItems(
+        items: List<ch.nutrisnap.app.data.api.GroqFoodEstimatorApi.MealParseItem>,
+        meal: MealType,
+        onDone: (Int) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            var n = 0
+            for (item in items) {
+                if (item.calories <= 0f || item.grams < 1f) continue
+                val id = repo.addManualEntry(
+                    name = item.name,
+                    kcal = item.calories,
+                    protein = item.protein,
+                    carbs = item.carbs,
+                    fat = item.fat,
+                    mealType = meal,
+                    date = _date.value,
+                    fiber = item.fiber,
+                    amountGrams = item.grams
+                )
+                repo.getById(id)?.let { entry ->
+                    ch.nutrisnap.app.health.HealthConnectNutritionSync.pushEntry(getApplication(), entry)
+                }
+                n++
+            }
+            onDone(n)
         }
     }
 

@@ -109,12 +109,40 @@ Nutze ausschließlich die Zahlen aus dem Kontext oben.
 
         val lastWeight = weightRepository.getLatest()?.weightKg
 
+        val goalP = profile.proteinGoalG
+        val goalC = profile.carbsGoalG
+        val goalF = profile.fatGoalG
+        val remainKcal = (goalKcal - todayKcal).toInt()
+        val remainP = goalP?.let { (it - todayProtein).toInt() }
+        val remainC = goalC?.let { (it - todayCarbs).toInt() }
+        val remainF = goalF?.let { (it - todayFat).toInt() }
+
+        val mealLines = todayEntries
+            .groupBy { it.mealType }
+            .entries
+            .sortedBy { it.key.ordinal }
+            .joinToString("\n") { (meal, entries) ->
+                val names = entries.joinToString("; ") {
+                    val g = it.recipeGrams?.toInt() ?: it.amountGrams.toInt().takeIf { a -> a > 0 }
+                    if (g != null && g > 0) "${it.foodName} (${g}g, ${it.calories.toInt()} kcal)"
+                    else "${it.foodName} (${it.calories.toInt()} kcal)"
+                }
+                "- ${meal.name}: $names"
+            }
+            .ifBlank { "- (noch nichts geloggt)" }
+
         return """
 Du bist der persönliche Ernährungsassistent des Nutzers in NutriSnap.
+Antworte kurz auf Deutsch, mit konkreten Zahlen aus dem Kontext. Erfinde keine Mahlzeiten.
 
-HEUTE:
-- Gegessen: ${todayKcal.toInt()} kcal (Ziel: $goalKcal kcal, Differenz: ${(todayKcal - goalKcal).toInt()} kcal)
-- Protein: ${todayProtein.toInt()}g | Carbs: ${todayCarbs.toInt()}g | Fett: ${todayFat.toInt()}g
+HEUTE (${today}):
+- Gegessen: ${todayKcal.toInt()} kcal (Ziel: $goalKcal kcal, noch ${remainKcal} kcal)
+- Protein: ${todayProtein.toInt()}g${goalP?.let { " / ${it.toInt()}g (noch ${remainP}g)" } ?: ""}
+- Carbs: ${todayCarbs.toInt()}g${goalC?.let { " / ${it.toInt()}g (noch ${remainC}g)" } ?: ""}
+- Fett: ${todayFat.toInt()}g${goalF?.let { " / ${it.toInt()}g (noch ${remainF}g)" } ?: ""}
+
+MAHLZEITEN HEUTE:
+$mealLines
 
 DIESE WOCHE (7 Tage):
 - Ø ${weeklyAvg.toInt()} kcal/Tag

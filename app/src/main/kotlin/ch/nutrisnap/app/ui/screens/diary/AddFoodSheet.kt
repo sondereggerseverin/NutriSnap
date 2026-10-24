@@ -847,6 +847,9 @@ private fun AiEstimateTab(
     var query by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf<FoodItem?>(null) }
+    var multiItems by remember {
+        mutableStateOf<List<ch.nutrisnap.app.data.api.GroqFoodEstimatorApi.MealParseItem>>(emptyList())
+    }
     var sourceLabel by remember { mutableStateOf("") }
     var errorMsg by remember { mutableStateOf<String?>(null) }
     var amountText by remember { mutableStateOf("100") }
@@ -863,6 +866,19 @@ private fun AiEstimateTab(
             isLoading = true
             errorMsg = null
             result = null
+            multiItems = emptyList()
+            val estimator = ch.nutrisnap.app.data.api.GroqFoodEstimatorApi
+            // 0) Multi-Item-Mahlzeit («2 Eier, Latte, 30g Hafer») → Review vor dem Speichern
+            if (estimator.looksLikeMultiItemMeal(q)) {
+                val parsed = runCatching { estimator.parseMealDescription(q) }.getOrNull()
+                if (parsed != null && parsed.items.size >= 2) {
+                    multiItems = parsed.items
+                    parsed.mealType?.let { selectedMeal = it }
+                    sourceLabel = "KI-Mahlzeit (${parsed.items.size} Positionen) – vor dem Speichern prüfen"
+                    isLoading = false
+                    return@launch
+                }
+            }
             // 1) Lokale Referenz (USDA-nah) – nichts erfinden
             val local = ch.nutrisnap.app.domain.IngredientNutritionDatabase.lookup(q)
             if (local != null) {
@@ -885,7 +901,6 @@ private fun AiEstimateTab(
                 return@launch
             }
             // 2) Gerichtsname → Portionsschätzung (wenn Toggle an)
-            val estimator = ch.nutrisnap.app.data.api.GroqFoodEstimatorApi
             if (dishAiEnabled && estimator.looksLikeDish(q)) {
                 val dish = runCatching { estimator.estimateDish(q) }.getOrNull()
                 if (dish != null) {
@@ -919,7 +934,7 @@ private fun AiEstimateTab(
         verticalArrangement = Arrangement.spacedBy(NutriSpacing.md)
     ) {
         Text(
-            "Name eingeben oder sprechen – zuerst Referenzwerte, sonst KI pro 100g",
+            "Sprechen oder tippen: einzelnes Lebensmittel, Gericht oder ganze Mahlzeit (z.B. «2 Eier und Latte»)",
             fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -931,7 +946,7 @@ private fun AiEstimateTab(
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                label = { Text("Lebensmittel (z.B. Hähnchenbrust, Reis)") },
+                label = { Text("Was hast du gegessen?") },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
                 shape = RoundedCornerShape(NutriRadius.md),
@@ -974,6 +989,65 @@ private fun AiEstimateTab(
 
         errorMsg?.let {
             Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+        }
+
+        if (multiItems.isNotEmpty()) {
+            Text(sourceLabel, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+            MealPicker(selected = selectedMeal) { selectedMeal = it }
+            val totalKcal = multiItems.sumOf { it.calories.toDouble() }
+            val totalP = multiItems.sumOf { it.protein.toDouble() }
+            val totalC = multiItems.sumOf { it.carbs.toDouble() }
+            val totalF = multiItems.sumOf { it.fat.toDouble() }
+            Text(
+                "Summe ≈ ${totalKcal.toInt()} kcal · P ${totalP.toInt()}g · K ${totalC.toInt()}g · F ${totalF.toInt()}g",
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp
+            )
+            multiItems.forEachIndexed { idx, item ->
+                Card(
+                    shape = RoundedCornerShape(NutriRadius.md),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(item.name, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                            Text(
+                                "${item.grams.toInt()} g · ${item.calories.toInt()} kcal · P ${item.protein.toInt()} · K ${item.carbs.toInt()} · F ${item.fat.toInt()}",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(onClick = {
+                            multiItems = multiItems.filterIndexed { i, _ -> i != idx }
+                        }) {
+                            Icon(Icons.Default.Close, "Entfernen", Modifier.size(18.dp))
+                        }
+                    }
+                }
+            }
+            Button(
+                onClick = {
+                    vm.addParsedMealItems(multiItems, selectedMeal) {
+                        onDismiss()
+                    }
+                },
+                enabled = multiItems.isNotEmpty(),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Check, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Alle ${multiItems.size} ins Tagebuch")
+            }
+            TextButton(
+                onClick = { multiItems = emptyList() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Verwerfen")
+            }
         }
 
         result?.let { food ->
