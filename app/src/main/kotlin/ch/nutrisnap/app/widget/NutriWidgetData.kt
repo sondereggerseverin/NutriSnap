@@ -22,11 +22,14 @@ data class WidgetSnapshot(
     val proteinGoal: Float,
     val carbs: Float,
     val fat: Float,
+    val waterMl: Int,
+    val waterGoalMl: Int,
     val streak: Int
 ) {
     val adjustedGoal: Float get() = if (isAdaptiveTarget) calorieGoal else calorieGoal + burnedKcal
     val remaining: Float get() = (adjustedGoal - totalCalories).coerceAtLeast(0f)
     val proteinRemaining: Float get() = (proteinGoal - protein).coerceAtLeast(0f)
+    val waterProgress: Float get() = if (waterGoalMl <= 0) 0f else (waterMl.toFloat() / waterGoalMl).coerceIn(0f, 1f)
     val progress: Float get() = if (adjustedGoal <= 0f) 0f else (totalCalories / adjustedGoal).coerceIn(0f, 1f)
 }
 
@@ -43,6 +46,7 @@ object WidgetDataProvider {
         val weightRepo = WeightRepository(db)
         val statsRepo = StatsRepository(db)
         val hcDao = db.healthConnectDao()
+        val waterDao = db.waterDao()
 
         val today = LocalDate.now()
         val entries = diaryRepo.getEntriesForDate(today).first()
@@ -52,6 +56,11 @@ object WidgetDataProvider {
         val dailySummaries = diaryRepo.getWeeklySummary(today.minusDays(TREND_WINDOW_DAYS)).first()
         val activityDays = hcDao.getLast30Days().first()
         val streak = statsRepo.calculateStreak()
+        val waterEntry = waterDao.getForDateOnce(today.toString())
+        val waterGoal = runCatching {
+            val prefs = context.notifDataStore.data.first()
+            prefs[ch.nutrisnap.app.ui.theme.KEY_WATER_GOAL_ML] ?: 2500
+        }.getOrDefault(2500)
 
         val manualWeightByDate = trendWeights.associate { LocalDate.parse(it.dateStr) to it.weightKg }
         val hcWeightByDate = activityDays
@@ -81,6 +90,8 @@ object WidgetDataProvider {
             proteinGoal = profile.proteinGoalG,
             carbs = entries.sumOf { it.carbs.toDouble() }.toFloat(),
             fat = entries.sumOf { it.fat.toDouble() }.toFloat(),
+            waterMl = waterEntry?.amountMl ?: 0,
+            waterGoalMl = waterGoal.coerceIn(500, 6000),
             streak = streak
         )
     }

@@ -133,6 +133,14 @@ private fun WideLayout(s: WidgetSnapshot) {
                     color = ColorProvider(androidx.compose.ui.graphics.Color(MacroColors.protein.toArgb()))
                 )
             )
+            Spacer(modifier = GlanceModifier.height(2.dp))
+            Text(
+                "Wasser ${s.waterMl}/${s.waterGoalMl} ml",
+                style = TextStyle(
+                    fontSize = 11.sp,
+                    color = ColorProvider(androidx.compose.ui.graphics.Color(0xFF4FC3F7))
+                )
+            )
             Spacer(modifier = GlanceModifier.height(6.dp))
             MacroDots(s)
             Spacer(modifier = GlanceModifier.height(6.dp))

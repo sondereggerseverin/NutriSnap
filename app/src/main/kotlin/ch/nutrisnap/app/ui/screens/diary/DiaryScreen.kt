@@ -307,6 +307,15 @@ fun DiaryScreen(
                     onCopyYesterday = if (compactDiary) copyYesterdayAction else null
                 )
             }
+            item {
+                ch.nutrisnap.app.ui.screens.home.WaterTrackerCard(
+                    waterMl = state.waterMl,
+                    goalMl = state.waterGoalMl,
+                    onAdd250 = { vm.addWater(250) },
+                    onAdd = { vm.addWater(it) },
+                    modifier = Modifier.padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs)
+                )
+            }
             if (!compactDiary) {
             item {
                 val largerYesterday = mealPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_YESTERDAY_BTN) ?: true

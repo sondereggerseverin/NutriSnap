@@ -37,6 +37,7 @@ import kotlinx.coroutines.launch
 import androidx.datastore.preferences.core.edit
 import ch.nutrisnap.app.ui.theme.AppTheme
 import ch.nutrisnap.app.ui.theme.KEY_APP_THEME
+import ch.nutrisnap.app.ui.theme.KEY_WATER_GOAL_ML
 import ch.nutrisnap.app.ui.theme.KEY_AUTO_GERMAN_METRIC
 import ch.nutrisnap.app.ui.theme.KEY_MANUAL_ACTIVITY_ENABLED
 import ch.nutrisnap.app.ui.theme.KEY_AGGRESSIVE_SPORT_DAY
@@ -186,6 +187,8 @@ fun SettingsScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
+    val waterGoalPref = prefs?.get(KEY_WATER_GOAL_ML) ?: ch.nutrisnap.app.ui.screens.home.DEFAULT_WATER_GOAL_ML
+    var waterGoalText by remember(waterGoalPref) { mutableStateOf(waterGoalPref.toString()) }
     val currentThemeName = prefs?.get(ch.nutrisnap.app.ui.theme.KEY_APP_THEME) ?: AppTheme.FOREST_GREEN.name
     val currentTheme = runCatching { AppTheme.valueOf(currentThemeName) }.getOrDefault(AppTheme.FOREST_GREEN)
 
@@ -911,6 +914,7 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
                     )
+                    GoalField("Wasserziel (ml)", waterGoalText, KeyboardType.Number) { waterGoalText = it }
                 }
 
                 SettingsCard(title = "Aktivitätslevel", icon = Icons.Default.DirectionsRun) {
@@ -974,6 +978,11 @@ fun SettingsScreen(
 
                 Button(
                     onClick = {
+                        scope.launch {
+                            context.notifDataStore.edit { p ->
+                                p[KEY_WATER_GOAL_ML] = (waterGoalText.toIntOrNull() ?: 2500).coerceIn(500, 6000)
+                            }
+                        }
                         vm.save(UserProfile(
                             weightKg         = weightText.toFloatOrNull()  ?: 0f,
                             heightCm         = heightText.toIntOrNull()    ?: 0,

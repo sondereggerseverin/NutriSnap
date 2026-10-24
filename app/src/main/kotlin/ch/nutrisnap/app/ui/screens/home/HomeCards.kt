@@ -1753,52 +1753,70 @@ internal fun DailyHealthScoreCard(
 }
 
 
-/** Schnell-Wassertracker: Fortschritt + Tap +250 ml (Fud-ähnliche Alltagsfunktion). */
+/** Schnell-Wassertracker: Fortschritt +/+500/−250 ml (Fud-ähnliche Alltagsfunktion). */
 @Composable
 internal fun WaterTrackerCard(
     waterMl: Int,
     goalMl: Int,
     onAdd250: () -> Unit,
+    onAdd: (Int) -> Unit = { delta -> if (delta == 250) onAdd250() },
     modifier: Modifier = Modifier
 ) {
     val progress = (waterMl.toFloat() / goalMl.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
+    val remaining = (goalMl - waterMl).coerceAtLeast(0)
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(NutriRadius.lg),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(NutriSpacing.md),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "Wasser",
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "${waterMl} / ${goalMl} ml",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(8.dp))
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp)),
-                    color = Color(0xFF4FC3F7),
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+        Column(Modifier.padding(NutriSpacing.md)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Wasser",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        "${waterMl} / ${goalMl} ml" +
+                            if (remaining > 0) " · noch ${remaining} ml" else " · Ziel erreicht",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
-            Spacer(Modifier.width(NutriSpacing.md))
-            FilledTonalButton(onClick = onAdd250) {
-                Text("+250 ml", fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                color = Color(0xFF4FC3F7),
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { onAdd(-250) },
+                    enabled = waterMl > 0,
+                    modifier = Modifier.weight(1f)
+                ) { Text("−250") }
+                FilledTonalButton(
+                    onClick = { onAdd(250) },
+                    modifier = Modifier.weight(1f)
+                ) { Text("+250", fontWeight = FontWeight.SemiBold) }
+                FilledTonalButton(
+                    onClick = { onAdd(500) },
+                    modifier = Modifier.weight(1f)
+                ) { Text("+500", fontWeight = FontWeight.SemiBold) }
             }
         }
     }

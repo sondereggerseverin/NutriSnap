@@ -13,6 +13,7 @@ import ch.nutrisnap.app.data.repository.WeightRepository
 import ch.nutrisnap.app.domain.AdaptiveTdeeCalculator
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.KEY_MEAL_ORDER
+import ch.nutrisnap.app.ui.theme.KEY_WATER_GOAL_ML
 import ch.nutrisnap.app.ui.theme.KEY_MANUAL_ACTIVITY_ENABLED
 import ch.nutrisnap.app.ui.theme.KEY_AGGRESSIVE_SPORT_DAY
 import ch.nutrisnap.app.ui.theme.KEY_PRIORITY_NUTRIENTS
@@ -318,7 +319,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             selectedDate = selected,
             isViewingToday = viewingToday,
             waterMl = waterEntry?.amountMl ?: 0,
-            waterGoalMl = DEFAULT_WATER_GOAL_ML,
+            waterGoalMl = (prefs[KEY_WATER_GOAL_ML] ?: DEFAULT_WATER_GOAL_ML).coerceIn(500, 6000),
             meals         = orderedMealMeta.map { (type, label, icon, color) ->
                 val mealEntries = byMeal[type] ?: emptyList()
                 val mealKcal = mealEntries.sumOf { it.calories.toDouble() }.toFloat()

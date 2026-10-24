@@ -20,6 +20,8 @@ import androidx.datastore.preferences.core.edit
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.KEY_AGGRESSIVE_SPORT_DAY
 import ch.nutrisnap.app.ui.theme.KEY_MANUAL_ACTIVITY_ENABLED
+import ch.nutrisnap.app.ui.theme.KEY_WATER_GOAL_ML
+import ch.nutrisnap.app.ui.screens.home.DEFAULT_WATER_GOAL_ML
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -40,6 +42,8 @@ data class DiaryUiState(
     val proteinGoal:   Float            = 120f,
     val carbsGoal:     Float            = 220f,
     val fatGoal:       Float            = 65f,
+    val waterMl:       Int              = 0,
+    val waterGoalMl:   Int              = 2500,
     val isLoading:     Boolean          = false
 )
 
@@ -65,6 +69,7 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     private val weightRepo  = WeightRepository(db)
     private val hcDao       = db.healthConnectDao()
     private val manualActivityDao = db.manualActivityDao()
+    private val waterDao = db.waterDao()
     private val contextRanking = ch.nutrisnap.app.data.repository.ContextualFoodRankingRepository(
         db.foodUsageContextDao(), favRepo
     )
@@ -86,7 +91,8 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
             repo.getWeeklySummary(selected.minusDays(trendWindowDays.toLong())),
             hcDao.getLast30Days(),
             app.notifDataStore.data,
-            manualActivityDao.getSince(selected.minusDays(29).toString())
+            manualActivityDao.getSince(selected.minusDays(29).toString()),
+            waterDao.getForDate(selected.toString())
         ) { args ->
             val entries = args[0] as List<DiaryEntry>
             val profile = args[1] as ch.nutrisnap.app.data.repository.UserProfile
@@ -100,6 +106,7 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
             val prefs = args[6] as androidx.datastore.preferences.core.Preferences
             @Suppress("UNCHECKED_CAST")
             val manualActivities = args[7] as List<ManualActivityEntry>
+            val waterEntry = args[8] as WaterEntry?
 
             val manualWeightByDate = trendWeights.associate { LocalDate.parse(it.dateStr) to it.weightKg }
             val hcWeightByDate = activityDays
@@ -166,7 +173,9 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
                 calorieGoal   = calorieGoal,
                 proteinGoal   = profile.proteinGoalG,
                 carbsGoal     = profile.carbsGoalG,
-                fatGoal       = profile.fatGoalG
+                fatGoal       = profile.fatGoalG,
+                waterMl       = waterEntry?.amountMl ?: 0,
+                waterGoalMl   = (prefs[KEY_WATER_GOAL_ML] ?: DEFAULT_WATER_GOAL_ML).coerceIn(500, 6000)
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DiaryUiState())
@@ -314,6 +323,17 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Kopiert alle Einträge von gestern auf das aktuell gewählte Datum. */
+    fun addWater(deltaMl: Int = 250, date: LocalDate = _date.value) {
+        if (deltaMl == 0) return
+        viewModelScope.launch {
+            val key = date.toString()
+            val current = waterDao.getForDateOnce(key)?.amountMl ?: 0
+            val next = (current + deltaMl).coerceAtLeast(0)
+            if (next == 0) waterDao.delete(key)
+            else waterDao.upsert(WaterEntry(dateStr = key, amountMl = next))
+        }
+    }
+
     fun copyYesterday(onDone: (Int) -> Unit = {}) {
         viewModelScope.launch {
             val target = _date.value

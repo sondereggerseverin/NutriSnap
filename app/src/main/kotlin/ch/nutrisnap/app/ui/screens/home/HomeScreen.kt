@@ -171,7 +171,8 @@ fun HomeScreen(
                     WaterTrackerCard(
                         waterMl = state.waterMl,
                         goalMl = state.waterGoalMl,
-                        onAdd250 = { vm.addWater(250) }
+                        onAdd250 = { vm.addWater(250) },
+                        onAdd = { vm.addWater(it) }
                     )
                 }
                 extraItems()
@@ -184,7 +185,8 @@ fun HomeScreen(
                     WaterTrackerCard(
                         waterMl = state.waterMl,
                         goalMl = state.waterGoalMl,
-                        onAdd250 = { vm.addWater(250) }
+                        onAdd250 = { vm.addWater(250) },
+                        onAdd = { vm.addWater(it) }
                     )
                 }
             }
