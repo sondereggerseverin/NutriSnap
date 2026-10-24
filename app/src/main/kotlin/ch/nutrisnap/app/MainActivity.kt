@@ -92,7 +92,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 // 5 Tabs (Material-Empfehlung). Analyse bleibt als Stack-Screen unter «Mehr» erreichbar.
 // KI-Koch weiter als zweiter Tab in RecipesHubScreen.
 val bottomNavItems = listOf(
-    Screen.Home, Screen.Diary, Screen.Coach, Screen.Recipes, Screen.Settings
+    Screen.Home, Screen.Diary, Screen.Recipes, Screen.Coach, Screen.Settings
 )
 
 @AndroidEntryPoint

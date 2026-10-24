@@ -307,6 +307,7 @@ fun DiaryScreen(
                     onCopyYesterday = if (compactDiary) copyYesterdayAction else null
                 )
             }
+            if (mealPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_WATER_TRACKER_ENABLED) ?: true) {
             item {
                 ch.nutrisnap.app.ui.screens.home.WaterTrackerCard(
                     waterMl = state.waterMl,
@@ -315,6 +316,7 @@ fun DiaryScreen(
                     onAdd = { vm.addWater(it) },
                     modifier = Modifier.padding(horizontal = NutriSpacing.lg, vertical = NutriSpacing.xs)
                 )
+            }
             }
             if (!compactDiary) {
             item {

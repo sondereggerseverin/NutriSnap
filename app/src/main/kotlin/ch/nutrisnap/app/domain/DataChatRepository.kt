@@ -50,7 +50,10 @@ data class ChatMessage(
 class DataChatRepository(
     private val diaryRepository: DiaryRepository,
     private val weightRepository: WeightRepository,
-    private val userProfileRepository: UserProfileRepository
+    private val userProfileRepository: UserProfileRepository,
+    private val recipeDao: ch.nutrisnap.app.data.db.RecipeDao? = null,
+    private val frozenMealDao: ch.nutrisnap.app.data.db.FrozenMealDao? = null,
+    private val waterDao: ch.nutrisnap.app.data.db.WaterDao? = null
 ) {
     private val _messages = mutableListOf<ChatMessage>()
     val messages: List<ChatMessage> get() = _messages.toList()
@@ -131,18 +134,58 @@ Nutze ausschließlich die Zahlen aus dem Kontext oben.
             }
             .ifBlank { "- (noch nichts geloggt)" }
 
+        val todayFiber = todayEntries.sumOf { it.fiber.toDouble() }
+        val waterMl = waterDao?.getForDateOnce(today.toString())?.amountMl ?: 0
+
+        val recipeLines = runCatching {
+            val recipes = recipeDao?.getAllOnce().orEmpty()
+                .sortedByDescending { it.id }
+                .take(12)
+            if (recipes.isEmpty()) "- (keine Rezepte gespeichert)"
+            else recipes.joinToString("\n") { r ->
+                val kcal = r.caloriesPerServingEffective()?.toInt()
+                val p = r.proteinPerServingEffective()?.toInt()
+                val title = r.displayTitle().take(60)
+                buildString {
+                    append("- $title")
+                    if (kcal != null) append(" · ${kcal} kcal")
+                    if (p != null) append(" · P ${p}g")
+                    append(" (1 Portion)")
+                }
+            }
+        }.getOrDefault("- (Rezepte nicht lesbar)")
+
+        val freezerLines = runCatching {
+            val meals = frozenMealDao?.getAllActive()?.first().orEmpty().take(10)
+            if (meals.isEmpty()) "- (Gefrierer leer)"
+            else meals.joinToString("\n") { m ->
+                "- ${m.name}: ${m.quantity}× · ${m.totalCaloriesPerPortion().toInt()} kcal · P ${m.totalProteinPerPortion().toInt()}g"
+            }
+        }.getOrDefault("- (Gefrierer nicht lesbar)")
+
         return """
 Du bist der persönliche Ernährungsassistent des Nutzers in NutriSnap.
-Antworte kurz auf Deutsch, mit konkreten Zahlen aus dem Kontext. Erfinde keine Mahlzeiten.
+Antworte kurz und konkret auf Deutsch. Nutze NUR Zahlen und Rezepte aus diesem Kontext.
+Erfinde keine Mahlzeiten oder Rezepte. Wenn der Nutzer nach Ideen fragt, schlage aus
+GESPEICHERTE REZEPTE und GEFRIERER vor (mit kcal/Protein). Bei „was noch essen“:
+Rest-Makros und passende Rezepte nennen.
 
 HEUTE (${today}):
 - Gegessen: ${todayKcal.toInt()} kcal (Ziel: $goalKcal kcal, noch ${remainKcal} kcal)
 - Protein: ${todayProtein.toInt()}g${goalP?.let { " / ${it.toInt()}g (noch ${remainP}g)" } ?: ""}
 - Carbs: ${todayCarbs.toInt()}g${goalC?.let { " / ${it.toInt()}g (noch ${remainC}g)" } ?: ""}
 - Fett: ${todayFat.toInt()}g${goalF?.let { " / ${it.toInt()}g (noch ${remainF}g)" } ?: ""}
+- Ballaststoffe: ${todayFiber.toInt()}g (Richtwert ≥30g)
+- Wasser: ${waterMl} ml
 
 MAHLZEITEN HEUTE:
 $mealLines
+
+GESPEICHERTE REZEPTE (Auswahl, neueste zuerst):
+$recipeLines
+
+GEFRIERER (verfügbar zum Auftauen):
+$freezerLines
 
 DIESE WOCHE (7 Tage):
 - Ø ${weeklyAvg.toInt()} kcal/Tag
@@ -163,7 +206,12 @@ GEWICHT: ${lastWeight?.let { "$it kg" } ?: "nicht erfasst"} | Ziel: ${profile.ta
 class DataChatViewModel(app: Application) : AndroidViewModel(app) {
     private val db = NutriDatabase.getInstance(app)
     private val chatRepository = DataChatRepository(
-        DiaryRepository(db), WeightRepository(db), UserProfileRepository(db)
+        DiaryRepository(db),
+        WeightRepository(db),
+        UserProfileRepository(db),
+        recipeDao = db.recipeDao(),
+        frozenMealDao = db.frozenMealDao(),
+        waterDao = db.waterDao()
     )
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())

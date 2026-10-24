@@ -38,6 +38,7 @@ import androidx.datastore.preferences.core.edit
 import ch.nutrisnap.app.ui.theme.AppTheme
 import ch.nutrisnap.app.ui.theme.KEY_APP_THEME
 import ch.nutrisnap.app.ui.theme.KEY_WATER_GOAL_ML
+import ch.nutrisnap.app.ui.theme.KEY_WATER_TRACKER_ENABLED
 import ch.nutrisnap.app.ui.theme.KEY_AUTO_GERMAN_METRIC
 import ch.nutrisnap.app.ui.theme.KEY_MANUAL_ACTIVITY_ENABLED
 import ch.nutrisnap.app.ui.theme.KEY_AGGRESSIVE_SPORT_DAY
@@ -915,6 +916,29 @@ fun SettingsScreen(
                         modifier = Modifier.padding(top = 4.dp)
                     )
                     GoalField("Wasserziel (ml)", waterGoalText, KeyboardType.Number) { waterGoalText = it }
+                    val waterEnabled = prefs?.get(KEY_WATER_TRACKER_ENABLED) ?: true
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Wasser-Anzeige", fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                            Text(
+                                "Tracker auf Start & Tagebuch",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = waterEnabled,
+                            onCheckedChange = { checked ->
+                                scope.launch {
+                                    context.notifDataStore.edit { it[KEY_WATER_TRACKER_ENABLED] = checked }
+                                }
+                            }
+                        )
+                    }
                 }
 
                 SettingsCard(title = "Aktivitätslevel", icon = Icons.Default.DirectionsRun) {
