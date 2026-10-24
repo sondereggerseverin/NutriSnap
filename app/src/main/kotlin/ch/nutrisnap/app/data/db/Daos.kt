@@ -17,6 +17,27 @@ interface DiaryDao {
     @Query("UPDATE diary_entries SET sortOrder = :sortOrder WHERE id = :id")
     suspend fun updateSortOrder(id: Long, sortOrder: Int)
 
+    /** Ältere Einträge ohne Foto: Bild vom verknüpften Rezept nachziehen (nur lokal, idempotent). */
+    @Query("""
+        UPDATE diary_entries
+        SET snapshotImageUrl = (SELECT r.imageUrl FROM recipes r WHERE r.id = diary_entries.matchedRecipeId)
+        WHERE (snapshotImageUrl IS NULL OR snapshotImageUrl = '')
+          AND matchedRecipeId IS NOT NULL
+          AND EXISTS (SELECT 1 FROM recipes r WHERE r.id = diary_entries.matchedRecipeId
+                      AND r.imageUrl IS NOT NULL AND r.imageUrl != '')
+    """)
+    suspend fun backfillImagesFromRecipes(): Int
+
+    /** Ältere Einträge ohne Foto: Produktbild des verknüpften Lebensmittels nachziehen. */
+    @Query("""
+        UPDATE diary_entries
+        SET snapshotImageUrl = (SELECT f.imageUrl FROM food_items f WHERE f.id = diary_entries.foodItemId)
+        WHERE (snapshotImageUrl IS NULL OR snapshotImageUrl = '')
+          AND EXISTS (SELECT 1 FROM food_items f WHERE f.id = diary_entries.foodItemId
+                      AND f.imageUrl IS NOT NULL AND f.imageUrl != '')
+    """)
+    suspend fun backfillImagesFromFoods(): Int
+
     @Query("""
         SELECT dateStr, 
                SUM(calories) as calories, 

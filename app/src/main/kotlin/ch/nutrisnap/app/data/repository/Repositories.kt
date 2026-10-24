@@ -355,6 +355,10 @@ class DiaryRepository(db: NutriDatabase) {
         pushSafely { SupabaseSync.upsertDiaryEntry(entry) }
     }
 
+    /** Zieht fehlende Eintrags-Fotos aus verknüpften Rezepten/Lebensmitteln nach. @return Anzahl aktualisierter Einträge */
+    suspend fun backfillEntryImages(): Int =
+        dao.backfillImagesFromRecipes() + dao.backfillImagesFromFoods()
+
     suspend fun deleteEntry(entry: DiaryEntry) {
         dao.delete(entry)
         pushSafely { SupabaseSync.deleteDiaryEntry(entry.id) }

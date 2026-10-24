@@ -37,6 +37,7 @@ import kotlin.math.roundToInt
 import java.io.File
 import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.nutrisnap.app.utils.FoodEmoji
 import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.data.model.favoriteKey
 import ch.nutrisnap.app.ui.components.EmptyState
@@ -953,12 +954,17 @@ private fun DiaryEntryRow(
                             .background(MaterialTheme.colorScheme.surfaceVariant),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            Icons.Default.Restaurant,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                            modifier = Modifier.size(22.dp)
-                        )
+                        val emoji = remember(entry.foodName) { FoodEmoji.forName(entry.foodName) }
+                        if (emoji != null) {
+                            Text(emoji, fontSize = 24.sp)
+                        } else {
+                            Icon(
+                                Icons.Default.Restaurant,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
                     Spacer(Modifier.width(NutriSpacing.sm))
                 }
@@ -991,7 +997,7 @@ private fun DiaryEntryRow(
                         color = MacroColors.calories
                     )
                     Text(
-                        "P ${fmtMacroShort(entry.protein)} · K ${fmtMacroShort(entry.carbs)} · F ${fmtMacroShort(entry.fat)}",
+                        "P ${fmtMacroShort(entry.protein)} · K ${fmtMacroShort(entry.carbs)} · F ${fmtMacroShort(entry.fat)} · B ${fmtMacroShort(entry.fiber)}",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1

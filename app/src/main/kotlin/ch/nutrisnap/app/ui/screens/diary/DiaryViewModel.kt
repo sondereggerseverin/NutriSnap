@@ -804,6 +804,8 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     val mealPatterns: StateFlow<List<ch.nutrisnap.app.domain.DetectedMealPattern>> = _mealPatterns
 
     init {
+        // Ältere Einträge ohne Foto: Rezept-/Produktbild nachziehen (günstiges UPDATE, idempotent)
+        viewModelScope.launch { runCatching { repo.backfillEntryImages() } }
         viewModelScope.launch {
             runCatching {
                 patternDetector.detectAndSavePatterns()
