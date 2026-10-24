@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.diary
 
+import ch.nutrisnap.app.ui.components.FoodThumbFallback
 import android.graphics.Bitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -435,16 +436,7 @@ private fun SavedMealsTab(
                                 contentScale = ContentScale.Crop
                             )
                         } else {
-                            Box(
-                                Modifier
-                                    .size(52.dp)
-                                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
-                                    .background(MaterialTheme.colorScheme.surface),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Restaurant, null, Modifier.size(22.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
+                            FoodThumbFallback(m.template.name, 52.dp)
                         }
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
@@ -1252,20 +1244,7 @@ private fun FoodResultRow(
                 contentScale = ContentScale.Crop
             )
         } else {
-            Box(
-                Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(NutriRadius.sm))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    food.name.firstOrNull()?.uppercase() ?: "?",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            FoodThumbFallback(food.name, 40.dp, shape = RoundedCornerShape(NutriRadius.sm))
         }
     },
     trailingAction: (@Composable () -> Unit)? = null

@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.search
 
+import ch.nutrisnap.app.ui.components.FoodThumbFallback
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -182,19 +183,7 @@ private fun FoodListItem(food: FoodItem, onClick: () -> Unit) {
                     contentScale = ContentScale.Crop
                 )
             } else {
-                Box(
-                    Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        food.name.firstOrNull()?.uppercase() ?: "?",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                FoodThumbFallback(food.name, 44.dp, shape = RoundedCornerShape(8.dp))
             }
         },
         headlineContent = { Text(food.name, fontWeight = FontWeight.Medium) },
