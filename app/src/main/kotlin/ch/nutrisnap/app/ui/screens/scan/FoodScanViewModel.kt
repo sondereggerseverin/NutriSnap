@@ -100,8 +100,15 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun analyzePhoto(bitmap: Bitmap, userNote: String = "") {
+        analyzePhotos(listOf(bitmap), userNote)
+    }
+
+    /** Bis zu 4 Fotos derselben Mahlzeit (Winkel/Beilage/Etikett). */
+    fun analyzePhotos(bitmaps: List<Bitmap>, userNote: String = "") {
+        val photos = bitmaps.filter { it.width > 0 && it.height > 0 }.take(4)
+        if (photos.isEmpty()) return
         overrides = emptyMap()
-        lastScanBitmap = downscaleForDiary(bitmap)
+        lastScanBitmap = downscaleForDiary(photos.first())
         viewModelScope.launch {
             val online = NetworkMonitor(getApplication()).isCurrentlyOnline()
             var usedOnDevice = false
@@ -110,11 +117,12 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
             var mealSummary: MealSummaryResult? = null
             var usedMealSummaryOnly = false
 
+            val primary = photos.first()
             val dish: DishScanResult = if (!online) {
-                // Phase C: On-Device-Fallback ohne Cloud
+                // Phase C: On-Device-Fallback ohne Cloud (nur erstes Foto)
                 usedOnDevice = true
                 showStage(PhotoAnalysisStage.ON_DEVICE_LABELING, onDevice = true)
-                onDeviceBackend.analyze(bitmap).fold(
+                onDeviceBackend.analyze(primary).fold(
                     onSuccess = { result ->
                         OnDeviceScanStats.recordSuccess(getApplication())
                         result
@@ -131,17 +139,17 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 showStage(PhotoAnalysisStage.IDENTIFYING_INGREDIENTS)
                 _state.value = FoodScanState.Analyzing(PhotoAnalysisStage.SEPARATING_INGREDIENTS)
-                val base64 = visionService.bitmapToBase64Jpeg(bitmap)
+                val base64List = photos.map { visionService.bitmapToBase64Jpeg(it) }
                 val mealSummaryEnabled = getApplication<Application>().notifDataStore.data.first()
                     ?.get(KEY_MEAL_PHOTO_SUMMARY) ?: true
                 // Parallel: Zutaten zerlegen + optional Meal-Summary (Yazio-ähnlich)
                 val (dishResult, summary) = coroutineScope {
                     val dishJob = async {
-                        visionService.analyzeDishIngredients(base64, userNote).getOrNull()
+                        visionService.analyzeDishIngredients(base64List, userNote).getOrNull()
                     }
                     val summaryJob = async {
                         if (mealSummaryEnabled) {
-                            visionService.analyzeMealSummary(base64, userNote).getOrNull()
+                            visionService.analyzeMealSummary(base64List, userNote).getOrNull()
                         } else null
                     }
                     dishJob.await() to summaryJob.await()
@@ -168,7 +176,7 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                     else -> {
                         usedOnDevice = true
                         showStage(PhotoAnalysisStage.ON_DEVICE_LABELING, onDevice = true, minDelayMs = 300)
-                        onDeviceBackend.analyze(bitmap).fold(
+                        onDeviceBackend.analyze(primary).fold(
                             onSuccess = { result ->
                                 OnDeviceScanStats.recordSuccess(getApplication())
                                 result

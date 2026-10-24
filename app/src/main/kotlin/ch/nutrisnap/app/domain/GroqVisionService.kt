@@ -242,9 +242,24 @@ SCHÄTZ-REGELN (für realistische Gramm- und Kalorienwerte):
     suspend fun analyzeDishIngredients(
         base64Jpeg: String,
         userNote: String? = null
+    ): Result<DishScanResult> = analyzeDishIngredients(listOf(base64Jpeg), userNote)
+
+    /**
+     * Wie [analyzeDishIngredients], aber mit bis zu 4 Fotos derselben Mahlzeit
+     * (andere Winkel, Etikett, zweite Beilage).
+     */
+    suspend fun analyzeDishIngredients(
+        base64Jpegs: List<String>,
+        userNote: String? = null
     ): Result<DishScanResult> = withContext(Dispatchers.IO) {
+        val images = base64Jpegs.filter { it.isNotBlank() }.take(4)
+        if (images.isEmpty()) return@withContext Result.failure(IllegalArgumentException("Keine Bilder"))
+        val multiHint = if (images.size > 1)
+            "\nEs liegen ${images.size} Fotos derselben Mahlzeit vor (andere Winkel/Teile). Kombiniere alle sichtbaren Zutaten zu EINER Liste, ohne Duplikate.\n"
+        else ""
         val prompt = """
 Du bist ein erfahrener Schweizer Ernährungsberater und Food-Vision-Experte. Analysiere das Foto eines Gerichts und zerlege es in seine einzelnen sichtbaren Bestandteile. Schätze die Portionsgrösse jeder Zutat in Gramm.
+$multiHint
 
 WICHTIGE SCHWEIZER PRIORITÄTEN (strikt beachten):
 
@@ -279,7 +294,7 @@ confidence ist "hoch", "mittel" oder "niedrig". Erfinde keine Zutaten, die nicht
 """.trimIndent() + PORTION_GUIDANCE + userNoteBlock(userNote)
         // Hoeheres Token-Limit als Standard-1000: bei vielen kleinen Zutaten (Bowls, Mezze-Teller)
         // braucht die JSON-Antwort mit einem Eintrag pro Zutat mehr Platz als eine einzelne Schaetzung.
-        callVisionPreferGemini(prompt, listOf(base64Jpeg), maxTokens = 2000).mapCatching {
+        callVisionPreferGemini(prompt, images, maxTokens = 2000).mapCatching {
             json.decodeFromString<DishScanResult>(sanitizeLlmJson(it))
         }
     }
@@ -291,10 +306,21 @@ confidence ist "hoch", "mittel" oder "niedrig". Erfinde keine Zutaten, die nicht
     suspend fun analyzeMealSummary(
         base64Jpeg: String,
         userNote: String? = null
+    ): Result<MealSummaryResult> = analyzeMealSummary(listOf(base64Jpeg), userNote)
+
+    suspend fun analyzeMealSummary(
+        base64Jpegs: List<String>,
+        userNote: String? = null
     ): Result<MealSummaryResult> = withContext(Dispatchers.IO) {
+        val images = base64Jpegs.filter { it.isNotBlank() }.take(4)
+        if (images.isEmpty()) return@withContext Result.failure(IllegalArgumentException("Keine Bilder"))
+        val multiHint = if (images.size > 1)
+            "\nEs liegen ${images.size} Fotos derselben Mahlzeit vor. Schätze die Gesamtmahlzeit aus allen Bildern zusammen.\n"
+        else ""
         val prompt = """
 Du bist Ernährungsberater. Analysiere das Foto einer Mahlzeit auf dem Teller.
 Schätze die Nährwerte der gesamten sichtbaren Portion (nicht pro 100g).
+$multiHint
 
 Antworte NUR mit JSON (kein Markdown):
 {
@@ -313,7 +339,7 @@ Regeln:
 - servingGrams: geschätztes Gesamtgewicht in Gramm
 - Keine erfundenen Zutaten im Namen; beschreibe nur was sichtbar ist
 """.trimIndent() + PORTION_GUIDANCE + userNoteBlock(userNote)
-        callVisionPreferGemini(prompt, listOf(base64Jpeg), maxTokens = 800).mapCatching {
+        callVisionPreferGemini(prompt, images, maxTokens = 800).mapCatching {
             json.decodeFromString<MealSummaryResult>(sanitizeLlmJson(it))
         }
     }

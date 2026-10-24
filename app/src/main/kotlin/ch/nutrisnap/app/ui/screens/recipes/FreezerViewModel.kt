@@ -73,7 +73,8 @@ class FreezerViewModel(app: Application) : AndroidViewModel(app) {
 
     fun thawAndTrack(meal: FrozenMeal, mealType: MealType, date: LocalDate = LocalDate.now(), track: Boolean = true) {
         viewModelScope.launch {
-            repo.thawAndTrack(meal, mealType, date, track)
+            val imageUrl = meal.recipeId?.let { recipeDao.getById(it)?.imageUrl }
+            repo.thawAndTrack(meal, mealType, date, track, snapshotImageUrl = imageUrl)
         }
     }
 

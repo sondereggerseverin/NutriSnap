@@ -13,17 +13,26 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Camera
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -51,7 +60,10 @@ fun PhotoCaptureScreen(
     enableCrop: Boolean = false,
     /** Optional: "Foto + Notiz" – Textfeld über dem Auslöser, nur sichtbar wenn [onNoteChange] gesetzt. */
     note: String = "",
-    onNoteChange: ((String) -> Unit)? = null
+    onNoteChange: ((String) -> Unit)? = null,
+    /** >1: mehrere Fotos derselben Mahlzeit sammeln (max. 4). */
+    maxPhotos: Int = 1,
+    onPhotosCaptured: ((List<Bitmap>) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -62,8 +74,26 @@ fun PhotoCaptureScreen(
     var cameraControl by remember { mutableStateOf<CameraControl?>(null) }
     var cameraInfo by remember { mutableStateOf<CameraInfo?>(null) }
     var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
+    var collectedPhotos by remember { mutableStateOf<List<Bitmap>>(emptyList()) }
+    val multiMode = maxPhotos > 1
+    val photoLimit = maxPhotos.coerceIn(1, 4)
     val executor = remember { Executors.newSingleThreadExecutor() }
     val mainExecutor = remember { ContextCompat.getMainExecutor(context) }
+
+    fun acceptPhoto(bmp: Bitmap) {
+        if (multiMode) {
+            if (collectedPhotos.size >= photoLimit) return
+            collectedPhotos = collectedPhotos + bmp
+        } else {
+            onPhotoCaptured(bmp)
+        }
+    }
+
+    fun finishMulti() {
+        val list = collectedPhotos
+        if (list.isEmpty()) return
+        if (onPhotosCaptured != null) onPhotosCaptured(list) else onPhotoCaptured(list.first())
+    }
 
     fun decodeBitmap(uri: Uri): Bitmap? = try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -87,7 +117,7 @@ fun PhotoCaptureScreen(
             onCropped = { cropped ->
                 pendingCropUri = null
                 isCapturing = false
-                decodeBitmap(cropped)?.let { onPhotoCaptured(it) }
+                decodeBitmap(cropped)?.let { acceptPhoto(it) }
             },
             onCancel = {
                 pendingCropUri = null
@@ -105,7 +135,7 @@ fun PhotoCaptureScreen(
             isCapturing = true
             pendingCropUri = uri
         } else {
-            decodeBitmap(uri)?.let { onPhotoCaptured(it) }
+            decodeBitmap(uri)?.let { acceptPhoto(it) }
         }
     }
 
@@ -249,7 +279,49 @@ fun PhotoCaptureScreen(
             Icon(Icons.Default.PhotoLibrary, contentDescription = "Aus Galerie wählen")
         }
 
-        FloatingActionButton(
+        
+        if (multiMode && collectedPhotos.isNotEmpty() && !isCapturing) {
+            Column(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(start = 12.dp, end = 12.dp, bottom = 100.dp)
+            ) {
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    collectedPhotos.forEachIndexed { idx, bmp ->
+                        Box {
+                            Image(
+                                bitmap = bmp.asImageBitmap(),
+                                contentDescription = "Foto ${idx + 1}",
+                                modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                            IconButton(
+                                onClick = {
+                                    collectedPhotos = collectedPhotos.filterIndexed { i, _ -> i != idx }
+                                },
+                                modifier = Modifier.align(Alignment.TopEnd).size(22.dp)
+                            ) {
+                                Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                            }
+                        }
+                    }
+                    Text("${collectedPhotos.size}/$photoLimit", color = Color.White, fontSize = 12.sp)
+                }
+                Spacer(Modifier.height(8.dp))
+                Button(onClick = { finishMulti() }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.Check, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Analysieren (${collectedPhotos.size})")
+                }
+            }
+        }
+
+FloatingActionButton(
             onClick = {
                 val capture = imageCapture ?: return@FloatingActionButton
                 if (isCapturing) return@FloatingActionButton
@@ -275,7 +347,7 @@ fun PhotoCaptureScreen(
                             mainExecutor.execute {
                                 isCapturing = false
                                 captureHint = null
-                                bitmap?.let { onPhotoCaptured(it) }
+                                bitmap?.let { acceptPhoto(it) }
                             }
                         }
                         override fun onError(exc: ImageCaptureException) {

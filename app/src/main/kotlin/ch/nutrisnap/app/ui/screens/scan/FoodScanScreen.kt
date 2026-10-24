@@ -31,11 +31,13 @@ fun FoodScanScreen(
     when (val s = state) {
         is FoodScanState.Capturing -> PhotoCaptureScreen(
             title = "Essen scannen",
-            instructions = "Auslösen → scharfes Foto → KI analysiert danach (nicht halten)",
+            instructions = "1–3 Fotos derselben Mahlzeit (Winkel/Beilage), dann Analysieren",
             onPhotoCaptured = { bitmap -> vm.analyzePhoto(bitmap, photoNote) },
             onNavigateBack = onNavigateBack,
             note = photoNote,
-            onNoteChange = { photoNote = it }
+            onNoteChange = { photoNote = it },
+            maxPhotos = 3,
+            onPhotosCaptured = { bitmaps -> vm.analyzePhotos(bitmaps, photoNote) }
         )
         is FoodScanState.Analyzing -> AnalysisProgressView(stage = s.stage, onDevice = s.onDevice)
         is FoodScanState.Verify -> VerifyAndSaveFlow(

@@ -122,10 +122,12 @@ class FrozenMealRepository(
         meal: FrozenMeal,
         mealType: MealType,
         date: LocalDate,
-        track: Boolean = true
+        track: Boolean = true,
+        snapshotImageUrl: String? = null
     ): Boolean {
         if (meal.quantity <= 0) return false
         if (track) {
+            val image = snapshotImageUrl?.takeIf { it.isNotBlank() }
             for (line in meal.portionLines()) {
                 diaryRepo.addManualEntry(
                     name = "${meal.name} – ${line.name}",
@@ -137,7 +139,8 @@ class FrozenMealRepository(
                     date = date,
                     fiber = line.fiber,
                     amountGrams = line.grams,
-                    matchedRecipeId = meal.recipeId
+                    matchedRecipeId = meal.recipeId,
+                    snapshotImageUrl = image
                 )
             }
         }
