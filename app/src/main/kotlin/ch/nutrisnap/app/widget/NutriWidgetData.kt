@@ -1,6 +1,7 @@
 package ch.nutrisnap.app.widget
 
 import android.content.Context
+import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.repository.DiaryRepository
 import ch.nutrisnap.app.data.repository.StatsRepository
