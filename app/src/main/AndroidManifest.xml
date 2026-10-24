@@ -109,6 +109,22 @@
             </intent-filter>
         </receiver>
 
+        <!-- Homescreen-Widget: kcal übrig + Makros -->
+        <receiver
+            android:name=".widget.NutriSnapWidgetReceiver"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/nutrisnap_widget_info"/>
+        </receiver>
+        <receiver
+            android:name=".widget.MidnightRefreshReceiver"
+            android:exported="false"/>
+
         <!-- Feature 6: PDF-Report-Sharing (PdfReportGenerator.shareReport) -->
         <provider
             android:name="androidx.core.content.FileProvider"

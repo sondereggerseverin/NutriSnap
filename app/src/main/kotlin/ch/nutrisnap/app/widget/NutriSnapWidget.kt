@@ -90,9 +90,21 @@ private fun CompactLayout(s: WidgetSnapshot) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalAlignment = Alignment.Vertical.CenterVertically
     ) {
-        CalorieRing(s, ringSizeDp = 72)
-        Spacer(modifier = GlanceModifier.height(4.dp))
-        StreakLine(s.streak)
+        CalorieRing(s, ringSizeDp = 64)
+        Spacer(modifier = GlanceModifier.height(2.dp))
+        Text(
+            "${s.remaining.roundToInt()}",
+            style = TextStyle(
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = WidgetOnBackground,
+                textAlign = TextAlign.Center
+            )
+        )
+        Text(
+            "kcal übrig",
+            style = TextStyle(fontSize = 10.sp, color = WidgetOnBackground, textAlign = TextAlign.Center)
+        )
     }
 }
 
@@ -111,6 +123,14 @@ private fun WideLayout(s: WidgetSnapshot) {
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
                     color = WidgetOnBackground
+                )
+            )
+            Spacer(modifier = GlanceModifier.height(2.dp))
+            Text(
+                "P ${s.proteinRemaining.roundToInt()}g übrig",
+                style = TextStyle(
+                    fontSize = 12.sp,
+                    color = ColorProvider(androidx.compose.ui.graphics.Color(MacroColors.protein.toArgb()))
                 )
             )
             Spacer(modifier = GlanceModifier.height(6.dp))

@@ -19,10 +19,20 @@ object WidgetUpdater {
     // Boot) ausserhalb jeder ViewModel-Lebensdauer aufgerufen.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    fun requestUpdate(context: Context) {
-        val appContext = context.applicationContext
+    @Volatile
+    private var appContext: Context? = null
+
+    /** Einmal aus [ch.nutrisnap.app.NutriSnapApplication] aufrufen. */
+    fun init(context: Context) {
+        appContext = context.applicationContext
+        scheduleMidnightRefresh(context.applicationContext)
+        requestUpdate(context.applicationContext)
+    }
+
+    fun requestUpdate(context: Context? = null) {
+        val appCtx = context?.applicationContext ?: appContext ?: return
         scope.launch {
-            runCatching { NutriSnapWidget().updateAll(appContext) }
+            runCatching { NutriSnapWidget().updateAll(appCtx) }
         }
     }
 

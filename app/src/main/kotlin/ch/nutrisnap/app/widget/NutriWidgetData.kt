@@ -19,12 +19,14 @@ data class WidgetSnapshot(
     val burnedKcal: Float,
     val isAdaptiveTarget: Boolean,
     val protein: Float,
+    val proteinGoal: Float,
     val carbs: Float,
     val fat: Float,
     val streak: Int
 ) {
     val adjustedGoal: Float get() = if (isAdaptiveTarget) calorieGoal else calorieGoal + burnedKcal
     val remaining: Float get() = (adjustedGoal - totalCalories).coerceAtLeast(0f)
+    val proteinRemaining: Float get() = (proteinGoal - protein).coerceAtLeast(0f)
     val progress: Float get() = if (adjustedGoal <= 0f) 0f else (totalCalories / adjustedGoal).coerceIn(0f, 1f)
 }
 
@@ -76,6 +78,7 @@ object WidgetDataProvider {
             burnedKcal = todayActiveKcal?.toFloat() ?: 0f,
             isAdaptiveTarget = adaptiveTarget != null,
             protein = entries.sumOf { it.protein.toDouble() }.toFloat(),
+            proteinGoal = profile.proteinGoalG,
             carbs = entries.sumOf { it.carbs.toDouble() }.toFloat(),
             fat = entries.sumOf { it.fat.toDouble() }.toFloat(),
             streak = streak

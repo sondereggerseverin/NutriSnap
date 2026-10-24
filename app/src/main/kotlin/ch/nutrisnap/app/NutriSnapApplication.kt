@@ -10,6 +10,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import ch.nutrisnap.app.data.repository.OffCatalogImporter
 import ch.nutrisnap.app.utils.CrashLogger
+import ch.nutrisnap.app.widget.WidgetUpdater
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +28,9 @@ class NutriSnapApplication : Application() {
         super.onCreate()
 
         CrashLogger.init(this)
+
+        // Homescreen-Widget: Kontext + Mitternachts-Refresh
+        WidgetUpdater.init(this)
 
         // Lokaler OFF-Katalog (CH/DE/AT) einmalig im Hintergrund importieren.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {

@@ -1,5 +1,7 @@
 package ch.nutrisnap.app.data.repository
 
+import ch.nutrisnap.app.widget.WidgetUpdater
+
 import android.content.Context
 import android.util.Log
 import ch.nutrisnap.app.BuildConfig
@@ -108,6 +110,10 @@ private fun pushSafely(block: suspend () -> Unit) {
 class DiaryRepository(db: NutriDatabase) {
     private val dao = db.diaryDao()
 
+    private fun notifyWidget() {
+        runCatching { WidgetUpdater.requestUpdate() }
+    }
+
     fun getEntriesForDate(date: LocalDate): Flow<List<DiaryEntry>> =
         dao.getEntriesForDate(date.toString())
 
@@ -153,6 +159,7 @@ class DiaryRepository(db: NutriDatabase) {
             )
         )
         dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }
+        notifyWidget()
         return id
     }
 
@@ -243,6 +250,7 @@ class DiaryRepository(db: NutriDatabase) {
             )
         )
         dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }
+        notifyWidget()
         return id
     }
 
@@ -286,6 +294,7 @@ class DiaryRepository(db: NutriDatabase) {
             dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }
             ids.add(id)
         }
+        notifyWidget()
         return ids
     }
 
@@ -334,6 +343,7 @@ class DiaryRepository(db: NutriDatabase) {
             )
         )
         dao.getById(id)?.let { entry -> pushSafely { SupabaseSync.upsertDiaryEntry(entry) } }
+        notifyWidget()
         return id
     }
 
@@ -347,12 +357,14 @@ class DiaryRepository(db: NutriDatabase) {
     suspend fun insertAndSync(entry: DiaryEntry): Long {
         val id = dao.insert(entry)
         dao.getById(id)?.let { saved -> pushSafely { SupabaseSync.upsertDiaryEntry(saved) } }
+        notifyWidget()
         return id
     }
 
     suspend fun updateEntry(entry: DiaryEntry) {
         dao.update(entry)
         pushSafely { SupabaseSync.upsertDiaryEntry(entry) }
+        notifyWidget()
     }
 
     /** Zieht fehlende Eintrags-Fotos aus verknüpften Rezepten/Lebensmitteln nach. @return Anzahl aktualisierter Einträge */
@@ -362,6 +374,7 @@ class DiaryRepository(db: NutriDatabase) {
     suspend fun deleteEntry(entry: DiaryEntry) {
         dao.delete(entry)
         pushSafely { SupabaseSync.deleteDiaryEntry(entry.id) }
+        notifyWidget()
     }
 
     /**
