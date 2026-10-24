@@ -721,6 +721,9 @@ data class FrozenMeal(
 
     fun totalCaloriesPerPortion(): Float = portionLines().sumOf { it.calories.toDouble() }.toFloat()
     fun totalProteinPerPortion(): Float = portionLines().sumOf { it.protein.toDouble() }.toFloat()
+    fun totalCarbsPerPortion(): Float = portionLines().sumOf { it.carbs.toDouble() }.toFloat()
+    fun totalFatPerPortion(): Float = portionLines().sumOf { it.fat.toDouble() }.toFloat()
+    fun totalFiberPerPortion(): Float = portionLines().sumOf { it.fiber.toDouble() }.toFloat()
     fun totalGramsPerPortion(): Float = portionLines().sumOf { it.grams.toDouble() }.toFloat()
 
     companion object {

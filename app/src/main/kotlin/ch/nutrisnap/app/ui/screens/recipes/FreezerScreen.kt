@@ -172,15 +172,27 @@ private fun FrozenMealCard(
             Spacer(Modifier.height(8.dp))
             lines.forEach { line ->
                 Text(
-                    "• ${line.name}: ${line.grams.toInt()} g · ${line.calories.toInt()} kcal",
+                    "• ${line.name}: ${line.grams.toInt()} g · ${line.calories.toInt()} kcal · " +
+                        "P ${line.protein.toInt()} · K ${line.carbs.toInt()} · F ${line.fat.toInt()}" +
+                        if (line.fiber > 0.5f) " · B ${line.fiber.toInt()}" else "",
                     fontSize = 13.sp
                 )
             }
             Spacer(Modifier.height(4.dp))
             Text(
                 "Portion gesamt: ${meal.totalGramsPerPortion().toInt()} g · " +
-                    "${meal.totalCaloriesPerPortion().toInt()} kcal · " +
-                    "${meal.totalProteinPerPortion().toInt()} g Protein",
+                    "${meal.totalCaloriesPerPortion().toInt()} kcal",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                "P ${meal.totalProteinPerPortion().toInt()} g · " +
+                    "K ${meal.totalCarbsPerPortion().toInt()} g · " +
+                    "F ${meal.totalFatPerPortion().toInt()} g" +
+                    if (meal.totalFiberPerPortion() > 0.5f)
+                        " · B ${meal.totalFiberPerPortion().toInt()} g"
+                    else "",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.primary
@@ -235,8 +247,19 @@ private fun ThawDialog(
         text = {
             Column {
                 Text(
-                    "1× ${meal.name} (${meal.totalCaloriesPerPortion().toInt()} kcal)",
+                    "1× ${meal.name}",
                     fontWeight = FontWeight.Medium
+                )
+                Text(
+                    "${meal.totalCaloriesPerPortion().toInt()} kcal · " +
+                        "P ${meal.totalProteinPerPortion().toInt()}g · " +
+                        "K ${meal.totalCarbsPerPortion().toInt()}g · " +
+                        "F ${meal.totalFatPerPortion().toInt()}g" +
+                        if (meal.totalFiberPerPortion() > 0.5f)
+                            " · B ${meal.totalFiberPerPortion().toInt()}g"
+                        else "",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(12.dp))
                 Text("Mahlzeit", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
