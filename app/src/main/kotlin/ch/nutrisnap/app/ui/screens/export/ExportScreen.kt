@@ -25,6 +25,8 @@ import ch.nutrisnap.app.data.repository.PdfReportGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 import java.util.Locale
 
 private fun fmt(v: Float): String = String.format(Locale.US, "%.1f", v)
@@ -117,6 +119,149 @@ class ExportViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+
+    /**
+     * Vollbackup: Tagebuch + Gewicht + Inventar (nutrisnap-backup-v1).
+     * Rezepte/Profil bewusst ausgelassen – die haben eigene Sync-/Export-Pfade.
+     */
+    suspend fun buildFullBackupJson(): String = withContext(Dispatchers.IO) {
+        val diary = db.diaryDao().getAllOnce()
+        val weights = db.weightDao().getAllOnce()
+        val inventory = db.inventoryDao().getAllOnce()
+        val root = JSONObject()
+        root.put("format", "nutrisnap-backup-v1")
+        root.put("exportedAt", java.time.Instant.now().toString())
+        val diaryArr = JSONArray()
+        diary.forEach { e ->
+            diaryArr.put(JSONObject().apply {
+                put("date", e.dateStr)
+                put("meal", e.mealType.name)
+                put("name", e.foodName)
+                put("foodItemId", e.foodItemId)
+                put("amountGrams", e.amountGrams.toDouble())
+                put("calories", e.calories.toDouble())
+                put("protein", e.protein.toDouble())
+                put("carbs", e.carbs.toDouble())
+                put("fat", e.fat.toDouble())
+                put("fiber", e.fiber.toDouble())
+                put("sugar", e.sugar.toDouble())
+                put("saturatedFat", e.saturatedFat.toDouble())
+                put("salt", e.salt.toDouble())
+                put("sodium", e.sodium.toDouble())
+                e.snapshotBrand?.let { put("brand", it) }
+                e.snapshotBarcode?.let { put("barcode", it) }
+            })
+        }
+        root.put("diary", diaryArr)
+        val wArr = JSONArray()
+        weights.forEach { w ->
+            wArr.put(JSONObject().apply {
+                put("date", w.dateStr)
+                put("weightKg", w.weightKg.toDouble())
+            })
+        }
+        root.put("weights", wArr)
+        val iArr = JSONArray()
+        inventory.forEach { item ->
+            iArr.put(JSONObject().apply {
+                put("name", item.name)
+                put("quantity", item.quantity.toDouble())
+                put("unit", item.unit)
+                put("location", item.location)
+                put("notes", item.notes)
+                item.barcode?.let { put("barcode", it) }
+                item.foodItemId?.let { put("foodItemId", it) }
+            })
+        }
+        root.put("inventory", iArr)
+        root.toString(2)
+    }
+
+    data class BackupImportResult(
+        val diaryAdded: Int,
+        val weightsUpserted: Int,
+        val inventoryAdded: Int
+    )
+
+    /**
+     * Importiert nutrisnap-backup-v1 (Merge: Tagebuch anhängen, Gewicht ersetzen pro Datum,
+     * Inventar neu anlegen bzw. Menge bei gleichem Barcode addieren).
+     */
+    suspend fun importFullBackupJson(json: String): BackupImportResult = withContext(Dispatchers.IO) {
+        val root = JSONObject(json)
+        val format = root.optString("format")
+        require(format == "nutrisnap-backup-v1") { "Unbekanntes Format: $format" }
+
+        var diaryAdded = 0
+        val diaryArr = root.optJSONArray("diary") ?: JSONArray()
+        for (i in 0 until diaryArr.length()) {
+            val o = diaryArr.getJSONObject(i)
+            val meal = runCatching {
+                ch.nutrisnap.app.data.model.MealType.valueOf(o.getString("meal"))
+            }.getOrDefault(ch.nutrisnap.app.data.model.MealType.LUNCH)
+            val entry = ch.nutrisnap.app.data.model.DiaryEntry(
+                foodItemId = o.optInt("foodItemId", -999),
+                foodName = o.getString("name"),
+                amountGrams = o.optDouble("amountGrams", 0.0).toFloat(),
+                mealType = meal,
+                dateStr = o.getString("date"),
+                calories = o.optDouble("calories", 0.0).toFloat(),
+                protein = o.optDouble("protein", 0.0).toFloat(),
+                carbs = o.optDouble("carbs", 0.0).toFloat(),
+                fat = o.optDouble("fat", 0.0).toFloat(),
+                fiber = o.optDouble("fiber", 0.0).toFloat(),
+                sugar = o.optDouble("sugar", 0.0).toFloat(),
+                saturatedFat = o.optDouble("saturatedFat", 0.0).toFloat(),
+                salt = o.optDouble("salt", 0.0).toFloat(),
+                sodium = o.optDouble("sodium", 0.0).toFloat(),
+                snapshotBrand = o.optString("brand").takeIf { it.isNotBlank() },
+                snapshotBarcode = o.optString("barcode").takeIf { it.isNotBlank() }
+            )
+            db.diaryDao().insert(entry)
+            diaryAdded++
+        }
+
+        var weightsUpserted = 0
+        val wArr = root.optJSONArray("weights") ?: JSONArray()
+        for (i in 0 until wArr.length()) {
+            val o = wArr.getJSONObject(i)
+            db.weightDao().upsert(
+                ch.nutrisnap.app.data.model.WeightEntry(
+                    dateStr = o.getString("date"),
+                    weightKg = o.getDouble("weightKg").toFloat()
+                )
+            )
+            weightsUpserted++
+        }
+
+        var inventoryAdded = 0
+        val invRepo = ch.nutrisnap.app.data.repository.InventoryRepository(db)
+        val iArr = root.optJSONArray("inventory") ?: JSONArray()
+        for (i in 0 until iArr.length()) {
+            val o = iArr.getJSONObject(i)
+            val barcode = o.optString("barcode").takeIf { it.isNotBlank() }
+            val qty = o.optDouble("quantity", 1.0).toFloat()
+            val existing = barcode?.let { invRepo.getByBarcode(it) }
+            if (existing != null) {
+                invRepo.updateQuantity(existing.id, existing.quantity + qty)
+            } else {
+                invRepo.upsert(
+                    ch.nutrisnap.app.data.model.InventoryItem(
+                        name = o.getString("name"),
+                        quantity = qty.coerceAtLeast(0.1f),
+                        unit = o.optString("unit", "Stk").ifBlank { "Stk" },
+                        location = o.optString("location", ""),
+                        notes = o.optString("notes", ""),
+                        barcode = barcode,
+                        foodItemId = if (o.has("foodItemId") && !o.isNull("foodItemId")) o.getLong("foodItemId") else null
+                    )
+                )
+                inventoryAdded++
+            }
+        }
+        BackupImportResult(diaryAdded, weightsUpserted, inventoryAdded)
+    }
+
     suspend fun diaryCount(): Int = withContext(Dispatchers.IO) { db.diaryDao().getAllOnce().size }
     suspend fun weightCount(): Int = withContext(Dispatchers.IO) { db.weightDao().getAllOnce().size }
     suspend fun inventoryCount(): Int = withContext(Dispatchers.IO) { db.inventoryDao().getAllOnce().size }
@@ -152,8 +297,31 @@ fun ExportScreen(
                     withContext(Dispatchers.IO) {
                         context.contentResolver.openOutputStream(uri)?.use { it.write(content.toByteArray()) }
                     }
-                }.onSuccess { snackbar.showSnackbar("✓ CSV gespeichert") }
+                }.onSuccess { snackbar.showSnackbar("✓ Datei gespeichert") }
                     .onFailure { snackbar.showSnackbar("Speichern fehlgeschlagen") }
+            }
+        }
+    }
+
+    val openBackupLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                val text = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                        ?: error("Datei leer")
+                }
+                val result = vm.importFullBackupJson(text)
+                diaryCount = vm.diaryCount()
+                weightCount = vm.weightCount()
+                inventoryCount = vm.inventoryCount()
+                snackbar.showSnackbar(
+                    "Import: ${result.diaryAdded} Tagebuch, ${result.weightsUpserted} Gewicht, ${result.inventoryAdded} Inventar"
+                )
+            }.onFailure { e ->
+                snackbar.showSnackbar("Import fehlgeschlagen: ${e.message?.take(80) ?: "unbekannt"}")
             }
         }
     }
@@ -253,6 +421,51 @@ fun ExportScreen(
                 },
                 onShare = { scope.launch { share(vm.buildInventoryCsv()) } }
             )
+
+            ExportCard(
+                title = "Vollbackup (JSON)",
+                subtitle = "Tagebuch + Gewicht + Inventar · nutrisnap-backup-v1",
+                icon = Icons.Default.Backup,
+                onSave = {
+                    scope.launch {
+                        pendingContent = vm.buildFullBackupJson()
+                        saveLauncher.launch("nutrisnap_backup.json")
+                    }
+                },
+                onShare = {
+                    scope.launch {
+                        val json = vm.buildFullBackupJson()
+                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "application/json"
+                            putExtra(android.content.Intent.EXTRA_TEXT, json)
+                        }
+                        context.startActivity(android.content.Intent.createChooser(intent, "Backup teilen"))
+                    }
+                }
+            )
+
+            Card(Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(2.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(Icons.Default.UploadFile, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
+                        Column {
+                            Text("Backup importieren", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                            Text("nutrisnap-backup-v1 JSON · Merge (kein Löschen)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Button(
+                        onClick = { openBackupLauncher.launch(arrayOf("application/json", "text/*", "*/*")) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.FolderOpen, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Datei wählen", fontSize = 13.sp)
+                    }
+                }
+            }
 
             Card(Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(2.dp)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
