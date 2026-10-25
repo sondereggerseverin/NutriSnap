@@ -18,9 +18,46 @@ class GlobalIngredientDictionary(private val dao: GlobalIngredientMatchDao) {
         // Schreibvarianten (Klammern, Reihenfolge, «gerieben», «roh» …) auf denselben Standard abbilden
         val key = IngredientKey.of(ingredientName)
         if (key.isBlank()) return null
-        val viaKey = keyIndex()[key] ?: return null
-        dao.incrementUsage(viaKey.normalizedName)
-        return viaKey
+        val viaKey = keyIndex()[key]
+        if (viaKey != null) {
+            dao.incrementUsage(viaKey.normalizedName)
+            return viaKey
+        }
+        // Zuordnung, die die KI in dieser Sitzung für diesen Namen gefunden hat
+        val viaAi = aliasCache[key]?.let { dao.findByName(it) } ?: return null
+        dao.incrementUsage(viaAi.normalizedName)
+        return viaAi
+    }
+
+    /** Prüft nur, ob ein Standard den Namen bereits abdeckt (ohne Nutzungszähler zu erhöhen). */
+    suspend fun covers(ingredientName: String): Boolean {
+        if (dao.findByName(ingredientName.trim().lowercase()) != null) return true
+        val key = IngredientKey.of(ingredientName)
+        if (key.isBlank()) return true
+        return keyIndex().containsKey(key) || aliasCache.containsKey(key)
+    }
+
+    /** Ähnlich klingende geprüfte Standards (grober Wortvergleich) als Kandidaten für die KI-Zuordnung. */
+    suspend fun candidatesFor(ingredientName: String, max: Int = 5): List<GlobalIngredientMatch> {
+        val tokens = IngredientKey.of(ingredientName).split(" ").filter { it.length >= 4 }
+        if (tokens.isEmpty()) return emptyList()
+        return keyIndex().entries
+            .filter { it.value.isVerifiedByUser }
+            .map { (k, v) -> v to similarity(tokens, k.split(" ")) }
+            .filter { it.second > 0 }
+            .sortedByDescending { it.second }
+            .take(max)
+            .map { it.first }
+    }
+
+    private fun similarity(a: List<String>, b: List<String>): Int =
+        a.count { x -> b.any { y -> y.length >= 4 && (x == y || x.commonPrefixWith(y).length >= 5 ||
+            (minOf(x.length, y.length) >= 5 && (x.contains(y) || y.contains(x)))) } }
+
+    /** Merkt sich (nur für diese App-Sitzung), dass [ingredientName] dasselbe Lebensmittel wie [standard] ist. */
+    fun rememberAlias(ingredientName: String, standard: GlobalIngredientMatch) {
+        val key = IngredientKey.of(ingredientName)
+        if (key.isNotBlank()) aliasCache[key] = standard.normalizedName
     }
 
     /** Schlüssel → Eintrag. Geprüfte Standards haben Vorrang vor automatisch gecachten Treffern. */
@@ -40,6 +77,7 @@ class GlobalIngredientDictionary(private val dao: GlobalIngredientMatchDao) {
     companion object {
         // Mehrere ViewModels erzeugen eigene Dictionary-Instanzen – der Index wird gemeinsam genutzt.
         @Volatile private var sharedIndex: Map<String, GlobalIngredientMatch>? = null
+        private val aliasCache = java.util.concurrent.ConcurrentHashMap<String, String>()
     }
 
     suspend fun save(

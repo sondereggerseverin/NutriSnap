@@ -10,6 +10,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -741,6 +742,13 @@ object RecipeNutritionAnalyzer {
         servings: Int = 1,
         allowNetwork: Boolean = true
     ): AnalysisResult {
+        // ── Pass 0: unbekannte Namen per KI einem vorhandenen eigenen Standard zuordnen ──
+        if (allowNetwork) {
+            try { mapUnknownToStandards(lines) }
+            catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (_: Exception) { /* Zuordnung ist optional – bei Fehler normal weiter */ }
+        }
+
         // ── Pass 1: local DB + optional OpenFoodFacts (parallel, per-ingredient) ─
         val firstPass = withContext(Dispatchers.IO) {
             coroutineScope {
@@ -1025,6 +1033,106 @@ object RecipeNutritionAnalyzer {
             winnerResult
         } else {
             loserJob.await()
+        }
+    }
+
+    /**
+     * Erkennt, wenn ein Zutatenname im Rezept dasselbe Lebensmittel wie einer der eigenen Standards
+     * meint, aber anders geschrieben ist (Synonym, Sprache, Mehrzahl, Zubereitung). Nur Namen mit
+     * ähnlichen Standards werden gefragt – ein einziger KI-Aufruf pro Rezept, nur bei Bedarf.
+     */
+    private suspend fun mapUnknownToStandards(lines: List<String>) {
+        val dict = globalDictionary ?: return
+        val pending = LinkedHashMap<String, List<ch.nutrisnap.app.data.db.entity.GlobalIngredientMatch>>()
+        for (line in lines) {
+            if (pending.size >= 15) break
+            val name = parseIngredientLine(line)?.name?.takeIf { it.length >= 2 } ?: continue
+            if (pending.containsKey(name) || dict.covers(name)) continue
+            val candidates = dict.candidatesFor(name)
+            if (candidates.isNotEmpty()) pending[name] = candidates
+        }
+        if (pending.isEmpty()) return
+
+        val system = """
+            You map ingredient names from a recipe to the user's own ingredient list.
+            For each ingredient choose ONE candidate only if it is the SAME food: spelling variant,
+            plural, synonym, translation (German/English/French), or just a preparation
+            (grated, raw, chopped, fresh). If it is a different food or a product form with clearly
+            different nutrition (milk vs cream, light vs regular, sweetened vs unsweetened,
+            oil vs whole nut, powder vs fresh, spread vs cookie) or you are unsure, answer "NONE".
+            Respond with ONLY JSON, no markdown:
+            {"matches":[{"ingredient":"<exact name as given>","match":"<exact candidate or NONE>"}]}
+        """.trimIndent()
+        val user = JSONArray().apply {
+            pending.forEach { (name, cands) ->
+                put(JSONObject().apply {
+                    put("ingredient", name)
+                    put("candidates", JSONArray(cands.map { it.originalName }))
+                })
+            }
+        }.toString()
+
+        val content = withTimeoutOrNull(8_000L) { askLlm(system, user) } ?: return
+        val json = content.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+        val matches = JSONObject(json).optJSONArray("matches") ?: return
+        for (i in 0 until matches.length()) {
+            val o = matches.optJSONObject(i) ?: continue
+            val ingredient = o.optString("ingredient")
+            val answer = o.optString("match").trim()
+            val cands = pending[ingredient] ?: continue
+            // nur exakte Kandidaten akzeptieren, nie eine frei erfundene Antwort
+            val chosen = cands.firstOrNull { it.originalName.equals(answer, ignoreCase = true) } ?: continue
+            dict.rememberAlias(ingredient, chosen)
+        }
+    }
+
+    /** Freitext-Anfrage an Gemini und Groq parallel, nimmt die schnellere gültige Antwort. */
+    private suspend fun askLlm(systemPrompt: String, userMessage: String): String? = coroutineScope {
+        val apiKey = ch.nutrisnap.app.data.api.GroqApiKey.get()
+
+        fun callGroq(): String? {
+            val payload = JSONObject().apply {
+                put("model", "openai/gpt-oss-20b")
+                put("temperature", 0.0)
+                put("max_tokens", 800)
+                put("messages", JSONArray().apply {
+                    put(JSONObject().apply { put("role", "system"); put("content", systemPrompt) })
+                    put(JSONObject().apply { put("role", "user"); put("content", userMessage) })
+                })
+            }
+            val req = Request.Builder()
+                .url(GROQ_URL)
+                .header("Authorization", "Bearer $apiKey")
+                .header("Content-Type", "application/json")
+                .post(payload.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+            val raw = aiClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                resp.body?.string() ?: return null
+            }
+            return JSONObject(raw).optJSONArray("choices")?.optJSONObject(0)
+                ?.optJSONObject("message")?.optString("content")
+        }
+
+        val jobs = mutableListOf<Deferred<String?>>()
+        if (GeminiService.isUsable()) {
+            jobs += async {
+                GeminiService.generateText(
+                    prompt = userMessage, systemPrompt = systemPrompt, temperature = 0.0, maxTokens = 800
+                ).getOrNull()
+            }
+        }
+        if (apiKey.isNotBlank()) {
+            jobs += async(Dispatchers.IO) { runCatching { callGroq() }.getOrNull() }
+        }
+        if (jobs.isEmpty()) return@coroutineScope null
+
+        val first = select<String?> { jobs.forEach { j -> j.onAwait { it } } }
+        if (first != null) {
+            jobs.forEach { it.cancel() }
+            first
+        } else {
+            jobs.firstNotNullOfOrNull { runCatching { it.await() }.getOrNull() }
         }
     }
 
