@@ -16,11 +16,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.db.NutriDatabase
+import ch.nutrisnap.app.data.api.WebDavClient
 import ch.nutrisnap.app.data.repository.PdfReportGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -463,6 +467,151 @@ fun ExportScreen(
                         Icon(Icons.Default.FolderOpen, null, Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("Datei wählen", fontSize = 13.sp)
+                    }
+                }
+            }
+
+            // ── WebDAV ──────────────────────────────────────────────────────
+            var webdavUrl by remember { mutableStateOf("") }
+            var webdavUser by remember { mutableStateOf("") }
+            var webdavPassword by remember { mutableStateOf("") }
+            var webdavPath by remember { mutableStateOf("nutrisnap_backup.json") }
+            var webdavStatus by remember { mutableStateOf<String?>(null) }
+            var webdavBusy by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                val cfg = WebDavClient.loadConfig(context.applicationContext as android.app.Application)
+                webdavUrl = cfg.baseUrl
+                webdavUser = cfg.user
+                webdavPath = cfg.path
+            }
+
+            Card(Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(2.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(Icons.Default.CloudUpload, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
+                        Column {
+                            Text("WebDAV-Backup", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                            Text("Nextcloud / ownCloud / beliebiger WebDAV-Server", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    OutlinedTextField(
+                        value = webdavUrl,
+                        onValueChange = { webdavUrl = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Server-URL") },
+                        placeholder = { Text("https://cloud.example/remote.php/dav/files/user") }
+                    )
+                    OutlinedTextField(
+                        value = webdavUser,
+                        onValueChange = { webdavUser = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Benutzer") }
+                    )
+                    OutlinedTextField(
+                        value = webdavPassword,
+                        onValueChange = { webdavPassword = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Passwort / App-Passwort") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                    )
+                    OutlinedTextField(
+                        value = webdavPath,
+                        onValueChange = { webdavPath = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Dateipfad") },
+                        placeholder = { Text("nutrisnap_backup.json") }
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                WebDavClient.saveConfig(
+                                    context.applicationContext as android.app.Application,
+                                    webdavUrl, webdavUser, webdavPassword, webdavPath
+                                )
+                                webdavPassword = ""
+                                webdavStatus = "Zugangsdaten gespeichert"
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Zugangsdaten speichern", fontSize = 13.sp) }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                if (webdavBusy) return@Button
+                                scope.launch {
+                                    webdavBusy = true
+                                    webdavStatus = "Lade hoch…"
+                                    // ggf. frische Credentials mit aktuellem Passwort-Feld
+                                    if (webdavPassword.isNotBlank() || webdavUrl.isNotBlank()) {
+                                        WebDavClient.saveConfig(
+                                            context.applicationContext as android.app.Application,
+                                            webdavUrl, webdavUser, webdavPassword, webdavPath
+                                        )
+                                        if (webdavPassword.isNotBlank()) webdavPassword = ""
+                                    }
+                                    val json = vm.buildFullBackupJson()
+                                    val app = context.applicationContext as android.app.Application
+                                    WebDavClient.upload(app, json)
+                                        .onSuccess { webdavStatus = "✓ Backup hochgeladen" }
+                                        .onFailure { webdavStatus = "Upload: ${it.message?.take(60)}" }
+                                    webdavBusy = false
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            enabled = !webdavBusy
+                        ) {
+                            Icon(Icons.Default.CloudUpload, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Hochladen", fontSize = 13.sp)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                if (webdavBusy) return@OutlinedButton
+                                scope.launch {
+                                    webdavBusy = true
+                                    webdavStatus = "Lade herunter…"
+                                    if (webdavPassword.isNotBlank() || webdavUrl.isNotBlank()) {
+                                        WebDavClient.saveConfig(
+                                            context.applicationContext as android.app.Application,
+                                            webdavUrl, webdavUser, webdavPassword, webdavPath
+                                        )
+                                        if (webdavPassword.isNotBlank()) webdavPassword = ""
+                                    }
+                                    val app = context.applicationContext as android.app.Application
+                                    WebDavClient.download(app)
+                                        .onSuccess { text ->
+                                            runCatching {
+                                                val result = vm.importFullBackupJson(text)
+                                                diaryCount = vm.diaryCount()
+                                                weightCount = vm.weightCount()
+                                                inventoryCount = vm.inventoryCount()
+                                                webdavStatus = "✓ Import: ${result.diaryAdded} Tagebuch, ${result.weightsUpserted} Gewicht, ${result.inventoryAdded} Inventar"
+                                            }.onFailure {
+                                                webdavStatus = "Import: ${it.message?.take(60)}"
+                                            }
+                                        }
+                                        .onFailure { webdavStatus = "Download: ${it.message?.take(60)}" }
+                                    webdavBusy = false
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            enabled = !webdavBusy
+                        ) {
+                            Icon(Icons.Default.CloudDownload, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Herunterladen", fontSize = 13.sp)
+                        }
+                    }
+                    webdavStatus?.let {
+                        Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
