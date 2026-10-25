@@ -6,6 +6,12 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.CustomFoodItem
+import java.time.LocalDate
+import ch.nutrisnap.app.data.repository.FoodItemRepository
+import ch.nutrisnap.app.data.repository.DiaryRepository
+import ch.nutrisnap.app.data.model.MealType
+import ch.nutrisnap.app.data.model.FoodSource
+import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.repository.CustomFoodRepository
 import ch.nutrisnap.app.domain.GroqVisionService
 import ch.nutrisnap.app.domain.IngredientNutritionDatabase
@@ -32,6 +38,7 @@ sealed class LabelScanState {
 class NutritionLabelScanViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = CustomFoodRepository(NutriDatabase.getInstance(app).customFoodDao())
     private val visionService = GroqVisionService()
+    private val diaryRepo = DiaryRepository(NutriDatabase.getInstance(app))
 
     private val _state = MutableStateFlow<LabelScanState>(LabelScanState.Capturing)
     val state: StateFlow<LabelScanState> = _state
@@ -89,49 +96,76 @@ class NutritionLabelScanViewModel(app: Application) : AndroidViewModel(app) {
         barcode: String? = null
     ) {
         viewModelScope.launch {
-            val bc = ch.nutrisnap.app.utils.BarcodeUtils.normalize(barcode).ifBlank { null }
-            val item = CustomFoodItem(
-                name = name.trim(),
-                calories = result.caloriesPer100g,
-                protein = result.proteinPer100g,
-                carbs = result.carbsPer100g,
-                fat = result.fatPer100g,
-                fiber = result.fiberPer100g,
-                sugar = result.sugarPer100g,
-                salt = result.saltPer100g,
-                brand = result.brand.ifBlank { null },
-                barcode = bc,
-                portionSizeG = portionSizeG.coerceAtLeast(1f),
-                source = "label_scan",
-                verified = true
-            )
-            val foodRepo = ch.nutrisnap.app.data.repository.FoodItemRepository(
-                ch.nutrisnap.app.data.db.NutriDatabase.getInstance(getApplication())
-            )
-            // Über FoodItemRepository, damit Barcode auch in food_items liegt
-            foodRepo.saveCustomFoodWithBarcode(item)
-            // Vitamine/Mineralstoffe aus Etikett in food_items (CustomFood hat keine Mikro-Spalten)
-            val food = ch.nutrisnap.app.data.model.FoodItem(
-                name = name.trim(),
-                brand = result.brand.ifBlank { null },
-                barcode = bc,
-                calories = result.caloriesPer100g,
-                protein = result.proteinPer100g,
-                carbs = result.carbsPer100g,
-                fat = result.fatPer100g,
-                fiber = result.fiberPer100g,
-                sugar = result.sugarPer100g,
-                salt = result.saltPer100g,
-                vitaminC = result.vitaminCPer100g.takeIf { it > 0f },
-                vitaminD = result.vitaminDPer100g.takeIf { it > 0f },
-                calcium = result.calciumPer100g.takeIf { it > 0f },
-                iron = result.ironPer100g.takeIf { it > 0f },
-                servingSize = portionSizeG.coerceAtLeast(1f),
-                source = ch.nutrisnap.app.data.model.FoodSource.MANUAL,
-                completenessScore = 95
-            )
-            foodRepo.saveCustomFood(food)
+            persistProduct(name, result, portionSizeG, barcode)
             _state.value = LabelScanState.Saved
         }
+    }
+
+    /**
+     * Wie Fud AI: Produkt speichern UND sofort ins Tagebuch eintragen (Menge [amountG]).
+     * Das gespeicherte Produkt bleibt zusätzlich per Suche/Barcode wiederfindbar.
+     */
+    fun saveAndLog(
+        name: String,
+        result: NutritionLabelResult,
+        portionSizeG: Float,
+        barcode: String?,
+        amountG: Float,
+        meal: MealType
+    ) {
+        viewModelScope.launch {
+            val food = persistProduct(name, result, portionSizeG, barcode)
+            diaryRepo.addEntry(food, amountG.coerceAtLeast(1f), meal, LocalDate.now())
+            _state.value = LabelScanState.Saved
+        }
+    }
+
+    private suspend fun persistProduct(
+        name: String,
+        result: NutritionLabelResult,
+        portionSizeG: Float,
+        barcode: String?
+    ): FoodItem {
+        val bc = ch.nutrisnap.app.utils.BarcodeUtils.normalize(barcode).ifBlank { null }
+        val item = CustomFoodItem(
+            name = name.trim(),
+            calories = result.caloriesPer100g,
+            protein = result.proteinPer100g,
+            carbs = result.carbsPer100g,
+            fat = result.fatPer100g,
+            fiber = result.fiberPer100g,
+            sugar = result.sugarPer100g,
+            salt = result.saltPer100g,
+            brand = result.brand.ifBlank { null },
+            barcode = bc,
+            portionSizeG = portionSizeG.coerceAtLeast(1f),
+            source = "label_scan",
+            verified = true
+        )
+        val foodRepo = FoodItemRepository(NutriDatabase.getInstance(getApplication()))
+        // Über FoodItemRepository, damit Barcode auch in food_items liegt
+        foodRepo.saveCustomFoodWithBarcode(item)
+        // Vitamine/Mineralstoffe aus Etikett in food_items (CustomFood hat keine Mikro-Spalten)
+        val food = FoodItem(
+            name = name.trim(),
+            brand = result.brand.ifBlank { null },
+            barcode = bc,
+            calories = result.caloriesPer100g,
+            protein = result.proteinPer100g,
+            carbs = result.carbsPer100g,
+            fat = result.fatPer100g,
+            fiber = result.fiberPer100g,
+            sugar = result.sugarPer100g,
+            salt = result.saltPer100g,
+            vitaminC = result.vitaminCPer100g.takeIf { it > 0f },
+            vitaminD = result.vitaminDPer100g.takeIf { it > 0f },
+            calcium = result.calciumPer100g.takeIf { it > 0f },
+            iron = result.ironPer100g.takeIf { it > 0f },
+            servingSize = portionSizeG.coerceAtLeast(1f),
+            source = FoodSource.MANUAL,
+            completenessScore = 95
+        )
+        val id = foodRepo.saveCustomFood(food).toInt()
+        return food.copy(id = id)
     }
 }

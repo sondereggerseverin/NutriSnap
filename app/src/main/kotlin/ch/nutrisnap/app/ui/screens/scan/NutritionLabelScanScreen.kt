@@ -17,6 +17,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.domain.NutritionLabelResult
+import ch.nutrisnap.app.ui.screens.diary.defaultMealForNow
 
 @Composable
 fun NutritionLabelScanScreen(
@@ -43,6 +44,9 @@ fun NutritionLabelScanScreen(
         is LabelScanState.Result -> LabelResultView(
             result = s.result,
             onSave = { name, result, portionG -> vm.saveAsProduct(name, result, portionG, barcode) },
+            onSaveAndLog = { name, result, portionG, amountG ->
+                vm.saveAndLog(name, result, portionG, barcode, amountG, defaultMealForNow())
+            },
             onRetake = { vm.retake() },
             onBack = onNavigateBack
         )
@@ -64,6 +68,7 @@ fun NutritionLabelScanScreen(
 private fun LabelResultView(
     result: NutritionLabelResult,
     onSave: (String, NutritionLabelResult, Float) -> Unit,
+    onSaveAndLog: (String, NutritionLabelResult, Float, Float) -> Unit,
     onRetake: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -74,7 +79,21 @@ private fun LabelResultView(
     var fat      by remember { mutableStateOf(result.fatPer100g.toString()) }
     var fiber    by remember { mutableStateOf(result.fiberPer100g.toString()) }
     var portionG by remember { mutableStateOf("100") }
+    // Menge fürs Tagebuch; leer = Portionsgrösse
+    var amountG  by remember { mutableStateOf("") }
     var saved    by remember { mutableStateOf(false) }
+
+    // Etikett-Werte inkl. Mikros (Vitamine/Mineralstoffe) aus dem Scan, Felder mit Nutzer-Korrekturen
+    fun edited() = result.copy(
+        caloriesPer100g = calories.replace(',', '.').toFloatOrNull() ?: 0f,
+        proteinPer100g  = protein.replace(',', '.').toFloatOrNull()  ?: 0f,
+        carbsPer100g    = carbs.replace(',', '.').toFloatOrNull()    ?: 0f,
+        fatPer100g      = fat.replace(',', '.').toFloatOrNull()      ?: 0f,
+        fiberPer100g    = fiber.replace(',', '.').toFloatOrNull()    ?: 0f,
+        productName     = name
+    )
+    fun portion() = portionG.replace(',', '.').toFloatOrNull() ?: 100f
+    fun amount()  = amountG.replace(',', '.').toFloatOrNull() ?: portion()
 
     val nameError = name.isBlank() && saved
 
@@ -87,34 +106,27 @@ private fun LabelResultView(
         },
         bottomBar = {
             Surface(shadowElevation = 8.dp) {
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedButton(onClick = onRetake, modifier = Modifier.weight(1f)) { Text("Neu fotografieren") }
                     Button(
                         onClick = {
                             saved = true
-                            if (name.isNotBlank()) {
-                                onSave(
-                                    name,
-                                    NutritionLabelResult(
-                                        caloriesPer100g = calories.toFloatOrNull() ?: 0f,
-                                        proteinPer100g  = protein.toFloatOrNull()  ?: 0f,
-                                        carbsPer100g    = carbs.toFloatOrNull()    ?: 0f,
-                                        fatPer100g      = fat.toFloatOrNull()      ?: 0f,
-                                        fiberPer100g    = fiber.toFloatOrNull()    ?: 0f,
-                                        sugarPer100g    = result.sugarPer100g,
-                                        saltPer100g     = result.saltPer100g,
-                                        productName     = name,
-                                        brand           = result.brand
-                                    ),
-                                    portionG.replace(',', '.').toFloatOrNull() ?: 100f
-                                )
-                            }
+                            if (name.isNotBlank()) onSaveAndLog(name, edited(), portion(), amount())
                         },
-                        modifier = Modifier.weight(1f)
-                    ) { Text("Speichern") }
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Speichern & ins Tagebuch eintragen") }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = onRetake, modifier = Modifier.weight(1f)) { Text("Neu fotografieren") }
+                        OutlinedButton(
+                            onClick = {
+                                saved = true
+                                if (name.isNotBlank()) onSave(name, edited(), portion())
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Nur speichern") }
+                    }
                 }
             }
         }
@@ -146,6 +158,17 @@ private fun LabelResultView(
                 onValueChange = { portionG = it.filter { c -> c.isDigit() || c == '.' || c == ',' } },
                 label = { Text("Portionsgrösse (g)") },
                 supportingText = { Text("z. B. 50 g bei einem Riegel") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            OutlinedTextField(
+                value = amountG,
+                onValueChange = { amountG = it.filter { c -> c.isDigit() || c == '.' || c == ',' } },
+                label = { Text("Menge fürs Tagebuch (g)") },
+                placeholder = { Text(portionG.ifBlank { "100" }) },
+                supportingText = { Text("Leer = Portionsgrösse") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
