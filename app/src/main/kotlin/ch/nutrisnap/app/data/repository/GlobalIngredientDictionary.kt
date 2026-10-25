@@ -15,7 +15,31 @@ class GlobalIngredientDictionary(private val dao: GlobalIngredientMatchDao) {
             dao.incrementUsage(normalized)
             return existing
         }
-        return null
+        // Schreibvarianten (Klammern, Reihenfolge, «gerieben», «roh» …) auf denselben Standard abbilden
+        val key = IngredientKey.of(ingredientName)
+        if (key.isBlank()) return null
+        val viaKey = keyIndex()[key] ?: return null
+        dao.incrementUsage(viaKey.normalizedName)
+        return viaKey
+    }
+
+    /** Schlüssel → Eintrag. Geprüfte Standards haben Vorrang vor automatisch gecachten Treffern. */
+    private suspend fun keyIndex(): Map<String, GlobalIngredientMatch> {
+        sharedIndex?.let { return it }
+        val map = HashMap<String, GlobalIngredientMatch>()
+        for (e in dao.getAllOnce().sortedBy { it.isVerifiedByUser }) {
+            val k = IngredientKey.of(e.normalizedName)
+            if (k.isNotBlank()) map[k] = e
+        }
+        sharedIndex = map
+        return map
+    }
+
+    private fun invalidateIndex() { sharedIndex = null }
+
+    companion object {
+        // Mehrere ViewModels erzeugen eigene Dictionary-Instanzen – der Index wird gemeinsam genutzt.
+        @Volatile private var sharedIndex: Map<String, GlobalIngredientMatch>? = null
     }
 
     suspend fun save(
@@ -31,6 +55,7 @@ class GlobalIngredientDictionary(private val dao: GlobalIngredientMatchDao) {
     ) {
         val normalized = originalName.trim().lowercase()
         if (normalized.isBlank()) return
+        invalidateIndex()
         // Automatischen Cache für offensichtlichen Rezept-Müll ablehnen
         // (Anweisungen, Hashtags, Satzfragmente) – manuelle Standards bleiben erlaubt
         if (!verifiedByUser && looksLikeJunkAlias(normalized)) return
@@ -96,6 +121,7 @@ class GlobalIngredientDictionary(private val dao: GlobalIngredientMatchDao) {
 
     /** Import: upsert aller Einträge (REPLACE). Gibt Anzahl geschriebener Zeilen zurück. */
     suspend fun importAll(items: List<GlobalIngredientMatch>): Int {
+        invalidateIndex()
         var n = 0
         for (item in items) {
             val normalized = item.normalizedName.ifBlank { item.originalName.trim().lowercase() }
@@ -113,6 +139,7 @@ class GlobalIngredientDictionary(private val dao: GlobalIngredientMatchDao) {
     }
 
     suspend fun delete(normalizedName: String) {
+        invalidateIndex()
         dao.deleteByName(normalizedName.trim().lowercase())
     }
 
