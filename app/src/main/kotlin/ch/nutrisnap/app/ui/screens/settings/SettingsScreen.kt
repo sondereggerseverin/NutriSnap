@@ -41,6 +41,7 @@ import ch.nutrisnap.app.ui.theme.AppTheme
 import ch.nutrisnap.app.ui.theme.KEY_APP_THEME
 import ch.nutrisnap.app.ui.theme.KEY_WATER_GOAL_ML
 import ch.nutrisnap.app.ui.theme.KEY_WATER_TRACKER_ENABLED
+import ch.nutrisnap.app.ui.theme.KEY_INVENTORY_TAB_ENABLED
 import ch.nutrisnap.app.ui.theme.KEY_AUTO_GERMAN_METRIC
 import ch.nutrisnap.app.ui.theme.KEY_MANUAL_ACTIVITY_ENABLED
 import ch.nutrisnap.app.ui.theme.KEY_AGGRESSIVE_SPORT_DAY
@@ -375,6 +376,18 @@ fun SettingsScreen(
                             }
                         )
                     }
+                    Spacer(Modifier.height(NutriSpacing.sm))
+                    val inventoryTabEnabled = prefs?.get(KEY_INVENTORY_TAB_ENABLED) ?: true
+                    SettingsSwitchRow(
+                        title = "Inventar-Tab",
+                        subtitle = "Vorrat im Rezepte-Bereich oben anzeigen",
+                        checked = inventoryTabEnabled,
+                        onCheckedChange = { checked ->
+                            scope.launch {
+                                context.notifDataStore.edit { it[KEY_INVENTORY_TAB_ENABLED] = checked }
+                            }
+                        }
+                    )
                 }
                 SettingsCard(title = "Rezept-Import", icon = Icons.Default.Bolt) {
                     Text(

@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,10 +34,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.nutrisnap.app.ui.screens.recipegen.RecipeGeneratorScreen
+import ch.nutrisnap.app.ui.screens.settings.notifDataStore
+import ch.nutrisnap.app.ui.theme.KEY_INVENTORY_TAB_ENABLED
 import ch.nutrisnap.app.ui.theme.NutriRadius
 import ch.nutrisnap.app.ui.theme.NutriSpacing
 
@@ -58,10 +63,28 @@ fun RecipesHubScreen(
     sharedRecipeJson: String? = null,
     openCookSheet: Boolean = false
 ) {
+    val context = LocalContext.current
+    val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
+    val inventoryEnabled = prefs?.get(KEY_INVENTORY_TAB_ENABLED) ?: true
+
+    val visibleTabs = remember(inventoryEnabled) {
+        RecipeTab.entries.filter { tab ->
+            tab != RecipeTab.INVENTORY || inventoryEnabled
+        }
+    }
+
     var tab by remember { mutableStateOf(RecipeTab.SAVED) }
+
+    // Wenn Inventar ausgeschaltet wird und gerade aktiv war → zurück zu Rezepte
+    LaunchedEffect(inventoryEnabled, tab) {
+        if (!inventoryEnabled && tab == RecipeTab.INVENTORY) {
+            tab = RecipeTab.SAVED
+        }
+    }
 
     Column(Modifier.fillMaxSize()) {
         RecipeHubSegmentedControl(
+            tabs = visibleTabs,
             selected = tab,
             onSelect = { tab = it },
             modifier = Modifier
@@ -78,7 +101,15 @@ fun RecipesHubScreen(
                 openCookSheet = openCookSheet
             )
             RecipeTab.FREEZER -> FreezerScreen()
-            RecipeTab.INVENTORY -> InventoryScreen()
+            RecipeTab.INVENTORY -> {
+                if (inventoryEnabled) InventoryScreen()
+                else RecipesScreen(
+                    sharedUrl = sharedUrl,
+                    sharedBatchUrls = sharedBatchUrls,
+                    sharedRecipeJson = sharedRecipeJson,
+                    openCookSheet = openCookSheet
+                )
+            }
             RecipeTab.AI -> RecipeGeneratorScreen()
         }
     }
@@ -86,6 +117,7 @@ fun RecipesHubScreen(
 
 @Composable
 private fun RecipeHubSegmentedControl(
+    tabs: List<RecipeTab>,
     selected: RecipeTab,
     onSelect: (RecipeTab) -> Unit,
     modifier: Modifier = Modifier
@@ -101,7 +133,7 @@ private fun RecipeHubSegmentedControl(
             .padding(2.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        RecipeTab.entries.forEach { item ->
+        tabs.forEach { item ->
             val isSelected = item == selected
             val bg by animateColorAsState(
                 targetValue = if (isSelected) scheme.primary else scheme.surfaceVariant.copy(alpha = 0f),
@@ -130,17 +162,17 @@ private fun RecipeHubSegmentedControl(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Icon(
-                        imageVector = item.icon,
+                        item.icon,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
                         tint = content
                     )
                     Text(
                         text = item.label,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                         color = content,
                         maxLines = 1

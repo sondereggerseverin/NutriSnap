@@ -364,6 +364,8 @@ val KEY_MANUAL_ACTIVITY_ENABLED = androidx.datastore.preferences.core.booleanPre
 val KEY_WATER_GOAL_ML = intPreferencesKey("water_goal_ml")
 /** Wasser-Tracker auf Home/Tagebuch anzeigen (default an). */
 val KEY_WATER_TRACKER_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("water_tracker_enabled")
+/** Inventar-Tab im Rezepte-Hub anzeigen (default an). */
+val KEY_INVENTORY_TAB_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("inventory_tab_enabled")
 val KEY_AGGRESSIVE_SPORT_DAY = androidx.datastore.preferences.core.booleanPreferencesKey("aggressive_sport_day")
 /** JSON-Map recipeId → Sterne 1–5, z.B. {"12":4,"3":5} */
 val KEY_RECIPE_RATINGS = stringPreferencesKey("recipe_ratings_json")
