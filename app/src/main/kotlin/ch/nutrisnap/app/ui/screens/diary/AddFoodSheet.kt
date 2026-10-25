@@ -487,6 +487,7 @@ private fun SearchTab(
     var amountText   by remember { mutableStateOf("100") }
     var selectedMeal by remember { mutableStateOf(initialMeal ?: MealType.LUNCH) }
     var portionWarning by remember { mutableStateOf<String?>(null) }
+    var inventorySnack by remember { mutableStateOf<String?>(null) }
 
     val results   by vm.searchResults.collectAsStateWithLifecycle()
     val searching by vm.isSearching.collectAsStateWithLifecycle()
@@ -655,6 +656,27 @@ private fun SearchTab(
                     else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            IconButton(
+                onClick = {
+                    vm.addToInventory(food) {
+                        inventorySnack = "„${food.name}“ ins Inventar"
+                    }
+                }
+            ) {
+                Icon(
+                    Icons.Default.Kitchen,
+                    contentDescription = "Ins Inventar",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+        if (inventorySnack != null) {
+            Text(
+                inventorySnack!!,
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
         }
         Spacer(Modifier.height(NutriSpacing.md))
         val presets = remember(food) { ch.nutrisnap.app.domain.FoodPortionPresets.forFood(food) }

@@ -482,6 +482,33 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
+     * Legt das Lebensmittel im Inventar an (oder erhöht die Menge, wenn Barcode
+     * schon vorhanden). Ohne Ablaufdatum – nur Name/Menge/Barcode.
+     */
+    fun addToInventory(food: FoodItem, quantity: Float = 1f, unit: String = "Stk", onDone: (() -> Unit)? = null) {
+        viewModelScope.launch {
+            val inv = ch.nutrisnap.app.data.repository.InventoryRepository(db)
+            val barcode = food.barcode?.takeIf { it.isNotBlank() }
+            val existing = barcode?.let { inv.getByBarcode(it) }
+            if (existing != null) {
+                inv.updateQuantity(existing.id, existing.quantity + quantity)
+            } else {
+                inv.upsert(
+                    ch.nutrisnap.app.data.model.InventoryItem(
+                        name = food.name,
+                        quantity = quantity.coerceAtLeast(0.1f),
+                        unit = unit,
+                        barcode = barcode,
+                        foodItemId = food.id.toLong(),
+                        notes = food.brand.orEmpty()
+                    )
+                )
+            }
+            onDone?.invoke()
+        }
+    }
+
+    /**
      * Manueller Eintrag: Name + kcal + optionale Makros, keine FoodItem-Referenz.
      * foodItemId = -999 markiert manuelle Einträge.
      */

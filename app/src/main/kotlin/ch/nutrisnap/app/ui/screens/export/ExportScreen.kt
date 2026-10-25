@@ -90,7 +90,7 @@ class ExportViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-        suspend fun buildWeightCsv(): String = withContext(Dispatchers.IO) {
+    suspend fun buildWeightCsv(): String = withContext(Dispatchers.IO) {
         val rows = db.weightDao().getAllOnce()
         buildString {
             appendLine("Datum,Gewicht_kg")
@@ -98,8 +98,28 @@ class ExportViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    suspend fun buildInventoryCsv(): String = withContext(Dispatchers.IO) {
+        val rows = db.inventoryDao().getAllOnce()
+        buildString {
+            appendLine("Name,Menge,Einheit,Ort,Notizen,Barcode")
+            rows.forEach { e ->
+                appendLine(
+                    listOf(
+                        csvEscape(e.name),
+                        fmt(e.quantity),
+                        csvEscape(e.unit),
+                        csvEscape(e.location),
+                        csvEscape(e.notes),
+                        csvEscape(e.barcode.orEmpty())
+                    ).joinToString(",")
+                )
+            }
+        }
+    }
+
     suspend fun diaryCount(): Int = withContext(Dispatchers.IO) { db.diaryDao().getAllOnce().size }
     suspend fun weightCount(): Int = withContext(Dispatchers.IO) { db.weightDao().getAllOnce().size }
+    suspend fun inventoryCount(): Int = withContext(Dispatchers.IO) { db.inventoryDao().getAllOnce().size }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -114,9 +134,11 @@ fun ExportScreen(
 
     var diaryCount by remember { mutableStateOf(0) }
     var weightCount by remember { mutableStateOf(0) }
+    var inventoryCount by remember { mutableStateOf(0) }
     LaunchedEffect(Unit) {
         diaryCount = vm.diaryCount()
         weightCount = vm.weightCount()
+        inventoryCount = vm.inventoryCount()
     }
 
     var pendingContent by remember { mutableStateOf<String?>(null) }
@@ -217,6 +239,19 @@ fun ExportScreen(
                     }
                 },
                 onShare = { scope.launch { share(vm.buildWeightCsv()) } }
+            )
+
+            ExportCard(
+                title = "Inventar (CSV)",
+                subtitle = "$inventoryCount Einträge · ohne Ablaufdatum",
+                icon = Icons.Default.Kitchen,
+                onSave = {
+                    scope.launch {
+                        pendingContent = vm.buildInventoryCsv()
+                        saveLauncher.launch("nutrisnap_inventar.csv")
+                    }
+                },
+                onShare = { scope.launch { share(vm.buildInventoryCsv()) } }
             )
 
             Card(Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(2.dp)) {
