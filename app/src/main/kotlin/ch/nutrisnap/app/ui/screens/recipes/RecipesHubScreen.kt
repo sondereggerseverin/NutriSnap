@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Kitchen
 import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +46,7 @@ private enum class RecipeTab(
 ) {
     SAVED("Rezepte", Icons.Default.RestaurantMenu),
     FREEZER("Gefrierer", Icons.Default.AcUnit),
+    INVENTORY("Inventar", Icons.Default.Kitchen),
     AI("KI-Koch", Icons.Default.AutoAwesome)
 }
 
@@ -76,6 +78,7 @@ fun RecipesHubScreen(
                 openCookSheet = openCookSheet
             )
             RecipeTab.FREEZER -> FreezerScreen()
+            RecipeTab.INVENTORY -> InventoryScreen()
             RecipeTab.AI -> RecipeGeneratorScreen()
         }
     }
