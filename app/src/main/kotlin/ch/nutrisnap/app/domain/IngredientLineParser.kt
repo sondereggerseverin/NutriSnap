@@ -159,18 +159,23 @@ fun stripSectionPrefix(line: String): String =
         ""
     ).trim()
 
-/** Zählbare Lebensmittel: "2 chicken breasts" / "2 weetbix" → Stück, nicht g. */
+/** Zählbare Lebensmittel: "2 chicken breasts" / "2 weetbix" → Stück, nicht g.
+ *  Plurals und Dialekte explizit (Substring „apfel“ matcht weder „äpfel“ noch CH „öpfel“). */
 private val COUNTABLE_NAME_HINTS = listOf(
     "breast", "brust", "filet", "fillet", "thigh", "schenkel",
     "egg", "eggs", "ei", "eier",
-    "onion", "zwiebel", "shallot", "schalotte",
+    "onion", "zwiebel", "zwiebeln", "shallot", "schalotte", "schalotten",
     "clove", "cloves", "zehe", "zehen", "garlic", "knoblauch",
-    "tomato", "tomate", "potato", "kartoffel", "avocado",
-    "banana", "banane", "apple", "apfel", "lime", "lemon", "zitrone",
+    "tomato", "tomate", "tomaten", "potato", "kartoffel", "kartoffeln", "avocado", "avocados",
+    "banana", "banane", "bananen",
+    // Apfel: Singular + DE-Plural + CH-Dialekt (Öpfel/Oepfel) + EN
+    "apple", "apples", "apfel", "äpfel", "aepfel", "öpfel", "oepfel",
+    "lime", "limes", "lemon", "lemons", "zitrone", "zitronen",
+    "orange", "orangen", "mandarine", "mandarinen", "birne", "birnen", "pear", "pears",
     // Gemüse/Obst oft ohne Einheit in IG-Captions ("2 rote Paprika", "2 Karotten")
     "paprika", "peperoni", "pepper", "bell pepper",
-    "karotte", "karotten", "carrot", "carrots", "rüebli", "ruebli", "möhre", "moehre",
-    "gurke", "cucumber", "zucchini", "aubergine", "eggplant",
+    "karotte", "karotten", "carrot", "carrots", "rüebli", "ruebli", "möhre", "moehre", "möhren", "moehren",
+    "gurke", "gurken", "cucumber", "zucchini", "aubergine", "eggplant",
     "brokkoli", "broccoli", "blumenkohl", "cauliflower",
     "lauch", "leek", "fenchel", "sellerie", "celery",
     "piece", "pieces", "stück", "stueck", "stange", "scheibe", "slice",

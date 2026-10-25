@@ -104,6 +104,24 @@ class IngredientLineParserTest {
     }
 
     @Test
+    fun `2 Aepfel without unit becomes Stuck not grams`() {
+        // DE-Plural: „apfel“ ist kein Substring von „äpfel“
+        val p = parseIngredientLine("2 Äpfel")
+        assertEquals("2", p.amount)
+        assertEquals("Stück", p.unit)
+        assertTrue(p.name.contains("Äpfel", ignoreCase = true) || p.name.contains("Apfel", ignoreCase = true))
+    }
+
+    @Test
+    fun `2 Oepfel CH-Dialekt without unit becomes Stuck not grams`() {
+        // Instagram/CH: „2 Öpfel“ darf nicht als 2 g geparst werden (Bug: High-Protein-Öpfelchueche)
+        val p = parseIngredientLine("2 Öpfel")
+        assertEquals("2", p.amount)
+        assertEquals("Stück", p.unit)
+        assertTrue(p.name.contains("Öpfel", ignoreCase = true) || p.name.contains("öpfel", ignoreCase = true))
+    }
+
+    @Test
     fun `3 Lauchziebeln without unit becomes Stuck`() {
         val p = parseIngredientLine("3 Lauchziebeln")
         assertEquals("3", p.amount)
