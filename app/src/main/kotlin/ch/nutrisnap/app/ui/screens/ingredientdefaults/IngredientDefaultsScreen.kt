@@ -213,13 +213,24 @@ class IngredientDefaultsViewModel(app: Application) : AndroidViewModel(app) {
         }.toString(2)
     }
 
-    /** Importiert Standards aus JSON. REPLACE pro Eintrag. Gibt Anzahl zurück. */
-    suspend fun importFromJson(raw: String): Int = withContext(Dispatchers.IO) {
+    /**
+     * Importiert Standards aus JSON. REPLACE pro Eintrag.
+     * Optional: "deleteNormalizedNames": [...] entfernt vorher diese Einträge.
+     * Gibt (importiert, gelöscht) zurück.
+     */
+    suspend fun importFromJson(raw: String): Pair<Int, Int> = withContext(Dispatchers.IO) {
         val root = org.json.JSONObject(raw.trim())
         if (!root.has("nutrisnap_ingredient_standards") && !root.has("items")) {
             error("Kein gültiges NutriSnap-Standards-JSON (fehlt nutrisnap_ingredient_standards / items)")
         }
-        val arr = root.getJSONArray("items")
+        var deleted = 0
+        root.optJSONArray("deleteNormalizedNames")?.let { del ->
+            for (i in 0 until del.length()) {
+                val name = del.optString(i).trim().lowercase()
+                if (name.isNotBlank()) { dict.delete(name); deleted++ }
+            }
+        }
+        val arr = root.optJSONArray("items") ?: org.json.JSONArray()
         val list = mutableListOf<GlobalIngredientMatch>()
         for (i in 0 until arr.length()) {
             val o = arr.getJSONObject(i)
@@ -239,13 +250,13 @@ class IngredientDefaultsViewModel(app: Application) : AndroidViewModel(app) {
                 isVerifiedByUser = true
             )
         }
-        dict.importAll(list)
+        dict.importAll(list) to deleted
     }
 }
 
 /** Plausibilitäts-Hinweis für einen Standard, oder null wenn nichts auffällt. */
 internal fun GlobalIngredientMatch.plausibilityWarning(): String? {
-    val estimate = 4.0 * proteinPer100g + 4.0 * carbsPer100g + 9.0 * fatPer100g
+    val estimate = 4.0 * proteinPer100g + 4.0 * carbsPer100g + 9.0 * fatPer100g + 2.0 * fiberPer100g
     if (kcalPer100g > 905.0) return "Über 900 kcal/100 g – evtl. kJ statt kcal"
     if (kcalPer100g > 0 && kotlin.math.abs(kcalPer100g - estimate) > maxOf(40.0, 0.25 * kcalPer100g)) {
         return "kcal passen nicht zu P/K/F (≈ %.0f kcal)".format(estimate)
@@ -286,8 +297,9 @@ fun IngredientDefaultsScreen(
                 val raw = context.contentResolver.openInputStream(uri)?.use { it.reader().readText() }
                     ?: error("Datei leer oder nicht lesbar")
                 vm.importFromJson(raw)
-            }.onSuccess { n ->
-                Toast.makeText(context, "$n Standards importiert", Toast.LENGTH_SHORT).show()
+            }.onSuccess { (n, del) ->
+                val extra = if (del > 0) ", $del gelöscht" else ""
+                Toast.makeText(context, "$n Standards importiert$extra", Toast.LENGTH_SHORT).show()
             }.onFailure {
                 Toast.makeText(context, "Import fehlgeschlagen: ${it.message}", Toast.LENGTH_LONG).show()
             }
