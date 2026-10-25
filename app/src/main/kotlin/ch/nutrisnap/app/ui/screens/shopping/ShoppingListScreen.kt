@@ -82,7 +82,7 @@ fun ShoppingListScreen(onBack: () -> Unit, vm: ShoppingListViewModel = viewModel
                 verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 item { Spacer(Modifier.height(8.dp)) }
                 item {
-                    Text("Alle Zutaten zusammengefasst — gleiche Zutat aus mehreren Rezepten wird addiert.",
+                    Text("Zusammengefasst · Inventar (g/ml) wird abgezogen, wo der Name passt.",
                         fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp))
                 }
@@ -131,6 +131,7 @@ fun ShoppingListScreen(onBack: () -> Unit, vm: ShoppingListViewModel = viewModel
 
 @Composable
 private fun AggregatedRow(agg: AggregatedShoppingItem, onToggle: () -> Unit) {
+    val fullyCovered = agg.totalGrams > 0f && agg.stillNeededGrams <= 0f
     Row(
         Modifier.fillMaxWidth().padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -140,10 +141,27 @@ private fun AggregatedRow(agg: AggregatedShoppingItem, onToggle: () -> Unit) {
             Text(
                 agg.name,
                 textDecoration = if (agg.checked) TextDecoration.LineThrough else null,
-                color = if (agg.checked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+                color = if (agg.checked || fullyCovered)
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                else MaterialTheme.colorScheme.onSurface
             )
-            if (agg.totalGrams > 0f) {
-                Text("${agg.totalGrams.toInt()} g", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            when {
+                agg.totalGrams <= 0f -> { /* keine Mengenangabe */ }
+                fullyCovered -> Text(
+                    "Im Inventar vorhanden (${agg.totalGrams.toInt()} g)",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                agg.inventoryGrams > 0f -> Text(
+                    "Noch ${agg.stillNeededGrams.toInt()} g · ${agg.inventoryGrams.toInt()} g im Inventar",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                else -> Text(
+                    "${agg.totalGrams.toInt()} g",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
         if (agg.itemIds.size > 1) {
