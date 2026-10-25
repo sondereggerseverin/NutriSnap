@@ -2,6 +2,8 @@ package ch.nutrisnap.app.ui.screens.recipes
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -359,6 +361,45 @@ internal fun IngredientVerifyRow(
                     }) {
                         Icon(Icons.Default.Edit, "Menge tippen", Modifier.size(18.dp),
                             tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                // Einheiten-Vorschläge (Scheibe, EL, Scoop, Glas …): ein Tipp setzt die Menge direkt
+                if (!readOnly && !isPiece) {
+                    val unitPresets = remember(state.result.parsed?.name, state.result.line) {
+                        ch.nutrisnap.app.domain.FoodPortionPresets.forIngredient(
+                            state.result.parsed?.name ?: state.result.line
+                        )
+                    }
+                    if (unitPresets.isNotEmpty()) {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(bottom = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            unitPresets.forEach { preset ->
+                                val selected = kotlin.math.abs(state.effectiveAmountG - preset.grams) < 0.5f
+                                Box(
+                                    Modifier
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(
+                                            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                                            else MaterialTheme.colorScheme.surface
+                                        )
+                                        .clickable { onAmountSaved(preset.grams) }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        "${preset.label} · ${"%.0f".format(preset.grams)} g",
+                                        fontSize = 11.sp,
+                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                        color = if (selected) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
                 if (editingAmount) {
