@@ -58,7 +58,7 @@ object RecipeImageTextExtractor {
      * Versucht, ein Rezept rein über OCR + Caption-Parser zu extrahieren.
      * @return ein-elementige Liste bei Erfolg, sonst null (Vision-Fallback).
      */
-    suspend fun tryExtract(bitmap: Bitmap, apiKey: String = BuildConfig.GROQ_API_KEY): List<RecipeFromImageResult>? =
+    suspend fun tryExtract(bitmap: Bitmap, apiKey: String = ch.nutrisnap.app.data.api.GroqApiKey.get()): List<RecipeFromImageResult>? =
         tryExtractDetailed(bitmap, apiKey).recipes
 
     /**
@@ -66,7 +66,7 @@ object RecipeImageTextExtractor {
      */
     suspend fun tryExtractDetailed(
         bitmap: Bitmap,
-        apiKey: String = BuildConfig.GROQ_API_KEY
+        apiKey: String = ch.nutrisnap.app.data.api.GroqApiKey.get()
     ): OcrAttempt = withContext(Dispatchers.Default) {
         val ocrText = OnDeviceTextRecognizer.recognizeOrNull(bitmap)
         if (ocrText.isNullOrBlank()) return@withContext OcrAttempt(null, null)
@@ -146,7 +146,7 @@ object RecipeImageTextExtractor {
                     sourceUrl = null,
                     platform = "bild",
                     imageUrl = null,
-                    apiKey = BuildConfig.GROQ_API_KEY,
+                    apiKey = ch.nutrisnap.app.data.api.GroqApiKey.get(),
                     fastModel = false
                 )?.takeIf { isUsableRecipe(it) }?.toImageResult()?.let { listOf(it) }
             }.getOrNull()

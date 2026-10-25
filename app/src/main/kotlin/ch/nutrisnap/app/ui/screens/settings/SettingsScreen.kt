@@ -20,11 +20,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ch.nutrisnap.app.data.api.GroqApiKey
 import ch.nutrisnap.app.data.repository.Sex
 import ch.nutrisnap.app.domain.FudCalorieCalculator
 import ch.nutrisnap.app.data.repository.UserProfile
@@ -539,6 +541,74 @@ fun SettingsScreen(
                         context = context
                     )
                 }
+
+                // ── BYOK: eigener Groq-API-Key ───────────────────────────────
+                SettingsCard(title = "Eigener Groq-API-Key (BYOK)", icon = Icons.Default.VpnKey) {
+                    Text(
+                        "Optional: eigenen Key von console.groq.com hinterlegen. Leer = App-Standard. " +
+                            "Gilt für KI-Schätzung, Vision, Rezept-Parsing und Transkripte.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(NutriSpacing.sm))
+                    var byokDraft by remember {
+                        mutableStateOf("")
+                    }
+                    var byokStatus by remember { mutableStateOf<String?>(null) }
+                    val userKeyPref = prefs?.get(GroqApiKey.KEY_USER_GROQ_API_KEY)?.trim().orEmpty()
+                    val hasUserKey = userKeyPref.isNotBlank()
+                    if (hasUserKey) {
+                        Text(
+                            "Aktiv: ${userKeyPref.take(4)}…${userKeyPref.takeLast(4)}",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(Modifier.height(6.dp))
+                    }
+                    OutlinedTextField(
+                        value = byokDraft,
+                        onValueChange = { byokDraft = it; byokStatus = null },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Groq API Key") },
+                        placeholder = { Text("gsk_…") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    GroqApiKey.setUserKey(byokDraft)
+                                    byokDraft = ""
+                                    byokStatus = if (GroqApiKey.hasUserKey()) "Gespeichert" else "Leer – Standard aktiv"
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Speichern") }
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    GroqApiKey.clearUserKey()
+                                    byokDraft = ""
+                                    byokStatus = "Standard-Key aktiv"
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            enabled = hasUserKey || byokDraft.isNotBlank()
+                        ) { Text("Zurücksetzen") }
+                    }
+                    byokStatus?.let {
+                        Spacer(Modifier.height(6.dp))
+                        Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+
                 // ── Priority-Mikronährstoffe (Home) ──────────────────────────
                 PriorityNutrientsSettingsCard(prefs = prefs, scope = scope, context = context)
                 // ── Design-Backlog-Toggles ──────────────────────────────────

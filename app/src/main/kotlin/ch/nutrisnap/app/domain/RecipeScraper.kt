@@ -830,7 +830,7 @@ class RecipeScraper(private val context: Context) {
 
         // 3) Nur wenn noch schwach: lokale KI (optional, teuer)
         progress("Rezept extrahieren…")
-        val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
+        val apiKey = ch.nutrisnap.app.data.api.GroqApiKey.get()
         val local = if (apiKey.isNotBlank() && remainingMs(deadlineAtMs) >= LOCAL_AI_MIN_REMAINING_MS) {
             withTimeoutOrNull(stageBudget(if (fastAi) 7_000L else 12_000L, deadlineAtMs)) {
                 RecipeAiParser.parse(caption, url, platform, thumbnail, apiKey, fastModel = true)
@@ -1512,7 +1512,7 @@ class RecipeScraper(private val context: Context) {
 
         // AI auf bereinigtem Seitentext (ohne Scripts/Nav/Footer)
         val pageText = extractReadableRecipeText(doc)
-        val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
+        val apiKey = ch.nutrisnap.app.data.api.GroqApiKey.get()
         if (pageText.length >= 80 && apiKey.isNotBlank()) {
             progress("Rezept per KI extrahieren…")
             val parsed = withTimeoutOrNull(

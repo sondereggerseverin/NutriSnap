@@ -790,7 +790,7 @@ JSON-Schema:
         maxTokens: Int = 1000
     ): Result<String> {
         return try {
-            val apiKey = BuildConfig.GROQ_API_KEY
+            val apiKey = ch.nutrisnap.app.data.api.GroqApiKey.get()
             if (apiKey.isBlank()) return Result.failure(Exception(
                 "Kein GROQ_API_KEY in local.properties konfiguriert"
             ))

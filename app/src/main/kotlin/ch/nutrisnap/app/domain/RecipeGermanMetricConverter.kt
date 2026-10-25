@@ -713,7 +713,7 @@ Antworte NUR mit JSON:
      * Identisches Muster wie in RecipeAiParser / GroqRecipeGeneratorService / GroqVisionService.
      */
     private suspend fun callLlm(prompt: String): Result<String> = coroutineScope {
-        val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
+        val apiKey = ch.nutrisnap.app.data.api.GroqApiKey.get()
 
         if (!GeminiService.isUsable()) {
             return@coroutineScope if (apiKey.isNotBlank()) callGroq(prompt, apiKey)

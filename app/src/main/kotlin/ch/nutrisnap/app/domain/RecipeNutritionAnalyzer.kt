@@ -865,7 +865,7 @@ object RecipeNutritionAnalyzer {
         val results: List<IngredientResult> = if (unmatched.isEmpty() || !allowNetwork) {
             firstPass
         } else {
-            val apiKey = runCatching { BuildConfig.GROQ_API_KEY }.getOrElse { "" }
+            val apiKey = ch.nutrisnap.app.data.api.GroqApiKey.get()
             val estimates = if (apiKey.isNotBlank()) {
                 // War bisher NICHT auf Dispatchers.IO gewrappt -> blockierende
                 // Netzwerkcalls liefen auf dem Aufrufer-Dispatcher (i.d.R. Main aus

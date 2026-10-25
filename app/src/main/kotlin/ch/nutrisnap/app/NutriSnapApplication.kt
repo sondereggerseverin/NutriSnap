@@ -9,6 +9,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import ch.nutrisnap.app.data.repository.OffCatalogImporter
+import ch.nutrisnap.app.data.api.GroqApiKey
 import ch.nutrisnap.app.utils.CrashLogger
 import ch.nutrisnap.app.widget.WidgetUpdater
 import dagger.hilt.android.HiltAndroidApp
@@ -28,6 +29,7 @@ class NutriSnapApplication : Application() {
         super.onCreate()
 
         CrashLogger.init(this)
+        GroqApiKey.init(this)
 
         // Homescreen-Widget: Kontext + Mitternachts-Refresh
         WidgetUpdater.init(this)

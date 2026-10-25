@@ -175,7 +175,7 @@ object GroqFoodEstimatorApi {
     }
 
     private fun estimateViaGroq(prompt: String, query: String): FoodItem? {
-        val apiKey = BuildConfig.GROQ_API_KEY
+        val apiKey = ch.nutrisnap.app.data.api.GroqApiKey.get()
         if (apiKey.isBlank()) return null
 
         val requestJson = JSONObject().apply {
@@ -332,7 +332,7 @@ object GroqFoodEstimatorApi {
     }
 
     private fun parseMealViaGroq(prompt: String): MealParseResult? {
-        val apiKey = BuildConfig.GROQ_API_KEY
+        val apiKey = ch.nutrisnap.app.data.api.GroqApiKey.get()
         if (apiKey.isBlank()) return null
         val requestJson = JSONObject().apply {
             put("model", "openai/gpt-oss-120b")

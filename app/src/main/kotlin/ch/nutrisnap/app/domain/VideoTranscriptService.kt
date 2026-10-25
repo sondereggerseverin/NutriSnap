@@ -32,7 +32,7 @@ object VideoTranscriptService {
      * @param mediaUrl direkte Play-URL (mp4/webm/mp3), nicht die Social-Share-URL
      * @return Transkript-Text oder null bei Fehler/leerem Ergebnis
      */
-    suspend fun transcribe(mediaUrl: String, apiKey: String = BuildConfig.GROQ_API_KEY): String? =
+    suspend fun transcribe(mediaUrl: String, apiKey: String = ch.nutrisnap.app.data.api.GroqApiKey.get()): String? =
         withContext(Dispatchers.IO) {
             if (apiKey.isBlank() || mediaUrl.isBlank()) return@withContext null
             runCatching {

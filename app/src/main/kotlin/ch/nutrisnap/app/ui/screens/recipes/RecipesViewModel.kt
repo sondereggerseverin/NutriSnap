@@ -1274,7 +1274,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             }
             // Gleicher AI-Parser wie beim automatischen Import (statt eigenem Regex-Pfad),
             // damit manuell eingefügte Captions genauso gut geparst werden.
-            val apiKey = runCatching { ch.nutrisnap.app.BuildConfig.GROQ_API_KEY }.getOrElse { "" }
+            val apiKey = ch.nutrisnap.app.data.api.GroqApiKey.get()
             val parsed = if (apiKey.isNotBlank()) {
                 RecipeAiParser.parse(caption, url.ifBlank { null }, platform, null, apiKey)
             } else {
