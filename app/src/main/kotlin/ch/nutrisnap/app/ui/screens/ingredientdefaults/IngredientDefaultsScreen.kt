@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -334,10 +335,18 @@ fun IngredientDefaultsScreen(
                         scope.launch {
                             runCatching { vm.buildExportJson() }
                                 .onSuccess { json ->
+                                    // Als echte .json-Datei teilen (Text war für Zwischenablage/Chat zu lang)
+                                    val dir = java.io.File(context.cacheDir, "exports").apply { mkdirs() }
+                                    val file = java.io.File(dir, "NutriSnap-Zutaten-Standards.json")
+                                    file.writeText(json, Charsets.UTF_8)
+                                    val uri = FileProvider.getUriForFile(
+                                        context, "${context.packageName}.fileprovider", file
+                                    )
                                     val intent = Intent(Intent.ACTION_SEND).apply {
                                         type = "application/json"
-                                        putExtra(Intent.EXTRA_TEXT, json)
+                                        putExtra(Intent.EXTRA_STREAM, uri)
                                         putExtra(Intent.EXTRA_SUBJECT, "NutriSnap-Zutaten-Standards.json")
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                     }
                                     context.startActivity(Intent.createChooser(intent, "Standards exportieren"))
                                 }
