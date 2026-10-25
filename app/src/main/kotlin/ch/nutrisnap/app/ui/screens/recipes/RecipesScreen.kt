@@ -652,6 +652,17 @@ fun RecipesScreen(
                             modifier = Modifier.height(28.dp)
                         )
                     }
+                    if (state.cookedFilter == CookedFilter.ARCHIVED) {
+                        InputChip(
+                            selected = true,
+                            onClick = { vm.setCookedFilter(CookedFilter.ALL) },
+                            label = { Text("📦 Archiv", fontSize = 11.sp) },
+                            trailingIcon = {
+                                Icon(Icons.Default.Close, null, Modifier.size(14.dp))
+                            },
+                            modifier = Modifier.height(28.dp)
+                        )
+                    }
                     collectionFilterId?.let { cid ->
                         val col = collections.find { it.id == cid }
                         if (col != null) {
@@ -781,6 +792,16 @@ fun RecipesScreen(
                                     )
                                 },
                                 label = { Text("Noch nicht", fontSize = 12.sp) }
+                            )
+                            FilterChip(
+                                selected = state.cookedFilter == CookedFilter.ARCHIVED,
+                                onClick = {
+                                    vm.setCookedFilter(
+                                        if (state.cookedFilter == CookedFilter.ARCHIVED) CookedFilter.ALL
+                                        else CookedFilter.ARCHIVED
+                                    )
+                                },
+                                label = { Text("📦 Archiv", fontSize = 12.sp) }
                             )
                             if (incompleteCount > 0) {
                                 FilterChip(

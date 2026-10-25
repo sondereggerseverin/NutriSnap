@@ -31,7 +31,7 @@ data class NutritionState(
 enum class RecipeSort { RECOMMENDED, NEWEST, NAME, CALORIES }
 
 /** Filter: schon getrackt vs. noch nie gekocht. */
-enum class CookedFilter { ALL, COOKED, NOT_COOKED }
+enum class CookedFilter { ALL, COOKED, NOT_COOKED, ARCHIVED }
 
 enum class BatchStatus { PENDING, RUNNING, DONE, ERROR }
 

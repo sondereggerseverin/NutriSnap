@@ -250,6 +250,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Ungefilterte Rezepte für „Was koche ich?“-Vorschläge. */
     val allRecipes: StateFlow<List<Recipe>> = repo.getAll()
+        .map { list -> list.filter { !it.isArchived } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
 

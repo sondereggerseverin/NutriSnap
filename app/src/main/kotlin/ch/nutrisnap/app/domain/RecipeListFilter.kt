@@ -21,7 +21,9 @@ object RecipeListFilter {
         remaining: MacroRemaining? = null,
         inventoryNames: Set<String> = emptySet()
     ): List<Recipe> {
-        var filtered = recipes
+        // Archivierte Rezepte erscheinen nur im Archiv-Filter, sonst nie
+        var filtered = if (cookedFilter == CookedFilter.ARCHIVED) recipes.filter { it.isArchived }
+                       else recipes.filter { !it.isArchived }
         if (platformFilter != null) {
             filtered = filtered.filter { (it.platform ?: "web").lowercase() == platformFilter }
         }
@@ -32,6 +34,7 @@ object RecipeListFilter {
             CookedFilter.ALL -> filtered
             CookedFilter.COOKED -> filtered.filter { it.timesCooked > 0 }
             CookedFilter.NOT_COOKED -> filtered.filter { it.timesCooked <= 0 }
+            CookedFilter.ARCHIVED -> filtered
         }
         if (needles.isNotEmpty()) {
             filtered = filtered

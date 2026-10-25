@@ -353,7 +353,11 @@ data class Recipe(
     /** Letzte Bewertung 1–5 (0 = noch keine). */
     val cookRating: Int = 0,
     /** Notiz fürs nächste Mal, z.B. „Himbeeren mit Erythrit süssen“. */
-    val nextTimeNote: String = ""
+    val nextTimeNote: String = "",
+    /** Archiviert = aus der normalen Liste und den Vorschlägen ausgeblendet. Nie gelöscht, jederzeit zurückholbar. */
+    val isArchived: Boolean = false,
+    /** Unix-ms, wann das Rezept im Aussortieren-Modus gesichtet wurde (null = noch nicht). */
+    val reviewedAt: Long? = null
 ) {
     /** Gewicht für Gramm-Tracking: gekocht falls gesetzt, sonst Roh-Zutatensumme. */
     fun yieldWeightG(): Float? =
