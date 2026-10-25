@@ -265,3 +265,30 @@ interface FavoriteFoodDao {
     @Query("DELETE FROM favorite_foods WHERE foodKey = :key")
     suspend fun deleteByKey(key: String)
 }
+
+@Dao
+interface InventoryDao {
+    @Query("SELECT * FROM inventory_items ORDER BY name COLLATE NOCASE ASC")
+    fun getAll(): Flow<List<InventoryItem>>
+
+    @Query("SELECT * FROM inventory_items ORDER BY name COLLATE NOCASE ASC")
+    suspend fun getAllOnce(): List<InventoryItem>
+
+    @Query("SELECT * FROM inventory_items WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): InventoryItem?
+
+    @Query("SELECT * FROM inventory_items WHERE barcode = :barcode LIMIT 1")
+    suspend fun getByBarcode(barcode: String): InventoryItem?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(item: InventoryItem): Long
+
+    @Delete
+    suspend fun delete(item: InventoryItem)
+
+    @Query("DELETE FROM inventory_items WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    @Query("UPDATE inventory_items SET quantity = :quantity, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateQuantity(id: Long, quantity: Float, updatedAt: Long = System.currentTimeMillis())
+}

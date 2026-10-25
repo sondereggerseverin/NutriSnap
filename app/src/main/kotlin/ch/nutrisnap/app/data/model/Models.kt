@@ -744,3 +744,27 @@ data class FrozenMeal(
         }
     }
 }
+
+// ─── Inventar / Pantry (ohne Ablaufdatum) ────────────────────────────────────
+
+/**
+ * Ein Eintrag im Vorrat / Inventar.
+ * Kein Ablaufdatum – bewusst schlank gehalten (Menge + Einheit + optionaler Ort).
+ */
+@Entity(tableName = "inventory_items")
+data class InventoryItem(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    /** Menge (z.B. 2, 500, 1.5). */
+    val quantity: Float = 1f,
+    /** Einheit: "Stk", "g", "ml", "Packung", "Dose", … */
+    val unit: String = "Stk",
+    val notes: String = "",
+    val barcode: String? = null,
+    /** Optionaler Link zum lokalen Food-Katalog. */
+    val foodItemId: Long? = null,
+    /** Optionaler Ort: "Kühlschrank", "Vorratsschrank", "Gefrierfach", "". */
+    val location: String = "",
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)

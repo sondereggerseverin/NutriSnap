@@ -80,9 +80,10 @@ interface UserProfileDao {
         WaterEntry::class,
         Supplement::class,
         RecipeComponent::class,
-        FrozenMeal::class
+        FrozenMeal::class,
+        InventoryItem::class
     ],
-    version = 42,
+    version = 43,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -95,6 +96,7 @@ abstract class NutriDatabase : RoomDatabase() {
     abstract fun userProfileDao(): UserProfileDao
     abstract fun weightDao(): WeightDao
     abstract fun favoriteFoodDao(): FavoriteFoodDao
+    abstract fun inventoryDao(): InventoryDao
     abstract fun recipeCollectionDao(): RecipeCollectionDao
     abstract fun healthConnectDao(): HealthConnectDao
     abstract fun ingredientMatchDao(): IngredientMatchDao
@@ -827,6 +829,26 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // Inventar / Pantry (ohne Ablaufdatum)
+        private val MIGRATION_42_43 = object : Migration(42, 43) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS inventory_items (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        quantity REAL NOT NULL DEFAULT 1,
+                        unit TEXT NOT NULL DEFAULT 'Stk',
+                        notes TEXT NOT NULL DEFAULT '',
+                        barcode TEXT,
+                        foodItemId INTEGER,
+                        location TEXT NOT NULL DEFAULT '',
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL
+                    )""".trimIndent()
+                )
+            }
+        }
+
         fun getInstance(context: Context): NutriDatabase =
             INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -845,7 +867,7 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32,
                         MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36,
                         MIGRATION_36_37, MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40, MIGRATION_40_41,
-                        MIGRATION_41_42
+                        MIGRATION_41_42, MIGRATION_42_43
                     )
                     .build()
                     .also { INSTANCE = it }
