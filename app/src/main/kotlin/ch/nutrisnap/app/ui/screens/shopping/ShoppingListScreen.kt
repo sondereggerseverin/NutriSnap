@@ -22,6 +22,7 @@ import ch.nutrisnap.app.data.model.ShoppingListItem
 fun ShoppingListScreen(onBack: () -> Unit, vm: ShoppingListViewModel = viewModel()) {
     val items by vm.items.collectAsStateWithLifecycle()
     val aggregated by vm.aggregated.collectAsStateWithLifecycle()
+    val inventoryByName by vm.inventoryGramsByName.collectAsStateWithLifecycle()
     var showAdd by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
     var aggregatedMode by remember { mutableStateOf(false) }
@@ -98,7 +99,7 @@ fun ShoppingListScreen(onBack: () -> Unit, vm: ShoppingListViewModel = viewModel
                 // Nach Rezept gruppieren, manuelle Einträge zuerst
                 val groups = open.groupBy { it.recipeTitle }
                 groups[null]?.let { manual ->
-                    items(manual, key = { it.id }) { ShoppingRow(it, onToggle = { vm.toggle(it) }, onDelete = { vm.delete(it) }) }
+                    items(manual, key = { it.id }) { ShoppingRow(it, inventoryGrams = invGramsFor(it, inventoryByName), onToggle = { vm.toggle(it) }, onDelete = { vm.delete(it) }) }
                 }
                 groups.filterKeys { it != null }.forEach { (recipe, recipeItems) ->
                     item(key = "header_$recipe") {
@@ -106,7 +107,7 @@ fun ShoppingListScreen(onBack: () -> Unit, vm: ShoppingListViewModel = viewModel
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
                     }
-                    items(recipeItems, key = { it.id }) { ShoppingRow(it, onToggle = { vm.toggle(it) }, onDelete = { vm.delete(it) }) }
+                    items(recipeItems, key = { it.id }) { ShoppingRow(it, inventoryGrams = invGramsFor(it, inventoryByName), onToggle = { vm.toggle(it) }, onDelete = { vm.delete(it) }) }
                 }
                 if (done.isNotEmpty()) {
                     item(key = "done_header") {
@@ -114,7 +115,7 @@ fun ShoppingListScreen(onBack: () -> Unit, vm: ShoppingListViewModel = viewModel
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
                     }
-                    items(done, key = { it.id }) { ShoppingRow(it, onToggle = { vm.toggle(it) }, onDelete = { vm.delete(it) }) }
+                    items(done, key = { it.id }) { ShoppingRow(it, inventoryGrams = invGramsFor(it, inventoryByName), onToggle = { vm.toggle(it) }, onDelete = { vm.delete(it) }) }
                 }
                 item { Spacer(Modifier.height(80.dp)) }
             }
@@ -170,8 +171,23 @@ private fun AggregatedRow(agg: AggregatedShoppingItem, onToggle: () -> Unit) {
     }
 }
 
+private fun invGramsFor(item: ShoppingListItem, inventoryByName: Map<String, Float>): Float {
+    val raw = if (item.amount != null) "${item.amount} ${item.unit ?: ""} ${item.name}" else item.name
+    val name = ch.nutrisnap.app.domain.RecipeNutritionAnalyzer.parseIngredientLine(raw)?.name ?: item.name
+    val key = name.lowercase()
+        .replace(Regex("""\([^)]*\)"""), "")
+        .replace(Regex("""\s+"""), " ")
+        .trim()
+    return inventoryByName[key] ?: 0f
+}
+
 @Composable
-private fun ShoppingRow(item: ShoppingListItem, onToggle: () -> Unit, onDelete: () -> Unit) {
+private fun ShoppingRow(
+    item: ShoppingListItem,
+    inventoryGrams: Float = 0f,
+    onToggle: () -> Unit,
+    onDelete: () -> Unit
+) {
     Row(
         Modifier.fillMaxWidth().padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -186,6 +202,13 @@ private fun ShoppingRow(item: ShoppingListItem, onToggle: () -> Unit, onDelete: 
             if (item.amount != null) {
                 val amountText = if (item.amount == item.amount.toInt().toFloat()) item.amount.toInt().toString() else item.amount.toString()
                 Text("$amountText ${item.unit ?: ""}".trim(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (inventoryGrams > 0f && !item.checked) {
+                Text(
+                    "≈ ${inventoryGrams.toInt()} g im Inventar",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         }
         IconButton(onClick = onDelete) { Icon(Icons.Default.Close, "Entfernen", tint = MaterialTheme.colorScheme.onSurfaceVariant) }

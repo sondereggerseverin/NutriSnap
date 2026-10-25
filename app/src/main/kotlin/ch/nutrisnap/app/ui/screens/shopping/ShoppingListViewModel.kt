@@ -11,6 +11,7 @@ import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -33,6 +34,24 @@ class ShoppingListViewModel(app: Application) : AndroidViewModel(app) {
 
     val items: StateFlow<List<ShoppingListItem>> = repo.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * Normalisierter Name → Inventar-Gramm (g/ml/kg/l). Für Hinweise in der
+     * «Nach Rezept»-Liste.
+     */
+    val inventoryGramsByName: StateFlow<Map<String, Float>> = inventoryRepo.getAll()
+        .map { inventory ->
+            val map = mutableMapOf<String, Float>()
+            inventory.forEach { item ->
+                val key = normalizeName(item.name)
+                val grams = inventoryToGrams(item.quantity, item.unit)
+                if (key.isNotBlank() && grams > 0f) {
+                    map[key] = (map[key] ?: 0f) + grams
+                }
+            }
+            map.toMap()
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     /**
      * Gleiche Zutat aus mehreren Rezepten wird addiert. Zusätzlich: Inventar-Match
@@ -120,12 +139,76 @@ class ShoppingListViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { repo.add(name, amount, unit) }
     }
 
-    fun addRecipeIngredients(recipeTitle: String, ingredients: List<Triple<String, Float?, String?>>) {
+    /**
+     * Fügt Rezept-Zutaten hinzu. Mengen in g/ml werden um vorhandenes Inventar
+     * reduziert; vollständig abgedeckte Positionen entfallen.
+     * @return Anzahl tatsächlich hinzugefügter Zeilen
+     */
+    fun addRecipeIngredients(
+        recipeTitle: String,
+        ingredients: List<Triple<String, Float?, String?>>,
+        onResult: ((added: Int, skipped: Int) -> Unit)? = null
+    ) {
         viewModelScope.launch {
-            repo.addAll(ingredients.map { (name, amount, unit) ->
-                ShoppingListItem(name = name, amount = amount, unit = unit, recipeTitle = recipeTitle)
-            })
+            val inv = inventoryRepo.getAllOnce()
+            val invMap = mutableMapOf<String, Float>()
+            inv.forEach { item ->
+                val key = normalizeName(item.name)
+                val g = inventoryToGrams(item.quantity, item.unit)
+                if (key.isNotBlank() && g > 0f) invMap[key] = (invMap[key] ?: 0f) + g
+            }
+            val toAdd = mutableListOf<ShoppingListItem>()
+            var skipped = 0
+            for ((name, amount, unit) in ingredients) {
+                val key = normalizeName(name)
+                val unitStr = unit?.trim().orEmpty()
+                val canReduce = unitStr.lowercase() in setOf("g", "gramm", "gr", "kg", "ml", "l", "liter")
+                if (amount != null && canReduce && key.isNotBlank()) {
+                    val needG = when (unitStr.lowercase()) {
+                        "kg", "l", "liter" -> amount * 1000f
+                        else -> amount
+                    }
+                    val have = invMap[key] ?: 0f
+                    if (have >= needG && needG > 0f) {
+                        invMap[key] = have - needG
+                        skipped++
+                        continue
+                    }
+                    if (have > 0f && needG > have) {
+                        val remainG = needG - have
+                        invMap[key] = 0f
+                        val (newAmount, newUnit) = when (unitStr.lowercase()) {
+                            "kg" -> (remainG / 1000f) to "kg"
+                            "l", "liter" -> (remainG / 1000f) to unitStr
+                            else -> remainG to unitStr.ifBlank { "g" }
+                        }
+                        toAdd.add(
+                            ShoppingListItem(
+                                name = name,
+                                amount = newAmount,
+                                unit = newUnit,
+                                recipeTitle = recipeTitle
+                            )
+                        )
+                        continue
+                    }
+                }
+                toAdd.add(
+                    ShoppingListItem(name = name, amount = amount, unit = unit, recipeTitle = recipeTitle)
+                )
+            }
+            if (toAdd.isNotEmpty()) repo.addAll(toAdd)
+            onResult?.invoke(toAdd.size, skipped)
         }
+    }
+
+    fun inventoryCoveredGrams(item: ShoppingListItem): Float {
+        val key = normalizeName(
+            RecipeNutritionAnalyzer.parseIngredientLine(
+                if (item.amount != null) "${item.amount} ${item.unit ?: ""} ${item.name}" else item.name
+            )?.name ?: item.name
+        )
+        return inventoryGramsByName.value[key] ?: 0f
     }
 
     fun toggle(item: ShoppingListItem) = viewModelScope.launch { repo.toggle(item) }
