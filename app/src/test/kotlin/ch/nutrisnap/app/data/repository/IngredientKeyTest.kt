@@ -19,7 +19,7 @@ class IngredientKeyTest {
     }
 
     @Test fun umlauteUndGrossschreibung() {
-        assertEquals(IngredientKey.of("Rüebli"), IngredientKey.of("RUEBLI"))
+        assertEquals(IngredientKey.of("Käse"), IngredientKey.of("KAESE"))
         assertEquals(IngredientKey.of("Crème fraîche"), IngredientKey.of("creme fraiche"))
     }
 
