@@ -364,6 +364,7 @@ internal fun RecipeQuickRatingDialog(
 internal fun CookWithWhatIHaveSheet(
     recipes: List<Recipe>,
     remaining: ch.nutrisnap.app.domain.MacroRemaining? = null,
+    inventoryNames: Set<String> = emptySet(),
     onDismiss: () -> Unit,
     onPickRecipe: (Recipe) -> Unit,
     onSearch: (ingredients: String, category: RecipeCategory?, targetKcal: Float?) -> Unit
@@ -375,14 +376,15 @@ internal fun CookWithWhatIHaveSheet(
     var ingredients by remember { mutableStateOf("") }
     var kcalText by remember { mutableStateOf("") }
 
-    val suggestions = remember(recipes, remaining, mode, category, seed) {
+    val suggestions = remember(recipes, remaining, mode, category, seed, inventoryNames) {
         ch.nutrisnap.app.domain.RecipeCookSuggester.suggest(
             recipes = recipes,
             remaining = remaining,
             mode = mode,
             preferredCategory = category,
             maxResults = 5,
-            seed = seed
+            seed = seed,
+            inventoryNames = inventoryNames
         )
     }
 

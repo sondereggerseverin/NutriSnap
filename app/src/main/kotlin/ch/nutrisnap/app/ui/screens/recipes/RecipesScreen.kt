@@ -1003,9 +1003,11 @@ fun RecipesScreen(
             carbs = (diaryState.carbsGoal - diaryState.totalCarbs).coerceAtLeast(0f),
             fat = (diaryState.fatGoal - diaryState.totalFat).coerceAtLeast(0f)
         )
+        val invNames by vm.inventoryNames.collectAsStateWithLifecycle()
         CookWithWhatIHaveSheet(
             recipes = allRecipes,
             remaining = remaining.takeIf { it.hasMeaningfulGap },
+            inventoryNames = invNames,
             onDismiss = { showCookSheet = false },
             onPickRecipe = { recipe ->
                 showCookSheet = false

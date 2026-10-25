@@ -62,7 +62,8 @@ object RecipeCookSuggester {
         preferredCategory: RecipeCategory? = null,
         maxResults: Int = 5,
         hourOfDay: Int? = null,
-        seed: Long = System.currentTimeMillis()
+        seed: Long = System.currentTimeMillis(),
+        inventoryNames: Set<String> = emptySet()
     ): List<CookSuggestion> {
         if (recipes.isEmpty()) return emptyList()
         val hour = hourOfDay ?: Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
@@ -84,7 +85,8 @@ object RecipeCookSuggester {
                 mode = mode,
                 hour = hour,
                 now = now,
-                rng = rng
+                rng = rng,
+                inventoryNames = inventoryNames
             )
             CookSuggestion(recipe = recipe, score = score, reasons = reasons)
         }
@@ -110,7 +112,8 @@ object RecipeCookSuggester {
         recipe: Recipe,
         remaining: MacroRemaining? = null,
         hourOfDay: Int? = null,
-        nowMs: Long = System.currentTimeMillis()
+        nowMs: Long = System.currentTimeMillis(),
+        inventoryNames: Set<String> = emptySet()
     ): Float {
         val hour = hourOfDay ?: Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         return scoreRecipe(
@@ -119,7 +122,8 @@ object RecipeCookSuggester {
             mode = CookSuggestMode.SMART,
             hour = hour,
             now = nowMs,
-            rng = Random(0) // deterministisch
+            rng = Random(0), // deterministisch
+            inventoryNames = inventoryNames
         ).first
     }
 
@@ -141,7 +145,8 @@ object RecipeCookSuggester {
         mode: CookSuggestMode,
         hour: Int,
         now: Long,
-        rng: Random
+        rng: Random,
+        inventoryNames: Set<String> = emptySet()
     ): Pair<Float, List<String>> {
         val reasons = mutableListOf<String>()
         var score = 0f
@@ -212,6 +217,15 @@ object RecipeCookSuggester {
             val macro = macroFitScore(recipe, remaining)
             score += macro.first
             macro.second?.let { reasons += it }
+        }
+
+        // ── Inventar-Match (Zutaten die du schon hast) ───────────────────────
+        if (inventoryNames.isNotEmpty()) {
+            val hits = inventoryMatchCount(recipe, inventoryNames)
+            if (hits > 0) {
+                score += min(hits, 3) * 14f + max(0, hits - 3) * 4f
+                reasons += if (hits == 1) "Zutat im Inventar" else "$hits Zutaten im Inventar"
+            }
         }
 
         // ── Nährwerte vorhanden (brauchbarer als „leere“ Karten) ────────────
@@ -311,5 +325,21 @@ object RecipeCookSuggester {
         in 15..17 -> listOf(RecipeCategory.SIDE_SNACK, RecipeCategory.DESSERT, RecipeCategory.DRINK)
         in 18..21 -> listOf(RecipeCategory.MAIN, RecipeCategory.SIDE_SNACK, RecipeCategory.DESSERT)
         else -> listOf(RecipeCategory.SIDE_SNACK, RecipeCategory.MAIN, RecipeCategory.DESSERT)
+    }
+
+    /**
+     * Zählt, wie viele Inventar-Namen im Zutatentext (oder Titel) des Rezepts vorkommen.
+     * Sehr kurze Tokens (< 3 Zeichen) werden ignoriert, um False-Positives zu vermeiden.
+     */
+    private fun inventoryMatchCount(recipe: Recipe, inventoryNames: Set<String>): Int {
+        if (inventoryNames.isEmpty()) return 0
+        val haystack = buildString {
+            append(recipe.ingredients.lowercase())
+            append('\n')
+            append(recipe.title.lowercase())
+        }
+        return inventoryNames.count { name ->
+            name.length >= 3 && haystack.contains(name)
+        }
     }
 }

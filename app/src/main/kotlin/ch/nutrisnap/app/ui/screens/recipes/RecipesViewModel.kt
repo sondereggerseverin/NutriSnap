@@ -34,6 +34,12 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = RecipeRepository(db, app)
     private val matchDao = db.ingredientMatchDao()
     private val budgetScaler = RecipeBudgetScaler(db)
+    private val inventoryRepo = ch.nutrisnap.app.data.repository.InventoryRepository(db)
+
+    /** Normalisierte Inventar-Namen für „Was koche ich?“ / Empfohlen-Sortierung. */
+    val inventoryNames: StateFlow<Set<String>> = inventoryRepo.getAll()
+        .map { list -> list.map { it.name.trim().lowercase() }.filter { it.length >= 3 }.toSet() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     init {
         // Feature 2: globales Zutaten-Wörterbuch für RecipeNutritionAnalyzer aktivieren
@@ -197,15 +203,17 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         _query.flatMapLatest { q ->
             if (q.isBlank()) repo.getAll() else repo.search(q)
         },
-        filterMetaFlow
-    ) { recipes, meta ->
+        filterMetaFlow,
+        inventoryNames
+    ) { recipes, meta, invNames ->
         RecipeListFilter.filterAndSort(
             recipes = recipes,
             platformFilter = meta.platformFilter,
             categoryFilter = meta.categoryFilter,
             needles = meta.needles,
             sort = meta.sort,
-            cookedFilter = meta.cookedFilter
+            cookedFilter = meta.cookedFilter,
+            inventoryNames = invNames
         )
     }
 
