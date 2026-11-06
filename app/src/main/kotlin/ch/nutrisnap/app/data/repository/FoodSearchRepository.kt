@@ -59,51 +59,16 @@ class FoodSearchRepository(
         }
 
         return coroutineScope {
+            // Gestaffelter Remote-Fallback statt 8–9 paralleler Calls:
+            // 1) OFF (Hauptquery) + Swiss parallel
+            // 2) eine Variante (Kompositum oder Synonym), nur wenn noch dünn
+            // 3) USDA + Nutritionix nur als letzte Reserve
+            // 4) KI-Schätzung nur wenn weiterhin nichts Brauchbares da ist
             val offDeferred = async { runCatching { openFoodFactsSearch(effectiveQuery) }.getOrDefault(emptyList()) }
-            val usdaDeferred = async { runCatching { usdaApi.search(effectiveQuery) }.getOrDefault(emptyList()) }
             val swissDeferred = async { runCatching { SwissFoodApi.search(query) }.getOrDefault(emptyList()) }
-            val compoundDeferred = compoundVariant?.let { cv ->
-                async { runCatching { openFoodFactsSearch(cv) }.getOrDefault(emptyList()) }
-            }
-            // Ein Synonym reicht (weniger OFF-Calls → weniger Rate-Limits)
-            val synonymRemoteDeferred = synonymQueries.take(1).map { sq ->
-                async { runCatching { openFoodFactsSearch(sq) }.getOrDefault(emptyList()) }
-            }
-            // Bei Mehrwort-Query auch das spezifischste Token remote suchen
-            val specificToken = effectiveQuery.trim().split(Regex("\\s+"))
-                .map { it.lowercase() }
-                .filter { it.length >= 5 }
-                .firstOrNull { t ->
-                    t !in setOf("poulet", "hähnchen", "haehnchen", "chicken", "fleisch", "sauce")
-                }
-            val specificDeferred = specificToken?.let { tok ->
-                async { runCatching { openFoodFactsSearch(tok) }.getOrDefault(emptyList()) }
-            }
-            // Bindestrich-Variante: "leinsamenbrot" → "leinsamen-brot"
-            val hyphenVariant = compoundVariant?.replace(" ", "-")
-            val hyphenDeferred = hyphenVariant?.let { hv ->
-                async { runCatching { openFoodFactsSearch(hv) }.getOrDefault(emptyList()) }
-            }
-            // Nutritionix parallel zu OFF (nicht erst danach sequentiell)
-            val nixDeferred = async {
-                runCatching { nutritionixApi.searchBranded(effectiveQuery) }.getOrDefault(emptyList())
-            }
-            val nixCompoundDeferred = compoundVariant?.let { cv ->
-                async { runCatching { nutritionixApi.searchBranded(cv) }.getOrDefault(emptyList()) }
-            }
-
             val off = offDeferred.await()
-            val usda = usdaDeferred.await()
             val swiss = swissDeferred.await()
-            val compound = compoundDeferred?.await() ?: emptyList()
-            val synonymRemote = synonymRemoteDeferred.flatMap { it.await() }
-            val specificRemote = specificDeferred?.await() ?: emptyList()
-            val hyphenRemote = hyphenDeferred?.await() ?: emptyList()
-            val nutritionix = nixDeferred.await()
-            val nutritionixCompound = nixCompoundDeferred?.await() ?: emptyList()
 
-            // Compound-/Hyphen-Treffer nur behalten, wenn der spezifische Kopf
-            // (z.B. "leinsamen") im Namen vorkommt — sonst Müll wie Weißbrot.
             val compoundHead = compoundVariant?.split(" ")?.firstOrNull()?.takeIf { it.length >= 4 }
             fun hasHead(items: List<FoodItem>): List<FoodItem> {
                 if (compoundHead == null) return items
@@ -114,9 +79,28 @@ class FoodSearchRepository(
                 }
             }
 
-            var combined = (cachedDistinct + swiss + off + usda +
-                hasHead(compound) + synonymRemote + specificRemote + hasHead(hyphenRemote) +
-                nutritionix + hasHead(nutritionixCompound))
+            var combined = cachedDistinct + swiss + off
+
+            fun usableCount(list: List<FoodItem>): Int =
+                list.count { hasUsableNutrition(it) && relevance(it, effectiveQuery) >= 2 }
+
+            // Eine zusätzliche OFF-Variante, nur wenn lokal+OFF+Swiss noch dünn sind
+            if (usableCount(combined) < 6) {
+                val variantQuery = compoundVariant ?: synonymQueries.firstOrNull()
+                if (variantQuery != null && !variantQuery.equals(effectiveQuery, ignoreCase = true)) {
+                    val variantHits = runCatching { openFoodFactsSearch(variantQuery) }.getOrDefault(emptyList())
+                    combined = combined + hasHead(variantHits)
+                }
+            }
+
+            // USDA + Nutritionix nur als Reserve (keine Parallel-Flut mehr)
+            if (usableCount(combined) < 5) {
+                val usdaDeferred = async { runCatching { usdaApi.search(effectiveQuery) }.getOrDefault(emptyList()) }
+                val nixDeferred = async {
+                    runCatching { nutritionixApi.searchBranded(effectiveQuery) }.getOrDefault(emptyList())
+                }
+                combined = combined + usdaDeferred.await() + nixDeferred.await()
+            }
 
             // Echte Treffer (Wort- oder Kompositum-/Fuzzy-Match, relevance >= 2) haben
             // immer Vorrang vor der KI-Schätzung. Nur wenn wirklich nichts Ähnliches
