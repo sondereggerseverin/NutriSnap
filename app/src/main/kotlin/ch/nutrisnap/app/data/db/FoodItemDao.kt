@@ -28,6 +28,10 @@ interface FoodItemDao {
     """)
     suspend fun searchFts(ftsQuery: String): List<FoodItem>
 
+    // ── Normalisierter Suchindex (FoodSearchIndex) – Tabelle ist Room unbekannt → RawQuery ──
+    @RawQuery
+    suspend fun rawFoodQuery(query: androidx.sqlite.db.SupportSQLiteQuery): List<FoodItem>
+
     // ── Extended search (used by FoodSearchRepository) ────────────────────────
     @Query("SELECT * FROM food_items WHERE ${SearchSql.NORM_NAME} LIKE '%' || ${SearchSql.NORM_QUERY} || '%' ORDER BY timesUsed DESC LIMIT 50")
     suspend fun searchFoods(query: String): List<FoodItem>

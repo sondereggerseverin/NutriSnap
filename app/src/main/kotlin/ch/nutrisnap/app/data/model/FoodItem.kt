@@ -90,7 +90,9 @@ data class FoodItem(
     val imageUrl: String? = null,
     val source: FoodSource = FoodSource.MANUAL,
     val completenessScore: Int = 0,
-    val timesUsed: Int = 0
+    val timesUsed: Int = 0,
+    /** Beliebtheit 0–100 aus dem OFF-Katalog (log-skalierte Scan-Zahl); Ranking-Signal der Suche. */
+    val popularity: Int = 0
 )
 
 enum class FoodSource {

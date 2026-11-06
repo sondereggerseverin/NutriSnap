@@ -79,7 +79,8 @@ object OffCatalogImporter {
             fiber = o.optDouble("fiberPer100g", 0.0).toFloat(),
             sugar = o.optDouble("sugarPer100g", 0.0).toFloat(),
             salt = o.optDouble("saltPer100g", 0.0).toFloat(),
-            source = FoodSource.OPEN_FOOD_FACTS
+            source = FoodSource.OPEN_FOOD_FACTS,
+            popularity = o.optInt("popularity", 0).coerceIn(0, 100)
         )
     }
 

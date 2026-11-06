@@ -83,7 +83,7 @@ interface UserProfileDao {
         FrozenMeal::class,
         InventoryItem::class
     ],
-    version = 44,
+    version = 45,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -829,6 +829,19 @@ abstract class NutriDatabase : RoomDatabase() {
             }
         }
 
+        // Lebensmittel-Suche: Beliebtheits-Spalte + normalisierter FTS4-Index (siehe FoodSearchIndex)
+        private val MIGRATION_44_45 = object : Migration(44, 45) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE food_items ADD COLUMN popularity INTEGER NOT NULL DEFAULT 0")
+                // Index ist nice-to-have: scheitert er, darf die Migration nicht scheitern
+                // (die App fällt dann auf die bisherige Suche zurück, ensure() versucht es beim Öffnen erneut).
+                runCatching {
+                    FoodSearchIndex.createStructure(db)
+                    FoodSearchIndex.rebuild(db)
+                }
+            }
+        }
+
         // Rezepte: Archiv (ohne Löschen) + Aussortieren-Status
         private val MIGRATION_43_44 = object : Migration(43, 44) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -875,8 +888,19 @@ abstract class NutriDatabase : RoomDatabase() {
                         MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32,
                         MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36,
                         MIGRATION_36_37, MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40, MIGRATION_40_41,
-                        MIGRATION_41_42, MIGRATION_42_43, MIGRATION_43_44
+                        MIGRATION_41_42, MIGRATION_42_43, MIGRATION_43_44, MIGRATION_44_45
                     )
+                    .addCallback(object : RoomDatabase.Callback() {
+                        // Neuinstallation: keine Migration → Index hier anlegen
+                        override fun onCreate(db: SupportSQLiteDatabase) {
+                            FoodSearchIndex.ensure(db)
+                        }
+
+                        // Selbstheilung: Index fehlt/ist leer trotz vorhandener Produkte
+                        override fun onOpen(db: SupportSQLiteDatabase) {
+                            FoodSearchIndex.ensure(db)
+                        }
+                    })
                     .build()
                     .also { INSTANCE = it }
             }
