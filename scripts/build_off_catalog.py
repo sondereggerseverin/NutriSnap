@@ -168,9 +168,10 @@ def fetch_country_api(country_tag: str, max_products: int) -> list[dict]:
                 "categories_tags,countries_tags,unique_scans_n",
             }
         )
+        # world zuerst (stabiler); de nur als Fallback
         hosts = (
-            "https://de.openfoodfacts.org/cgi/search.pl",
             "https://world.openfoodfacts.org/cgi/search.pl",
+            "https://de.openfoodfacts.org/cgi/search.pl",
         )
         data = None
         for host in hosts:
@@ -203,39 +204,60 @@ def fetch_country_api(country_tag: str, max_products: int) -> list[dict]:
 
 
 def fetch_dump(path: str | None, dump_url: str | None, wanted: set[str], max_products: int) -> list[dict]:
+    """Streamt den OFF-JSONL-Dump und behält die populärsten DACH-Produkte.
+
+    Speichert nicht alle Treffer im RAM, sondern nur die Top-(max*2) nach Scans
+    (Heap), damit CI bei DE+CH+AT nicht aus dem Speicher läuft.
+    """
+    import heapq
+
     if path:
         src = gzip.open(path, "rt", encoding="utf-8", errors="replace")
     else:
         url = dump_url or DUMP_URL
         print(f"  Lade Dump {url} …", flush=True)
         req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-        resp = urllib.request.urlopen(req, timeout=120)
+        # 30 Min. Timeout für den Stream-Start; S3-Redirect wird von urllib gefolgt
+        resp = urllib.request.urlopen(req, timeout=1800)
         src = gzip.open(resp, "rt", encoding="utf-8", errors="replace")
 
-    kept: list[dict] = []
+    # needles: JSON-Substring-Match auf countries_tags
+    needles = [f'"{t}"' for t in wanted]
+    # zusätzlich unquoted / alternative Schreibweisen
+    needles += [t for t in wanted]
+
+    # Min-Heap (scans, seq, product) – behält die besten max_keep Einträge
+    max_keep = max(max_products * 2, 5000) if max_products else 100_000
+    heap: list[tuple[int, int, dict]] = []
     total = 0
-    needles = ['"' + t + '"' for t in wanted]
+    matched = 0
+    seq = 0
     with src:
         for line in src:
             total += 1
-            if total % 250_000 == 0:
-                print(f"  {total} Zeilen, {len(kept)} behalten", flush=True)
-            # Schneller Vorfilter: json.loads nur für Zeilen der gewünschten Länder
+            if total % 500_000 == 0:
+                print(f"  {total} Zeilen, {matched} DACH-Roh, {len(heap)} im Heap", flush=True)
             if not any(n in line for n in needles):
                 continue
             try:
                 p = json.loads(line)
             except ValueError:
                 continue
-            if not wanted.intersection(p.get("countries_tags") or []):
+            tags = p.get("countries_tags") or []
+            if not wanted.intersection(tags):
                 continue
             m = map_product(p)
             if m is None:
                 continue
-            # Kein Early-Break: erst alle Kandidaten sammeln, dann nach
-            # Popularität schneiden (sonst landet eine beliebige Teilmenge im Katalog).
-            kept.append(m)
-    print(f"  Dump: {len(kept)} Kandidaten aus {total} Zeilen", flush=True)
+            matched += 1
+            scans = int(m.get("_scans") or 0)
+            seq += 1
+            if len(heap) < max_keep:
+                heapq.heappush(heap, (scans, seq, m))
+            elif scans > heap[0][0]:
+                heapq.heapreplace(heap, (scans, seq, m))
+    kept = [m for _, _, m in heap]
+    print(f"  Dump: {len(kept)} Kandidaten ({matched} DACH mit Makros) aus {total} Zeilen", flush=True)
     return kept
 
 
@@ -301,12 +323,16 @@ def main():
     if use_dump:
         try:
             products = fetch_dump(args.input, args.dump_url, wanted, args.max)
+            print(f"Dump lieferte {len(products)} Kandidaten", flush=True)
         except Exception as e:
             print(f"Dump fehlgeschlagen: {e!r} – fallback API", flush=True)
             products = []
 
-    if len(products) < 50:
-        print("Baue Katalog über REST-API …", flush=True)
+    if len(products) < 200:
+        if products:
+            print(f"Dump zu dünn ({len(products)}) – ergänze per REST-API …", flush=True)
+        else:
+            print("Baue Katalog über REST-API …", flush=True)
         for c in countries:
             tag = COUNTRY_TAGS[c]
             print(f"Land: {c} ({tag})", flush=True)
