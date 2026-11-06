@@ -121,6 +121,7 @@ def map_product(p: dict) -> dict | None:
         "category": cats[-1] if cats else None,
         "imageUrl": None,
         "_scans": int(p.get("unique_scans_n") or 0),
+        "_ch": "en:switzerland" in (p.get("countries_tags") or []),
     }
 
 
@@ -192,8 +193,9 @@ def fetch_country_api(country_tag: str, max_products: int) -> list[dict]:
             if max_products and len(kept) >= max_products:
                 break
         print(f"  Seite {page}: +{batch} behalten (gesamt {len(kept)})", flush=True)
-        page_count = int(data.get("page_count") or 0)
-        if page >= page_count or not data["products"]:
+        total = int(data.get("count") or 0)
+        total_pages = (total + PAGE_SIZE - 1) // PAGE_SIZE if total else 0
+        if (total_pages and page >= total_pages) or not data["products"]:
             break
         page += 1
         time.sleep(REQUEST_PAUSE_S)
@@ -212,11 +214,15 @@ def fetch_dump(path: str | None, dump_url: str | None, wanted: set[str], max_pro
 
     kept: list[dict] = []
     total = 0
+    needles = ['"' + t + '"' for t in wanted]
     with src:
         for line in src:
             total += 1
-            if total % 100_000 == 0:
+            if total % 250_000 == 0:
                 print(f"  {total} Zeilen, {len(kept)} behalten", flush=True)
+            # Schneller Vorfilter: json.loads nur für Zeilen der gewünschten Länder
+            if not any(n in line for n in needles):
+                continue
             try:
                 p = json.loads(line)
             except ValueError:
@@ -226,17 +232,23 @@ def fetch_dump(path: str | None, dump_url: str | None, wanted: set[str], max_pro
             m = map_product(p)
             if m is None:
                 continue
+            # Kein Early-Break: erst alle Kandidaten sammeln, dann nach
+            # Popularität schneiden (sonst landet eine beliebige Teilmenge im Katalog).
             kept.append(m)
-            if max_products and len(kept) >= max_products * 3:
-                break
     print(f"  Dump: {len(kept)} Kandidaten aus {total} Zeilen", flush=True)
     return kept
+
+
+def popularity_score(scans: int) -> int:
+    """Log-skalierte Beliebtheit 0–100 (10^5 Scans ≈ 100)."""
+    import math
+    return max(0, min(100, int(round(20 * math.log10(1 + max(scans, 0))))))
 
 
 def dedup_sort(products: list[dict], max_products: int) -> list[dict]:
     seen_bc: set[str] = set()
     seen_key: set[str] = set()
-    ranked: list[tuple[int, dict]] = []
+    ranked: list[tuple[float, dict]] = []
     for m in products:
         bc = m.get("barcode")
         if bc and bc in seen_bc:
@@ -248,10 +260,16 @@ def dedup_sort(products: list[dict], max_products: int) -> list[dict]:
             seen_bc.add(bc)
         seen_key.add(key)
         scans = int(m.pop("_scans", 0) or 0)
-        # Staples (kein Barcode, kein _scans) immer behalten → künstlich hohe Prio
-        if not bc and scans == 0 and m.get("brand") is None:
-            scans = 10**9
-        ranked.append((scans, m))
+        is_ch = bool(m.pop("_ch", False))
+        is_staple = not bc and scans == 0 and m.get("brand") is None
+        if is_staple:
+            # Staples (kein Barcode, keine Scans) immer behalten und hoch einstufen
+            m["popularity"] = 70
+            ranked.append((float(10**9), m))
+            continue
+        m["popularity"] = popularity_score(scans)
+        # Schweizer Produkte beim Schneiden bevorzugen (global wenig gescannt)
+        ranked.append((scans * 3.0 if is_ch else float(scans), m))
     ranked.sort(key=lambda t: t[0], reverse=True)
     if max_products and len(ranked) > max_products:
         ranked = ranked[:max_products]

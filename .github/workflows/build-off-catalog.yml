@@ -5,11 +5,15 @@ on:
       countries:
         description: "Kommagetrennt: switzerland,germany,austria"
         required: true
-        default: "switzerland"
+        default: "switzerland,germany,austria"
       max_products:
-        description: "Maximale Produktzahl (API-Pagination, Standard 15000)"
+        description: "Maximale Produktzahl (nach Popularität geschnitten, Standard 80000)"
         required: true
-        default: "15000"
+        default: "80000"
+      source:
+        description: "dump = kompletter OFF-Dump (empfohlen), api = REST-Pagination (limitiert)"
+        required: true
+        default: "dump"
 
 permissions:
   contents: write
@@ -17,8 +21,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # API-Pagination ist deutlich schneller als der 13-GB-Dump
-    timeout-minutes: 45
+    # Dump-Modus streamt ~7 GB gzip und filtert zeilenweise vor
+    timeout-minutes: 120
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,11 +30,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Katalog über OFF-API bauen
+      - name: Katalog bauen (Dump oder API)
         run: |
+          EXTRA=""
+          if [ "${{ inputs.source }}" = "dump" ]; then EXTRA="--prefer-dump"; fi
           python3 scripts/build_off_catalog.py \
             --countries "${{ inputs.countries }}" \
             --max "${{ inputs.max_products }}" \
+            $EXTRA \
             --out app/src/main/assets/off_catalog.jsonl.gz \
             2>&1 | tee off_catalog.log
           # Mindestens der Seed-Stand muss übrig bleiben
@@ -40,7 +47,7 @@ jobs:
           with gzip.open(path, "rt", encoding="utf-8") as f:
               n = sum(1 for _ in f)
           print(f"Zeilen im Katalog: {n}")
-          if n < 20:
+          if n < (2000 if "${{ inputs.source }}" == "dump" else 20):
               sys.exit(f"Katalog zu klein ({n}) – Abbruch ohne Commit")
           PY
       - name: Commit result
