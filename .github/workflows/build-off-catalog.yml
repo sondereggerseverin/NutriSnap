@@ -41,7 +41,7 @@ jobs:
             --out app/src/main/assets/off_catalog.jsonl.gz \
             2>&1 | tee off_catalog.log
           # Mindestens der Seed-Stand muss übrig bleiben
-          python3 - <<'PY'
+          python3 - <<'PY' 2>&1 | tee -a off_catalog.log
           import gzip, sys
           path = "app/src/main/assets/off_catalog.jsonl.gz"
           with gzip.open(path, "rt", encoding="utf-8") as f:
@@ -66,3 +66,16 @@ jobs:
             done
             git status -sb
           fi
+      - name: Fehlerlog ins Repo (nur bei Fehlschlag)
+        if: failure()
+        run: |
+          git config user.email "severin@nutrisnap.dev"
+          git config user.name "Severin Sonderegger"
+          { echo "Run ${{ github.run_id }} (${{ inputs.source }}, ${{ inputs.countries }}, max ${{ inputs.max_products }})"; \
+            tail -n 120 off_catalog.log 2>/dev/null || echo "kein Log vorhanden"; } > off_catalog_error.txt
+          git add off_catalog_error.txt
+          git commit -m "ci: OFF-Katalog Fehlerlog (Run ${{ github.run_id }})" || true
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push && break
+            sleep 5
+          done
