@@ -198,12 +198,21 @@ fun AddFoodSheet(
             // Nachträglich tracken: Tag wählen (nutzt dieselbe Datums-Navigation wie das Tagebuch)
             val diaryDate by vm.uiState.collectAsStateWithLifecycle()
             val activeDate = diaryDate.selectedDate
-            Text("Tag", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(4.dp))
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(bottom = NutriSpacing.md)
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(bottom = NutriSpacing.sm),
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                Text(
+                    "Tag",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = 2.dp)
+                )
+
                 val today = java.time.LocalDate.now()
                 listOf(
                     today to "Heute",
@@ -227,62 +236,74 @@ fun AddFoodSheet(
                 )
             }
 
-            // Direkte Einstiege: Foto ist der kürzeste Weg zum Tracken per Kamera
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = NutriSpacing.md),
-                horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)
-            ) {
-                OutlinedButton(
-                    onClick = onNavigateToPhotoScan,
-                    modifier = Modifier.weight(1f)
+            // Suche ist der Hauptweg (wie Yazio/MFP). Foto & Barcode sitzen in der Suchzeile.
+            // KI / Manuell / Vorlagen sind Nebeneinstiege – keine gleichwertigen Tabs mehr.
+            if (activeTab == AddFoodTab.SEARCH) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = NutriSpacing.sm)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(NutriSpacing.xs),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.PhotoCamera, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(NutriSpacing.xs))
-                    Text("Foto")
+                    Text(
+                        "Weitere Wege",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(end = 4.dp)
+                    )
+                    AssistChip(
+                        onClick = { activeTab = AddFoodTab.AI },
+                        label = { Text("KI schätzen", fontSize = 12.sp) },
+                        leadingIcon = {
+                            Icon(Icons.Default.AutoAwesome, null, Modifier.size(16.dp))
+                        }
+                    )
+                    AssistChip(
+                        onClick = { activeTab = AddFoodTab.MANUAL },
+                        label = { Text("Manuell", fontSize = 12.sp) },
+                        leadingIcon = {
+                            Icon(Icons.Default.Edit, null, Modifier.size(16.dp))
+                        }
+                    )
+                    AssistChip(
+                        onClick = { activeTab = AddFoodTab.SAVED },
+                        label = { Text("Vorlagen", fontSize = 12.sp) },
+                        leadingIcon = {
+                            Icon(Icons.Default.Bookmarks, null, Modifier.size(16.dp))
+                        }
+                    )
                 }
-                OutlinedButton(
-                    onClick = { showScanner = true },
-                    modifier = Modifier.weight(1f)
+            } else {
+                // In Neben-Modi: klarer Rückweg zur Suche
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = NutriSpacing.sm),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.QrCodeScanner, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(NutriSpacing.xs))
-                    Text("Barcode")
+                    TextButton(
+                        onClick = { activeTab = AddFoodTab.SEARCH },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Icon(Icons.Default.ArrowBack, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Suche", fontSize = 13.sp)
+                    }
+                    Text(
+                        when (activeTab) {
+                            AddFoodTab.AI -> "KI schätzen"
+                            AddFoodTab.MANUAL -> "Manueller Eintrag"
+                            AddFoodTab.SAVED -> "Vorlagen"
+                            else -> ""
+                        },
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
                 }
             }
-
-            ScrollableTabRow(
-                selectedTabIndex = activeTab.ordinal,
-                edgePadding = 0.dp
-            ) {
-                Tab(
-                    selected = activeTab == AddFoodTab.SEARCH,
-                    onClick  = { activeTab = AddFoodTab.SEARCH },
-                    text     = { Text("Suche") },
-                    icon     = { Icon(Icons.Default.Search, null, Modifier.size(16.dp)) }
-                )
-                Tab(
-                    selected = activeTab == AddFoodTab.AI,
-                    onClick  = { activeTab = AddFoodTab.AI },
-                    text     = { Text("KI schätzen") },
-                    icon     = { Icon(Icons.Default.AutoAwesome, null, Modifier.size(16.dp)) }
-                )
-                Tab(
-                    selected = activeTab == AddFoodTab.MANUAL,
-                    onClick  = { activeTab = AddFoodTab.MANUAL },
-                    text     = { Text("Manuell") },
-                    icon     = { Icon(Icons.Default.Edit, null, Modifier.size(16.dp)) }
-                )
-                Tab(
-                    selected = activeTab == AddFoodTab.SAVED,
-                    onClick  = { activeTab = AddFoodTab.SAVED },
-                    text     = { Text("Vorlagen") },
-                    icon     = { Icon(Icons.Default.Bookmarks, null, Modifier.size(16.dp)) }
-                )
-            }
-
-            Spacer(Modifier.height(NutriSpacing.md))
 
             if (pendingUnknownBarcode != null && labelCaptureStep == 0) {
                 Card(
@@ -329,6 +350,7 @@ fun AddFoodSheet(
                     initialMeal = initialMeal,
                     barcodeStatus = barcodeStatus,
                     onOpenScanner = { showScanner = true },
+                    onOpenPhoto = onNavigateToPhotoScan,
                     onSwitchToAi = { activeTab = AddFoodTab.AI },
                     onDismiss = { requestDismiss() }
                 )
@@ -479,6 +501,7 @@ private fun SearchTab(
     initialMeal: MealType? = null,
     barcodeStatus: String,
     onOpenScanner: () -> Unit,
+    onOpenPhoto: () -> Unit = {},
     onSwitchToAi: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
@@ -533,11 +556,23 @@ private fun SearchTab(
                 onClick = onOpenScanner,
                 modifier = Modifier
                     .align(Alignment.CenterVertically)
-                    .size(56.dp)
+                    .size(44.dp)
             ) {
                 Icon(
-                    Icons.Default.QrCodeScanner, "Barcode",
-                    Modifier.size(28.dp),
+                    Icons.Default.QrCodeScanner, "Barcode scannen",
+                    Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+            IconButton(
+                onClick = onOpenPhoto,
+                modifier = Modifier
+                    .align(Alignment.CenterVertically)
+                    .size(44.dp)
+            ) {
+                Icon(
+                    Icons.Default.PhotoCamera, "Foto / Etikett",
+                    Modifier.size(24.dp),
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
@@ -555,9 +590,10 @@ private fun SearchTab(
 
         if (query.isBlank() && favorites.isNotEmpty()) {
             Text(
-                "\u2B50 Favoriten",
+                "Favoriten",
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = NutriSpacing.md, bottom = NutriSpacing.xs)
             )
             LazyColumn(Modifier.heightIn(max = 220.dp)) {
