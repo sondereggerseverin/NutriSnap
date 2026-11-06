@@ -74,7 +74,7 @@ object OpenFoodFactsApi {
                 // Beliebteste Produkte zuerst (OFF liefert sonst keine feste Reihenfolge)
                 "&sort_by=unique_scans_n" +
                 "&countries=Germany,Switzerland,Austria" +
-                "&fields=product_name,brands,nutriments,code,serving_size,image_front_small_url,image_url,image_front_url"
+                "&fields=product_name,brands,nutriments,code,serving_size,image_front_small_url,image_url,image_front_url,unique_scans_n"
         val req = Request.Builder().url(url)
             .header("User-Agent", "NutriSnap/1.0 (Android)").build()
         val body = try {
@@ -163,13 +163,21 @@ object OpenFoodFactsApi {
                 p.optString("image_front_url", "")
             ).firstOrNull { it.isNotBlank() },
             source            = FoodSource.OPEN_FOOD_FACTS,
-            completenessScore = 50
+            completenessScore = 50,
+            popularity        = popularityFromScans(p.optLong("unique_scans_n", 0L))
         )
     }
 
     /** Liest ein _100g-Nutriment als Float, oder null wenn nicht vorhanden. */
     private fun JSONObject.g(key: String): Float? =
         if (has(key)) optDouble(key, Double.NaN).toFloat().takeIf { !it.isNaN() } else null
+
+    /** Log-skalierte Beliebtheit 0–100 (10^5 Scans ≈ 100), wie im Katalog-Skript. */
+    private fun popularityFromScans(scans: Long): Int {
+        if (scans <= 0L) return 0
+        val score = (20.0 * kotlin.math.log10(1.0 + scans.toDouble())).toInt()
+        return score.coerceIn(0, 100)
+    }
 
     /** Parst OFFs freitextiges serving_size-Feld (z.B. "50 g", "1 riegel (40g)") zu (Menge, Einheit). */
     private fun parseServingSize(raw: String): Pair<Float, String> {
