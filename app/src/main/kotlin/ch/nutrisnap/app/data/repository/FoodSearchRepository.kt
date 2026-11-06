@@ -8,6 +8,7 @@ import ch.nutrisnap.app.data.db.FoodItemDao
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.FoodSource
 import ch.nutrisnap.app.domain.FoodRanker
+import ch.nutrisnap.app.domain.FoodSearchText
 import ch.nutrisnap.app.domain.NutritionSanity
 import ch.nutrisnap.app.domain.SearchUtils
 import kotlinx.coroutines.async
@@ -46,15 +47,14 @@ class FoodSearchRepository(
             if (ftsHits.isNotEmpty()) ftsHits
             else runCatching { foodItemDao.searchFoods(q) }.getOrDefault(emptyList())
         }
+        val queryTokens = FoodSearchText.tokens(effectiveQuery)
         val cachedDistinct = cached
             .distinctBy { normalizeKey(it) }
-            .filter { hasUsableNutrition(it) || relevance(it, effectiveQuery) >= 3 }
-        // Nur ein EXAKTER Namens-Treffer zählt als "gut genug" — "beginnt mit" reicht
-        // nicht, weil z.B. "Apfelringe" auch mit "apfel" beginnt und sonst faelschlich
-        // als Treffer für die Anfrage "apfel" durchgeht, obwohl kein echter Apfel dabei ist.
-        // Nur bei vielen exakten Cache-Treffern Remote überspringen — sonst immer
-        // OFF/Nutritionix nachladen, damit Markenprodukte sichtbar werden.
-        if (cachedDistinct.size >= 12 && cachedDistinct.count { relevance(it, effectiveQuery) == 4 } >= 3) {
+            .filter { hasUsableNutrition(it) || FoodRanker.isStrong(it, queryTokens) }
+        // Bei vielen starken lokalen Treffern (Score ≥ EXACTISH) Remote überspringen.
+        if (cachedDistinct.size >= 12 &&
+            cachedDistinct.count { FoodRanker.isExactish(it, queryTokens) } >= 3
+        ) {
             return FoodRanker.rank(cachedDistinct, effectiveQuery).take(20)
         }
 
@@ -75,14 +75,14 @@ class FoodSearchRepository(
                 val h = SearchUtils.normalize(compoundHead)
                 return items.filter { item ->
                     val n = SearchUtils.normalize(item.name).replace(" ", "")
-                    n.contains(h) || relevance(item, effectiveQuery) >= 2
+                    n.contains(h) || FoodRanker.isStrong(item, queryTokens)
                 }
             }
 
             var combined = cachedDistinct + swiss + off
 
             fun usableCount(list: List<FoodItem>): Int =
-                list.count { hasUsableNutrition(it) && relevance(it, effectiveQuery) >= 2 }
+                list.count { hasUsableNutrition(it) && FoodRanker.isStrong(it, queryTokens) }
 
             // Eine zusätzliche OFF-Variante, nur wenn lokal+OFF+Swiss noch dünn sind
             if (usableCount(combined) < 6) {
@@ -102,11 +102,8 @@ class FoodSearchRepository(
                 combined = combined + usdaDeferred.await() + nixDeferred.await()
             }
 
-            // Echte Treffer (Wort- oder Kompositum-/Fuzzy-Match, relevance >= 2) haben
-            // immer Vorrang vor der KI-Schätzung. Nur wenn wirklich nichts Ähnliches
-            // gefunden wurde, wird per KI grob geschätzt (klar als "KI-geschätzt"
-            // markiert, s. GroqFoodEstimatorApi/FoodSource).
-            if (combined.none { relevance(it, effectiveQuery) >= 2 && hasUsableNutrition(it) }) {
+            // Echte Treffer (FoodRanker STRONG) haben Vorrang vor der KI-Schätzung.
+            if (combined.none { hasUsableNutrition(it) && FoodRanker.isStrong(it, queryTokens) }) {
                 GroqFoodEstimatorApi.estimate(effectiveQuery)?.let { combined = combined + it }
             }
 
@@ -128,10 +125,11 @@ class FoodSearchRepository(
                         }
                         if (filtered.isNotEmpty()) filtered else usable
                     } else usable
-                    // Harte Spezifität: relevance ≥ 2 zuerst. Schwache Treffer (nur
-                    // "brot" o.ä.) nur auffüllen, wenn wirklich zu wenig Spezifisches da ist.
-                    val specific = plausible.filter { relevance(it, effectiveQuery) >= 2 }
-                    val weak = plausible.filter { relevance(it, effectiveQuery) == 1 }
+                    // Harte Spezifität über FoodRanker: STRONG zuerst, WEAK nur auffüllen.
+                    val specific = plausible.filter { FoodRanker.isStrong(it, queryTokens) }
+                    val weak = plausible.filter {
+                        !FoodRanker.isStrong(it, queryTokens) && FoodRanker.isWeakOrBetter(it, queryTokens)
+                    }
                     when {
                         specific.size >= 5 -> specific
                         specific.isNotEmpty() -> (specific + weak).distinct().take(15)

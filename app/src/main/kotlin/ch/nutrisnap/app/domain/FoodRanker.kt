@@ -64,4 +64,26 @@ object FoodRanker {
             .sortedWith(compareByDescending<Pair<FoodItem, Int>> { it.second }.thenBy { it.first.name.length })
             .map { it.first }
     }
+
+    /**
+     * Schwellen für Filter (nicht nur Sortierung):
+     *  EXACTISH ≥ 800  – Name beginnt mit Query / exakt (früher relevance == 4/3)
+     *  STRONG   ≥ 350  – alle Query-Tokens im Namen (früher relevance ≥ 2)
+     *  WEAK     ≥ 100  – mindestens ein Token trifft (früher relevance == 1)
+     */
+    const val SCORE_EXACTISH = 800
+    const val SCORE_STRONG = 350
+    const val SCORE_WEAK = 100
+
+    fun score(item: FoodItem, query: String): Int =
+        score(item, FoodSearchText.tokens(query))
+
+    fun isExactish(item: FoodItem, queryTokens: List<String>): Boolean =
+        score(item, queryTokens) >= SCORE_EXACTISH
+
+    fun isStrong(item: FoodItem, queryTokens: List<String>): Boolean =
+        score(item, queryTokens) >= SCORE_STRONG
+
+    fun isWeakOrBetter(item: FoodItem, queryTokens: List<String>): Boolean =
+        score(item, queryTokens) >= SCORE_WEAK
 }

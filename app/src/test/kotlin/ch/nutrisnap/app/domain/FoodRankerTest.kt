@@ -88,4 +88,16 @@ class FoodRankerTest {
         )
         assertTrue(FoodRanker.rank(items, "reis").first().brand == null)
     }
+
+    @Test
+    fun schwellen_exactishUndStrong() {
+        val tokens = FoodSearchText.tokens("apfel")
+        assertTrue(FoodRanker.isExactish(food("Apfel"), tokens))
+        assertTrue(FoodRanker.isStrong(food("Apfelringe getrocknet"), tokens))
+        // "Milchgetränk … Kakaomasse" ist kein starker Treffer für "kakao"
+        val kakao = FoodSearchText.tokens("kakao")
+        assertTrue(FoodRanker.isStrong(food("Kakaopulver"), kakao))
+        assertTrue(FoodRanker.score(food("Milchgetränk mit fettarmer Kakaomasse"), kakao)
+            < FoodRanker.score(food("Kakaopulver"), kakao))
+    }
 }
