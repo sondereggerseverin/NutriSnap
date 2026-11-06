@@ -31,7 +31,11 @@ object OpenFoodFactsApi {
                 // Barcode lookup
                 if (query.startsWith("barcode:")) {
                     val code = query.removePrefix("barcode:")
-                    val url = "https://world.openfoodfacts.org/api/v0/product/$code.json?fields=product_name,brands,nutriments,code,serving_size,image_front_small_url,image_url,image_front_url"
+                    // v2-Product-API (stabiler als v0); Namenssuche bleibt vorerst cgi/search.pl,
+                    // weil api/v2/search aktuell oft 503 liefert.
+                    val url = "https://world.openfoodfacts.org/api/v2/product/$code" +
+                        "?fields=product_name,brands,nutriments,code,serving_size," +
+                        "image_front_small_url,image_url,image_front_url"
                     val req = Request.Builder().url(url)
                         .header("User-Agent", "NutriSnap/1.0 (Android)").build()
                     val body = client.newCall(req).execute().use { it.body?.string() ?: return@runCatching emptyList() }
