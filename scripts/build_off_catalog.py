@@ -325,6 +325,12 @@ def main():
         for m in final:
             out.write(json.dumps(m, ensure_ascii=False, separators=(",", ":")) + "\n")
     print(f"FERTIG: {len(final)} Produkte (inkl. {len(STAPLES)} Staples) → {args.out}", flush=True)
+    # Nur-Staples ist kein brauchbarer Katalog – Workflow soll dann nicht committen.
+    if len(final) <= len(STAPLES) + 20:
+        sys.exit(
+            f"Katalog praktisch nur Seed/Staples ({len(final)} Einträge) – "
+            "Dump/API haben nichts geliefert."
+        )
 
 
 if __name__ == "__main__":

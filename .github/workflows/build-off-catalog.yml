@@ -31,34 +31,46 @@ jobs:
         with:
           python-version: '3.12'
       - name: Katalog bauen (Dump oder API)
+        env:
+          CATALOG_SOURCE: ${{ inputs.source }}
         run: |
+          set -euo pipefail
           EXTRA=""
-          if [ "${{ inputs.source }}" = "dump" ]; then EXTRA="--prefer-dump"; fi
+          if [ "$CATALOG_SOURCE" = "dump" ]; then EXTRA="--prefer-dump"; fi
           python3 scripts/build_off_catalog.py \
             --countries "${{ inputs.countries }}" \
             --max "${{ inputs.max_products }}" \
             $EXTRA \
             --out app/src/main/assets/off_catalog.jsonl.gz \
             2>&1 | tee off_catalog.log
-          # Mindestens der Seed-Stand muss übrig bleiben
+          # Harte Mindestgrösse: Dump braucht echten Bestand, API mindestens > Seed
           python3 - <<'PY' 2>&1 | tee -a off_catalog.log
-          import gzip, sys
+          import gzip, os, sys
           path = "app/src/main/assets/off_catalog.jsonl.gz"
           with gzip.open(path, "rt", encoding="utf-8") as f:
               n = sum(1 for _ in f)
-          print(f"Zeilen im Katalog: {n}")
-          if n < (2000 if "${{ inputs.source }}" == "dump" else 20):
-              sys.exit(f"Katalog zu klein ({n}) – Abbruch ohne Commit")
+          source = os.environ.get("CATALOG_SOURCE", "dump")
+          min_n = 2000 if source == "dump" else 500
+          print(f"Zeilen im Katalog: {n} (Quelle={source}, Minimum={min_n})")
+          if n < min_n:
+              sys.exit(f"Katalog zu klein ({n} < {min_n}) – Abbruch ohne Commit")
           PY
       - name: Commit result
         run: |
+          set -euo pipefail
           git config user.email "severin@nutrisnap.dev"
           git config user.name "Severin Sonderegger"
           git add app/src/main/assets/off_catalog.jsonl.gz
           if git diff --cached --quiet; then
             echo "Keine Änderungen."
           else
-            git commit -m "OFF-Katalog aktualisiert (${{ inputs.countries }}, max ${{ inputs.max_products }})"
+            # Nochmals prüfen, damit ein leerer Seed nie gepusht wird
+            N=$(python3 -c "import gzip;print(sum(1 for _ in gzip.open('app/src/main/assets/off_catalog.jsonl.gz','rt',encoding='utf-8')))")
+            if [ "$N" -lt 500 ]; then
+              echo "Commit abgebrochen: Katalog hat nur $N Zeilen"
+              exit 1
+            fi
+            git commit -m "OFF-Katalog aktualisiert (${{ inputs.countries }}, max ${{ inputs.max_products }}, ${N} Produkte)"
             for i in 1 2 3; do
               git pull --rebase origin main && git push && break
               echo "Push-Versuch $i fehlgeschlagen, erneut..."
