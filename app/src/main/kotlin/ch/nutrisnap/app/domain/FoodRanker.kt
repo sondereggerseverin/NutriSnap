@@ -43,7 +43,8 @@ object FoodRanker {
             s += if (queryTokens.size == 1) 40 else 20
         }
         s += item.popularity.coerceIn(0, 100) * 3 / 2
-        s += minOf(item.timesUsed, 30) * 8
+        // Bereits getrackte Lebensmittel klar nach oben (Yazio-ähnlich)
+        s += minOf(item.timesUsed, 50) * 20
         if (item.source == FoodSource.USDA || item.source == FoodSource.SWISS_FSVO || item.source == FoodSource.BLS) s += 20
         s += item.completenessScore.coerceIn(0, 100) / 10
 
@@ -55,15 +56,42 @@ object FoodRanker {
         return s
     }
 
-    /** Sortiert absteigend nach Score; bei Gleichstand kürzerer Name zuerst. */
-    fun rank(items: List<FoodItem>, query: String): List<FoodItem> {
+    /**
+     * Sortiert absteigend:
+     * 1) Favoriten (optional [favoriteKeys] = name|brand)
+     * 2) Score (Textmatch + timesUsed + Popularität …)
+     * 3) kürzerer Name
+     */
+    fun rank(
+        items: List<FoodItem>,
+        query: String,
+        favoriteKeys: Set<String> = emptySet(),
+    ): List<FoodItem> {
         val q = FoodSearchText.tokens(query)
-        if (q.isEmpty()) return items
+        if (q.isEmpty()) {
+            if (favoriteKeys.isEmpty()) return items
+            return items.sortedWith(
+                compareByDescending<FoodItem> {
+                    foodKey(it) in favoriteKeys
+                }.thenByDescending { it.timesUsed }.thenBy { it.name.length }
+            )
+        }
         return items
-            .map { it to score(it, q) }
-            .sortedWith(compareByDescending<Pair<FoodItem, Int>> { it.second }.thenBy { it.first.name.length })
+            .map { item ->
+                val key = foodKey(item)
+                var s = score(item, q)
+                if (key in favoriteKeys) s += 5000 // immer über reinem Textmatch
+                item to s
+            }
+            .sortedWith(
+                compareByDescending<Pair<FoodItem, Int>> { it.second }
+                    .thenBy { it.first.name.length }
+            )
             .map { it.first }
     }
+
+    private fun foodKey(item: FoodItem): String =
+        "${item.name.trim().lowercase()}|${item.brand?.trim()?.lowercase() ?: ""}"
 
     /**
      * Schwellen für Filter (nicht nur Sortierung):

@@ -5,6 +5,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.*
+import ch.nutrisnap.app.data.model.favoriteKey
+import ch.nutrisnap.app.domain.FoodRanker
+import ch.nutrisnap.app.domain.FoodSearchText
 import ch.nutrisnap.app.data.repository.DiaryRepository
 import ch.nutrisnap.app.data.repository.FavoriteFoodRepository
 import ch.nutrisnap.app.data.repository.FoodItemRepository
@@ -218,16 +221,27 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
             _isSearching.value = false
             return
         }
-        // Debounce + progressive: lokale Treffer sofort, Remote danach nachladen
+        // Debounce + progressive: lokale Treffer sofort, Remote danach nachladen.
+        // Favoriten und oft getrackte Lebensmittel werden nach oben sortiert.
         searchJob = viewModelScope.launch {
             delay(280)
             _isSearching.value = true
+            val favKeys = favorites.value.map { it.favoriteKey() }.toSet()
+            val favMatches = favorites.value.filter {
+                FoodRanker.isWeakOrBetter(it, FoodSearchText.tokens(query))
+            }
+            fun prioritize(list: List<FoodItem>): List<FoodItem> {
+                val merged = (favMatches + list).distinctBy {
+                    it.barcode ?: it.favoriteKey()
+                }
+                return FoodRanker.rank(merged, query, favKeys)
+            }
             val local = runCatching { foodRepo.searchLocalOnly(query) }.getOrDefault(emptyList())
-            if (local.isNotEmpty()) {
-                _searchResults.value = local
+            if (local.isNotEmpty() || favMatches.isNotEmpty()) {
+                _searchResults.value = prioritize(local)
             }
             val all = runCatching { foodRepo.searchAll(query) }.getOrDefault(local)
-            _searchResults.value = all
+            _searchResults.value = prioritize(all)
             _isSearching.value = false
         }
     }

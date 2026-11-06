@@ -90,6 +90,26 @@ class FoodRankerTest {
     }
 
     @Test
+    fun favoritenStehenUeberGleichenTreffern() {
+        val items = listOf(
+            food("Vollkornbrot", brand = "A", barcode = "1", timesUsed = 0),
+            food("Vollkornbrot", brand = "B", barcode = "2", timesUsed = 0)
+        )
+        val favKeys = setOf("vollkornbrot|b")
+        val ranked = FoodRanker.rank(items, "vollkornbrot", favKeys)
+        assertEquals("B", ranked.first().brand)
+    }
+
+    @Test
+    fun oftGetracktStehtHoeher() {
+        val items = listOf(
+            food("Haferflocken", brand = "X", barcode = "1", timesUsed = 0),
+            food("Haferflocken", brand = "Y", barcode = "2", timesUsed = 12)
+        )
+        assertEquals("Y", FoodRanker.rank(items, "haferflocken").first().brand)
+    }
+
+    @Test
     fun schwellen_exactishUndStrong() {
         val tokens = FoodSearchText.tokens("apfel")
         assertTrue(FoodRanker.isExactish(food("Apfel"), tokens))
