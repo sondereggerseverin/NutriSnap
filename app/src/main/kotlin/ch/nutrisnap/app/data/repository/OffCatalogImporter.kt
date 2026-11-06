@@ -68,6 +68,10 @@ object OffCatalogImporter {
         val o = runCatching { JSONObject(line) }.getOrNull() ?: return null
         val name = o.str("name") ?: return null
         if (!o.has("caloriesPer100g")) return null
+        val servingSize = o.optDouble("servingSize", 100.0).toFloat().let {
+            if (it > 0f && it <= 5000f) it else 100f
+        }
+        val servingUnit = o.str("servingUnit")?.lowercase()?.takeIf { it in setOf("g", "ml", "kg", "l") } ?: "g"
         return FoodItem(
             name = name,
             brand = o.str("brand"),
@@ -79,6 +83,8 @@ object OffCatalogImporter {
             fiber = o.optDouble("fiberPer100g", 0.0).toFloat(),
             sugar = o.optDouble("sugarPer100g", 0.0).toFloat(),
             salt = o.optDouble("saltPer100g", 0.0).toFloat(),
+            servingSize = servingSize,
+            servingUnit = servingUnit,
             source = FoodSource.OPEN_FOOD_FACTS,
             popularity = o.optInt("popularity", 0).coerceIn(0, 100)
         )

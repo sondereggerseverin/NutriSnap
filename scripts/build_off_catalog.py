@@ -88,6 +88,24 @@ def num(n: dict, *keys):
     return None
 
 
+def parse_serving(raw: str | None) -> tuple[float, str]:
+    """OFF serving_size Freitext → (Menge, Einheit), Default 100 g."""
+    if not raw:
+        return 100.0, "g"
+    import re
+    m = re.search(r"(\d+(?:[.,]\d+)?)\s*(g|ml|kg|l)\b", str(raw), re.I)
+    if not m:
+        return 100.0, "g"
+    try:
+        amount = float(m.group(1).replace(",", "."))
+    except ValueError:
+        return 100.0, "g"
+    unit = m.group(2).lower()
+    if amount <= 0 or amount > 5000:
+        return 100.0, "g"
+    return amount, unit
+
+
 def map_product(p: dict) -> dict | None:
     name = (p.get("product_name_de") or p.get("product_name") or "").strip()
     if len(name) < 2:
@@ -109,6 +127,7 @@ def map_product(p: dict) -> dict | None:
 
     brand = (p.get("brands") or "").split(",")[0].strip() or None
     cats = p.get("categories_tags") or []
+    serving_size, serving_unit = parse_serving(p.get("serving_size"))
     return {
         "name": name[:120],
         "brand": brand,
@@ -122,6 +141,8 @@ def map_product(p: dict) -> dict | None:
         "saltPer100g": round(num(n, "salt_100g") or 0.0, 2),
         "category": cats[-1] if cats else None,
         "imageUrl": None,
+        "servingSize": serving_size,
+        "servingUnit": serving_unit,
         "_scans": int(p.get("unique_scans_n") or 0),
         "_ch": "en:switzerland" in (p.get("countries_tags") or []),
     }
@@ -167,7 +188,7 @@ def fetch_country_api(country_tag: str, max_products: int) -> list[dict]:
                 "json": 1,
                 "sort_by": "unique_scans_n",
                 "fields": "code,product_name,product_name_de,brands,nutriments,"
-                "categories_tags,countries_tags,unique_scans_n",
+                "categories_tags,countries_tags,unique_scans_n,serving_size",
             }
         )
         # world zuerst (stabiler); de nur als Fallback
