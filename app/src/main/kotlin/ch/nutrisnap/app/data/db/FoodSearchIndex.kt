@@ -1,6 +1,9 @@
 package ch.nutrisnap.app.data.db
 
+import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteDatabase
+import ch.nutrisnap.app.domain.FoodSearchText
+import ch.nutrisnap.app.data.model.FoodItem
 
 /**
  * Normalisierter Volltext-Suchindex über food_items (FTS4, unabhängig von Rooms eigenem
@@ -68,4 +71,30 @@ internal object FoodSearchIndex {
             }
         }
     }
+
+    /**
+     * Kandidaten für die Suche: erst Präfix-Treffer über den FTS-Index (schnell), bei zu wenig
+     * Treffern zusätzlich Teilstring-Treffer (z. B. "brot" → "Vollkornbrot"). Fehlertolerant:
+     * bei jedem Fehler leere Liste, der Aufrufer fällt dann auf die bisherige Suche zurück.
+     */
+    suspend fun candidates(dao: FoodItemDao, query: String, limit: Int = 150): List<FoodItem> {
+        val found = LinkedHashMap<Int, FoodItem>()
+        for (m in FoodSearchText.matchQueries(query)) {
+            val sql = "SELECT food_items.* FROM $TABLE JOIN food_items ON food_items.id = $TABLE.docid " +
+                "WHERE $TABLE MATCH ? LIMIT $limit"
+            runCatching { dao.rawFoodQuery(SimpleSQLiteQuery(sql, arrayOf<Any>(m))) }
+                .getOrDefault(emptyList()).forEach { found.putIfAbsent(it.id, it) }
+        }
+        val tokens = FoodSearchText.tokens(query)
+        if (found.size < MIN_BEFORE_INFIX && tokens.isNotEmpty() && tokens.sumOf { it.length } >= 3) {
+            val where = tokens.joinToString(" AND ") { "($TABLE.name_norm || ' ' || $TABLE.brand_norm) LIKE ?" }
+            val sql = "SELECT food_items.* FROM $TABLE JOIN food_items ON food_items.id = $TABLE.docid " +
+                "WHERE $where LIMIT $limit"
+            runCatching { dao.rawFoodQuery(SimpleSQLiteQuery(sql, tokens.map { "%$it%" }.toTypedArray<Any>())) }
+                .getOrDefault(emptyList()).forEach { found.putIfAbsent(it.id, it) }
+        }
+        return found.values.toList()
+    }
+
+    private const val MIN_BEFORE_INFIX = 15
 }
