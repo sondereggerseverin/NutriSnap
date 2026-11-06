@@ -7,6 +7,7 @@ import ch.nutrisnap.app.data.api.UsdaFoodApi
 import ch.nutrisnap.app.data.db.FoodItemDao
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.FoodSource
+import ch.nutrisnap.app.domain.FoodRanker
 import ch.nutrisnap.app.domain.NutritionSanity
 import ch.nutrisnap.app.domain.SearchUtils
 import kotlinx.coroutines.async
@@ -54,11 +55,7 @@ class FoodSearchRepository(
         // Nur bei vielen exakten Cache-Treffern Remote überspringen — sonst immer
         // OFF/Nutritionix nachladen, damit Markenprodukte sichtbar werden.
         if (cachedDistinct.size >= 12 && cachedDistinct.count { relevance(it, effectiveQuery) == 4 } >= 3) {
-            return cachedDistinct.sortedWith(
-                compareByDescending<FoodItem> { relevance(it, effectiveQuery) }
-                    .thenByDescending { microRichness(it) }
-                    .thenByDescending { sourcePriority(it.source) }
-            ).take(20)
+            return FoodRanker.rank(cachedDistinct, effectiveQuery).take(20)
         }
 
         return coroutineScope {
@@ -159,13 +156,7 @@ class FoodSearchRepository(
                         else -> list
                     }
                 }
-                .sortedWith(
-                    // 1) Namens-Relevanz, 2) Marke/Barcode (Retail), 3) Mikro, 4) Quelle
-                    compareByDescending<FoodItem> { relevance(it, effectiveQuery) }
-                        .thenByDescending { retailSignal(it) }
-                        .thenByDescending { microRichness(it) }
-                        .thenByDescending { sourcePriority(it.source) }
-                )
+                .let { FoodRanker.rank(it, effectiveQuery) }
                 .take(20) // UI soll nicht endlos scrollen, aber ~10+ sind drin
 
             foodItemDao.insertAll(result.filter { it.source != FoodSource.MANUAL }.take(40))

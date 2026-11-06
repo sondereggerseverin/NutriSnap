@@ -2,6 +2,7 @@ package ch.nutrisnap.app.data.repository
 
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.FoodSource
+import ch.nutrisnap.app.domain.FoodRanker
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -30,7 +31,7 @@ class FoodSearchRankingTest {
     @Test
     fun kakao_genericPowderComesFirst() {
         val cleaned = FoodSearchRepository.cleanSearchResults(kakaoResults)
-        val sorted = cleaned.sortedWith(FoodSearchRepository.relevanceComparator("kakao"))
+        val sorted = FoodRanker.rank(cleaned, "kakao")
         assertEquals("Kakaopulver", sorted.first().name)
     }
 

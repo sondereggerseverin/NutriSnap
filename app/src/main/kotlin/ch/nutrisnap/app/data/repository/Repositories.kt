@@ -12,6 +12,7 @@ import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.data.supabase.SupabaseSync
 import ch.nutrisnap.app.data.supabase.SyncStatusHolder
+import ch.nutrisnap.app.domain.FoodRanker
 import ch.nutrisnap.app.domain.RecipeScraper
 import ch.nutrisnap.app.domain.SearchUtils
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
@@ -1071,7 +1072,7 @@ class FoodItemRepository(db: NutriDatabase) {
             .distinctBy { it.barcode ?: (it.name.lowercase().trim() + "|" + (it.brand?.lowercase()?.trim() ?: "")) }
             .mapNotNull { with(ch.nutrisnap.app.domain.NutritionSanity) { it.sanitized() } }
             .let { FoodSearchRepository.cleanSearchResults(it) }
-            .sortedWith(FoodSearchRepository.relevanceComparator(query))
+            .let { FoodRanker.rank(it, query) }
             .take(20)
     }
 
@@ -1098,7 +1099,7 @@ class FoodItemRepository(db: NutriDatabase) {
             .distinctBy { it.barcode ?: (it.name.lowercase().trim() + "|" + (it.brand?.lowercase()?.trim() ?: "")) }
             .mapNotNull { with(ch.nutrisnap.app.domain.NutritionSanity) { it.sanitized() } }
             .let { FoodSearchRepository.cleanSearchResults(it) }
-            .sortedWith(FoodSearchRepository.relevanceComparator(query))
+            .let { FoodRanker.rank(it, query) }
     }
 
     suspend fun searchBarcode(barcode: String): FoodItem? {
