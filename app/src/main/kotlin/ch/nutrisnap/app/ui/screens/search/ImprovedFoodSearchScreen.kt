@@ -27,6 +27,8 @@ import ch.nutrisnap.app.data.model.FoodSource
 import ch.nutrisnap.app.data.repository.FoodSearchRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import ch.nutrisnap.app.domain.FoodRanker
+import ch.nutrisnap.app.domain.FoodSearchText
 
 sealed class SearchState {
     object Idle : SearchState()
@@ -151,10 +153,9 @@ private fun IdleSearchContent(recentFoods: List<FoodItem>, frequentFoods: List<F
 
 @Composable
 private fun SearchResultsList(items: List<FoodItem>, query: String, onFoodSelected: (FoodItem) -> Unit) {
-    // Keine Ergebnisse hat exakten/Wort-Treffer (relevance >= 2) -> alles was
-    // angezeigt wird, kommt nur aus Tippfehler-/Kompositum-/Synonym-Matching.
-    // Statt das wie sichere Treffer zu präsentieren, klar als Vorschlag kennzeichnen.
-    val onlyFuzzyMatches = items.isNotEmpty() && items.none { FoodSearchRepository.relevance(it, query) >= 2 }
+    // Kein starker FoodRanker-Treffer (Score < STRONG) -> nur Fuzzy/Synonym-Vorschläge.
+    val onlyFuzzyMatches = items.isNotEmpty() &&
+        items.none { FoodRanker.isStrong(it, FoodSearchText.tokens(query)) }
     LazyColumn {
         item {
             Text(
