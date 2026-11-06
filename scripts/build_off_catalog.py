@@ -18,6 +18,8 @@ Ausgabe: JSON Lines (gzip), Schema wie yazio_foods.json.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import argparse
 import gzip
 import json
@@ -344,13 +346,44 @@ def main():
     if not products:
         sys.exit("Keine Produkte gefunden (API und Dump leer/fehlerhaft).")
 
-    # Staples zuerst, dann API/Dump – Dedup behält Staples bei Namensgleichheit
-    products = list(STAPLES) + products
+    # Staples + optionale yazio_foods.json (DACH-Alltag) zuerst, dann API/Dump
+    extras: list[dict] = list(STAPLES)
+    yazio_path = Path(__file__).resolve().parent.parent / "app/src/main/assets/yazio_foods.json"
+    if yazio_path.is_file():
+        try:
+            yazio = json.loads(yazio_path.read_text(encoding="utf-8"))
+            n_y = 0
+            for raw in yazio:
+                try:
+                    extras.append({
+                        "name": str(raw["name"])[:120],
+                        "brand": raw.get("brand") or None,
+                        "barcode": raw.get("barcode") or None,
+                        "caloriesPer100g": round(float(raw["caloriesPer100g"]), 1),
+                        "proteinPer100g": round(float(raw["proteinPer100g"]), 1),
+                        "carbsPer100g": round(float(raw["carbsPer100g"]), 1),
+                        "fatPer100g": round(float(raw["fatPer100g"]), 1),
+                        "fiberPer100g": round(float(raw.get("fiberPer100g") or 0), 1),
+                        "sugarPer100g": round(float(raw.get("sugarPer100g") or 0), 1),
+                        "saltPer100g": round(float(raw.get("saltPer100g") or 0), 2),
+                        "category": raw.get("category"),
+                        "imageUrl": raw.get("imageUrl"),
+                        "_scans": 0,
+                        "_ch": True,
+                    })
+                    n_y += 1
+                except (KeyError, TypeError, ValueError):
+                    continue
+            print(f"  yazio_foods.json: {n_y} Einträge geladen", flush=True)
+        except Exception as e:
+            print(f"  yazio_foods.json übersprungen: {e!r}", flush=True)
+
+    products = extras + products
     final = dedup_sort(products, args.max if args.max else 0)
     with gzip.open(args.out, "wt", encoding="utf-8", compresslevel=9) as out:
         for m in final:
             out.write(json.dumps(m, ensure_ascii=False, separators=(",", ":")) + "\n")
-    print(f"FERTIG: {len(final)} Produkte (inkl. {len(STAPLES)} Staples) → {args.out}", flush=True)
+    print(f"FERTIG: {len(final)} Produkte (inkl. Staples/Yazio) → {args.out}", flush=True)
     # Nur-Staples ist kein brauchbarer Katalog – Workflow soll dann nicht committen.
     if len(final) <= len(STAPLES) + 20:
         sys.exit(
