@@ -35,6 +35,7 @@ import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.repository.FoodItemRepository
 import ch.nutrisnap.app.domain.GroqVisionService
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
+import ch.nutrisnap.app.ui.components.VoiceInputButton
 import ch.nutrisnap.app.ui.screens.scan.PhotoCaptureScreen
 import kotlinx.coroutines.launch
 
@@ -92,7 +93,13 @@ fun IngredientIdentifySheet(
             IdentifyMode.Choose -> IdentifyChooseScreen(
                 ingredientName = ingredientName,
                 onBarcode = { mode = IdentifyMode.Barcode },
-                onSearch  = { mode = IdentifyMode.Search(ingredientName) },
+                // „Neue Zutat“ nicht als Suchtext vorbefüllen – leeres Feld, Nutzer tippt/spricht
+                onSearch  = {
+                    val q = ingredientName.trim().takeUnless {
+                        it.isEmpty() || it.equals("Neue Zutat", ignoreCase = true)
+                    }.orEmpty()
+                    mode = IdentifyMode.Search(q)
+                },
                 onAi      = { mode = IdentifyMode.AiEstimate }
             )
             IdentifyMode.Barcode -> BarcodeLookupScreen(
@@ -111,7 +118,12 @@ fun IngredientIdentifySheet(
                 barcode = m.barcode,
                 error = m.error,
                 onCaptureLabel = { mode = IdentifyMode.LabelCapture(m.barcode) },
-                onSearchName = { mode = IdentifyMode.Search(ingredientName.ifBlank { "" }) },
+                onSearchName = {
+                    val q = ingredientName.trim().takeUnless {
+                        it.isEmpty() || it.equals("Neue Zutat", ignoreCase = true)
+                    }.orEmpty()
+                    mode = IdentifyMode.Search(q)
+                },
                 onBack = { mode = IdentifyMode.Choose }
             )
             is IdentifyMode.Search -> FoodSearchScreen(
@@ -196,7 +208,12 @@ private fun IdentifyChooseScreen(
 ) {
     Column(Modifier.padding(16.dp).padding(bottom = 24.dp)) {
         Text("Zutat identifizieren", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        Text(ingredientName, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        val subtitle = when {
+            ingredientName.isBlank() || ingredientName.equals("Neue Zutat", ignoreCase = true) ->
+                "Neue Zutat hinzufügen"
+            else -> ingredientName
+        }
+        Text(subtitle, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 2.dp, bottom = 16.dp))
 
         OptionRow(
@@ -421,20 +438,33 @@ private fun FoodSearchScreen(
         }
         Spacer(Modifier.height(8.dp))
 
-        OutlinedTextField(
-            value = searchText,
-            onValueChange = { searchText = it },
-            label = { Text("Lebensmittel suchen") },
-            leadingIcon = { Icon(Icons.Default.Search, null) },
-            trailingIcon = {
-                IconButton(onClick = { refreshSearch() }) {
-                    Icon(Icons.Default.Send, "Suchen")
-                }
-            },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            OutlinedTextField(
+                value = searchText,
+                onValueChange = { searchText = it },
+                label = { Text("Lebensmittel suchen") },
+                leadingIcon = { Icon(Icons.Default.Search, null) },
+                trailingIcon = {
+                    IconButton(onClick = { refreshSearch() }) {
+                        Icon(Icons.Default.Send, "Suchen")
+                    }
+                },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp)
+            )
+            VoiceInputButton(
+                prompt = "Welches Lebensmittel suchst du?",
+                onResult = { spoken ->
+                    searchText = spoken
+                    refreshSearch()
+                },
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
 
         Spacer(Modifier.height(8.dp))
 
