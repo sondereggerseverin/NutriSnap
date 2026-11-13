@@ -64,16 +64,24 @@ object OpenFoodFactsApi {
             }.getOrDefault(emptyList())
         }
 
-    /** Fuehrt eine Namenssuche gegen die angegebene OFF-Subdomain aus (z.B. ch./world.). */
+    /** Fuehrt eine Namenssuche gegen die angegebene OFF-Subdomain aus (z.B. de./world.). */
     private fun searchOn(baseHost: String, query: String, limit: Int): List<FoodItem> {
         val encoded = java.net.URLEncoder.encode(query.take(60), "UTF-8")
-        // countries= prioritisiert DACH-Produkte in der OFF-Ranking-Pipeline
+        // countries= nur auf der DE-Instanz: DACH-Produkte priorisieren.
+        // Auf world.openfoodfacts.org darf der Filter nicht gesetzt werden — sonst
+        // kommen bei englischen Begriffen (z.B. "french dressing") 0 Treffer,
+        // weil fast alle relevanten Produkte aus UK/US/etc. stammen.
+        val countriesParam = if (baseHost.contains("de.openfoodfacts")) {
+            "&countries=Germany,Switzerland,Austria"
+        } else {
+            ""
+        }
         val url = "$baseHost/cgi/search.pl" +
                 "?search_terms=$encoded&search_simple=1&action=process&json=1" +
                 "&page_size=$limit" +
                 // Beliebteste Produkte zuerst (OFF liefert sonst keine feste Reihenfolge)
                 "&sort_by=unique_scans_n" +
-                "&countries=Germany,Switzerland,Austria" +
+                countriesParam +
                 "&fields=product_name,brands,nutriments,code,serving_size,image_front_small_url,image_url,image_front_url,unique_scans_n"
         val req = Request.Builder().url(url)
             .header("User-Agent", "NutriSnap/1.0 (Android)").build()

@@ -13,6 +13,7 @@ import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.data.supabase.SupabaseSync
 import ch.nutrisnap.app.data.supabase.SyncStatusHolder
 import ch.nutrisnap.app.domain.FoodRanker
+import ch.nutrisnap.app.domain.FoodSearchText
 import ch.nutrisnap.app.domain.RecipeScraper
 import ch.nutrisnap.app.domain.SearchUtils
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
@@ -1057,6 +1058,10 @@ class FoodItemRepository(db: NutriDatabase) {
     /**
      * Nur lokale DB + Custom Foods (schnell, offline). Für progressive Suche:
      * UI zeigt diese Treffer sofort, Remote folgt nach.
+     *
+     * Harte Relevanz-Untergrenze: Einträge ohne Textmatch (Score < WEAK) fliegen raus,
+     * auch wenn sie hohe timesUsed haben — sonst landen oft getrackte Zutaten wie
+     * „Würstchen“ oder „Zucker“ bei einer Suche nach „french dressing“ oben.
      */
     suspend fun searchLocalOnly(query: String): List<FoodItem> {
         if (query.isBlank()) return emptyList()
@@ -1068,10 +1073,12 @@ class FoodItemRepository(db: NutriDatabase) {
             runCatching { customFoodDao.searchOnce(q) }.getOrDefault(emptyList())
         }.map { it.toFoodItem() }
             .distinctBy { it.barcode ?: it.name.lowercase().trim() }
+        val tokens = FoodSearchText.tokens(query)
         return (local + custom)
             .distinctBy { it.barcode ?: (it.name.lowercase().trim() + "|" + (it.brand?.lowercase()?.trim() ?: "")) }
             .mapNotNull { with(ch.nutrisnap.app.domain.NutritionSanity) { it.sanitized() } }
             .let { FoodSearchRepository.cleanSearchResults(it) }
+            .filter { tokens.isEmpty() || FoodRanker.isWeakOrBetter(it, tokens) }
             .let { FoodRanker.rank(it, query) }
             .take(20)
     }
@@ -1095,10 +1102,13 @@ class FoodItemRepository(db: NutriDatabase) {
         val remoteList = remoteRepo.search(query)
         val names = (local + custom).map { it.name.lowercase() }.toSet()
         val combined = local + custom + remoteList.filter { it.name.lowercase() !in names }
+        val tokens = FoodSearchText.tokens(query)
         return combined
             .distinctBy { it.barcode ?: (it.name.lowercase().trim() + "|" + (it.brand?.lowercase()?.trim() ?: "")) }
             .mapNotNull { with(ch.nutrisnap.app.domain.NutritionSanity) { it.sanitized() } }
             .let { FoodSearchRepository.cleanSearchResults(it) }
+            // Ohne Textmatch raus: timesUsed allein darf keine fremden Zutaten an die Spitze schieben
+            .filter { tokens.isEmpty() || FoodRanker.isWeakOrBetter(it, tokens) }
             .let { FoodRanker.rank(it, query) }
     }
 

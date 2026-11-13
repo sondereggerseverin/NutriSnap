@@ -139,7 +139,10 @@ object SearchUtils {
         "haferflocken" to listOf("oats", "oatmeal", "porridge", "hafer"),
         "huettenkaese" to listOf("cottage cheese", "huttenkase", "hüttenkäse"),
         "leinsamen" to listOf("flaxseed", "flax seed", "leinsamenbrot"),
-        "karotte" to listOf("carrot", "moehre", "ruebli", "rüebli")
+        "karotte" to listOf("carrot", "moehre", "ruebli", "rüebli"),
+        "french dressing" to listOf("salatdressing", "franzoesisches dressing", "vinaigrette", "french style dressing"),
+        "dressing" to listOf("salatdressing", "vinaigrette", "salatsauce"),
+        "salatdressing" to listOf("dressing", "vinaigrette", "french dressing")
     )
 
     /**
