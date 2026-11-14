@@ -237,7 +237,7 @@ fun DiaryScreen(
         // Wer bereits im Tagebuch war, hatte keine Moeglichkeit, ohne Umweg ueber
         // "Start" einen Eintrag zu erfassen.
         floatingActionButton = {
-            val consolidateFab = mealPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_DIARY_FAB_CONSOLIDATION) ?: false
+            val consolidateFab = mealPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_DIARY_FAB_CONSOLIDATION) ?: true
             if (consolidateFab) {
                 FloatingActionButton(onClick = { showAddSheet = true }) {
                     Icon(Icons.Default.Add, contentDescription = "Eintrag hinzufügen")
@@ -282,7 +282,7 @@ fun DiaryScreen(
             val present = state.entries.map { it.mealType }.toSet()
             mealPatterns.filter { it.mealType !in present }
         }
-        val compactDiary = mealPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_DIARY_LAYOUT_COMPACT) ?: false
+        val compactDiary = mealPrefs?.get(ch.nutrisnap.app.ui.theme.KEY_TOGGLE_DIARY_LAYOUT_COMPACT) ?: true
         val copyYesterdayAction: () -> Unit = {
             vm.copyYesterday { n ->
                 scope.launch {
@@ -948,7 +948,11 @@ private fun DiaryEntryRow(
                         else -> imageUrl
                     }
                     AsyncImage(
-                        model = coilModel,
+                        model = coil.request.ImageRequest.Builder(context)
+                            .data(coilModel)
+                            .size(144) // 48.dp @3x – keine Full-Res-Thumbs in der Liste
+                            .crossfade(false)
+                            .build(),
                         contentDescription = entry.foodName,
                         modifier = Modifier
                             .size(48.dp)

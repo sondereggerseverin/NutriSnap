@@ -709,7 +709,7 @@ fun SettingsScreen(
                         title = "Kontrast-Modus (Text auf Primärfarbe)",
                         subtitle = "Schwarz statt Weiss wo nötig, wirkt in Light + Dark (≥4.5:1 WCAG AA)",
                         key = KEY_TOGGLE_DARK_MODE_CONTRAST,
-                        defaultOn = false,
+                        defaultOn = true,
                         prefs = prefs,
                         scope = scope,
                         context = context
@@ -727,7 +727,7 @@ fun SettingsScreen(
                         title = "„Noch X kcal übrig“ hervorheben",
                         subtitle = "Stärker mit Macro-/Primary-Farbe",
                         key = KEY_TOGGLE_CALORIES_REMAINING_HIGHLIGHT,
-                        defaultOn = false,
+                        defaultOn = true,
                         prefs = prefs,
                         scope = scope,
                         context = context
@@ -765,7 +765,7 @@ fun SettingsScreen(
                         title = "Diary kompakter",
                         subtitle = "„Gestern übernehmen“ in Top-Bar/Navigator",
                         key = KEY_TOGGLE_DIARY_LAYOUT_COMPACT,
-                        defaultOn = false,
+                        defaultOn = true,
                         prefs = prefs,
                         scope = scope,
                         context = context
@@ -776,7 +776,7 @@ fun SettingsScreen(
                         title = "Diary-FAB konsolidieren",
                         subtitle = "Kamera-SmallFAB entfernen (bleibt in Add-Sheet)",
                         key = KEY_TOGGLE_DIARY_FAB_CONSOLIDATION,
-                        defaultOn = false,
+                        defaultOn = true,
                         prefs = prefs,
                         scope = scope,
                         context = context
@@ -785,7 +785,7 @@ fun SettingsScreen(
                         title = "Recipes-FABs konsolidieren",
                         subtitle = "1 FAB + Overflow statt 4 gestapelter FABs",
                         key = KEY_TOGGLE_RECIPES_FAB_CONSOLIDATION,
-                        defaultOn = false,
+                        defaultOn = true,
                         prefs = prefs,
                         scope = scope,
                         context = context

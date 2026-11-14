@@ -220,7 +220,7 @@ fun RecipesScreen(
     val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
     val classicList = prefs?.get(KEY_CLASSIC_RECIPE_LIST) == true
     val freshCards = (prefs?.get(KEY_FRESH_RECIPE_CARDS) == true) || (prefs?.get(KEY_FRESH_UI) == true)
-    val consolidateFab = prefs?.get(KEY_TOGGLE_RECIPES_FAB_CONSOLIDATION) ?: false
+    val consolidateFab = prefs?.get(KEY_TOGGLE_RECIPES_FAB_CONSOLIDATION) ?: true
     val useGrid = !classicList
     val window = ch.nutrisnap.app.ui.rememberWindowInfo()
     // 6 (Standard, ~3 Zeilen) oder 4 (größere Kacheln wie früher, ~2 Zeilen)

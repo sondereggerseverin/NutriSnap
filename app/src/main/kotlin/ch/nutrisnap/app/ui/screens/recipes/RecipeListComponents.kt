@@ -24,6 +24,7 @@ import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.KEY_RECIPE_RATINGS
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import java.io.File
 
 // ── Recipe Card ───────────────────────────────────────────────────────────────
@@ -144,14 +145,22 @@ internal fun RecipeThumbnail(
     onRetryImage: (() -> Unit)? = null,
     imageRefreshStatus: String? = null
 ) {
+    val context = LocalContext.current
     val box = if (size != null) modifier.then(Modifier.size(size)) else modifier
     val url = recipe.imageUrl
     // Track load failure so CDN-expired/auth-gated TikTok URLs fall back to gradient
     var imageLoadFailed by remember(url) { mutableStateOf(false) }
+    // Decode-Größe begrenzen: Grid-Thumbs brauchen keine 2k-Fotos (RAM + Scroll-Jank)
+    val decodePx = ((size?.value ?: 96f) * 3f).toInt().coerceIn(96, 480)
 
     if (!url.isNullOrBlank() && !imageLoadFailed) {
         AsyncImage(
-            model = coilModel(url), contentDescription = recipe.displayTitle(),
+            model = ImageRequest.Builder(context)
+                .data(coilModel(url))
+                .size(decodePx)
+                .crossfade(false)
+                .build(),
+            contentDescription = recipe.displayTitle(),
             modifier = box.clip(shape),
             contentScale = ContentScale.Crop,
             onError = { imageLoadFailed = true }

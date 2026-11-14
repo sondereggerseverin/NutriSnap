@@ -488,7 +488,7 @@ fun NutriSnapTheme(content: @Composable () -> Unit) {
     val themeName = prefs?.get(KEY_APP_THEME) ?: AppTheme.FOREST_GREEN.name
     val theme = runCatching { AppTheme.valueOf(themeName) }.getOrDefault(AppTheme.FOREST_GREEN)
     val useDarkColors = isSystemInDarkTheme()
-    val contrastSafeOnPrimary = prefs?.get(KEY_TOGGLE_DARK_MODE_CONTRAST) ?: false
+    val contrastSafeOnPrimary = prefs?.get(KEY_TOGGLE_DARK_MODE_CONTRAST) ?: true
 
     CompositionLocalProvider(LocalAppTheme provides theme) {
         MaterialTheme(

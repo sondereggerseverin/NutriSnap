@@ -183,7 +183,7 @@ internal fun HomeHeader(
     val overGoal = state.totalCalories > state.adjustedGoal && state.adjustedGoal > 0f
     val headerContext = LocalContext.current
     val headerPrefs by headerContext.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
-    val highlightRemaining = headerPrefs?.get(KEY_TOGGLE_CALORIES_REMAINING_HIGHLIGHT) ?: false
+    val highlightRemaining = headerPrefs?.get(KEY_TOGGLE_CALORIES_REMAINING_HIGHLIGHT) ?: true
 
     Column(
         Modifier
