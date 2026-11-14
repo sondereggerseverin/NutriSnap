@@ -1253,15 +1253,26 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         matchDao.getMatchesForRecipe(recipeId)
 
     /**
-     * Importiert ein von Claude (Chat) geteiltes Rezept-JSON direkt, ohne Zwischenschritt.
+     * Importiert ein von Claude/Grok (Chat) geteiltes Rezept-JSON direkt, ohne Zwischenschritt.
      * Wird still ignoriert, falls der Text kein erkennbares Rezept-JSON ist.
+     *
+     * Enthält das JSON bereits Makros (totalCalories > 0), werden diese behalten und
+     * nicht durch Zutaten-Matching überschrieben – typisch bei Produkt-Rezepten
+     * (YourStarter, Fertigbecher etc.), die in OFF falsch oder gar nicht matchen.
+     * Matching kann später manuell über „Verify“ nachgezogen werden.
      */
     fun importFromSharedJson(json: String) {
         val recipe = ch.nutrisnap.app.domain.RecipeJsonImport.tryParse(json) ?: return
         viewModelScope.launch {
             var saved = recipe.copy(id = repo.saveRecipe(recipe))
-            // JSON aus Chat oft schon DE/metrisch – Auto-Einstellung, Nährwerte nachziehen
-            saved = postProcessImported(saved, forceGerman = false, withNutrition = true)
+            val hasTrustedMacros = (recipe.totalCalories ?: 0f) > 0f &&
+                (recipe.proteinPerServing != null || recipe.carbsPerServing != null)
+            // JSON aus Chat oft schon DE/metrisch; Nährwerte nur nachziehen wenn fehlen
+            saved = postProcessImported(
+                saved,
+                forceGerman = false,
+                withNutrition = !hasTrustedMacros
+            )
             _importState.update { it.copy(lastImport = saved) }
         }
     }

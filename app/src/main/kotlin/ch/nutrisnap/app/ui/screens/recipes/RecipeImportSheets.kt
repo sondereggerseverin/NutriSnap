@@ -51,10 +51,23 @@ fun ImportSheet(
     var showManual by remember(openAtManualCaption) { mutableStateOf(openAtManualCaption) }
     var manualTitle by remember { mutableStateOf("") }; var manualCaption by remember { mutableStateOf("") }
     var hybridScreenshots by remember { mutableStateOf<List<Bitmap>>(emptyList()) }
+    var clipboardJson by remember { mutableStateOf<String?>(null) }
+    var jsonImportHint by remember { mutableStateOf<String?>(null) }
     val urlLower = url.lowercase()
     val isInstagram = "instagram.com" in urlLower || "instagr.am" in urlLower
     val isTikTok = "tiktok.com" in urlLower || "vm.tiktok.com" in urlLower
     val isSocial = isInstagram || isTikTok
+
+    // Zwischenablage auf nutrisnap_recipe-JSON prüfen (Grok/Claude → 1-Tap ohne Notes)
+    fun refreshClipboardJson() {
+        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        val clip = cm?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()?.trim()
+        clipboardJson = clip?.takeIf {
+            it.startsWith("{") && "nutrisnap_recipe" in it &&
+                ch.nutrisnap.app.domain.RecipeJsonImport.tryParse(it) != null
+        }
+    }
+    LaunchedEffect(Unit) { refreshClipboardJson() }
 
     fun decodePickedBitmap(uri: Uri): Bitmap? =
         ch.nutrisnap.app.utils.ImageDecodeUtils.decodeUri(context, uri, maxEdgePx = 2048)
@@ -115,13 +128,52 @@ fun ImportSheet(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Instagram, TikTok oder Webseite",
+                    "Instagram, TikTok, Webseite oder KI-JSON",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(12.dp))
+
+                // KI-Rezept-JSON aus Zwischenablage (Grok/Claude) – ohne Notes-Umweg
+                OutlinedButton(
+                    onClick = {
+                        refreshClipboardJson()
+                        val json = clipboardJson
+                        if (json != null) {
+                            vm.importFromSharedJson(json)
+                            onDismiss()
+                        } else {
+                            jsonImportHint = "Kein nutrisnap_recipe-JSON in der Zwischenablage. JSON in Grok/Claude kopieren, dann erneut tippen."
+                        }
+                    },
+                    enabled = !isLoading,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Code, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        if (clipboardJson != null) "KI-Rezept-JSON importieren"
+                        else "KI-JSON aus Zwischenablage"
+                    )
+                }
+                if (clipboardJson != null) {
+                    Text(
+                        "JSON erkannt – 1-Tap Import, Nährwerte aus dem Chat bleiben erhalten.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+                    )
+                } else if (jsonImportHint != null) {
+                    Text(
+                        jsonImportHint!!,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
 
                 // Instagram-specific import button
                 Card(
