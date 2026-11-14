@@ -747,7 +747,7 @@ fun SettingsScreen(
                         title = "Activity-Karten zusammenlegen",
                         subtitle = "Health Connect + manuelle Aktivität",
                         key = KEY_TOGGLE_HOME_ACTIVITY_MERGE,
-                        defaultOn = false,
+                        defaultOn = true,
                         prefs = prefs,
                         scope = scope,
                         context = context
@@ -756,7 +756,7 @@ fun SettingsScreen(
                         title = "Home-Reihenfolge neu",
                         subtitle = "Ring → Meals → Makros → Activity",
                         key = KEY_TOGGLE_HOME_REORDER,
-                        defaultOn = false,
+                        defaultOn = true,
                         prefs = prefs,
                         scope = scope,
                         context = context

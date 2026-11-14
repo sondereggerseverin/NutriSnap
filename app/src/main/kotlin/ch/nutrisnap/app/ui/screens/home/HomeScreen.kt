@@ -58,8 +58,8 @@ fun HomeScreen(
     val window = ch.nutrisnap.app.ui.rememberWindowInfo()
     val homeContext = LocalContext.current
     val homePrefs by homeContext.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
-    val reorderHome = homePrefs?.get(KEY_TOGGLE_HOME_REORDER) ?: false
-    val mergeActivityCards = (homePrefs?.get(KEY_TOGGLE_HOME_ACTIVITY_MERGE) ?: false) && state.manualActivityEnabled
+    val reorderHome = homePrefs?.get(KEY_TOGGLE_HOME_REORDER) ?: true
+    val mergeActivityCards = (homePrefs?.get(KEY_TOGGLE_HOME_ACTIVITY_MERGE) ?: true) && state.manualActivityEnabled
     val showNavShortcuts = homePrefs?.get(KEY_TOGGLE_NAV_SHORTCUTS) ?: false
 
     ch.nutrisnap.app.ui.AdaptiveContent(window = window) {

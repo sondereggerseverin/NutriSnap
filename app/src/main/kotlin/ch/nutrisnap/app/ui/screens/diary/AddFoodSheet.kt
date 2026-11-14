@@ -45,6 +45,7 @@ import ch.nutrisnap.app.ui.screens.barcode.BarcodeScannerScreen
 import ch.nutrisnap.app.ui.screens.scan.PhotoCaptureScreen
 import ch.nutrisnap.app.ui.theme.MacroColors
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import androidx.compose.ui.layout.ContentScale
 import ch.nutrisnap.app.ui.theme.NutriRadius
 import ch.nutrisnap.app.ui.theme.NutriSpacing
@@ -452,7 +453,11 @@ private fun SavedMealsTab(
                         }
                         if (model != null) {
                             AsyncImage(
-                                model = model,
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(model)
+                                    .size(156)
+                                    .crossfade(false)
+                                    .build(),
                                 contentDescription = m.template.name,
                                 modifier = Modifier.size(52.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp)),
                                 contentScale = ContentScale.Crop
@@ -1368,7 +1373,11 @@ private fun FoodResultRow(
         val url = food.imageUrl
         if (!url.isNullOrBlank()) {
             AsyncImage(
-                model = url,
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(url)
+                    .size(120)
+                    .crossfade(false)
+                    .build(),
                 contentDescription = food.name,
                 modifier = Modifier
                     .size(40.dp)

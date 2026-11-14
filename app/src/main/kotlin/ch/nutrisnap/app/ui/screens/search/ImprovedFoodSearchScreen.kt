@@ -16,7 +16,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -176,7 +178,11 @@ private fun FoodListItem(food: FoodItem, onClick: () -> Unit) {
             val url = food.imageUrl
             if (!url.isNullOrBlank()) {
                 AsyncImage(
-                    model = url,
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(url)
+                        .size(132)
+                        .crossfade(false)
+                        .build(),
                     contentDescription = food.name,
                     modifier = Modifier
                         .size(44.dp)

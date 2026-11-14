@@ -24,6 +24,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.FrozenMeal
 import ch.nutrisnap.app.data.model.MealType
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -138,7 +140,11 @@ private fun FrozenMealCard(
             ) {
                 if (!imageUrl.isNullOrBlank()) {
                     AsyncImage(
-                        model = coilModel(imageUrl),
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(coilModel(imageUrl))
+                            .size(192)
+                            .crossfade(false)
+                            .build(),
                         contentDescription = meal.name,
                         modifier = Modifier
                             .size(64.dp)
