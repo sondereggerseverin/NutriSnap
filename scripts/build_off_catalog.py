@@ -110,6 +110,9 @@ def map_product(p: dict) -> dict | None:
     name = (p.get("product_name_de") or p.get("product_name") or "").strip()
     if len(name) < 2:
         return None
+    # OFF enthält viele GROSSGESCHRIEBENE Namen (Kassenbon-Stil) → lesbar machen
+    if len(name) > 6 and name.isupper():
+        name = " ".join(w.capitalize() for w in name.split(" "))
     n = p.get("nutriments") or {}
     kcal = num(n, "energy-kcal_100g")
     if kcal is None:
