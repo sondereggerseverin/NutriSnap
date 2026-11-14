@@ -28,6 +28,7 @@ import ch.nutrisnap.app.domain.ActivityPreset
 import ch.nutrisnap.app.domain.estimateKcal
 import ch.nutrisnap.app.ui.components.MacroRing
 import androidx.datastore.preferences.core.edit
+import kotlinx.coroutines.launch
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_HOME
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_UI
@@ -68,11 +69,11 @@ fun HomeScreen(
 
     // Täglicher Gewichtsdialog: einmal pro Tag beim Öffnen von Home, wenn noch kein Eintrag.
     LaunchedEffect(homePrefs) {
-        if (homePrefs == null) return@LaunchedEffect
-        val enabled = homePrefs[KEY_DAILY_WEIGHT_PROMPT] ?: true
+        val prefs = homePrefs ?: return@LaunchedEffect
+        val enabled = prefs[KEY_DAILY_WEIGHT_PROMPT] ?: true
         if (!enabled) return@LaunchedEffect
         val today = java.time.LocalDate.now().toString()
-        if (homePrefs[KEY_WEIGHT_PROMPT_SKIPPED_DATE] == today) return@LaunchedEffect
+        if (prefs[KEY_WEIGHT_PROMPT_SKIPPED_DATE] == today) return@LaunchedEffect
         if (vm.hasWeightForToday()) return@LaunchedEffect
         // Kurze Verzögerung, damit Home erst rendert und HC-Sync nicht kollidiert
         kotlinx.coroutines.delay(400)
