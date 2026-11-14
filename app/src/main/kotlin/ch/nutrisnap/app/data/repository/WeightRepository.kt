@@ -33,6 +33,11 @@ class WeightRepository(db: NutriDatabase) {
 
     suspend fun getLatest(): WeightEntry? = dao.getLatest()
 
+    suspend fun getByDate(date: LocalDate): WeightEntry? = dao.getByDate(date.toString())
+
+    suspend fun hasWeightForToday(): Boolean =
+        getByDate(LocalDate.now()) != null
+
     suspend fun logWeight(date: LocalDate, kg: Float) {
         val entry = WeightEntry(dateStr = date.toString(), weightKg = kg)
         dao.upsert(entry)

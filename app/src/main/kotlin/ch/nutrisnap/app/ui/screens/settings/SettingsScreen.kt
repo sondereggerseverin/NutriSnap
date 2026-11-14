@@ -41,6 +41,7 @@ import ch.nutrisnap.app.ui.theme.AppTheme
 import ch.nutrisnap.app.ui.theme.KEY_APP_THEME
 import ch.nutrisnap.app.ui.theme.KEY_WATER_GOAL_ML
 import ch.nutrisnap.app.ui.theme.KEY_WATER_TRACKER_ENABLED
+import ch.nutrisnap.app.ui.theme.KEY_DAILY_WEIGHT_PROMPT
 import ch.nutrisnap.app.ui.theme.KEY_INVENTORY_TAB_ENABLED
 import ch.nutrisnap.app.ui.theme.KEY_AUTO_GERMAN_METRIC
 import ch.nutrisnap.app.ui.theme.KEY_MANUAL_ACTIVITY_ENABLED
@@ -1018,6 +1019,29 @@ fun SettingsScreen(
                             onCheckedChange = { checked ->
                                 scope.launch {
                                     context.notifDataStore.edit { it[KEY_WATER_TRACKER_ENABLED] = checked }
+                                }
+                            }
+                        )
+                    }
+                    val dailyWeightPrompt = prefs?.get(KEY_DAILY_WEIGHT_PROMPT) ?: true
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Tägliche Gewichtsabfrage", fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                            Text(
+                                "Beim Öffnen der App, wenn heute noch kein Gewicht",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = dailyWeightPrompt,
+                            onCheckedChange = { checked ->
+                                scope.launch {
+                                    context.notifDataStore.edit { it[KEY_DAILY_WEIGHT_PROMPT] = checked }
                                 }
                             }
                         )

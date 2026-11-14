@@ -921,22 +921,36 @@ internal fun StreakCard(streak: Int) {
 internal fun WeightEntryDialog(
     currentWeight: Float?,
     onConfirm: (Float) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    /** Täglicher Prompt: klarerer Titel + „Später“ statt „Abbrechen“. */
+    dailyPrompt: Boolean = false
 ) {
     var text by remember { mutableStateOf(currentWeight?.let { "%.1f".format(it) } ?: "") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Gewicht eintragen") },
+        title = {
+            Text(if (dailyPrompt) "Gewicht für heute" else "Gewicht eintragen")
+        },
         text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                label = { Text("Gewicht (kg)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+            Column {
+                if (dailyPrompt) {
+                    Text(
+                        "Kurzer Check-in – hilft bei Trend und Kalorienziel.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(NutriSpacing.sm))
+                }
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text("Gewicht (kg)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         },
         confirmButton = {
             TextButton(onClick = {
@@ -945,7 +959,9 @@ internal fun WeightEntryDialog(
             }) { Text("Speichern") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Abbrechen") }
+            TextButton(onClick = onDismiss) {
+                Text(if (dailyPrompt) "Später" else "Abbrechen")
+            }
         }
     )
 }

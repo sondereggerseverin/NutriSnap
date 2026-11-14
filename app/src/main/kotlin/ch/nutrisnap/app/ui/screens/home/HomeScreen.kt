@@ -27,6 +27,7 @@ import ch.nutrisnap.app.domain.ACTIVITY_PRESETS
 import ch.nutrisnap.app.domain.ActivityPreset
 import ch.nutrisnap.app.domain.estimateKcal
 import ch.nutrisnap.app.ui.components.MacroRing
+import androidx.datastore.preferences.core.edit
 import ch.nutrisnap.app.ui.screens.settings.notifDataStore
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_HOME
 import ch.nutrisnap.app.ui.theme.KEY_FRESH_UI
@@ -54,6 +55,8 @@ fun HomeScreen(
     val healthScore by vm.healthScore.collectAsStateWithLifecycle()
     var detailsExpanded by rememberSaveable { mutableStateOf(false) }
     var showWeightDialog by remember { mutableStateOf(false) }
+    /** true nur beim automatischen Tages-Prompt (Skip-Datum + Titel „für heute“). */
+    var weightDialogIsDaily by remember { mutableStateOf(false) }
     var showActivityDialog by remember { mutableStateOf(false) }
     val window = ch.nutrisnap.app.ui.rememberWindowInfo()
     val homeContext = LocalContext.current
@@ -61,6 +64,21 @@ fun HomeScreen(
     val reorderHome = homePrefs?.get(KEY_TOGGLE_HOME_REORDER) ?: true
     val mergeActivityCards = (homePrefs?.get(KEY_TOGGLE_HOME_ACTIVITY_MERGE) ?: true) && state.manualActivityEnabled
     val showNavShortcuts = homePrefs?.get(KEY_TOGGLE_NAV_SHORTCUTS) ?: false
+    val scope = rememberCoroutineScope()
+
+    // Täglicher Gewichtsdialog: einmal pro Tag beim Öffnen von Home, wenn noch kein Eintrag.
+    LaunchedEffect(homePrefs) {
+        if (homePrefs == null) return@LaunchedEffect
+        val enabled = homePrefs[KEY_DAILY_WEIGHT_PROMPT] ?: true
+        if (!enabled) return@LaunchedEffect
+        val today = java.time.LocalDate.now().toString()
+        if (homePrefs[KEY_WEIGHT_PROMPT_SKIPPED_DATE] == today) return@LaunchedEffect
+        if (vm.hasWeightForToday()) return@LaunchedEffect
+        // Kurze Verzögerung, damit Home erst rendert und HC-Sync nicht kollidiert
+        kotlinx.coroutines.delay(400)
+        weightDialogIsDaily = true
+        showWeightDialog = true
+    }
 
     ch.nutrisnap.app.ui.AdaptiveContent(window = window) {
         LazyColumn(
@@ -201,8 +219,26 @@ fun HomeScreen(
     if (showWeightDialog) {
         WeightEntryDialog(
             currentWeight = state.lastWeightKg,
-            onConfirm = { kg -> vm.logWeight(kg); showWeightDialog = false },
-            onDismiss = { showWeightDialog = false }
+            dailyPrompt = weightDialogIsDaily,
+            onConfirm = { kg ->
+                vm.logWeight(kg)
+                showWeightDialog = false
+                weightDialogIsDaily = false
+            },
+            onDismiss = {
+                val wasDaily = weightDialogIsDaily
+                showWeightDialog = false
+                weightDialogIsDaily = false
+                // Täglicher Prompt: heute nicht erneut (nächster Kalendertag wieder)
+                if (wasDaily) {
+                    scope.launch {
+                        homeContext.notifDataStore.edit {
+                            it[KEY_WEIGHT_PROMPT_SKIPPED_DATE] =
+                                java.time.LocalDate.now().toString()
+                        }
+                    }
+                }
+            }
         )
     }
     if (showActivityDialog) {

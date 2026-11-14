@@ -404,6 +404,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** true, wenn für heute bereits ein manueller Gewichtseintrag existiert. */
+    suspend fun hasWeightForToday(): Boolean = weightRepo.hasWeightForToday()
+
     fun logManualActivity(kcal: Float, date: LocalDate = _selectedDate.value) {
         viewModelScope.launch {
             val key = date.toString()

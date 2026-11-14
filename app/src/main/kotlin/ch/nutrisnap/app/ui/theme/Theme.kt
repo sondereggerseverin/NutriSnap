@@ -363,6 +363,9 @@ val KEY_MANUAL_ACTIVITY_ENABLED = androidx.datastore.preferences.core.booleanPre
 /** Tagesziel Wasser in ml (Standard 2500). */
 val KEY_WATER_GOAL_ML = intPreferencesKey("water_goal_ml")
 /** Wasser-Tracker auf Home/Tagebuch anzeigen (default an). */
+val KEY_DAILY_WEIGHT_PROMPT = androidx.datastore.preferences.core.booleanPreferencesKey("daily_weight_prompt")
+/** Datum (YYYY-MM-DD), an dem der tägliche Gewichtsdialog übersprungen wurde. */
+val KEY_WEIGHT_PROMPT_SKIPPED_DATE = stringPreferencesKey("weight_prompt_skipped_date")
 val KEY_WATER_TRACKER_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("water_tracker_enabled")
 /** Inventar-Tab im Rezepte-Hub anzeigen (default an). */
 val KEY_INVENTORY_TAB_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("inventory_tab_enabled")
