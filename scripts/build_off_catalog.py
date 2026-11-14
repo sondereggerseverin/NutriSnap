@@ -284,6 +284,55 @@ def fetch_dump(path: str | None, dump_url: str | None, wanted: set[str], max_pro
     return kept
 
 
+def fetch_parquet(path: str, wanted: set[str]) -> list[dict]:
+    """Liest DACH-Produkte aus dem OFF-Parquet (HuggingFace food.parquet) per DuckDB.
+
+    Nur die nötigen Spalten werden gelesen; die Zeilen werden in das JSON-Format des
+    JSONL-Dumps übersetzt, damit map_product() unverändert gilt.
+    """
+    import duckdb
+
+    def nut(key: str) -> str:
+        return f"struct_extract(list_filter(nutriments, lambda x: x.name = '{key}')[1], '100g')"
+
+    tags = ", ".join(f"'{t}'" for t in sorted(wanted))
+    sql = f"""
+        SELECT code,
+               COALESCE(list_filter(product_name, lambda x: x.lang = 'de')[1].text,
+                        list_filter(product_name, lambda x: x.lang = 'main')[1].text,
+                        product_name[1].text) AS pname,
+               brands, serving_size, COALESCE(unique_scans_n, 0) AS scans,
+               categories_tags[-1] AS cat,
+               list_contains(countries_tags, 'en:switzerland') AS is_ch,
+               {nut('energy-kcal')} AS kcal, {nut('energy')} AS kj,
+               {nut('proteins')} AS protein, {nut('carbohydrates')} AS carbs, {nut('fat')} AS fat,
+               {nut('fiber')} AS fiber, {nut('sugars')} AS sugars, {nut('salt')} AS salt
+        FROM read_parquet('{path}')
+        WHERE list_has_any(countries_tags, [{tags}])
+    """
+    con = duckdb.connect()
+    rows = con.execute(sql).fetchall()
+    out: list[dict] = []
+    for (code, pname, brands, serving, scans, cat, is_ch, kcal, kj, prot, carbs, fat, fiber, sugars, salt) in rows:
+        if not pname:
+            continue
+        n = {}
+        for k, v in (("energy-kcal_100g", kcal), ("energy_100g", kj), ("proteins_100g", prot),
+                     ("carbohydrates_100g", carbs), ("fat_100g", fat), ("fiber_100g", fiber),
+                     ("sugars_100g", sugars), ("salt_100g", salt)):
+            if v is not None:
+                n[k] = v
+        m = map_product({
+            "code": code, "product_name": pname, "brands": brands, "serving_size": serving,
+            "unique_scans_n": scans, "categories_tags": [cat] if cat else [],
+            "countries_tags": ["en:switzerland"] if is_ch else [], "nutriments": n,
+        })
+        if m is not None:
+            out.append(m)
+    print(f"  Parquet: {len(rows)} DACH-Zeilen, {len(out)} mit gültigen Makros", flush=True)
+    return out
+
+
 def popularity_score(scans: int) -> int:
     """Log-skalierte Beliebtheit 0–100 (10^5 Scans ≈ 100)."""
     import math
@@ -328,6 +377,7 @@ def main():
     ap.add_argument("--input", help="Lokaler JSONL.GZ-Dump")
     ap.add_argument("--dump-url", help="Dump-URL statt API (langsam)")
     ap.add_argument("--prefer-dump", action="store_true", help="Dump vor API versuchen")
+    ap.add_argument("--parquet", help="Lokales OFF food.parquet (bevorzugt, via DuckDB)")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -343,7 +393,13 @@ def main():
     products: list[dict] = []
     use_dump = bool(args.input or args.dump_url or args.prefer_dump)
 
-    if use_dump:
+    if args.parquet:
+        try:
+            products = fetch_parquet(args.parquet, wanted)
+        except Exception as e:
+            print(f"Parquet fehlgeschlagen: {e!r} – weiter mit Dump/API", flush=True)
+            products = []
+    elif use_dump:
         try:
             products = fetch_dump(args.input, args.dump_url, wanted, args.max)
             print(f"Dump lieferte {len(products)} Kandidaten", flush=True)

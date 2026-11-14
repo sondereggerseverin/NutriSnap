@@ -11,9 +11,9 @@ on:
         required: true
         default: "80000"
       source:
-        description: "dump = kompletter OFF-Dump (empfohlen), api = REST-Pagination (limitiert)"
+        description: "parquet = OFF food.parquet via DuckDB (empfohlen), dump = JSONL-Dump (13 GB, langsam), api = REST (limitiert)"
         required: true
-        default: "dump"
+        default: "parquet"
 
 permissions:
   contents: write
@@ -37,6 +37,17 @@ jobs:
           set -euo pipefail
           EXTRA=""
           if [ "$CATALOG_SOURCE" = "dump" ]; then EXTRA="--prefer-dump"; fi
+          if [ "$CATALOG_SOURCE" = "parquet" ]; then
+            pip install -q "duckdb==2.0.0"
+            df -h / | tail -1
+            # Einmaliger Komplett-Download (8 GB) statt vieler Range-Requests (HuggingFace: HTTP 429)
+            curl -sSL --fail --retry 6 --retry-delay 30 --retry-all-errors \
+              -A "NutriSnap-CatalogBuilder/1.0" \
+              -o food.parquet \
+              "https://huggingface.co/datasets/openfoodfacts/product-database/resolve/main/food.parquet"
+            ls -l food.parquet
+            EXTRA="--parquet food.parquet"
+          fi
           python3 scripts/build_off_catalog.py \
             --countries "${{ inputs.countries }}" \
             --max "${{ inputs.max_products }}" \
@@ -50,7 +61,7 @@ jobs:
           with gzip.open(path, "rt", encoding="utf-8") as f:
               n = sum(1 for _ in f)
           source = os.environ.get("CATALOG_SOURCE", "dump")
-          min_n = 2000 if source == "dump" else 500
+          min_n = 2000 if source in ("dump", "parquet") else 500
           print(f"Zeilen im Katalog: {n} (Quelle={source}, Minimum={min_n})")
           if n < min_n:
               sys.exit(f"Katalog zu klein ({n} < {min_n}) – Abbruch ohne Commit")
