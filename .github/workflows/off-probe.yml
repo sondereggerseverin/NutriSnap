@@ -1,0 +1,54 @@
+name: OFF-Quellen prüfen (Diagnose)
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install duckdb
+      - name: Probe
+        run: |
+          python3 - <<'PY'
+          import subprocess, traceback, sys
+          out = []
+          def log(s):
+              print(s, flush=True); out.append(str(s))
+          def sh(cmd):
+              r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=90)
+              return (r.stdout + r.stderr).strip()
+          try:
+              log("== Dump-Erreichbarkeit")
+              for u in ["https://static.openfoodfacts.org/data/openfoodfacts-products.jsonl.gz",
+                        "https://huggingface.co/datasets/openfoodfacts/product-database/resolve/main/food.parquet"]:
+                  h = sh(f"curl -sIL -m 40 -A 'NutriSnap-CatalogBuilder/1.0' '{u}' | grep -iE '^HTTP|^content-length|^location' | head -6")
+                  log(u.split('/')[2] + " -> " + h.replace("\n", " | "))
+              import duckdb
+              con = duckdb.connect()
+              con.execute("INSTALL httpfs; LOAD httpfs;")
+              U = "https://huggingface.co/datasets/openfoodfacts/product-database/resolve/main/food.parquet"
+              log("== Parquet-Schema (relevante Spalten)")
+              want = {"code","product_name","brands","countries_tags","nutriments","unique_scans_n","categories_tags","serving_size","serving_quantity","lang"}
+              for r in con.execute(f"DESCRIBE SELECT * FROM read_parquet('{U}')").fetchall():
+                  if r[0] in want:
+                      log(f"COL {r[0]}: {str(r[1])[:260]}")
+              log("== Anzahl je Land")
+              for c in ["en:switzerland", "en:germany", "en:austria"]:
+                  n = con.execute(f"SELECT count(*) FROM read_parquet('{U}') WHERE list_contains(countries_tags, '{c}')").fetchone()[0]
+                  log(f"{c}: {n}")
+              log("== Beispiel CH")
+              for r in con.execute(f"SELECT code, product_name, brands, unique_scans_n FROM read_parquet('{U}') WHERE list_contains(countries_tags, 'en:switzerland') ORDER BY unique_scans_n DESC NULLS LAST LIMIT 2").fetchall():
+                  log(str(r)[:400])
+              log("== nutriments-Beispiel")
+              r = con.execute(f"SELECT nutriments FROM read_parquet('{U}') WHERE code = '7610200012116' LIMIT 1").fetchall()
+              log(str(r)[:700])
+          except Exception:
+              log("FEHLER: " + traceback.format_exc()[-900:])
+          finally:
+              msg = "\n".join(out).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print("::notice title=OFF-Probe::" + msg[:9000])
+          PY

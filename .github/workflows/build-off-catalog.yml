@@ -91,3 +91,16 @@ jobs:
             git pull --rebase origin main && git push && break
             sleep 5
           done
+      - name: Kurzbericht als Annotation (immer)
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import re
+          try:
+              lines = open("off_catalog.log", encoding="utf-8", errors="replace").read().splitlines()
+          except OSError:
+              lines = ["kein Log"]
+          keep = [l for l in lines if re.search(r"Dump|Fehler|HTTP|Zeilen|FERTIG|Stop|Seite 1:|OFF meldet|Land:|Baue", l)]
+          msg = "\n".join(keep[-25:] or lines[-15:]).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+          print("::notice title=OFF-Katalog::" + msg[:9000])
+          PY
