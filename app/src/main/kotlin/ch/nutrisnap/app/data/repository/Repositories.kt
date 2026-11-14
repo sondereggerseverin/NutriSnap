@@ -12,6 +12,7 @@ import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.model.*
 import ch.nutrisnap.app.data.supabase.SupabaseSync
 import ch.nutrisnap.app.data.supabase.SyncStatusHolder
+import ch.nutrisnap.app.data.db.FoodSearchIndex
 import ch.nutrisnap.app.domain.FoodRanker
 import ch.nutrisnap.app.domain.FoodSearchText
 import ch.nutrisnap.app.domain.RecipeScraper
@@ -1045,8 +1046,20 @@ class FoodItemRepository(db: NutriDatabase) {
     fun getCustom(): Flow<List<FoodItem>> = dao.getAllCustom()
 
 
-    /** FTS5 zuerst, LIKE als Fallback (kurze Queries / leerer FTS-Treffer). */
-    private suspend fun localFoodSearch(dao: ch.nutrisnap.app.data.db.FoodItemDao, q: String): List<FoodItem> {
+    /**
+     * Lokale Kandidaten: erst der normalisierte Suchindex (FoodSearchIndex: Präfix + Teilstring,
+     * umlaut-tolerant, Popularität im Ranking), bei leerem Ergebnis/Indexfehler die bisherige
+     * FTS-/LIKE-Suche. [allowInfix]=false für Anfrage-Varianten, damit nur die Originalanfrage den
+     * (langsameren) Teilstring-Scan auslösen kann.
+     */
+    private suspend fun localFoodSearch(
+        dao: ch.nutrisnap.app.data.db.FoodItemDao,
+        q: String,
+        allowInfix: Boolean = true
+    ): List<FoodItem> {
+        val indexed = runCatching { FoodSearchIndex.candidates(dao, q, allowInfix = allowInfix) }
+            .getOrDefault(emptyList())
+        if (indexed.isNotEmpty()) return indexed
         val fts = SearchUtils.toFtsMatchQuery(q)
         if (fts.isNotBlank()) {
             val hits = runCatching { dao.searchFts(fts) }.getOrDefault(emptyList())
@@ -1066,8 +1079,8 @@ class FoodItemRepository(db: NutriDatabase) {
     suspend fun searchLocalOnly(query: String): List<FoodItem> {
         if (query.isBlank()) return emptyList()
         val variants = SearchUtils.localQueryVariants(query)
-        val local = variants.flatMap { q ->
-            localFoodSearch(dao, q)
+        val local = variants.withIndex().flatMap { (i, q) ->
+            localFoodSearch(dao, q, allowInfix = i == 0)
         }.distinctBy { it.barcode ?: it.name.lowercase().trim() }
         val custom = variants.flatMap { q ->
             runCatching { customFoodDao.searchOnce(q) }.getOrDefault(emptyList())
@@ -1092,8 +1105,8 @@ class FoodItemRepository(db: NutriDatabase) {
         // Lokale Queries mit Varianten (Kompositum-Split, Tokens, Synonyme),
         // damit z.B. "kalbsplätzli" auch "Kalbs Plätzli" in custom_foods findet.
         val variants = SearchUtils.localQueryVariants(query)
-        val local = variants.flatMap { q ->
-            localFoodSearch(dao, q)
+        val local = variants.withIndex().flatMap { (i, q) ->
+            localFoodSearch(dao, q, allowInfix = i == 0)
         }.distinctBy { it.barcode ?: it.name.lowercase().trim() }
         val custom = variants.flatMap { q ->
             runCatching { customFoodDao.searchOnce(q) }.getOrDefault(emptyList())

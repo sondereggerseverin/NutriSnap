@@ -77,7 +77,12 @@ internal object FoodSearchIndex {
      * Treffern zusätzlich Teilstring-Treffer (z. B. "brot" → "Vollkornbrot"). Fehlertolerant:
      * bei jedem Fehler leere Liste, der Aufrufer fällt dann auf die bisherige Suche zurück.
      */
-    suspend fun candidates(dao: FoodItemDao, query: String, limit: Int = 150): List<FoodItem> {
+    suspend fun candidates(
+        dao: FoodItemDao,
+        query: String,
+        limit: Int = 150,
+        allowInfix: Boolean = true
+    ): List<FoodItem> {
         val found = LinkedHashMap<Int, FoodItem>()
         for (m in FoodSearchText.matchQueries(query)) {
             val sql = "SELECT food_items.* FROM $TABLE JOIN food_items ON food_items.id = $TABLE.docid " +
@@ -86,7 +91,7 @@ internal object FoodSearchIndex {
                 .getOrDefault(emptyList()).forEach { found.putIfAbsent(it.id, it) }
         }
         val tokens = FoodSearchText.tokens(query)
-        if (found.size < MIN_BEFORE_INFIX && tokens.isNotEmpty() && tokens.sumOf { it.length } >= 3) {
+        if (allowInfix && found.size < MIN_BEFORE_INFIX && tokens.isNotEmpty() && tokens.sumOf { it.length } >= 3) {
             val where = tokens.joinToString(" AND ") { "($TABLE.name_norm || ' ' || $TABLE.brand_norm) LIKE ?" }
             val sql = "SELECT food_items.* FROM $TABLE JOIN food_items ON food_items.id = $TABLE.docid " +
                 "WHERE $where LIMIT $limit"
