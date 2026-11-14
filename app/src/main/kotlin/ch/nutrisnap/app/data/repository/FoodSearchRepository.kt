@@ -7,6 +7,7 @@ import ch.nutrisnap.app.data.api.UsdaFoodApi
 import ch.nutrisnap.app.data.db.FoodItemDao
 import ch.nutrisnap.app.data.model.FoodItem
 import ch.nutrisnap.app.data.model.FoodSource
+import ch.nutrisnap.app.data.db.FoodSearchIndex
 import ch.nutrisnap.app.domain.FoodRanker
 import ch.nutrisnap.app.domain.FoodSearchText
 import ch.nutrisnap.app.domain.NutritionSanity
@@ -40,6 +41,11 @@ class FoodSearchRepository(
         // Auch die Komposita-Variante lokal suchen: "leinsamenbrot" findet so den
         // Katalogeintrag "Leinsamen-Brot" bzw. "Leinsamen Brot" (FTS trennt am Bindestrich).
         val cached = (listOf(query) + synonymQueries + listOfNotNull(compoundVariant)).distinct().flatMap { q ->
+            // Normalisierter Suchindex zuerst (Präfix + Teilstring, umlaut-tolerant); nur die
+            // Originalanfrage darf den Teilstring-Scan auslösen. Alte FTS/LIKE-Suche als Fallback.
+            val indexed = runCatching { FoodSearchIndex.candidates(foodItemDao, q, allowInfix = q == query) }
+                .getOrDefault(emptyList())
+            if (indexed.isNotEmpty()) return@flatMap indexed
             val fts = SearchUtils.toFtsMatchQuery(q)
             val ftsHits = if (fts.isNotBlank())
                 runCatching { foodItemDao.searchFts(fts) }.getOrDefault(emptyList())
