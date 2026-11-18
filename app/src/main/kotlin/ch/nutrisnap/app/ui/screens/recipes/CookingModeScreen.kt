@@ -52,7 +52,12 @@ private fun scaleIngredientLine(line: String, factor: Double): String {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CookingModeScreen(recipe: Recipe, onBack: () -> Unit) {
+fun CookingModeScreen(
+    recipe: Recipe,
+    onBack: () -> Unit,
+    /** Wird bei «Fertig!» aufgerufen (Abschluss: Tagebuch → Bewertung). Ohne Angabe: nur zurück. */
+    onFinished: (() -> Unit)? = null
+) {
 
     // Wakelock: Bildschirm bleibt an waehrend des Kochens
     val context = LocalContext.current
@@ -318,7 +323,7 @@ fun CookingModeScreen(recipe: Recipe, onBack: () -> Unit) {
                         }
                     } else {
                         Button(
-                            onClick = onBack,
+                            onClick = { (onFinished ?: onBack).invoke() },
                             modifier = Modifier.weight(1f).height(56.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.tertiary

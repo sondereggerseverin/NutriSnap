@@ -250,7 +250,12 @@ fun RecipesScreen(
     cookingRecipe?.let { recipe ->
         CookingModeScreen(
             recipe = recipe,
-            onBack = { cookingRecipe = null }
+            onBack = { cookingRecipe = null },
+            // Abschluss wie bei Samsung Food «Made it»: Kochmodus → Tagebuch → Bewertung
+            onFinished = {
+                cookingRecipe = null
+                addToDiaryRecipe = recipe
+            }
         )
         return
     }
