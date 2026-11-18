@@ -1,48 +1,91 @@
-# Build errors - run 1247
+# Build errors - run 1253
 
 ## Unit Tests (test_output.log) - Error lines
 ```
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/home/HomeScreen.kt:72:23 Smart cast to 'Preferences' is impossible, because 'homePrefs' is a delegated property.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/home/HomeScreen.kt:75:13 Smart cast to 'Preferences' is impossible, because 'homePrefs' is a delegated property.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/home/HomeScreen.kt:234:27 Unresolved reference 'launch'.
-e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/home/HomeScreen.kt:235:52 Suspend function 'suspend fun DataStore<Preferences>.edit(transform: suspend (MutablePreferences) -> Unit): Preferences' can only be called from a coroutine or another suspend function.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:120:22 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:124:17 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:128:21 Cannot infer type for type parameter 'V'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:128:29 Unresolved reference 'getWeightForRange'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:132:39 Unresolved reference 'getLastNightSleep'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:135:17 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:135:39 Unresolved reference 'getTodaysAvgHeartRate'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:135:63 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:166:25 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:167:21 Unresolved reference 'getWeightForRange'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:168:11 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:168:11 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:168:24 Cannot infer type for type parameter 'K'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:168:24 Cannot infer type for type parameter 'V'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:177:25 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:177:47 Unresolved reference 'getStepsForDay'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:178:28 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:178:50 Unresolved reference 'getActiveCaloriesForDay'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:179:25 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:179:47 Unresolved reference 'getSleepForNight'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:197:53 Unresolved reference 'hasAllPermissions'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/data/repository/HealthConnectRepository.kt:199:59 Unresolved reference 'hasHistoryPermission'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:57:13 Unresolved reference 'getStatus'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:68:9 Unresolved reference 'client'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:71:40 Unresolved reference 'REQUIRED_PERMISSIONS'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:75:37 Unresolved reference 'HISTORY_PERMISSION'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:79:37 Unresolved reference 'WRITE_NUTRITION_PERMISSION'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:135:9 Unresolved reference 'client'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:138:15 Cannot access 'val TAG: String': it is private in file.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:146:13 Unresolved reference 'client'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:146:20 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:146:20 Cannot infer type for type parameter 'K'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:146:20 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:150:40 Unresolved reference 'originFilter'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:154:19 Cannot access 'val TAG: String': it is private in file.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:171:27 Unresolved reference 'client'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:177:17 Unresolved reference 'it'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:177:38 Unresolved reference 'it'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:179:62 Unresolved reference 'it'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:181:19 Cannot access 'val TAG: String': it is private in file.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:191:16 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:192:24 Unresolved reference 'client'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:195:35 Unresolved reference 'it'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:196:44 Unresolved reference 'it'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:196:58 Unresolved reference 'it'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:203:16 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:203:28 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:204:24 Unresolved reference 'client'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:209:28 Unresolved reference 'it'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:210:18 Cannot infer type for type parameter 'K'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:210:18 Cannot infer type for type parameter 'V'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:210:18 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:210:61 Unresolved reference 'weight'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:231:22 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:232:24 Unresolved reference 'client'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:241:40 Unresolved reference 'weight'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:255:24 Unresolved reference 'client'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:258:45 Unresolved reference 'it'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:258:75 Unresolved reference 'it'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:259:52 Unresolved reference 'it'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectManager.kt:281:1 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectNutritionSync.kt:32:34 Unresolved reference 'getStatus'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/health/HealthConnectNutritionSync.kt:34:58 Unresolved reference 'writeNutritionEntry'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/analysis/AnalysisViewModel.kt:150:72 Unresolved reference 'HISTORY_PERMISSION'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/settings/SettingsIntegrationCards.kt:42:18 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/settings/SettingsIntegrationCards.kt:42:50 Unresolved reference 'getStatus'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/settings/SettingsIntegrationCards.kt:52:71 Unresolved reference 'REQUIRED_PERMISSIONS'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/settings/SettingsIntegrationCards.kt:53:71 Unresolved reference 'WRITE_NUTRITION_PERMISSION'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/settings/SettingsIntegrationCards.kt:60:46 Unresolved reference 'hasAllPermissions'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/settings/SettingsIntegrationCards.kt:61:49 Unresolved reference 'hasWriteNutritionPermission'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/settings/SettingsIntegrationCards.kt:86:58 Unresolved reference 'openPlayStore'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/settings/SettingsIntegrationCards.kt:129:80 Unresolved reference 'REQUESTABLE_PERMISSIONS'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/settings/SettingsIntegrationCards.kt:149:68 Unresolved reference 'WRITE_NUTRITION_PERMISSION'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/settings/SettingsIntegrationCards.kt:159:70 Unresolved reference 'hasAllPermissions'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/screens/settings/SettingsIntegrationCards.kt:160:73 Unresolved reference 'hasWriteNutritionPermission'.
+e: file:///home/runner/work/NutriSnap/NutriSnap/app/src/main/kotlin/ch/nutrisnap/app/ui/viewmodel/HealthConnectViewModel.kt:134:46 Unresolved reference 'isAvailable'.
 > Task :app:compileDebugKotlin FAILED
    > Compilation error. See log for more details
 Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilation error. See log for more details
-BUILD FAILED in 58s
+BUILD FAILED in 1m 38s
 ```
 
 ## Unit Tests (test_output.log) - Last 150 lines
 ```
-	at org.gradle.internal.work.DefaultAsyncWorkTracker.waitForItemsAndGatherFailures(DefaultAsyncWorkTracker.java:92)
-	at org.gradle.internal.work.DefaultAsyncWorkTracker.waitForAll(DefaultAsyncWorkTracker.java:78)
-	at org.gradle.internal.work.DefaultAsyncWorkTracker.waitForCompletion(DefaultAsyncWorkTracker.java:66)
-	at org.gradle.api.internal.tasks.execution.TaskExecution$3.run(TaskExecution.java:252)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:29)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:26)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.run(DefaultBuildOperationRunner.java:47)
-	at org.gradle.api.internal.tasks.execution.TaskExecution.executeAction(TaskExecution.java:229)
-	at org.gradle.api.internal.tasks.execution.TaskExecution.executeActions(TaskExecution.java:212)
-	at org.gradle.api.internal.tasks.execution.TaskExecution.executeWithPreviousOutputFiles(TaskExecution.java:195)
-	at org.gradle.api.internal.tasks.execution.TaskExecution.execute(TaskExecution.java:162)
-	at org.gradle.internal.execution.steps.ExecuteStep.executeInternal(ExecuteStep.java:105)
-	at org.gradle.internal.execution.steps.ExecuteStep.access$000(ExecuteStep.java:44)
-	at org.gradle.internal.execution.steps.ExecuteStep$1.call(ExecuteStep.java:59)
-	at org.gradle.internal.execution.steps.ExecuteStep$1.call(ExecuteStep.java:56)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
-	at org.gradle.internal.execution.steps.ExecuteStep.execute(ExecuteStep.java:56)
-	at org.gradle.internal.execution.steps.ExecuteStep.execute(ExecuteStep.java:44)
-	at org.gradle.internal.execution.steps.CancelExecutionStep.execute(CancelExecutionStep.java:42)
 	at org.gradle.internal.execution.steps.TimeoutStep.executeWithoutTimeout(TimeoutStep.java:75)
 	at org.gradle.internal.execution.steps.TimeoutStep.execute(TimeoutStep.java:55)
 	at org.gradle.internal.execution.steps.PreCreateOutputParentsStep.execute(PreCreateOutputParentsStep.java:50)
@@ -128,6 +171,35 @@ BUILD FAILED in 58s
 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:303)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
+	at org.gradle.execution.plan.DefaultPlanExecutor.process(DefaultPlanExecutor.java:111)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.executeWithServices(DefaultTaskExecutionGraph.java:138)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.execute(DefaultTaskExecutionGraph.java:123)
+	at org.gradle.execution.SelectedTaskExecutionAction.execute(SelectedTaskExecutionAction.java:35)
+	at org.gradle.execution.DryRunBuildExecutionAction.execute(DryRunBuildExecutionAction.java:51)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:54)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:43)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor.execute(BuildOperationFiringBuildWorkerExecutor.java:40)
+	at org.gradle.internal.build.DefaultBuildLifecycleController.lambda$executeTasks$10(DefaultBuildLifecycleController.java:313)
+	at org.gradle.internal.model.StateTransitionController.doTransition(StateTransitionController.java:266)
+	at org.gradle.internal.model.StateTransitionController.lambda$tryTransition$8(StateTransitionController.java:177)
+	at org.gradle.internal.work.DefaultSynchronizer.withLock(DefaultSynchronizer.java:46)
+	at org.gradle.internal.model.StateTransitionController.tryTransition(StateTransitionController.java:177)
+	at org.gradle.internal.build.DefaultBuildLifecycleController.executeTasks(DefaultBuildLifecycleController.java:304)
+	at org.gradle.internal.build.DefaultBuildWorkGraphController$DefaultBuildWorkGraph.runWork(DefaultBuildWorkGraphController.java:220)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:263)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:127)
+	at org.gradle.composite.internal.DefaultBuildController.doRun(DefaultBuildController.java:181)
+	at org.gradle.composite.internal.DefaultBuildController.access$000(DefaultBuildController.java:50)
+	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.lambda$run$0(DefaultBuildController.java:198)
+	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:85)
+	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.run(DefaultBuildController.java:198)
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilation error. See log for more details
@@ -162,7 +234,7 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilat
 	... 2 more
 
 
-BUILD FAILED in 58s
+BUILD FAILED in 1m 38s
 18 actionable tasks: 18 executed
 ```
 
