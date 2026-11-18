@@ -22,22 +22,14 @@ class HealthConnectRepository(
     private val profileRepo: UserProfileRepository? = null,
     context: Context? = null
 ) {
-    // Tier 0 source: reads active calories directly from Samsung Health, bypassing Health
-    // Connect entirely. Only used when available/permitted; falls back to Health Connect
-    // tiers (see HealthConnectManager.getActiveCaloriesForDay) otherwise. `context` is
-    // optional so existing call sites that don't pass one keep working (Tier 0 simply
-    // stays disabled for them, same as before this SDK was integrated).
+    // Samsung-Health-SDK wird nicht mehr als Datenquelle gelesen (nur noch Garmin über
+    // Health Connect). Das Feld bleibt bis zum Entfernen der Samsung-Berechtigungs-UI.
     private val samsungHealthManager: SamsungHealthDataManager? =
         context?.let {
             runCatching { SamsungHealthDataManager(it.applicationContext) }
-                .onFailure { e -> Log.w(TAG, "Samsung Health SDK init failed, disabling Tier 0", e) }
+                .onFailure { e -> Log.w(TAG, "Samsung Health SDK init failed", e) }
                 .getOrNull()
         }
-
-    private suspend fun samsungActiveCalories(date: LocalDate): Double? =
-        runCatching { samsungHealthManager?.readActiveCalories(date) }
-            .onFailure { Log.w(TAG, "Samsung Health Tier 0 calories read failed for $date", it) }
-            .getOrNull()
 
     /**
      * Entscheidet, ob ein Tag erneut von Health Connect / Samsung Health gelesen werden muss.
@@ -80,7 +72,6 @@ class HealthConnectRepository(
         val cappedTo = if (to.isAfter(today)) today else to
         if (from.isAfter(cappedTo)) return@runCatching 0
 
-        val bmr = currentBmr()
         val cached = dao.getRangeOnce(from, cappedTo).associateBy { it.date }
         val missingDays = generateSequence(from) { d -> d.plusDays(1) }
             .takeWhile { !it.isAfter(cappedTo) }
@@ -97,8 +88,7 @@ class HealthConnectRepository(
         var synced = 0
         for (date in missingDays) {
             val steps = runCatching { manager.getStepsForDay(date) }.getOrDefault(0L)
-            val calories = samsungActiveCalories(date)
-                ?: runCatching { manager.getActiveCaloriesForDay(date, bmr) }.getOrDefault(null)
+            val calories = runCatching { manager.getActiveCaloriesForDay(date) }.getOrDefault(null)
             val sleep = runCatching { manager.getSleepForNight(date) }.getOrDefault(0L)
             val weight = weightMap[date] ?: cached[date]?.weightKg
 
@@ -120,22 +110,14 @@ class HealthConnectRepository(
         synced
     }
 
-    // Used as a fallback: Samsung Health often writes TotalCaloriesBurnedRecord to
-    // Health Connect but never writes ActiveCaloriesBurnedRecord. Subtracting a
-    // prorated BMR from the total gives a usable "active calories" estimate.
-    private suspend fun currentBmr(): Double? =
-        runCatching { profileRepo?.get()?.firstOrNull()?.computedBmr() }.getOrNull()
-
     suspend fun syncToday(): Result<HealthConnectCache> = runCatching {
         coroutineScope {
-            val bmr = currentBmr()
-            val steps = async {
+                val steps = async {
                 runCatching { manager.getTodaysSteps().firstOrNull() ?: 0L }.getOrDefault(0L)
             }
             val calories = async {
-                samsungActiveCalories(LocalDate.now()) ?: runCatching {
-                    manager.getActiveCaloriesForDay(LocalDate.now(), bmr)
-                }.onFailure { Log.e(TAG, "syncToday: calories fetch failed", it) }
+                runCatching { manager.getActiveCaloriesForDay(LocalDate.now()) }
+                    .onFailure { Log.e(TAG, "syncToday: calories fetch failed", it) }
                     .getOrDefault(null)
             }
             val weight = async {
@@ -178,7 +160,6 @@ class HealthConnectRepository(
      */
     suspend fun syncHistorical(days: Int = 180): Result<Int> = runCatching {
         val today = LocalDate.now()
-        val bmr = currentBmr()
         // Fetch all weight data in one API call for efficiency
         val weightFrom = today.minusDays(days.toLong())
             .atStartOfDay(ZoneId.systemDefault()).toInstant()
@@ -194,8 +175,7 @@ class HealthConnectRepository(
             if (!needsResync(existing, date, today)) continue
 
             val steps = runCatching { manager.getStepsForDay(date) }.getOrDefault(0L)
-            val calories = samsungActiveCalories(date)
-                ?: runCatching { manager.getActiveCaloriesForDay(date, bmr) }.getOrDefault(null)
+            val calories = runCatching { manager.getActiveCaloriesForDay(date) }.getOrDefault(null)
             val sleep = runCatching { manager.getSleepForNight(date) }.getOrDefault(0L)
             val weight = weightMap[date] ?: existing?.weightKg
 

@@ -12,6 +12,7 @@ import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.MealType as HcMealType
 import androidx.health.connect.client.records.NutritionRecord
+import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
@@ -38,53 +39,19 @@ class HealthConnectManager(context: Context) {
         HealthConnectClient.getOrCreate(context.applicationContext)
     }
 
+    private val originFilter = setOf(DataOrigin(DATA_ORIGIN_PACKAGE))
+
+    private fun Record.isFromGarmin(): Boolean =
+        metadata.dataOrigin.packageName == DATA_ORIGIN_PACKAGE
+
     companion object {
         private const val TAG = "HealthConnectManager"
 
-        // Samsung Health's package id - used to filter out other contributing apps
-        // (e.g. Google Fit, other trackers) that may inflate or duplicate values.
-        private const val SAMSUNG_HEALTH_PACKAGE = "com.sec.android.app.shealth"
-
-        // Sanity cap: guards against sensor/aggregation glitches producing absurd values
-        // (e.g. duplicate-counted records). Raised from the original 3000 kcal default
-        // because endurance activity (multi-hour rides/hikes) can legitimately produce
-        // 3000-5000+ kcal active-calorie days. Used only as a last-resort guard on the
-        // unfiltered aggregate fallback.
-        private const val ACTIVE_CALORIES_SANITY_CAP_KCAL = 6000.0
-
-        val REQUIRED_PERMISSIONS = setOf(
-            HealthPermission.getReadPermission(StepsRecord::class),
-            HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
-            HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
-            HealthPermission.getReadPermission(WeightRecord::class),
-            HealthPermission.getReadPermission(SleepSessionRecord::class),
-            HealthPermission.getReadPermission(HeartRateRecord::class),
-            HealthPermission.getReadPermission(ExerciseSessionRecord::class),
-        )
-
-        // Ohne diese Permission liefert Health Connect nur die letzten 30 Tage zurück.
-        // Bewusst NICHT in REQUIRED_PERMISSIONS gebündelt, sondern separat im Analyse-Tab
-        // angefragt (nur wenn der Nutzer per Kalender/Monat weiter als 30 Tage zurückgeht),
-        // damit der normale "Health Connect verbinden"-Flow nicht davon abhängt.
-        val HISTORY_PERMISSION = HealthPermission.PERMISSION_READ_HEALTH_DATA_HISTORY
-
-        /** Optional: Tagebuch → NutritionRecord. */
-        val WRITE_NUTRITION_PERMISSION = HealthPermission.getWritePermission(NutritionRecord::class)
-
-        /**
-         * Permissions, die der "Verbinden"-Dialog anfragt: Lesen (Pflicht-Set) + Nutrition-Schreiben.
-         * [hasAllPermissions] bleibt auf [REQUIRED_PERMISSIONS], damit bestehende Nutzer ohne
-         * Write-Grant nicht als "getrennt" gelten.
-         */
-        val REQUESTABLE_PERMISSIONS: Set<String> = REQUIRED_PERMISSIONS + WRITE_NUTRITION_PERMISSION
-
-        fun getStatus(context: Context): HealthConnectStatus = when (
-            HealthConnectClient.getSdkStatus(context)
-        ) {
-            HealthConnectClient.SDK_AVAILABLE -> HealthConnectStatus.AVAILABLE
-            HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> HealthConnectStatus.NEEDS_UPDATE
-            else -> HealthConnectStatus.NOT_AVAILABLE
-        }
+        // Einzige Datenquelle für Uhr-Daten (Schritte, Aktiv-kcal, Schlaf, Puls):
+        // Garmin Connect. Andere Apps/Uhren in Health Connect (z. B. Samsung Health
+        // mit einer fremden Uhr) werden bewusst ignoriert.
+        private const val DATA_ORIGIN_PACKAGE = "com.garmin.android.apps.connectmobile"
+    }
 
         fun isAvailable(context: Context): Boolean =
             getStatus(context) == HealthConnectStatus.AVAILABLE
@@ -179,7 +146,8 @@ class HealthConnectManager(context: Context) {
             client.aggregate(
                 AggregateRequest(
                     metrics = setOf(StepsRecord.COUNT_TOTAL),
-                    timeRangeFilter = TimeRangeFilter.between(start, end)
+                    timeRangeFilter = TimeRangeFilter.between(start, end),
+                    dataOriginFilter = originFilter
                 )
             )[StepsRecord.COUNT_TOTAL] ?: 0L
         }.onFailure {
@@ -188,123 +156,30 @@ class HealthConnectManager(context: Context) {
     }
 
     /**
-     * Activity calories for a specific day (active/movement only, no BMR).
-     *
-     * Four-tier fallback, in order of trustworthiness:
-     *  1. Sum individual ActiveCaloriesBurnedRecord entries written by Samsung Health
-     *     (filtered by dataOrigin). Most granular and reliable when present.
-     *  2. Aggregate ActiveCaloriesBurnedRecord but restricted to Samsung Health's
-     *     dataOrigin via AggregateRequest's dataOriginFilter. Cheaper, same source.
-     *  3. Samsung's TotalCaloriesBurnedRecord minus a prorated resting-metabolism
-     *     estimate (bmrKcalPerDay). Samsung Health frequently writes total calories
-     *     to Health Connect while never writing the "active" record type at all —
-     *     this is a well-known Samsung Health / Health Connect gap, not something
-     *     fixable purely by reading differently on tiers 1/2. Only used when the
-     *     caller supplies a BMR estimate (from the user's profile).
-     *  4. Unfiltered ActiveCaloriesBurnedRecord aggregate across all sources, capped
-     *     at a sanity ceiling, so a misbehaving/duplicate source can't blow up the
-     *     displayed number. Last resort, used only if nothing above has any data
-     *     (e.g. permission not granted yet, or Samsung Health hasn't synced).
+     * Aktiv-kcal (nur Bewegung, ohne Grundumsatz) eines Tages aus Garmin-Records.
+     * Zuordnung strikt nach startTime-Kalendertag — so landet eine Radfahrt, die um
+     * 22:00 startet, am Starttag und nicht anteilig am Folgetag.
+     * null = Garmin hat für den Tag nichts geschrieben (z. B. noch nicht synchronisiert);
+     * bewusst unterschieden von 0.0 = "wirklich 0 kcal".
      */
-    suspend fun getActiveCaloriesForDay(date: LocalDate, bmrKcalPerDay: Double? = null): Double? {
+    suspend fun getActiveCaloriesForDay(date: LocalDate): Double? {
         val zone = ZoneId.systemDefault()
-        // Fenster etwas weiter, Zuordnung aber strikt nach startTime-Kalendertag —
-        // so landet eine Radfahrt, die um 22:00 startet, am Starttag und nicht
-        // anteilig am Folgetag (Sync-Zeit ≠ Workout-Start).
         val windowStart = date.minusDays(1).atStartOfDay(zone).toInstant()
         val windowEnd = if (date == LocalDate.now()) Instant.now()
                         else date.plusDays(2).atStartOfDay(zone).toInstant()
-        val range = TimeRangeFilter.between(windowStart, windowEnd)
-        val dayStart = date.atStartOfDay(zone).toInstant()
-        val dayEnd = date.plusDays(1).atStartOfDay(zone).toInstant()
-        val dayRange = TimeRangeFilter.between(dayStart, if (date == LocalDate.now()) Instant.now() else dayEnd)
-
-        // Tier 1: sum raw Samsung-origin records, attributed by startTime local date.
-        val samsungRecordsSum = runCatching {
-            val resp = client.readRecords(
-                ReadRecordsRequest(ActiveCaloriesBurnedRecord::class, range)
-            )
-            val samsungRecords = resp.records.filter {
-                it.metadata.dataOrigin.packageName == SAMSUNG_HEALTH_PACKAGE &&
-                    it.startTime.atZone(zone).toLocalDate() == date
+        return runCatching {
+            val records = client.readRecords(
+                ReadRecordsRequest(
+                    ActiveCaloriesBurnedRecord::class,
+                    TimeRangeFilter.between(windowStart, windowEnd)
+                )
+            ).records.filter {
+                it.isFromGarmin() && it.startTime.atZone(zone).toLocalDate() == date
             }
-            if (samsungRecords.isEmpty()) null
-            else samsungRecords.sumOf { it.energy.inKilocalories }
+            if (records.isEmpty()) null else records.sumOf { it.energy.inKilocalories }
         }.onFailure {
-            Log.e(TAG, "getActiveCaloriesForDay: Tier 1 (Samsung records) failed for $date", it)
+            Log.e(TAG, "getActiveCaloriesForDay failed for $date", it)
         }.getOrNull()
-
-        if (samsungRecordsSum != null && samsungRecordsSum > 0.0) {
-            return samsungRecordsSum
-        }
-
-        // Tier 2: Samsung-filtered aggregate (Kalendertag lokal).
-        val samsungAggregate = runCatching {
-            client.aggregate(
-                AggregateRequest(
-                    metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
-                    timeRangeFilter = dayRange,
-                    dataOriginFilter = setOf(DataOrigin(SAMSUNG_HEALTH_PACKAGE))
-                )
-            )[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories
-        }.onFailure {
-            Log.e(TAG, "getActiveCaloriesForDay: Tier 2 (Samsung aggregate) failed for $date", it)
-        }.getOrNull()
-
-        if (samsungAggregate != null && samsungAggregate > 0.0) {
-            return samsungAggregate
-        }
-
-        // Tier 3: Samsung's TotalCaloriesBurnedRecord minus prorated BMR.
-        // Only attempted if the caller gave us a BMR estimate.
-        if (bmrKcalPerDay != null && bmrKcalPerDay > 0.0) {
-            val totalResult = runCatching {
-                val resp = client.readRecords(
-                    ReadRecordsRequest(TotalCaloriesBurnedRecord::class, range)
-                )
-                val samsungTotalRecords = resp.records.filter {
-                    it.metadata.dataOrigin.packageName == SAMSUNG_HEALTH_PACKAGE
-                }
-                if (samsungTotalRecords.isEmpty()) null
-                else samsungTotalRecords.sumOf { it.energy.inKilocalories }
-            }.onFailure {
-                Log.e(TAG, "getActiveCaloriesForDay: Tier 3 (Samsung total calories) failed for $date", it)
-            }.getOrNull()
-
-            if (totalResult != null && totalResult > 0.0) {
-                // Prorate the daily BMR by the elapsed fraction of the day so a
-                // partial "today" query doesn't subtract a full day's resting burn.
-                val rangeEnd = if (date == LocalDate.now()) Instant.now() else dayEnd
-                val elapsedFraction = (java.time.Duration.between(dayStart, rangeEnd).toMinutes()
-                    .coerceAtLeast(0)).toDouble() / (24 * 60)
-                val restingEstimate = bmrKcalPerDay * elapsedFraction
-                val active = (totalResult - restingEstimate).coerceAtLeast(0.0)
-                if (active > 0.0) return active
-            }
-        }
-
-        // Tier 4: unfiltered aggregate, capped as a last resort.
-        // Kept nullable here on purpose: a missing key means Health Connect has
-        // no record at all for this day (e.g. Samsung Health hasn't synced yet),
-        // which is different from a genuine "burned 0 kcal" reading.
-        val unfilteredAggregate = runCatching {
-            client.aggregate(
-                AggregateRequest(
-                    metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
-                    timeRangeFilter = range
-                )
-            )[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories
-        }.onFailure {
-            Log.e(TAG, "getActiveCaloriesForDay: Tier 4 (unfiltered aggregate) failed for $date", it)
-        }.getOrNull()
-
-        if (unfilteredAggregate == null) {
-            Log.w(TAG, "getActiveCaloriesForDay: all tiers returned no data for $date " +
-                "(check Health Connect permissions / Samsung Health sync)")
-            return null
-        }
-
-        return unfilteredAggregate.coerceAtMost(ACTIVE_CALORIES_SANITY_CAP_KCAL)
     }
 
     /** Sleep for a specific night (18:00 day-1 → 12:00 day) */
@@ -317,7 +192,7 @@ class HealthConnectManager(context: Context) {
             val resp = client.readRecords(
                 ReadRecordsRequest(SleepSessionRecord::class, TimeRangeFilter.between(from, to))
             )
-            resp.records.sumOf {
+            resp.records.filter { it.isFromGarmin() }.sumOf {
                 java.time.Duration.between(it.startTime, it.endTime).toMinutes()
             }
         }.getOrDefault(0L)
@@ -338,7 +213,7 @@ class HealthConnectManager(context: Context) {
 
     /**
      * Steps today.
-     * AggregateRequest deduplicates Samsung Health overlapping records internally.
+     * AggregateRequest dedupliziert überlappende Records innerhalb der Garmin-Quelle.
      */
     fun getTodaysSteps(): Flow<Long> = flow {
         emit(getStepsForDay(LocalDate.now()))
@@ -347,8 +222,8 @@ class HealthConnectManager(context: Context) {
     /**
      * Activity calories heute.
      */
-    fun getTodaysActiveCalories(bmrKcalPerDay: Double? = null): Flow<Double?> = flow {
-        emit(getActiveCaloriesForDay(LocalDate.now(), bmrKcalPerDay))
+    fun getTodaysActiveCalories(): Flow<Double?> = flow {
+        emit(getActiveCaloriesForDay(LocalDate.now()))
     }
 
     /** Latest weight reading from last 30 days */
@@ -380,7 +255,7 @@ class HealthConnectManager(context: Context) {
             val resp = client.readRecords(
                 ReadRecordsRequest(HeartRateRecord::class, TimeRangeFilter.between(start, end))
             )
-            val all = resp.records.flatMap { it.samples }
+            val all = resp.records.filter { it.isFromGarmin() }.flatMap { it.samples }
             if (all.isEmpty()) null else all.map { it.beatsPerMinute }.average().toLong()
         }.getOrDefault(null)
         emit(result)
