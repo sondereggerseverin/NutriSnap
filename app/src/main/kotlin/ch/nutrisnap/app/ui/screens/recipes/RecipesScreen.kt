@@ -198,6 +198,7 @@ fun RecipesScreen(
     var splitRecipeId      by remember { mutableStateOf<Long?>(null) }
     var addToDiaryRecipe  by remember { mutableStateOf<Recipe?>(null) }
     var rateAfterDiary   by remember { mutableStateOf<Recipe?>(null) }
+    var deductAfterCook  by remember { mutableStateOf<Recipe?>(null) }
     var editRecipe        by remember { mutableStateOf<Recipe?>(null) }
     var editComponentsRecipe by remember { mutableStateOf<Recipe?>(null) }
     var hideIncomplete    by remember { mutableStateOf(false) }
@@ -1444,12 +1445,35 @@ fun RecipesScreen(
             onSave = { stars, nextTime ->
                 vm.saveCookFeedback(recipe, stars, nextTime, alsoIncrementCook = true)
                 rateAfterDiary = null
+                deductAfterCook = recipe
             },
             onSkip = {
                 vm.recordRecipeCooked(recipe)
                 rateAfterDiary = null
+                deductAfterCook = recipe
             }
         )
+    }
+
+    // Nach dem Kochen: Vorrat abbuchen (nur wenn Zutaten im Vorrat gefunden wurden)
+    deductAfterCook?.let { recipe ->
+        var deductions by remember(recipe.id) {
+            mutableStateOf<List<ch.nutrisnap.app.domain.InventoryMatcher.Deduction>?>(null)
+        }
+        LaunchedEffect(recipe.id) {
+            val found = vm.inventoryDeductionsFor(recipe)
+            if (found.isEmpty()) deductAfterCook = null else deductions = found
+        }
+        deductions?.let { list ->
+            InventoryDeductDialog(
+                deductions = list,
+                onApply = { chosen ->
+                    vm.applyInventoryDeductions(chosen)
+                    deductAfterCook = null
+                },
+                onSkip = { deductAfterCook = null }
+            )
+        }
     }
 
     editRecipe?.let { recipe ->

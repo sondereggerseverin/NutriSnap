@@ -1055,6 +1055,24 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Vorschläge, welche Vorrats-Positionen nach dem Kochen abzubuchen sind (leer = kein Treffer). */
+    suspend fun inventoryDeductionsFor(recipe: Recipe): List<ch.nutrisnap.app.domain.InventoryMatcher.Deduction> {
+        val lines = recipe.ingredients.lines().filter { it.isNotBlank() }
+        val inventory = ch.nutrisnap.app.data.repository.InventoryRepository(db).getAllOnce()
+        return ch.nutrisnap.app.domain.InventoryMatcher.match(lines, inventory)
+    }
+
+    /** Bestätigte Abbuchungen anwenden: aufgebrauchte Positionen entfernen, sonst Menge setzen. */
+    fun applyInventoryDeductions(list: List<ch.nutrisnap.app.domain.InventoryMatcher.Deduction>) {
+        viewModelScope.launch {
+            val inventoryRepo = ch.nutrisnap.app.data.repository.InventoryRepository(db)
+            list.forEach { d ->
+                if (d.fullyUsed) inventoryRepo.deleteById(d.inventoryId)
+                else inventoryRepo.updateQuantity(d.inventoryId, d.newQty)
+            }
+        }
+    }
+
     fun getComponents(recipeId: Long): Flow<List<RecipeComponent>> = repo.getComponents(recipeId)
 
     suspend fun getComponentsOnce(recipeId: Long): List<RecipeComponent> =
