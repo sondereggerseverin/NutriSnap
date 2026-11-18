@@ -25,7 +25,8 @@ class InventoryViewModel(app: Application) : AndroidViewModel(app) {
         notes: String = "",
         location: String = "",
         barcode: String? = null,
-        foodItemId: Long? = null
+        foodItemId: Long? = null,
+        expiresAt: Long? = null
     ) {
         if (name.isBlank()) return
         viewModelScope.launch {
@@ -40,7 +41,8 @@ class InventoryViewModel(app: Application) : AndroidViewModel(app) {
                 foodItemId = foodItemId,
                 location = location.trim(),
                 createdAt = existing?.createdAt ?: System.currentTimeMillis(),
-                updatedAt = System.currentTimeMillis()
+                updatedAt = System.currentTimeMillis(),
+                expiresAt = expiresAt
             )
             repo.upsert(item)
         }

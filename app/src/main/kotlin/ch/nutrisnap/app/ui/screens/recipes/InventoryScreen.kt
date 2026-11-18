@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.InventoryItem
+import ch.nutrisnap.app.domain.InventoryExpiry
 
 private val UNIT_OPTIONS = listOf("Stk", "g", "ml", "Packung", "Dose", "Glas", "Beutel", "kg", "l")
 private val LOCATION_OPTIONS = listOf("", "Kühlschrank", "Vorratsschrank", "Gefrierfach", "Keller")
@@ -43,9 +44,17 @@ fun InventoryScreen(vm: InventoryViewModel = viewModel()) {
             Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
                 Text("Inventar", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                val now = remember(items) { System.currentTimeMillis() }
+                val soonCount = remember(items) {
+                    items.count {
+                        InventoryExpiry.groupOf(it.expiresAt, now).let { g ->
+                            g == InventoryExpiry.Group.SOON || g == InventoryExpiry.Group.EXPIRED
+                        }
+                    }
+                }
                 Text(
                     if (items.isEmpty()) "Noch leer"
-                    else "${items.size} Einträge",
+                    else "${items.size} Einträge" + if (soonCount > 0) " · $soonCount laufen bald ab" else "",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -74,7 +83,7 @@ fun InventoryScreen(vm: InventoryViewModel = viewModel()) {
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Zutaten und Packungen erfassen,\ndie du zu Hause hast.\n(Ohne Ablaufdatum)",
+                        "Zutaten und Packungen erfassen,\ndie du zu Hause hast.\nMit Ablaufdatum behältst du den Überblick.",
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.outline,
                         textAlign = TextAlign.Center
@@ -86,12 +95,42 @@ fun InventoryScreen(vm: InventoryViewModel = viewModel()) {
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(items, key = { it.id }) { item ->
-                    InventoryRow(
-                        item = item,
-                        onEdit = { editTarget = item },
-                        onDelete = { vm.delete(item) }
-                    )
+                val now = System.currentTimeMillis()
+                val grouped = items.groupBy { InventoryExpiry.groupOf(it.expiresAt, now) }
+                val anyDated = items.any { it.expiresAt != null }
+                val order = listOf(
+                    InventoryExpiry.Group.EXPIRED to "Abgelaufen",
+                    InventoryExpiry.Group.SOON to "Läuft bald ab (≤ ${InventoryExpiry.SOON_DAYS} Tage)",
+                    InventoryExpiry.Group.LATER to "Später",
+                    InventoryExpiry.Group.NONE to "Ohne Datum"
+                )
+                order.forEach { (group, title) ->
+                    val rows = grouped[group].orEmpty().let { list ->
+                        if (group == InventoryExpiry.Group.NONE) list else list.sortedBy { it.expiresAt }
+                    }
+                    if (rows.isNotEmpty()) {
+                        if (anyDated) {
+                            item(key = "header_${group.name}") {
+                                Text(
+                                    title,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 13.sp,
+                                    color = if (group == InventoryExpiry.Group.EXPIRED)
+                                        MaterialTheme.colorScheme.error
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+                                )
+                            }
+                        }
+                        items(rows, key = { it.id }) { item ->
+                            InventoryRow(
+                                item = item,
+                                now = now,
+                                onEdit = { editTarget = item },
+                                onDelete = { vm.delete(item) }
+                            )
+                        }
+                    }
                 }
                 item { Spacer(Modifier.height(80.dp)) }
             }
@@ -103,8 +142,11 @@ fun InventoryScreen(vm: InventoryViewModel = viewModel()) {
             title = "Eintrag hinzufügen",
             initial = null,
             onDismiss = { showAdd = false },
-            onSave = { name, qty, unit, notes, location ->
-                vm.upsert(name = name, quantity = qty, unit = unit, notes = notes, location = location)
+            onSave = { name, qty, unit, notes, location, expiresAt ->
+                vm.upsert(
+                    name = name, quantity = qty, unit = unit, notes = notes,
+                    location = location, expiresAt = expiresAt
+                )
                 showAdd = false
             }
         )
@@ -115,7 +157,7 @@ fun InventoryScreen(vm: InventoryViewModel = viewModel()) {
             title = "Eintrag bearbeiten",
             initial = target,
             onDismiss = { editTarget = null },
-            onSave = { name, qty, unit, notes, location ->
+            onSave = { name, qty, unit, notes, location, expiresAt ->
                 vm.upsert(
                     id = target.id,
                     name = name,
@@ -124,7 +166,8 @@ fun InventoryScreen(vm: InventoryViewModel = viewModel()) {
                     notes = notes,
                     location = location,
                     barcode = target.barcode,
-                    foodItemId = target.foodItemId
+                    foodItemId = target.foodItemId,
+                    expiresAt = expiresAt
                 )
                 editTarget = null
             }
@@ -135,6 +178,7 @@ fun InventoryScreen(vm: InventoryViewModel = viewModel()) {
 @Composable
 private fun InventoryRow(
     item: InventoryItem,
+    now: Long,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -161,6 +205,18 @@ private fun InventoryRow(
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                InventoryExpiry.daysLeft(item.expiresAt, now)?.let { days ->
+                    Text(
+                        InventoryExpiry.label(days) + " · " + InventoryExpiry.format(item.expiresAt!!),
+                        fontSize = 12.sp,
+                        fontWeight = if (days <= InventoryExpiry.SOON_DAYS) FontWeight.SemiBold else FontWeight.Normal,
+                        color = when {
+                            days < 0 -> MaterialTheme.colorScheme.error
+                            days <= InventoryExpiry.SOON_DAYS -> MaterialTheme.colorScheme.tertiary
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
                 if (item.notes.isNotBlank()) {
                     Text(
                         item.notes,
@@ -185,7 +241,7 @@ private fun InventoryEditDialog(
     title: String,
     initial: InventoryItem?,
     onDismiss: () -> Unit,
-    onSave: (name: String, qty: Float, unit: String, notes: String, location: String) -> Unit
+    onSave: (name: String, qty: Float, unit: String, notes: String, location: String, expiresAt: Long?) -> Unit
 ) {
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var qtyText by remember {
@@ -198,6 +254,11 @@ private fun InventoryEditDialog(
     var unit by remember { mutableStateOf(initial?.unit ?: "Stk") }
     var notes by remember { mutableStateOf(initial?.notes ?: "") }
     var location by remember { mutableStateOf(initial?.location ?: "") }
+    var expiryText by remember {
+        mutableStateOf(initial?.expiresAt?.let { InventoryExpiry.format(it) } ?: "")
+    }
+    val expiryParsed = InventoryExpiry.parseDate(expiryText)
+    val expiryInvalid = expiryText.isNotBlank() && expiryParsed == null
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -260,6 +321,31 @@ private fun InventoryEditDialog(
                         )
                     }
                 }
+                // Ablaufdatum: Textfeld (TT.MM.JJJJ) + Schnellwahl
+                OutlinedTextField(
+                    value = expiryText,
+                    onValueChange = { expiryText = it.filter { c -> c.isDigit() || c == '.' }.take(10) },
+                    label = { Text("Ablaufdatum (TT.MM.JJJJ, optional)") },
+                    singleLine = true,
+                    isError = expiryInvalid,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf("3 T." to 3, "1 Wo." to 7, "2 Wo." to 14, "1 Mt." to 30).forEach { (label, days) ->
+                        AssistChip(
+                            onClick = {
+                                expiryText = InventoryExpiry.format(
+                                    InventoryExpiry.inDays(days, System.currentTimeMillis())
+                                )
+                            },
+                            label = { Text(label, fontSize = 11.sp) }
+                        )
+                    }
+                }
                 OutlinedTextField(
                     value = notes,
                     onValueChange = { notes = it },
@@ -274,9 +360,11 @@ private fun InventoryEditDialog(
             TextButton(
                 onClick = {
                     val qty = qtyText.replace(',', '.').toFloatOrNull() ?: 1f
-                    if (name.isNotBlank()) onSave(name.trim(), qty, unit.ifBlank { "Stk" }, notes, location)
+                    if (name.isNotBlank()) {
+                        onSave(name.trim(), qty, unit.ifBlank { "Stk" }, notes, location, expiryParsed)
+                    }
                 },
-                enabled = name.isNotBlank()
+                enabled = name.isNotBlank() && !expiryInvalid
             ) { Text("Speichern") }
         },
         dismissButton = {

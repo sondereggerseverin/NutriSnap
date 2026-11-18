@@ -107,7 +107,7 @@ class ExportViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun buildInventoryCsv(): String = withContext(Dispatchers.IO) {
         val rows = db.inventoryDao().getAllOnce()
         buildString {
-            appendLine("Name,Menge,Einheit,Ort,Notizen,Barcode")
+            appendLine("Name,Menge,Einheit,Ort,Notizen,Barcode,Ablaufdatum")
             rows.forEach { e ->
                 appendLine(
                     listOf(
@@ -116,7 +116,8 @@ class ExportViewModel(app: Application) : AndroidViewModel(app) {
                         csvEscape(e.unit),
                         csvEscape(e.location),
                         csvEscape(e.notes),
-                        csvEscape(e.barcode.orEmpty())
+                        csvEscape(e.barcode.orEmpty()),
+                        csvEscape(e.expiresAt?.let { ch.nutrisnap.app.domain.InventoryExpiry.format(it) }.orEmpty())
                     ).joinToString(",")
                 )
             }
@@ -175,6 +176,7 @@ class ExportViewModel(app: Application) : AndroidViewModel(app) {
                 put("notes", item.notes)
                 item.barcode?.let { put("barcode", it) }
                 item.foodItemId?.let { put("foodItemId", it) }
+                item.expiresAt?.let { put("expiresAt", it) }
             })
         }
         root.put("inventory", iArr)
@@ -257,7 +259,8 @@ class ExportViewModel(app: Application) : AndroidViewModel(app) {
                         location = o.optString("location", ""),
                         notes = o.optString("notes", ""),
                         barcode = barcode,
-                        foodItemId = if (o.has("foodItemId") && !o.isNull("foodItemId")) o.getLong("foodItemId") else null
+                        foodItemId = if (o.has("foodItemId") && !o.isNull("foodItemId")) o.getLong("foodItemId") else null,
+                        expiresAt = if (o.has("expiresAt") && !o.isNull("expiresAt")) o.getLong("expiresAt") else null
                     )
                 )
                 inventoryAdded++
@@ -415,7 +418,7 @@ fun ExportScreen(
 
             ExportCard(
                 title = "Inventar (CSV)",
-                subtitle = "$inventoryCount Einträge · ohne Ablaufdatum",
+                subtitle = "$inventoryCount Einträge · mit Ablaufdatum",
                 icon = Icons.Default.Kitchen,
                 onSave = {
                     scope.launch {

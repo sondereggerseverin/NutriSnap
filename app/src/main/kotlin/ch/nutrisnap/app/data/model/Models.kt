@@ -770,5 +770,7 @@ data class InventoryItem(
     /** Optionaler Ort: "Kühlschrank", "Vorratsschrank", "Gefrierfach", "". */
     val location: String = "",
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    /** Ablaufdatum (Tagesbeginn, Unix-ms); null = ohne Datum. */
+    val expiresAt: Long? = null
 )
