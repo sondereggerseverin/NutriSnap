@@ -8,7 +8,10 @@ import ch.nutrisnap.app.data.model.ShoppingListItem
 import ch.nutrisnap.app.data.repository.InventoryRepository
 import ch.nutrisnap.app.data.repository.ShoppingListRepository
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -27,10 +30,16 @@ data class AggregatedShoppingItem(
     val stillNeededGrams: Float = totalGrams
 )
 
+/** Ereignis für die «Rückgängig»-Snackbar nach dem Entfernen von Einträgen. */
+data class ShoppingUndoEvent(val message: String, val removed: List<ShoppingListItem>)
+
 class ShoppingListViewModel(app: Application) : AndroidViewModel(app) {
     private val db = NutriDatabase.getInstance(app)
     private val repo = ShoppingListRepository(db)
     private val inventoryRepo = InventoryRepository(db)
+
+    private val _undoEvents = MutableSharedFlow<ShoppingUndoEvent>(extraBufferCapacity = 4)
+    val undoEvents: SharedFlow<ShoppingUndoEvent> = _undoEvents.asSharedFlow()
 
     val items: StateFlow<List<ShoppingListItem>> = repo.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -212,7 +221,40 @@ class ShoppingListViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun toggle(item: ShoppingListItem) = viewModelScope.launch { repo.toggle(item) }
-    fun delete(item: ShoppingListItem) = viewModelScope.launch { repo.delete(item) }
-    fun clearChecked() = viewModelScope.launch { repo.clearChecked() }
-    fun clearAll() = viewModelScope.launch { repo.clearAll() }
+
+    fun delete(item: ShoppingListItem) = viewModelScope.launch {
+        repo.delete(item)
+        _undoEvents.tryEmit(ShoppingUndoEvent("«${item.name}» entfernt", listOf(item)))
+    }
+
+    fun clearChecked() = viewModelScope.launch {
+        val gone = items.value.filter { it.checked }
+        if (gone.isEmpty()) return@launch
+        repo.clearChecked()
+        _undoEvents.tryEmit(ShoppingUndoEvent("${gone.size} erledigte Einträge entfernt", gone))
+    }
+
+    fun clearAll() = viewModelScope.launch {
+        val gone = items.value
+        if (gone.isEmpty()) return@launch
+        repo.clearAll()
+        _undoEvents.tryEmit(ShoppingUndoEvent("Liste geleert (${gone.size} Einträge)", gone))
+    }
+
+    /** «Rückgängig»: Einträge mit ihren ursprünglichen IDs/Zeitstempeln wiederherstellen. */
+    fun restore(removed: List<ShoppingListItem>) = viewModelScope.launch { repo.addAll(removed) }
+
+    /** Text zum Teilen/Kopieren: offene Positionen, nach Supermarkt-Gang sortiert. */
+    fun buildShareText(): String {
+        val lines = aggregated.value
+            .filter { !it.checked && !(it.totalGrams > 0f && it.stillNeededGrams <= 0f) }
+            .map { agg ->
+                val grams = if (agg.totalGrams > 0f) agg.stillNeededGrams.toInt() else 0
+                ch.nutrisnap.app.domain.ShoppingListText.Line(
+                    agg.name,
+                    if (grams > 0) "$grams g" else null
+                )
+            }
+        return ch.nutrisnap.app.domain.ShoppingListText.build(lines)
+    }
 }

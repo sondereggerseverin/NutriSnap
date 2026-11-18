@@ -10,11 +10,14 @@ import androidx.compose.runtime.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.flow.collectLatest
+import ch.nutrisnap.app.domain.ShoppingAisle
 import ch.nutrisnap.app.data.model.ShoppingListItem
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,11 +29,26 @@ fun ShoppingListScreen(onBack: () -> Unit, vm: ShoppingListViewModel = viewModel
     var showAdd by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
     var aggregatedMode by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+
+    // «Rückgängig» nach Entfernen (einzeln, Erledigte, ganze Liste) – nichts geht still verloren
+    LaunchedEffect(Unit) {
+        vm.undoEvents.collectLatest { ev ->
+            val result = snackbarHostState.showSnackbar(
+                message = ev.message,
+                actionLabel = "Rückgängig",
+                duration = SnackbarDuration.Long
+            )
+            if (result == SnackbarResult.ActionPerformed) vm.restore(ev.removed)
+        }
+    }
 
     val open = items.filter { !it.checked }
     val done = items.filter { it.checked }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column {
                 TopAppBar(
@@ -40,6 +58,23 @@ fun ShoppingListScreen(onBack: () -> Unit, vm: ShoppingListViewModel = viewModel
                         Box {
                             IconButton(onClick = { menuExpanded = true }) { Icon(Icons.Default.MoreVert, "Mehr") }
                             DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                                DropdownMenuItem(
+                                    text = { Text("Liste teilen / kopieren") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        val text = vm.buildShareText()
+                                        if (text.isNotBlank()) {
+                                            val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                                type = "text/plain"
+                                                putExtra(android.content.Intent.EXTRA_TEXT, text)
+                                            }
+                                            context.startActivity(
+                                                android.content.Intent.createChooser(send, "Einkaufsliste teilen")
+                                            )
+                                        }
+                                    },
+                                    enabled = aggregated.isNotEmpty()
+                                )
                                 DropdownMenuItem(
                                     text = { Text("Erledigte entfernen") },
                                     onClick = { vm.clearChecked(); menuExpanded = false },
@@ -83,12 +118,41 @@ fun ShoppingListScreen(onBack: () -> Unit, vm: ShoppingListViewModel = viewModel
                 verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 item { Spacer(Modifier.height(8.dp)) }
                 item {
-                    Text("Zusammengefasst · Inventar (g/ml) wird abgezogen, wo der Name passt.",
+                    Text("Zusammengefasst, nach Supermarkt-Gang sortiert · Inventar (g/ml) wird abgezogen, wo der Name passt.",
                         fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp))
                 }
-                items(aggregated, key = { it.name }) { agg ->
-                    AggregatedRow(agg, onToggle = { vm.toggleAggregated(agg) })
+                // Offene Positionen nach Gang gruppiert (Reihenfolge wie im Laden), Erledigtes ans Ende
+                val openAgg = aggregated.filter { !it.checked }
+                val doneAgg = aggregated.filter { it.checked }
+                openAgg.groupBy { ShoppingAisle.classify(it.name) }
+                    .toSortedMap(compareBy { it.ordinal })
+                    .forEach { (aisle, rows) ->
+                        item(key = "aisle_${aisle.name}") {
+                            Text(
+                                aisle.label,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
+                            )
+                        }
+                        items(rows, key = { it.name }) { agg ->
+                            AggregatedRow(agg, onToggle = { vm.toggleAggregated(agg) })
+                        }
+                    }
+                if (doneAgg.isNotEmpty()) {
+                    item(key = "agg_done_header") {
+                        Text(
+                            "Erledigt (${doneAgg.size})",
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 16.dp, bottom = 2.dp)
+                        )
+                    }
+                    items(doneAgg, key = { it.name }) { agg ->
+                        AggregatedRow(agg, onToggle = { vm.toggleAggregated(agg) })
+                    }
                 }
                 item { Spacer(Modifier.height(80.dp)) }
             }
