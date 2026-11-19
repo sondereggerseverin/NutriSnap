@@ -51,7 +51,40 @@ class HealthConnectManager(context: Context) {
         // Garmin Connect. Andere Apps/Uhren in Health Connect (z. B. Samsung Health
         // mit einer fremden Uhr) werden bewusst ignoriert.
         private const val DATA_ORIGIN_PACKAGE = "com.garmin.android.apps.connectmobile"
-    }
+
+        val REQUIRED_PERMISSIONS = setOf(
+            HealthPermission.getReadPermission(StepsRecord::class),
+            HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
+            HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
+            HealthPermission.getReadPermission(WeightRecord::class),
+            HealthPermission.getReadPermission(SleepSessionRecord::class),
+            HealthPermission.getReadPermission(HeartRateRecord::class),
+            HealthPermission.getReadPermission(ExerciseSessionRecord::class),
+        )
+
+        // Ohne diese Permission liefert Health Connect nur die letzten 30 Tage zurück.
+        // Bewusst NICHT in REQUIRED_PERMISSIONS gebündelt, sondern separat im Analyse-Tab
+        // angefragt (nur wenn der Nutzer per Kalender/Monat weiter als 30 Tage zurückgeht),
+        // damit der normale "Health Connect verbinden"-Flow nicht davon abhängt.
+        val HISTORY_PERMISSION = HealthPermission.PERMISSION_READ_HEALTH_DATA_HISTORY
+
+        /** Optional: Tagebuch → NutritionRecord. */
+        val WRITE_NUTRITION_PERMISSION = HealthPermission.getWritePermission(NutritionRecord::class)
+
+        /**
+         * Permissions, die der "Verbinden"-Dialog anfragt: Lesen (Pflicht-Set) + Nutrition-Schreiben.
+         * [hasAllPermissions] bleibt auf [REQUIRED_PERMISSIONS], damit bestehende Nutzer ohne
+         * Write-Grant nicht als "getrennt" gelten.
+         */
+        val REQUESTABLE_PERMISSIONS: Set<String> = REQUIRED_PERMISSIONS + WRITE_NUTRITION_PERMISSION
+
+        fun getStatus(context: Context): HealthConnectStatus = when (
+            HealthConnectClient.getSdkStatus(context)
+        ) {
+            HealthConnectClient.SDK_AVAILABLE -> HealthConnectStatus.AVAILABLE
+            HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> HealthConnectStatus.NEEDS_UPDATE
+            else -> HealthConnectStatus.NOT_AVAILABLE
+        }
 
         fun isAvailable(context: Context): Boolean =
             getStatus(context) == HealthConnectStatus.AVAILABLE
