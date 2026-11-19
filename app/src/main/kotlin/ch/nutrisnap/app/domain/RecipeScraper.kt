@@ -409,10 +409,12 @@ class RecipeScraper(private val context: Context) {
     }
 
     private fun loadCachedCaption(key: String): String {
-        captionCache[key]?.let { if (isGoodCaption(it)) return it }
+        // Gekürzte Captions (ohne Zutaten) aus älteren Imports gelten als Cache-Miss,
+        // damit ein erneuter Import die vollständige Caption neu holt.
+        captionCache[key]?.let { if (isGoodCaption(it) && CaptionCompleteness.hasIngredientContent(it)) return it }
         if (usePersistentCache) {
             persistentStore.get(key)?.let { c ->
-                if (isGoodCaption(c)) {
+                if (isGoodCaption(c) && CaptionCompleteness.hasIngredientContent(c)) {
                     captionCache[key] = c
                     return c
                 }
@@ -422,7 +424,7 @@ class RecipeScraper(private val context: Context) {
     }
 
     private fun saveCachedCaption(key: String, caption: String) {
-        if (!isGoodCaption(caption)) return
+        if (!isGoodCaption(caption) || !CaptionCompleteness.hasIngredientContent(caption)) return
         captionCache[key] = caption
         if (usePersistentCache) persistentStore.put(key, caption)
     }
@@ -438,7 +440,10 @@ class RecipeScraper(private val context: Context) {
         budgetMs: Long = 12_000L
     ): String {
         if (!useVideoTranscript) return caption
-        if (!VideoTranscriptService.isWeakCaption(caption) && isGoodCaption(caption)) return caption
+        if (!VideoTranscriptService.isWeakCaption(caption) &&
+            isGoodCaption(caption) &&
+            CaptionCompleteness.hasIngredientContent(caption)
+        ) return caption
         progress("Video-Transkript…")
         // Reines Enrichment — darf den Hauptpfad nie blockieren. Das Budget greift
         // wirklich, weil die Calls cancelbar sind (Call.await).
@@ -880,22 +885,38 @@ class RecipeScraper(private val context: Context) {
                 jobs: MutableList<kotlinx.coroutines.Deferred<Cap?>>,
                 timeoutMs: Long,
                 onSource: ((String) -> Unit)? = null
-            ): String? = withTimeoutOrNull(timeoutMs) {
-                val pending = jobs.toMutableList()
-                while (pending.isNotEmpty()) {
-                    val done = select {
-                        pending.forEach { job ->
-                            job.onAwait { result -> job to result }
+            ): String? {
+                // Schnelle Quellen (og:description, oEmbed, Mirrors) liefern bei langen
+                // Captions oft nur den gekürzten Intro-Text ohne Zutaten. Der besteht
+                // isGoodCaption, darf das Race aber nicht gewinnen: erst weiterwarten,
+                // ob eine Quelle die vollständige Caption liefert. Läuft das Timeout ab,
+                // gilt die längste unvollständige Caption als Notlösung.
+                var bestIncomplete: Cap? = null
+                val complete = withTimeoutOrNull(timeoutMs) {
+                    val pending = jobs.toMutableList()
+                    while (pending.isNotEmpty()) {
+                        val done = select {
+                            pending.forEach { job ->
+                                job.onAwait { result -> job to result }
+                            }
+                        }
+                        pending.remove(done.first)
+                        val cap = done.second
+                        if (cap != null && isGoodCaption(cap.text)) {
+                            if (CaptionCompleteness.hasIngredientContent(cap.text)) {
+                                onSource?.invoke(cap.source)
+                                return@withTimeoutOrNull cap.text
+                            }
+                            if (bestIncomplete == null || cap.text.length > bestIncomplete!!.text.length) {
+                                bestIncomplete = cap
+                            }
                         }
                     }
-                    pending.remove(done.first)
-                    val cap = done.second
-                    if (cap != null && isGoodCaption(cap.text)) {
-                        onSource?.invoke(cap.source)
-                        return@withTimeoutOrNull cap.text
-                    }
+                    null
                 }
-                null
+                if (complete != null) return complete
+                bestIncomplete?.let { onSource?.invoke(it.source + " (unvollständig)") }
+                return bestIncomplete?.text
             }
 
             val jobs = mutableListOf<kotlinx.coroutines.Deferred<Cap?>>()
