@@ -191,6 +191,9 @@ fun SettingsScreen(
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
+    val weightRepo = remember { ch.nutrisnap.app.data.repository.WeightRepository(ch.nutrisnap.app.data.db.NutriDatabase.getInstance(context)) }
+    var showWeightDialog by remember { mutableStateOf(false) }
+    var latestWeightKg by remember { mutableStateOf<Float?>(null) }
     val prefs by context.notifDataStore.data.collectAsStateWithLifecycle(initialValue = null)
     val waterGoalPref = prefs?.get(KEY_WATER_GOAL_ML) ?: ch.nutrisnap.app.ui.screens.home.DEFAULT_WATER_GOAL_ML
     var waterGoalText by remember(waterGoalPref) { mutableStateOf(waterGoalPref.toString()) }
@@ -1053,6 +1056,26 @@ fun SettingsScreen(
                 }
 
                 SettingsCard(title = "Zielgewicht & Prognose", icon = Icons.Default.Flag) {
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                latestWeightKg = weightRepo.getLatest()?.weightKg
+                                showWeightDialog = true
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Gewicht eintragen") }
+                    Spacer(Modifier.height(NutriSpacing.xs))
+                    if (showWeightDialog) {
+                        ch.nutrisnap.app.ui.screens.home.WeightEntryDialog(
+                            currentWeight = latestWeightKg,
+                            onConfirm = { kg ->
+                                scope.launch { weightRepo.logWeight(java.time.LocalDate.now(), kg) }
+                                showWeightDialog = false
+                            },
+                            onDismiss = { showWeightDialog = false }
+                        )
+                    }
                     Text(
                         "Optional: Zielgewicht setzen, um zu sehen, wann du es bei deinem aktuellen Tempo erreichst.",
                         fontSize = 11.sp,
