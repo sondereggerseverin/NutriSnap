@@ -3,11 +3,15 @@ package ch.nutrisnap.app.data.repository
 import android.util.Log
 import ch.nutrisnap.app.data.db.HealthConnectDao
 import ch.nutrisnap.app.data.model.HealthConnectCache
+import ch.nutrisnap.app.domain.ActiveCalorieEstimator
 import ch.nutrisnap.app.health.HealthConnectManager
+import ch.nutrisnap.app.health.exerciseMets
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -16,7 +20,8 @@ private const val TAG = "HealthConnectRepo"
 
 class HealthConnectRepository(
     private val manager: HealthConnectManager,
-    private val dao: HealthConnectDao
+    private val dao: HealthConnectDao,
+    private val profileRepo: UserProfileRepository
 ) {
     /**
      * Entscheidet, ob ein Tag erneut von Health Connect / Samsung Health gelesen werden muss.
@@ -75,7 +80,7 @@ class HealthConnectRepository(
         var synced = 0
         for (date in missingDays) {
             val steps = runCatching { manager.getStepsForDay(date) }.getOrDefault(0L)
-            val calories = runCatching { manager.getActiveCaloriesForDay(date) }.getOrDefault(null)
+            val calories = runCatching { estimateActiveKcal(date) }.getOrDefault(null)
             val sleep = runCatching { manager.getSleepForNight(date) }.getOrDefault(0L)
             val weight = weightMap[date] ?: cached[date]?.weightKg
 
@@ -97,13 +102,39 @@ class HealthConnectRepository(
         synced
     }
 
+    /**
+     * Aktiv-kcal (netto, ohne Grundumsatz) eines Tages, berechnet aus Garmin-Rohdaten:
+     * Training über MET, restliche Schritte (ausserhalb von Trainings) als Gehen.
+     * Schritte innerhalb eines Trainings zählen nur über dessen MET (keine Doppelzählung).
+     * null = Garmin hat für den Tag nichts geschrieben; wirft, wenn Gewicht/Grösse im Profil fehlen.
+     */
+    private suspend fun estimateActiveKcal(date: LocalDate): Double? {
+        val profile = profileRepo.get().first()
+        val steps = manager.getStepsForDay(date)
+        val sessions = manager.getExerciseSessionsForDay(date)
+        if (steps == 0L && sessions.isEmpty()) return null
+
+        val sessionSteps = sessions.sumOf { manager.getStepsBetween(it.start, it.end) }
+        val walking = ActiveCalorieEstimator.walkingKcal(
+            (steps - sessionSteps).coerceAtLeast(0L), profile.heightCm, profile.weightKg
+        )
+        val training = sessions.sumOf {
+            ActiveCalorieEstimator.sessionKcal(
+                exerciseMets(it.exerciseType),
+                profile.weightKg,
+                Duration.between(it.start, it.end).toMinutes().toDouble()
+            )
+        }
+        return walking + training
+    }
+
     suspend fun syncToday(): Result<HealthConnectCache> = runCatching {
         coroutineScope {
                 val steps = async {
                 runCatching { manager.getTodaysSteps().firstOrNull() ?: 0L }.getOrDefault(0L)
             }
             val calories = async {
-                runCatching { manager.getActiveCaloriesForDay(LocalDate.now()) }
+                runCatching { estimateActiveKcal(LocalDate.now()) }
                     .onFailure { Log.e(TAG, "syncToday: calories fetch failed", it) }
                     .getOrDefault(null)
             }
@@ -162,7 +193,7 @@ class HealthConnectRepository(
             if (!needsResync(existing, date, today)) continue
 
             val steps = runCatching { manager.getStepsForDay(date) }.getOrDefault(0L)
-            val calories = runCatching { manager.getActiveCaloriesForDay(date) }.getOrDefault(null)
+            val calories = runCatching { estimateActiveKcal(date) }.getOrDefault(null)
             val sleep = runCatching { manager.getSleepForNight(date) }.getOrDefault(0L)
             val weight = weightMap[date] ?: existing?.weightKg
 

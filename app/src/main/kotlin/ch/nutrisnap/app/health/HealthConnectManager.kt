@@ -171,48 +171,48 @@ class HealthConnectManager(context: Context) {
         Log.w(TAG, "writeNutritionEntry failed for \"$name\": ${it.message}")
     }
 
-    /** Steps for a specific day */
+    /** Garmin-Schritte eines Kalendertags. */
     suspend fun getStepsForDay(date: LocalDate): Long {
-        val start = date.atStartOfDay(ZoneId.systemDefault()).toInstant()
-        val end   = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
-        return runCatching {
-            client.aggregate(
-                AggregateRequest(
-                    metrics = setOf(StepsRecord.COUNT_TOTAL),
-                    timeRangeFilter = TimeRangeFilter.between(start, end),
-                    dataOriginFilter = originFilter
-                )
-            )[StepsRecord.COUNT_TOTAL] ?: 0L
-        }.onFailure {
-            Log.e(TAG, "getStepsForDay failed for $date", it)
-        }.getOrDefault(0L)
+        val zone = ZoneId.systemDefault()
+        return getStepsBetween(
+            date.atStartOfDay(zone).toInstant(),
+            date.plusDays(1).atStartOfDay(zone).toInstant()
+        )
     }
 
+    /** Garmin-Schritte in einem Zeitfenster (z. B. während eines Trainings). */
+    suspend fun getStepsBetween(start: Instant, end: Instant): Long = runCatching {
+        client.aggregate(
+            AggregateRequest(
+                metrics = setOf(StepsRecord.COUNT_TOTAL),
+                timeRangeFilter = TimeRangeFilter.between(start, end),
+                dataOriginFilter = originFilter
+            )
+        )[StepsRecord.COUNT_TOTAL] ?: 0L
+    }.onFailure {
+        Log.e(TAG, "getStepsBetween failed for $start..$end", it)
+    }.getOrDefault(0L)
+
     /**
-     * Aktiv-kcal (nur Bewegung, ohne Grundumsatz) eines Tages aus Garmin-Records.
-     * Zuordnung strikt nach startTime-Kalendertag — so landet eine Radfahrt, die um
-     * 22:00 startet, am Starttag und nicht anteilig am Folgetag.
-     * null = Garmin hat für den Tag nichts geschrieben (z. B. noch nicht synchronisiert);
-     * bewusst unterschieden von 0.0 = "wirklich 0 kcal".
+     * Garmin-Trainings eines Tages. Zuordnung strikt nach startTime-Kalendertag — so landet
+     * eine Radfahrt, die um 22:00 startet, am Starttag.
      */
-    suspend fun getActiveCaloriesForDay(date: LocalDate): Double? {
+    suspend fun getExerciseSessionsForDay(date: LocalDate): List<GarminExerciseSession> {
         val zone = ZoneId.systemDefault()
         val windowStart = date.minusDays(1).atStartOfDay(zone).toInstant()
-        val windowEnd = if (date == LocalDate.now()) Instant.now()
-                        else date.plusDays(2).atStartOfDay(zone).toInstant()
+        val windowEnd = date.plusDays(2).atStartOfDay(zone).toInstant()
         return runCatching {
-            val records = client.readRecords(
+            client.readRecords(
                 ReadRecordsRequest(
-                    ActiveCaloriesBurnedRecord::class,
+                    ExerciseSessionRecord::class,
                     TimeRangeFilter.between(windowStart, windowEnd)
                 )
-            ).records.filter {
-                it.isFromGarmin() && it.startTime.atZone(zone).toLocalDate() == date
-            }
-            if (records.isEmpty()) null else records.sumOf { it.energy.inKilocalories }
+            ).records
+                .filter { it.isFromGarmin() && it.startTime.atZone(zone).toLocalDate() == date }
+                .map { GarminExerciseSession(it.exerciseType, it.startTime, it.endTime) }
         }.onFailure {
-            Log.e(TAG, "getActiveCaloriesForDay failed for $date", it)
-        }.getOrNull()
+            Log.e(TAG, "getExerciseSessionsForDay failed for $date", it)
+        }.getOrDefault(emptyList())
     }
 
     /** Sleep for a specific night (18:00 day-1 → 12:00 day) */
@@ -250,13 +250,6 @@ class HealthConnectManager(context: Context) {
      */
     fun getTodaysSteps(): Flow<Long> = flow {
         emit(getStepsForDay(LocalDate.now()))
-    }
-
-    /**
-     * Activity calories heute.
-     */
-    fun getTodaysActiveCalories(): Flow<Double?> = flow {
-        emit(getActiveCaloriesForDay(LocalDate.now()))
     }
 
     /** Latest weight reading from last 30 days */
@@ -311,4 +304,29 @@ class HealthConnectManager(context: Context) {
         val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
         return Pair(start, Instant.now())
     }
+}
+
+data class GarminExerciseSession(
+    val exerciseType: Int,
+    val start: Instant,
+    val end: Instant
+)
+
+/**
+ * MET-Werte nach Compendium of Physical Activities (gerundet, wie ACTIVITY_PRESETS).
+ * Nicht gelistete Trainingstypen zählen als moderate Aktivität (4,0 MET).
+ */
+fun exerciseMets(exerciseType: Int): Double = when (exerciseType) {
+    ExerciseSessionRecord.EXERCISE_TYPE_WALKING -> 3.5
+    ExerciseSessionRecord.EXERCISE_TYPE_HIKING -> 6.0
+    ExerciseSessionRecord.EXERCISE_TYPE_RUNNING,
+    ExerciseSessionRecord.EXERCISE_TYPE_RUNNING_TREADMILL -> 8.3
+    ExerciseSessionRecord.EXERCISE_TYPE_BIKING,
+    ExerciseSessionRecord.EXERCISE_TYPE_BIKING_STATIONARY -> 6.8
+    ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_POOL,
+    ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_OPEN_WATER -> 7.0
+    ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING -> 5.0
+    ExerciseSessionRecord.EXERCISE_TYPE_HIGH_INTENSITY_INTERVAL_TRAINING -> 8.0
+    ExerciseSessionRecord.EXERCISE_TYPE_YOGA -> 3.0
+    else -> 4.0
 }

@@ -41,7 +41,7 @@ class HealthConnectViewModel(app: Application) : AndroidViewModel(app) {
     private val db = NutriDatabase.getInstance(app)
     private val manager = HealthConnectManager(app)
     private val profileRepo = UserProfileRepository(db)
-    private val repository = HealthConnectRepository(manager, db.healthConnectDao())
+    private val repository = HealthConnectRepository(manager, db.healthConnectDao(), profileRepo)
 
     private val _uiState = MutableStateFlow(HealthConnectUiState())
     val uiState: StateFlow<HealthConnectUiState> = _uiState.asStateFlow()

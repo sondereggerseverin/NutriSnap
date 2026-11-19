@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import ch.nutrisnap.app.data.db.NutriDatabase
 import ch.nutrisnap.app.data.repository.DiaryRepository
 import ch.nutrisnap.app.data.repository.HealthConnectRepository
+import ch.nutrisnap.app.data.repository.UserProfileRepository
 import ch.nutrisnap.app.health.HealthConnectManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -157,7 +158,7 @@ class InsightsEngine(
 class InsightsViewModel(app: Application) : AndroidViewModel(app) {
     private val db = NutriDatabase.getInstance(app)
     private val engine = InsightsEngine(
-        HealthConnectRepository(HealthConnectManager(app), db.healthConnectDao()),
+        HealthConnectRepository(HealthConnectManager(app), db.healthConnectDao(), UserProfileRepository(db)),
         DiaryRepository(db)
     )
 
