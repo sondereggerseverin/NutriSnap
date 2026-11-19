@@ -1151,7 +1151,6 @@ fun SettingsScreen(
 
             SettingsHubSection.Health -> {
                 HealthConnectCard()
-                SamsungHealthCard()
                 ManualActivitySettingsCard()
                 AggressiveSportDayCard()
             }

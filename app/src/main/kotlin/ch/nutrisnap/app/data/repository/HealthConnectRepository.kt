@@ -1,11 +1,9 @@
 package ch.nutrisnap.app.data.repository
 
-import android.content.Context
 import android.util.Log
 import ch.nutrisnap.app.data.db.HealthConnectDao
 import ch.nutrisnap.app.data.model.HealthConnectCache
 import ch.nutrisnap.app.health.HealthConnectManager
-import ch.nutrisnap.app.health.SamsungHealthDataManager
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -18,19 +16,8 @@ private const val TAG = "HealthConnectRepo"
 
 class HealthConnectRepository(
     private val manager: HealthConnectManager,
-    private val dao: HealthConnectDao,
-    private val profileRepo: UserProfileRepository? = null,
-    context: Context? = null
+    private val dao: HealthConnectDao
 ) {
-    // Samsung-Health-SDK wird nicht mehr als Datenquelle gelesen (nur noch Garmin über
-    // Health Connect). Das Feld bleibt bis zum Entfernen der Samsung-Berechtigungs-UI.
-    private val samsungHealthManager: SamsungHealthDataManager? =
-        context?.let {
-            runCatching { SamsungHealthDataManager(it.applicationContext) }
-                .onFailure { e -> Log.w(TAG, "Samsung Health SDK init failed", e) }
-                .getOrNull()
-        }
-
     /**
      * Entscheidet, ob ein Tag erneut von Health Connect / Samsung Health gelesen werden muss.
      * Wichtig: Früher wurde nur bei steps==0 nachgeladen — dadurch blieben Tage mit
@@ -197,13 +184,4 @@ class HealthConnectRepository(
     suspend fun hasPermissions(): Boolean = manager.hasAllPermissions()
 
     suspend fun hasHistoryPermission(): Boolean = manager.hasHistoryPermission()
-
-    suspend fun hasSamsungHealthPermissions(): Boolean =
-        samsungHealthManager?.hasPermissions() ?: false
-
-    suspend fun requestSamsungHealthPermissions(activity: android.app.Activity): Boolean =
-        samsungHealthManager?.requestPermissions(activity) ?: false
-
-    fun isSamsungHealthSupported(): Boolean =
-        samsungHealthManager != null && SamsungHealthDataManager.isSupported()
 }

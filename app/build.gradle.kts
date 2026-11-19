@@ -78,8 +78,6 @@ ksp {
 }
 
 dependencies {
-    // Samsung Health Data SDK (local AAR, Developer Mode / partner-only distribution)
-    implementation(files("libs/samsung-health-data-api-1.1.0.aar"))
     implementation(libs.gson)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.androidx.core.ktx)

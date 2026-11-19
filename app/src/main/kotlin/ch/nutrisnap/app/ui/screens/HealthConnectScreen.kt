@@ -78,7 +78,7 @@ fun HealthConnectScreen(
             ) {
                 Column {
                     Text(
-                        if (uiState.hasPermission) "✅ Verbunden mit Samsung Health / Health Connect"
+                        if (uiState.hasPermission) "✅ Verbunden mit Health Connect (Garmin)"
                         else "Nicht verbunden",
                         fontSize = 13.sp,
                         color = if (uiState.hasPermission) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error
@@ -168,7 +168,7 @@ private fun TodayOverviewCard(
                     Icon(Icons.Default.FavoriteBorder, contentDescription = null,
                         modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(8.dp))
-                    Text("Samsung Health verbinden", fontWeight = FontWeight.Medium)
+                    Text("Health Connect verbinden", fontWeight = FontWeight.Medium)
                     Text("Für automatische Kalorienziel-Anpassung", fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(12.dp))

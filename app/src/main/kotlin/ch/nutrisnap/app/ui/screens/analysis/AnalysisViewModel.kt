@@ -139,7 +139,7 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
     private val profileRepo = UserProfileRepository(db)
     private val weightRepo  = WeightRepository(db)
     private val statsRepo   = StatsRepository(db)
-    private val healthRepo  = HealthConnectRepository(HealthConnectManager(app), db.healthConnectDao(), profileRepo, app)
+    private val healthRepo  = HealthConnectRepository(HealthConnectManager(app), db.healthConnectDao())
 
     private val _uiState = MutableStateFlow(AnalysisUiState())
     val uiState: StateFlow<AnalysisUiState> = _uiState.asStateFlow()
