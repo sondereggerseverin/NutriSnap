@@ -13,6 +13,10 @@ import android.util.Log
  */
 object AppLog {
 
+    /** Wird von [CrashLogger.init] gesetzt; bis dahin (z. B. in Unit-Tests) bleibt es null. */
+    @Volatile
+    internal var errorSink: ((tag: String, message: String, throwable: Throwable?) -> Unit)? = null
+
     fun warn(tag: String, message: String, throwable: Throwable? = null) {
         try {
             if (throwable != null) Log.w(tag, message, throwable) else Log.w(tag, message)
@@ -24,6 +28,6 @@ object AppLog {
     /** Wie [warn], zusätzlich im lokalen Absturzprotokoll sichtbar. */
     fun error(tag: String, message: String, throwable: Throwable? = null) {
         warn(tag, message, throwable)
-        CrashLogger.recordErrorIfInitialized(tag, message, throwable)
+        errorSink?.let { runCatching { it(tag, message, throwable) } }
     }
 }

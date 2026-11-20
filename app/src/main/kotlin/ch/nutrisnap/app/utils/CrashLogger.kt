@@ -61,6 +61,9 @@ object CrashLogger {
     /** Einmal beim App-Start aufrufen (Application.onCreate). */
     fun init(context: Context) {
         appContext = context.applicationContext
+        AppLog.errorSink = { tag, message, throwable ->
+            recordError(context.applicationContext, tag, message, throwable)
+        }
         startWatchdog()
     }
 
@@ -94,12 +97,6 @@ object CrashLogger {
             message = "[$tag] $message",
             stack = stack
         )
-    }
-
-    /** Wie [recordError], aber ohne Context – tut nichts, solange [init] nicht lief. */
-    fun recordErrorIfInitialized(tag: String, message: String, throwable: Throwable? = null) {
-        val ctx = appContext ?: return
-        runCatching { recordError(ctx, tag, message, throwable) }
     }
 
     fun read(context: Context): String =
