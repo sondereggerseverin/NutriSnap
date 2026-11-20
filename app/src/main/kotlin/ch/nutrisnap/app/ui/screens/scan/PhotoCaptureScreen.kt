@@ -105,7 +105,8 @@ fun PhotoCaptureScreen(
             @Suppress("DEPRECATION")
             MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
         }
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+        ch.nutrisnap.app.utils.AppLog.error("PhotoCapture", "Bild konnte nicht geladen werden", e)
         null
     }
 
@@ -200,7 +201,9 @@ fun PhotoCaptureScreen(
                         previewView.post {
                             focusCenter(previewView, camera.cameraControl)
                         }
-                    } catch (_: Exception) { /* Kamera nicht verfügbar */ }
+                    } catch (e: Exception) {
+                        ch.nutrisnap.app.utils.AppLog.error("PhotoCapture", "Kamera nicht verfügbar", e)
+                    }
                 }, ContextCompat.getMainExecutor(ctx))
                 previewView
             },

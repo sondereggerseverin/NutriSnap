@@ -746,7 +746,7 @@ object RecipeNutritionAnalyzer {
         if (allowNetwork) {
             try { mapUnknownToStandards(lines) }
             catch (e: kotlinx.coroutines.CancellationException) { throw e }
-            catch (_: Exception) { /* Zuordnung ist optional – bei Fehler normal weiter */ }
+            catch (e: Exception) { ch.nutrisnap.app.utils.AppLog.warn("RecipeNutritionAnalyzer", "Standard-Zuordnung übersprungen", e) }
         }
 
         // ── Pass 1: local DB + optional OpenFoodFacts (parallel, per-ingredient) ─
@@ -1140,7 +1140,9 @@ object RecipeNutritionAnalyzer {
         val jsonText = content.trim()
             .removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
 
-        val items = try { JSONObject(jsonText).optJSONArray("items") } catch (_: Exception) { null } ?: return null
+        val items = try { JSONObject(jsonText).optJSONArray("items") } catch (e: Exception) {
+            ch.nutrisnap.app.utils.AppLog.warn("RecipeNutritionAnalyzer", "KI-Antwort kein gültiges JSON", e); null
+        } ?: return null
         val map = mutableMapOf<String, AiNutritionEntry>()
         for (i in 0 until items.length()) {
             val obj  = items.getJSONObject(i)

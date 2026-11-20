@@ -96,6 +96,12 @@ object CrashLogger {
         )
     }
 
+    /** Wie [recordError], aber ohne Context – tut nichts, solange [init] nicht lief. */
+    fun recordErrorIfInitialized(tag: String, message: String, throwable: Throwable? = null) {
+        val ctx = appContext ?: return
+        runCatching { recordError(ctx, tag, message, throwable) }
+    }
+
     fun read(context: Context): String =
         runCatching { logFile(context).readText() }.getOrDefault("")
 

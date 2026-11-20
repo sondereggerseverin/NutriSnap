@@ -117,7 +117,8 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
             val removed = diaryRepo.deduplicateEntries()
             val recipes = try {
                 db.recipeDao().getAll().first()
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                ch.nutrisnap.app.utils.AppLog.error("YazioImport", "Rezepte für Reparatur nicht ladbar", e)
                 emptyList()
             }
             val repaired = diaryRepo.repairInflatedRecipeEntries(recipes)

@@ -87,12 +87,14 @@ object OpenFoodFactsApi {
             .header("User-Agent", "NutriSnap/1.0 (Android)").build()
         val body = try {
             client.newCall(req).execute().use { it.body?.string() }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            ch.nutrisnap.app.utils.AppLog.warn("OpenFoodFactsApi", "Suche fehlgeschlagen (Netzwerk): ${e.javaClass.simpleName}", e)
             return emptyList()
         } ?: return emptyList()
         val products = try {
             JSONObject(body).optJSONArray("products")
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            ch.nutrisnap.app.utils.AppLog.warn("OpenFoodFactsApi", "Antwort nicht lesbar (JSON)", e)
             return emptyList()
         } ?: return emptyList()
         return (0 until products.length())
