@@ -879,7 +879,7 @@ object RecipeNutritionAnalyzer {
                 // Netzwerkcalls liefen auf dem Aufrufer-Dispatcher (i.d.R. Main aus
                 // viewModelScope.launch) -> NetworkOnMainThreadException-Risiko.
                 withContext(Dispatchers.IO) {
-                    runCatching { estimateViaAi(unmatched.map { it.parsed!!.name }, apiKey) }.getOrNull()
+                    runCatching { estimateViaAi(unmatched.mapNotNull { it.parsed?.name }, apiKey) }.getOrNull()
                 }
             } else null
 

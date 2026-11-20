@@ -1109,7 +1109,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             }
             val alreadySplit = deduped.size >= 2 &&
                 dens.all { it > 0f } &&
-                dens.maxOrNull()!!.let { mx -> dens.minOrNull()!!.let { mn -> mx / mn.coerceAtLeast(0.001f) > 1.08f } }
+                (dens.maxOrNull() ?: 0f).let { mx -> (dens.minOrNull() ?: 0f).let { mn -> mx / mn.coerceAtLeast(0.001f) > 1.08f } }
             var comps = if (alreadySplit) deduped else healComponentNutrition(recipe, deduped)
             repo.setComponents(recipeId, comps)
             if (updateRecipeTotals && comps.isNotEmpty()) {

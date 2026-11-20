@@ -158,10 +158,10 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                 when {
                     dishResult != null && dishResult.ingredients.any { it.name.isNotBlank() } ->
                         dishResult
-                    mealSummary != null && mealSummary!!.calories > 50f -> {
+                    summary != null && summary.calories > 50f -> {
                         usedMealSummaryOnly = true
-                        val g = mealSummary!!.servingGrams.coerceIn(100f, 1200f)
-                        val name = mealSummary!!.dishName.ifBlank { "Gericht vom Foto" }
+                        val g = summary.servingGrams.coerceIn(100f, 1200f)
+                        val name = summary.dishName.ifBlank { "Gericht vom Foto" }
                         DishScanResult(
                             dishName = name,
                             ingredients = listOf(
@@ -208,9 +208,10 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                 onDevice = usedOnDevice
             )
 
-            val analysisResult = if (usedMealSummaryOnly && mealSummary != null) {
+            val mealSummaryFinal: MealSummaryResult? = mealSummary
+            val analysisResult = if (usedMealSummaryOnly && mealSummaryFinal != null) {
                 // Makros aus Gericht-Summary direkt injizieren (nicht DB-Lookup)
-                buildAnalysisFromMealSummary(mealSummary!!)
+                buildAnalysisFromMealSummary(mealSummaryFinal)
             } else {
                 val lines = cleanedIngredients.map { ing ->
                     val grams = ing.estimatedGrams.toInt().coerceAtLeast(1)
@@ -238,8 +239,8 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
             }
             // Alternative Gesamtschätzung, wenn Zutaten UND Summary vorhanden
             val summaryAlt: RecipeNutritionAnalyzer.AnalysisResult? =
-                if (!usedMealSummaryOnly && mealSummary != null && mealSummary!!.calories > 50f) {
-                    buildAnalysisFromMealSummary(mealSummary!!)
+                if (!usedMealSummaryOnly && mealSummaryFinal != null && mealSummaryFinal.calories > 50f) {
+                    buildAnalysisFromMealSummary(mealSummaryFinal)
                 } else null
 
             if (summaryAlt != null) {
@@ -254,8 +255,9 @@ class FoodScanViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
 
+            val summaryDishName = mealSummaryFinal?.dishName?.takeIf { it.isNotBlank() }
             val displayName = when {
-                mealSummary?.dishName?.isNotBlank() == true -> mealSummary!!.dishName
+                summaryDishName != null -> summaryDishName
                 dish.dishName.isNotBlank() -> dish.dishName
                 else -> "Gescanntes Essen"
             }

@@ -366,7 +366,7 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                         list.maxWithOrNull(
                             compareBy<CustomFoodItem> { if (it.source == "yazio_import") 2 else if (it.verified) 1 else 0 }
                                 .thenByDescending { it.calories }
-                        )!!
+                        ) ?: list.first()
                     }
 
                 var imported = 0
@@ -506,7 +506,7 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                 // Match-Reihenfolge: Barcode > identity(name+brand+barcode) > baseName+brand
                 val byBarcode = existing
                     .filter { !it.barcode.isNullOrBlank() }
-                    .associateBy { it.barcode!!.trim() }
+                    .associateBy { it.barcode.orEmpty().trim() }
                     .toMutableMap()
                 val byIdentity = existing
                     .associateBy { identityKey(it.name, it.brand, it.barcode) }
@@ -610,7 +610,7 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                             )
                             db.customFoodDao().update(updatedItem)
                             if (!updatedItem.barcode.isNullOrBlank()) {
-                                byBarcode[updatedItem.barcode!!.trim()] = updatedItem
+                                byBarcode[updatedItem.barcode.orEmpty().trim()] = updatedItem
                             }
                             byIdentity[key] = updatedItem
                             byBaseBrand[baseBrandKey] = updatedItem
@@ -651,7 +651,7 @@ class YazioImportViewModel(app: Application) : AndroidViewModel(app) {
                 list.maxWithOrNull(
                     compareBy<CustomFoodItem> { if (it.source == "yazio_import") 2 else if (it.verified) 1 else 0 }
                         .thenByDescending { it.calories }
-                )!!
+                ) ?: list.first()
             }
         var updated = 0
         for (item in all) {

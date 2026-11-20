@@ -229,7 +229,7 @@ object RecipeCookSuggester {
         }
 
         // ── Nährwerte vorhanden (brauchbarer als „leere“ Karten) ────────────
-        if (recipe.totalCalories != null && recipe.totalCalories!! > 0f) {
+        if ((recipe.totalCalories ?: 0f) > 0f) {
             score += 3f
         }
 

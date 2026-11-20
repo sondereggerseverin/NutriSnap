@@ -404,7 +404,8 @@ class RecipeScraper(private val context: Context) {
         return when {
             retry != null && retryScore >= firstScore -> retry
             first != null -> first
-            else -> throw (retryAttempt.exceptionOrNull() ?: firstAttempt.exceptionOrNull()!!)
+            else -> throw (retryAttempt.exceptionOrNull() ?: firstAttempt.exceptionOrNull()
+                ?: IllegalStateException("Rezept konnte nicht geladen werden"))
         }
     }
 
@@ -562,14 +563,15 @@ class RecipeScraper(private val context: Context) {
         val tCaptionMs = SystemClock.elapsedRealtime() - t0
 
         // Gründlich: Caption an Server-Kandidat mergen, wenn vorhanden
-        if (!fastScrape && bestServerCandidate != null && isGoodCaption(caption)) {
-            val merged = bestServerCandidate!!.copy(
+        val serverCandidate = bestServerCandidate
+        if (!fastScrape && serverCandidate != null && isGoodCaption(caption)) {
+            val merged = serverCandidate.copy(
                 ingredients = RecipeAiParser.mergeIngredientsFromCaption(
-                    bestServerCandidate!!.ingredients, caption
+                    serverCandidate.ingredients, caption
                 )
             )
             if (isAmmQuality(merged) || ingredientQualityScore(merged) >
-                ingredientQualityScore(bestServerCandidate!!)
+                ingredientQualityScore(serverCandidate)
             ) {
                 bestServerCandidate = merged
             }
@@ -649,8 +651,7 @@ class RecipeScraper(private val context: Context) {
                     )
                 }
                 if (hasUsableIngredients(serverCap) &&
-                    (bestServerCandidate == null ||
-                        ingredientQualityScore(serverCap) > ingredientQualityScore(bestServerCandidate!!))
+                    (bestServerCandidate?.let { ingredientQualityScore(serverCap) > ingredientQualityScore(it) } ?: true)
                 ) {
                     bestServerCandidate = serverCap
                 }
@@ -907,7 +908,7 @@ class RecipeScraper(private val context: Context) {
                                 onSource?.invoke(cap.source)
                                 return@withTimeoutOrNull cap.text
                             }
-                            if (bestIncomplete == null || cap.text.length > bestIncomplete!!.text.length) {
+                            if ((bestIncomplete?.text?.length ?: -1) < cap.text.length) {
                                 bestIncomplete = cap
                             }
                         }
@@ -1366,7 +1367,7 @@ class RecipeScraper(private val context: Context) {
             var caption: String? = raced.first
             var thumbnail: String? = raced.second
             val author: String? = raced.third
-            if (isGoodCaption(caption)) saveCachedCaption(key, caption!!)
+            caption?.takeIf { isGoodCaption(it) }?.let { saveCachedCaption(key, it) }
 
             // Optional Whisper bei schwacher Caption
             val enriched = enrichWithTranscript(
@@ -1374,7 +1375,7 @@ class RecipeScraper(private val context: Context) {
             )
             if (enriched.isNotBlank()) {
                 caption = enriched
-                if (isGoodCaption(caption)) saveCachedCaption(key, caption!!)
+                caption?.takeIf { isGoodCaption(it) }?.let { saveCachedCaption(key, it) }
             }
 
             if (caption.isNullOrBlank()) {
@@ -1390,7 +1391,7 @@ class RecipeScraper(private val context: Context) {
             }
 
             progress("Rezept extrahieren…")
-            var workingCaption = caption!!
+            var workingCaption: String = caption.orEmpty()
             var parsed = parseCaptionToRecipe(workingCaption, url, "tiktok", thumbnail, fastAi, deadlineAtMs = deadlineAtMs)
             if (!hasUsableIngredients(parsed)) {
                 progress("Struktur nachbessern…")

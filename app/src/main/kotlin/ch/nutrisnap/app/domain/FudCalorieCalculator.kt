@@ -89,9 +89,10 @@ object FudCalorieCalculator {
         }
 
         val level = nearestActivity(activityFactor)
-        val usedKatch = bodyFatPercent != null && bodyFatPercent > 0f
-        val bmr = if (usedKatch) {
-            bmrKatch(weightKg, bodyFatPercent!!)
+        val bodyFat = bodyFatPercent?.takeIf { it > 0f }
+        val usedKatch = bodyFat != null
+        val bmr = if (bodyFat != null) {
+            bmrKatch(weightKg, bodyFat)
         } else {
             bmrMifflin(weightKg, heightCm, ageYears, sex)
         }

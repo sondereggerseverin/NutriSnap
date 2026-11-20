@@ -109,13 +109,12 @@ class HealthConnectViewModel(app: Application) : AndroidViewModel(app) {
             .getOrNull() ?: emptyList()
 
         val weightByDate = last30Days
-            .filter { it.weightKg != null }
-            .associate { it.date to it.weightKg!!.toFloat() }
+            .mapNotNull { p -> p.weightKg?.let { w -> p.date to w.toFloat() } }
+            .toMap()
         val intakeByDate = diarySummaries
             .filter { it.calories > 0f }
-            .associate { runCatching { LocalDate.parse(it.dateStr) }.getOrNull() to it.calories }
-            .filterKeys { it != null }
-            .mapKeys { it.key!! }
+            .mapNotNull { s -> runCatching { LocalDate.parse(s.dateStr) }.getOrNull()?.let { d -> d to s.calories } }
+            .toMap()
 
         val trendTdee = AdaptiveTdeeCalculator.computeTrendTdee(weightByDate, intakeByDate)
         val todayActiveKcal = last30Days.find { it.date == LocalDate.now() }?.activeCaloriesKcal
