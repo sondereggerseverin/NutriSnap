@@ -178,3 +178,46 @@ jobs:
             --notes "Automatischer Debug-Build von commit ${{ github.sha }}" \
             app/build/outputs/apk/debug/app-debug.apk \
             build_output.log
+      - name: Clear stale build_errors.txt after green run
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_NUM: ${{ github.run_number }}
+        run: |
+          python3 - <<'PYEOF'
+          import base64, json, os, urllib.request, urllib.error
+
+          repo = os.environ["REPO"]
+          token = os.environ["GH_TOKEN"]
+          run_num = os.environ["RUN_NUM"]
+          api_url = f"https://api.github.com/repos/{repo}/contents/build_errors.txt"
+          headers = {"Authorization": f"token {token}"}
+
+          try:
+              existing = json.load(urllib.request.urlopen(urllib.request.Request(api_url, headers=headers)))
+          except urllib.error.HTTPError:
+              print("build_errors.txt existiert nicht - nichts zu tun")
+              raise SystemExit(0)
+
+          old = base64.b64decode(existing["content"]).decode(errors="replace")
+          if old.startswith("# Build OK"):
+              print("build_errors.txt ist bereits aufgeraeumt")
+              raise SystemExit(0)
+
+          content = f"# Build OK - run {run_num}\n\nKeine Fehler. Die Fehlerdetails des letzten roten Runs wurden aufgeraeumt.\n"
+          payload = {
+              "message": f"ci: build ok run {run_num} (build_errors.txt aufgeraeumt)",
+              "content": base64.b64encode(content.encode()).decode(),
+              "sha": existing["sha"],
+          }
+          req = urllib.request.Request(
+              api_url, data=json.dumps(payload).encode(),
+              headers={**headers, "Content-Type": "application/json"}, method="PUT")
+          try:
+              resp = json.load(urllib.request.urlopen(req))
+              print("Aufgeraeumt:", resp.get("commit", {}).get("sha", "?")[:12])
+          except urllib.error.HTTPError as e:
+              # Nicht kritisch (z.B. SHA-Konflikt bei parallelem Push) - Build bleibt gruen
+              print(f"Aufraeumen uebersprungen ({e.code})")
+          PYEOF
