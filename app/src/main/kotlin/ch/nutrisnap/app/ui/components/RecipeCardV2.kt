@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.components
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -110,7 +111,7 @@ fun RecipeCardV2(
                     Text(
                         recipe.displayTitle(),
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp,
+                        fontSize = NutriFont.Subtitle,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         lineHeight = 18.sp,
@@ -190,7 +191,7 @@ fun RecipeCardV2(
                         Text(
                             "${it.toInt()} kcal",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
+                            fontSize = NutriFont.Subtitle,
                             color = MacroColors.calories
                         )
                     }
@@ -224,7 +225,7 @@ fun RecipeCardV2(
                                     Text(
                                         if (step == step.toInt().toFloat()) step.toInt().toString()
                                         else step.toString(),
-                                        fontSize = 12.sp,
+                                        fontSize = NutriFont.Small,
                                         fontWeight = FontWeight.SemiBold,
                                         color = if (selected) MaterialTheme.colorScheme.onPrimary
                                         else MaterialTheme.colorScheme.onSurfaceVariant
@@ -277,7 +278,7 @@ fun RecipeCardV2(
 private fun MacroInline(label: String, value: Float, color: Color) {
     Text(
         "${value.toInt()}$label",
-        fontSize = 11.sp,
+        fontSize = NutriFont.Caption,
         fontWeight = FontWeight.Medium,
         color = color
     )

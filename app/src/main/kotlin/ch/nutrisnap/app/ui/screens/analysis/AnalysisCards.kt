@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.analysis
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import ch.nutrisnap.app.ui.theme.StatusColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -58,7 +59,7 @@ internal fun PeriodSelector(selected: AnalysisPeriod, onSelect: (AnalysisPeriod)
             ) {
                 Text(
                     period.label(),
-                    fontSize = 13.sp,
+                    fontSize = NutriFont.Body,
                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                     color = if (isSelected) MaterialTheme.colorScheme.onSurface
                             else MaterialTheme.colorScheme.onSurfaceVariant
@@ -109,7 +110,7 @@ internal fun RangeNavigator(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.width(6.dp))
-                Text(state.rangeLabel, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Text(state.rangeLabel, fontSize = NutriFont.BodyLarge, fontWeight = FontWeight.Medium)
             }
             IconButton(onClick = onNext, enabled = !state.isCurrentPeriod) {
                 Icon(
@@ -124,7 +125,7 @@ internal fun RangeNavigator(
         }
         if (!state.isCurrentPeriod) {
             TextButton(onClick = onToday, modifier = Modifier.fillMaxWidth()) {
-                Text("Zu heute springen", fontSize = 12.sp)
+                Text("Zu heute springen", fontSize = NutriFont.Small)
             }
         }
     }
@@ -187,18 +188,18 @@ internal fun HistoryPermissionBanner(onGrant: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text(
                     "Mehr Verlauf anzeigen",
-                    fontSize = 13.sp,
+                    fontSize = NutriFont.Body,
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     "Ohne zus\u00E4tzliche Berechtigung zeigt Health Connect nur die letzten 30 Tage. Erlaube den Zugriff, um Aktivit\u00E4tskalorien und Gewicht auch f\u00FCr \u00E4ltere Zeitr\u00E4ume zu sehen.",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(NutriSpacing.sm))
                 TextButton(onClick = onGrant, contentPadding = PaddingValues(0.dp)) {
-                    Text("Zugriff erlauben", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Zugriff erlauben", fontSize = NutriFont.Body, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -214,9 +215,9 @@ internal fun DayCaloriesCard(state: AnalysisUiState) {
     AnalysisCard(title = "Kalorien gegessen") {
         val eaten = day?.calories?.toInt() ?: 0
         val goal  = state.goals.computedTdee()?.toInt() ?: state.goals.dailyCalorieGoal
-        Text("$eaten kcal", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text("$eaten kcal", fontSize = NutriFont.HeadlineLarge, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(NutriSpacing.xs))
-        Text("Ziel: $goal kcal", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Ziel: $goal kcal", fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(NutriSpacing.sm))
         val pct = (eaten.toFloat() / goal.coerceAtLeast(1)).coerceIn(0f, 1f)
         LinearProgressIndicator(
@@ -235,9 +236,9 @@ internal fun DayActivityCard(state: AnalysisUiState) {
     val macros = rememberMacroColors()
     AnalysisCard(title = "Aktivit\u00E4tskalorien") {
         val burned = day?.activityCalories?.toInt() ?: 0
-        Text("$burned kcal", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = macros.fiber)
+        Text("$burned kcal", fontSize = NutriFont.HeadlineLarge, fontWeight = FontWeight.Bold, color = macros.fiber)
         Spacer(Modifier.height(NutriSpacing.xs))
-        Text("Aus Health Connect", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Aus Health Connect", fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -247,11 +248,11 @@ internal fun DayWeightCard(state: AnalysisUiState) {
     AnalysisCard(title = "Gewicht") {
         val w = day?.weightKg
         if (w != null) {
-            Text("%.1f kg".format(w), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("%.1f kg".format(w), fontSize = NutriFont.HeadlineLarge, fontWeight = FontWeight.Bold)
         } else {
             Text(
                 "Keine Gewichtsdaten f\u00FCr diesen Tag.",
-                fontSize = 13.sp,
+                fontSize = NutriFont.Body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -280,12 +281,12 @@ internal fun CaloriesCard(state: AnalysisUiState) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(
                 "\u00D8 ${state.avgCalories} kcal/Tag",
-                fontSize = 12.sp,
+                fontSize = NutriFont.Small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
                 "Ziel: ${state.goals.computedTdee()?.toInt() ?: state.goals.dailyCalorieGoal} kcal",
-                fontSize = 12.sp,
+                fontSize = NutriFont.Small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -316,7 +317,7 @@ internal fun ActivityCaloriesCard(state: AnalysisUiState) {
         Spacer(Modifier.height(NutriSpacing.md))
         Text(
             "\u00D8 ${state.avgActivityCalories} kcal/Tag \u00B7 Health Connect",
-            fontSize = 12.sp,
+            fontSize = NutriFont.Small,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
@@ -346,7 +347,7 @@ internal fun WeightCard(state: AnalysisUiState) {
         if (weightValues.isEmpty()) {
             Text(
                 "Noch keine Gewichtsdaten f\u00FCr diesen Zeitraum \u2013 trag dein Gewicht auf der Startseite ein oder verbinde Health Connect.",
-                fontSize = 13.sp,
+                fontSize = NutriFont.Body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
@@ -366,7 +367,7 @@ internal fun WeightCard(state: AnalysisUiState) {
             val targetKg = state.goals.targetWeightKg
             Text(
                 "Zeitraum: ${weightPoints.first().date.format(dateFormatter)} \u2013 ${weightPoints.last().date.format(dateFormatter)} \u00B7 ${weightValues.size} Messungen",
-                fontSize = 11.sp,
+                fontSize = NutriFont.Caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(NutriSpacing.xs))
@@ -384,20 +385,20 @@ internal fun WeightCard(state: AnalysisUiState) {
             ) {
                 Text(
                     "${state.weightStart} kg",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 val diff = (state.weightEnd ?: 0f) - (state.weightStart ?: 0f)
                 val sign = if (diff > 0) "+" else ""
                 Text(
                     "$sign%.1f kg".format(diff),
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     fontWeight = FontWeight.SemiBold,
                     color = if (diff > 0) MaterialTheme.colorScheme.error else macros.calories
                 )
                 Text(
                     "${state.weightEnd} kg",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -407,20 +408,20 @@ internal fun WeightCard(state: AnalysisUiState) {
                 Spacer(Modifier.height(NutriSpacing.sm))
                 Text(
                     projectionText,
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             if (targetKg != null) {
                 Text(
                     "Gestrichelte Linie = Zielgewicht (%.1f kg) · Trend = gleitender Mittelwert".format(targetKg),
-                    fontSize = 11.sp,
+                    fontSize = NutriFont.Caption,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else if (smoothed.size >= 2) {
                 Text(
                     "Gestrichelte Kurve = geglätteter Trend",
-                    fontSize = 11.sp,
+                    fontSize = NutriFont.Caption,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -484,14 +485,14 @@ internal fun StreakCard(streak: Int) {
                     .background(macros.fat.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text("\uD83D\uDD25", fontSize = 24.sp)
+                Text("\uD83D\uDD25", fontSize = NutriFont.Display)
             }
             Spacer(Modifier.width(NutriSpacing.lg))
             Column {
-                Text("$streak Tage Streak", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("$streak Tage Streak", fontWeight = FontWeight.Bold, fontSize = NutriFont.Title)
                 Text(
                     "Aktuelle Serie an Tagen mit Eintr\u00E4gen",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -508,7 +509,7 @@ internal fun AnalysisCard(title: String, content: @Composable ColumnScope.() -> 
         elevation = CardDefaults.cardElevation(1.dp)
     ) {
         Column(Modifier.padding(NutriSpacing.lg)) {
-            Text(title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Text(title, fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Subtitle)
             Spacer(Modifier.height(NutriSpacing.md))
             content()
         }
@@ -526,10 +527,10 @@ internal fun MacroAverageRow(label: String, value: Float, goal: Float, color: Co
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(label, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            Text(label, fontSize = NutriFont.Body, fontWeight = FontWeight.Medium)
             Text(
                 "${value.toInt()}g / ${goal.toInt()}g",
-                fontSize = 12.sp,
+                fontSize = NutriFont.Small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -573,14 +574,14 @@ internal fun WeekOverviewSheet(
             Text(
                 if (mode == OverviewMode.WOCHE) "Wochenübersicht" else "Tagesübersicht",
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
+                fontSize = NutriFont.TitleLarge
             )
             Text(
                 if (mode == OverviewMode.WOCHE)
                     "Ø-Werte pro Kalenderwoche (Mo–So, ohne den heutigen Tag). Zone relativ zum Abnehm-Tagesziel. Δ kg = Ø-Gewicht ggü. Vorwoche, Δ Ziel = Ø kcal − Ø Tagesziel."
                 else
                     "Zone relativ zum Tagesziel (Erhaltung − Defizit, aktivitätsbereinigt). Δ Ziel = kcal − Tagesziel. Trend = geglättetes Gewicht (EWMA).",
-                fontSize = 12.sp,
+                fontSize = NutriFont.Small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
             )
@@ -614,7 +615,7 @@ internal fun WeekOverviewSheet(
                         weekRows.isEmpty() -> {
                             Text(
                                 "Noch keine Wochendaten.",
-                                fontSize = 13.sp,
+                                fontSize = NutriFont.Body,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(24.dp)
                             )
@@ -648,7 +649,7 @@ internal fun WeekOverviewSheet(
                         dayRows.isEmpty() -> {
                             Text(
                                 "Noch keine Tagesdaten.",
-                                fontSize = 13.sp,
+                                fontSize = NutriFont.Body,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(24.dp)
                             )
@@ -685,13 +686,13 @@ internal fun WeekOverviewHeaderRow() {
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("KW", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(36.dp))
-        Text("Ø kg", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(52.dp))
-        Text("Δ kg", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
-        Text("Ø kcal", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(56.dp))
-        Text("Δ Ziel", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
-        Text("Aktiv.", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
-        Text("Zone", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+        Text("KW", fontSize = NutriFont.Caption, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(36.dp))
+        Text("Ø kg", fontSize = NutriFont.Caption, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(52.dp))
+        Text("Δ kg", fontSize = NutriFont.Caption, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
+        Text("Ø kcal", fontSize = NutriFont.Caption, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(56.dp))
+        Text("Δ Ziel", fontSize = NutriFont.Caption, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
+        Text("Aktiv.", fontSize = NutriFont.Caption, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
+        Text("Zone", fontSize = NutriFont.Caption, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
     }
 }
 
@@ -708,30 +709,30 @@ internal fun WeekOverviewDataRow(row: WeekOverviewRow) {
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("${row.weekNumber}", fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.width(36.dp))
-        Text(row.avgWeightKg?.let { "%.1f".format(it) } ?: "—", fontSize = 12.sp, modifier = Modifier.width(52.dp))
+        Text("${row.weekNumber}", fontSize = NutriFont.Small, fontWeight = FontWeight.Medium, modifier = Modifier.width(36.dp))
+        Text(row.avgWeightKg?.let { "%.1f".format(it) } ?: "—", fontSize = NutriFont.Small, modifier = Modifier.width(52.dp))
         Text(
             row.weightChangeKg?.let { (if (it > 0f) "+" else "") + "%.1f".format(it) } ?: "—",
-            fontSize = 11.sp,
+            fontSize = NutriFont.Caption,
             color = trendColor(row.weightChangeKg?.div(7f)),
             modifier = Modifier.width(48.dp)
         )
         Text(
             if (row.avgCalories > 0) row.avgCalories.toString() else "—",
-            fontSize = 12.sp,
+            fontSize = NutriFont.Small,
             fontWeight = if (calHighlight) FontWeight.Bold else FontWeight.Normal,
             modifier = Modifier.width(56.dp)
         )
         Text(
             row.balanceKcal?.let { if (it > 0) "+$it" else "$it" } ?: "—",
-            fontSize = 11.sp,
+            fontSize = NutriFont.Caption,
             color = zoneColor(row.zone),
             modifier = Modifier.width(48.dp)
         )
-        Text(if (row.avgActivityCalories > 0) row.avgActivityCalories.toString() else "—", fontSize = 12.sp, modifier = Modifier.width(48.dp))
+        Text(if (row.avgActivityCalories > 0) row.avgActivityCalories.toString() else "—", fontSize = NutriFont.Small, modifier = Modifier.width(48.dp))
         Text(
             row.zone,
-            fontSize = 11.sp,
+            fontSize = NutriFont.Caption,
             fontWeight = FontWeight.Medium,
             color = zoneColor(row.zone),
             maxLines = 1,
@@ -749,13 +750,13 @@ internal fun DayOverviewHeaderRow() {
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("Tag", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(56.dp))
-        Text("kg", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
-        Text("Trend", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
-        Text("kcal", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(52.dp))
-        Text("Δ Ziel", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
-        Text("Aktiv.", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
-        Text("Zone", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+        Text("Tag", fontSize = NutriFont.Caption, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(56.dp))
+        Text("kg", fontSize = NutriFont.Caption, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
+        Text("Trend", fontSize = NutriFont.Caption, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
+        Text("kcal", fontSize = NutriFont.Caption, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(52.dp))
+        Text("Δ Ziel", fontSize = NutriFont.Caption, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
+        Text("Aktiv.", fontSize = NutriFont.Caption, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(48.dp))
+        Text("Zone", fontSize = NutriFont.Caption, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
     }
 }
 
@@ -774,30 +775,30 @@ internal fun DayOverviewDataRow(row: DayOverviewRow) {
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(dayLabel, fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.width(56.dp))
-        Text(row.weightKg?.let { "%.1f".format(it) } ?: "—", fontSize = 12.sp, modifier = Modifier.width(48.dp))
+        Text(dayLabel, fontSize = NutriFont.Small, fontWeight = FontWeight.Medium, modifier = Modifier.width(56.dp))
+        Text(row.weightKg?.let { "%.1f".format(it) } ?: "—", fontSize = NutriFont.Small, modifier = Modifier.width(48.dp))
         Text(
             row.trendWeightKg?.let { "%.1f".format(it) } ?: "—",
-            fontSize = 11.sp,
+            fontSize = NutriFont.Caption,
             color = trendColor(row.trendChangeKg),
             modifier = Modifier.width(48.dp)
         )
         Text(
             if (row.calories > 0) row.calories.toString() else "—",
-            fontSize = 12.sp,
+            fontSize = NutriFont.Small,
             fontWeight = if (calHighlight) FontWeight.Bold else FontWeight.Normal,
             modifier = Modifier.width(52.dp)
         )
         Text(
             row.balanceKcal?.let { if (it > 0) "+$it" else "$it" } ?: "—",
-            fontSize = 11.sp,
+            fontSize = NutriFont.Caption,
             color = zoneColor(row.zone),
             modifier = Modifier.width(48.dp)
         )
-        Text(if (row.activityCalories > 0) row.activityCalories.toString() else "—", fontSize = 12.sp, modifier = Modifier.width(48.dp))
+        Text(if (row.activityCalories > 0) row.activityCalories.toString() else "—", fontSize = NutriFont.Small, modifier = Modifier.width(48.dp))
         Text(
             row.zone,
-            fontSize = 11.sp,
+            fontSize = NutriFont.Caption,
             fontWeight = FontWeight.Medium,
             color = zoneColor(row.zone),
             maxLines = 1,

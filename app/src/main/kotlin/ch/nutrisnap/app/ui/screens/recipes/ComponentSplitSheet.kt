@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -258,7 +259,7 @@ fun ComponentSplitSheet(
                 Text(
                     "Komponenten trennen",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
+                    fontSize = NutriFont.TitleLarge,
                     modifier = Modifier.weight(1f)
                 )
                 IconButton(onClick = { requestDismiss() }, modifier = Modifier.size(36.dp)) {
@@ -267,19 +268,19 @@ fun ComponentSplitSheet(
             }
             Text(
                 recipe.displayTitle(),
-                fontSize = 13.sp,
+                fontSize = NutriFont.Body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(4.dp))
             Text(
                 "Abschnitte anlegen, Zutaten zuordnen, Kochgewicht eintragen. Fertig.",
-                fontSize = 12.sp,
+                fontSize = NutriFont.Small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(16.dp))
 
             // ── 1. Komponenten (Name + Kochgewicht) ──────────────────────────
-            Text("Abschnitte", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Text("Abschnitte", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Subtitle)
             Spacer(Modifier.height(8.dp))
 
             parts.forEachIndexed { index, part ->
@@ -341,7 +342,7 @@ fun ComponentSplitSheet(
                         if (kcal > 0f) {
                             Text(
                                 "${fmtNum(kcal)} kcal aus zugeordneten Zutaten",
-                                fontSize = 12.sp,
+                                fontSize = NutriFont.Small,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(top = 4.dp)
                             )
@@ -366,11 +367,11 @@ fun ComponentSplitSheet(
             Spacer(Modifier.height(20.dp))
 
             // ── 2. Zutaten zuordnen (ein Dropdown pro Zutat) ─────────────────
-            Text("Zutaten zuordnen", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Text("Zutaten zuordnen", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Subtitle)
             Spacer(Modifier.height(4.dp))
             Text(
                 "Tippe auf den Abschnitt-Namen, um die Zutat umzuzuordnen.",
-                fontSize = 12.sp,
+                fontSize = NutriFont.Small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(8.dp))
@@ -378,7 +379,7 @@ fun ComponentSplitSheet(
             if (workingMatches.isEmpty()) {
                 Text(
                     "Keine Zutaten vorhanden. Zuerst im Verify-Sheet matchen oder Abschnitte im Zutaten-Text anlegen.",
-                    fontSize = 13.sp,
+                    fontSize = NutriFont.Body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
@@ -398,13 +399,13 @@ fun ComponentSplitSheet(
                         Column(Modifier.weight(1f)) {
                             Text(
                                 m.ingredientRaw.ifBlank { m.ingredientName },
-                                fontSize = 14.sp
+                                fontSize = NutriFont.BodyLarge
                             )
                             val kcal = m.matchedCalories ?: 0f
                             if (kcal > 0f) {
                                 Text(
                                     "${fmtNum(kcal)} kcal",
-                                    fontSize = 11.sp,
+                                    fontSize = NutriFont.Caption,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -413,7 +414,7 @@ fun ComponentSplitSheet(
                             AssistChip(
                                 onClick = { menuOpen = true },
                                 label = {
-                                    Text(currentName, fontSize = 12.sp, maxLines = 1)
+                                    Text(currentName, fontSize = NutriFont.Small, maxLines = 1)
                                 },
                                 trailingIcon = {
                                     Icon(

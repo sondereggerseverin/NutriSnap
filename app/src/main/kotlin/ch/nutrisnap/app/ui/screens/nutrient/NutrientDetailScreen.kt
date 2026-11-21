@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.nutrient
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import ch.nutrisnap.app.ui.theme.StatusColors
 import android.app.Application
 import androidx.compose.foundation.layout.*
@@ -208,7 +209,7 @@ fun NutrientDetailScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     Column(Modifier.padding(NutriSpacing.lg)) {
-                        Text("Heute", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Heute", fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(4.dp))
                         Text(
                             formatAmount(state.amountDisplay, state.unit),
@@ -220,7 +221,7 @@ fun NutrientDetailScreen(
                             Text(
                                 "Ziel: ${formatAmount(goal, state.unit)}" +
                                     (state.pctOfGoal?.let { " · $it %" } ?: ""),
-                                fontSize = 14.sp,
+                                fontSize = NutriFont.BodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(Modifier.height(10.dp))
@@ -241,7 +242,7 @@ fun NutrientDetailScreen(
             item {
                 Text(
                     state.description,
-                    fontSize = 14.sp,
+                    fontSize = NutriFont.BodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 20.sp
                 )
@@ -261,7 +262,7 @@ fun NutrientDetailScreen(
                         } else {
                             "Beitrag konnte nicht den einzelnen Lebensmitteln zugeordnet werden."
                         },
-                        fontSize = 13.sp,
+                        fontSize = NutriFont.Body,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 18.sp
                     )
@@ -278,7 +279,7 @@ fun NutrientDetailScreen(
                     ) {
                         Text(
                             c.name,
-                            fontSize = 14.sp,
+                            fontSize = NutriFont.BodyLarge,
                             modifier = Modifier.weight(1f),
                             maxLines = 2
                         )
@@ -287,7 +288,7 @@ fun NutrientDetailScreen(
                                 append(formatAmount(c.amountDisplay, state.unit))
                                 c.pctOfToday?.let { append(" · $it %") }
                             },
-                            fontSize = 13.sp,
+                            fontSize = NutriFont.Body,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -313,13 +314,13 @@ fun NutrientDetailScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(dateLabel, fontSize = 14.sp)
+                    Text(dateLabel, fontSize = NutriFont.BodyLarge)
                     Text(
                         buildString {
                             append(formatAmount(point.amountDisplay, state.unit))
                             point.pctOfGoal?.let { append("  ·  $it %") }
                         },
-                        fontSize = 14.sp,
+                        fontSize = NutriFont.BodyLarge,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurface
                     )

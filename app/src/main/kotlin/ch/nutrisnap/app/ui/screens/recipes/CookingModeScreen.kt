@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import android.view.WindowManager
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -264,7 +265,7 @@ fun CookingModeScreen(
                         Text(
                             text = steps.getOrElse(currentStep) { "" },
                             style = MaterialTheme.typography.bodyLarge,
-                            fontSize = 20.sp,
+                            fontSize = NutriFont.Headline,
                             modifier = Modifier.padding(24.dp),
                             lineHeight = 32.sp
                         )

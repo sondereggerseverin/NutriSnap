@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.scan
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import android.Manifest
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -218,9 +219,9 @@ fun PhotoCaptureScreen(
                 .padding(top = 48.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)
         ) {
             Column {
-                Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = NutriFont.TitleLarge)
                 Spacer(Modifier.height(4.dp))
-                Text(instructions, color = Color.White, fontSize = 13.sp)
+                Text(instructions, color = Color.White, fontSize = NutriFont.Body)
             }
         }
 
@@ -241,7 +242,7 @@ fun PhotoCaptureScreen(
                 Text(
                     captureHint ?: "Foto wird aufgenommen…",
                     color = Color.White,
-                    fontSize = 14.sp
+                    fontSize = NutriFont.BodyLarge
                 )
             }
         }
@@ -250,7 +251,7 @@ fun PhotoCaptureScreen(
             OutlinedTextField(
                 value = note,
                 onValueChange = { if (it.length <= 200) onNoteChange(it) },
-                placeholder = { Text("Notiz (optional): z. B. 1 EL Öl, halbe Portion", fontSize = 13.sp) },
+                placeholder = { Text("Notiz (optional): z. B. 1 EL Öl, halbe Portion", fontSize = NutriFont.Body) },
                 maxLines = 2,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -313,7 +314,7 @@ fun PhotoCaptureScreen(
                             }
                         }
                     }
-                    Text("${collectedPhotos.size}/$photoLimit", color = Color.White, fontSize = 12.sp)
+                    Text("${collectedPhotos.size}/$photoLimit", color = Color.White, fontSize = NutriFont.Small)
                 }
                 Spacer(Modifier.height(8.dp))
                 Button(onClick = { finishMulti() }, modifier = Modifier.fillMaxWidth()) {

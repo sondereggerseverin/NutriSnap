@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.supplements
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -84,7 +85,7 @@ fun SupplementsScreen(
             contentPadding = PaddingValues(bottom = 88.dp, top = NutriSpacing.sm)
         ) {
             item {
-                Text("Heute empfohlen", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("Heute empfohlen", fontWeight = FontWeight.Bold, fontSize = NutriFont.Title)
                 Spacer(Modifier.height(6.dp))
             }
             item {
@@ -108,13 +109,13 @@ fun SupplementsScreen(
                     Text(
                         "Nur bei Bedarf / ärztlich",
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp,
+                        fontSize = NutriFont.Body,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     plan.onDemandHints.forEach { s ->
                         Text(
                             "· ${s.name}",
-                            fontSize = 12.sp,
+                            fontSize = NutriFont.Small,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -124,7 +125,7 @@ fun SupplementsScreen(
 
             item {
                 Spacer(Modifier.height(8.dp))
-                Text("Dein Bestand (${list.size})", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("Dein Bestand (${list.size})", fontWeight = FontWeight.Bold, fontSize = NutriFont.Title)
             }
             items(list, key = { it.id }) { s ->
                 SupplementCard(
@@ -181,10 +182,10 @@ private fun RecommendationBlock(
             Text(
                 if (items.isEmpty()) title else "$title ($done/${items.size})",
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp
+                fontSize = NutriFont.BodyLarge
             )
             if (items.isEmpty()) {
-                Text("Keine Empfehlung", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Keine Empfehlung", fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 items.forEach { rec ->
                     val id = rec.supplement.id
@@ -204,13 +205,13 @@ private fun RecommendationBlock(
                             Text(
                                 rec.supplement.name,
                                 fontWeight = FontWeight.Medium,
-                                fontSize = 13.sp,
+                                fontSize = NutriFont.Body,
                                 color = if (taken) MaterialTheme.colorScheme.onSurfaceVariant
                                 else MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 "${rec.supplement.servingSize.ifBlank { "laut Packung" }} · ${rec.reason}",
-                                fontSize = 11.sp,
+                                fontSize = NutriFont.Caption,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -246,17 +247,17 @@ private fun SupplementCard(
             Icon(Icons.Default.Medication, contentDescription = null, tint = statusColor)
             Spacer(Modifier.width(NutriSpacing.md))
             Column(Modifier.weight(1f)) {
-                Text(item.name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text(item.name, fontWeight = FontWeight.SemiBold, fontSize = NutriFont.BodyLarge)
                 val sub = listOfNotNull(
                     item.brand.takeIf { it.isNotBlank() },
                     item.category.name.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() },
                     item.status.name.lowercase()
                 ).joinToString(" · ")
-                Text(sub, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(sub, fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (item.activeIngredients.isNotBlank()) {
                     Text(
                         item.activeIngredients.take(80) + if (item.activeIngredients.length > 80) "…" else "",
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -326,8 +327,8 @@ private fun SupplementDetailScreen(
 @Composable
 private fun DetailSection(title: String, body: String) {
     if (body.isBlank()) return
-    Text(title, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-    Text(body, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(title, fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Body)
+    Text(body, fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable
@@ -350,7 +351,7 @@ private fun AddSupplementDialog(
                 OutlinedTextField(brand, { brand = it }, label = { Text("Marke") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(ingredients, { ingredients = it }, label = { Text("Wirkstoffe") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(dosage, { dosage = it }, label = { Text("Dosierung") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                Text("Timing", fontSize = 12.sp)
+                Text("Timing", fontSize = NutriFont.Small)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf(SupplementTiming.MORGENS, SupplementTiming.ABENDS).forEach { t ->
                         FilterChip(

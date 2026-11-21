@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.components
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.net.Uri
@@ -159,7 +160,7 @@ fun ComposeCropScreen(
                 title,
                 color = Color.White,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 16.sp,
+                fontSize = NutriFont.Title,
                 modifier = Modifier.weight(1f)
             )
             IconButton(
@@ -174,7 +175,7 @@ fun ComposeCropScreen(
             Text(
                 msg,
                 color = Color(0xFFFFAB91),
-                fontSize = 12.sp,
+                fontSize = NutriFont.Small,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
         }
@@ -203,7 +204,7 @@ fun ComposeCropScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(color = Color.White)
                         Spacer(Modifier.height(12.dp))
-                        Text("Bild wird vorbereitet…", color = Color.White, fontSize = 14.sp)
+                        Text("Bild wird vorbereitet…", color = Color.White, fontSize = NutriFont.BodyLarge)
                     }
                 }
             }
@@ -221,7 +222,7 @@ fun ComposeCropScreen(
                         Text(
                             if (isRotating) "Drehen…" else "Speichern…",
                             color = Color.White,
-                            fontSize = 14.sp
+                            fontSize = NutriFont.BodyLarge
                         )
                     }
                 }
@@ -231,7 +232,7 @@ fun ComposeCropScreen(
         Text(
             "Ecken ziehen · Fläche verschieben",
             color = Color.White.copy(alpha = 0.7f),
-            fontSize = 12.sp,
+            fontSize = NutriFont.Small,
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)
                 .padding(bottom = 4.dp)

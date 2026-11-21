@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -147,7 +148,7 @@ private fun FabMenuItem(
             shape = RoundedCornerShape(8.dp),
             shadowElevation = 2.dp
         ) {
-            Text(label, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), fontSize = 13.sp)
+            Text(label, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), fontSize = NutriFont.Body)
         }
         SmallFloatingActionButton(
             onClick = onClick,
@@ -400,7 +401,7 @@ fun RecipesScreen(
                 placeholder = {
                     Text(
                         "Rezepte durchsuchen…",
-                        fontSize = 13.sp,
+                        fontSize = NutriFont.Body,
                         maxLines = 1
                     )
                 },
@@ -428,7 +429,7 @@ fun RecipesScreen(
                     .heightIn(max = 52.dp),
                 singleLine = true,
                 shape = RoundedCornerShape(percent = 50),
-                textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                textStyle = LocalTextStyle.current.copy(fontSize = NutriFont.Body),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
@@ -445,13 +446,13 @@ fun RecipesScreen(
                 ) {
                     Text(
                         "Zutaten: " + state.ingredientNeedles.joinToString(", "),
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.weight(1f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    TextButton(onClick = { vm.clearCookFilters() }) { Text("Reset", fontSize = 11.sp) }
+                    TextButton(onClick = { vm.clearCookFilters() }) { Text("Reset", fontSize = NutriFont.Caption) }
                 }
             }
 
@@ -499,7 +500,7 @@ fun RecipesScreen(
                             collectionFilterId = null
                             hideIncomplete = false
                         },
-                        label = { Text("Alle", fontSize = 12.sp) },
+                        label = { Text("Alle", fontSize = NutriFont.Small) },
                         modifier = Modifier.height(30.dp)
                     )
                     FilterChip(
@@ -511,7 +512,7 @@ fun RecipesScreen(
                         label = {
                             Text(
                                 if (favCount > 0) "★ $favCount" else "★ Favoriten",
-                                fontSize = 12.sp
+                                fontSize = NutriFont.Small
                             )
                         },
                         modifier = Modifier.height(30.dp)
@@ -527,7 +528,7 @@ fun RecipesScreen(
                             )
                             favoritesOnly = false
                         },
-                        label = { Text("🆕 Neu", fontSize = 12.sp) },
+                        label = { Text("🆕 Neu", fontSize = NutriFont.Small) },
                         modifier = Modifier.height(30.dp)
                     )
                     FilterChip(
@@ -536,7 +537,7 @@ fun RecipesScreen(
                         label = {
                             Text(
                                 if (activeFilterCount > 0) "Filter · $activeFilterCount" else "Filter",
-                                fontSize = 12.sp
+                                fontSize = NutriFont.Small
                             )
                         },
                         leadingIcon = if (hasActiveFilters) {
@@ -569,7 +570,7 @@ fun RecipesScreen(
                                 RecipeSort.NAME        -> "A–Z"
                                 RecipeSort.CALORIES    -> "kcal"
                             },
-                        fontSize = 10.sp,
+                        fontSize = NutriFont.Tiny,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         modifier = Modifier.padding(end = 2.dp)
@@ -610,7 +611,7 @@ fun RecipesScreen(
                         InputChip(
                             selected = true,
                             onClick = { vm.setCategoryFilter(null) },
-                            label = { Text("${cat.emoji} ${cat.label}", fontSize = 11.sp) },
+                            label = { Text("${cat.emoji} ${cat.label}", fontSize = NutriFont.Caption) },
                             trailingIcon = {
                                 Icon(Icons.Default.Close, null, Modifier.size(14.dp))
                             },
@@ -629,7 +630,7 @@ fun RecipesScreen(
                         InputChip(
                             selected = true,
                             onClick = { vm.setPlatformFilter(null) },
-                            label = { Text(label, fontSize = 11.sp) },
+                            label = { Text(label, fontSize = NutriFont.Caption) },
                             trailingIcon = {
                                 Icon(Icons.Default.Close, null, Modifier.size(14.dp))
                             },
@@ -640,7 +641,7 @@ fun RecipesScreen(
                         InputChip(
                             selected = true,
                             onClick = { vm.setCookedFilter(CookedFilter.ALL) },
-                            label = { Text("Schon gekocht", fontSize = 11.sp) },
+                            label = { Text("Schon gekocht", fontSize = NutriFont.Caption) },
                             trailingIcon = {
                                 Icon(Icons.Default.Close, null, Modifier.size(14.dp))
                             },
@@ -651,7 +652,7 @@ fun RecipesScreen(
                         InputChip(
                             selected = true,
                             onClick = { vm.setCookedFilter(CookedFilter.ALL) },
-                            label = { Text("Noch nicht", fontSize = 11.sp) },
+                            label = { Text("Noch nicht", fontSize = NutriFont.Caption) },
                             trailingIcon = {
                                 Icon(Icons.Default.Close, null, Modifier.size(14.dp))
                             },
@@ -662,7 +663,7 @@ fun RecipesScreen(
                         InputChip(
                             selected = true,
                             onClick = { vm.setCookedFilter(CookedFilter.ALL) },
-                            label = { Text("📦 Archiv", fontSize = 11.sp) },
+                            label = { Text("📦 Archiv", fontSize = NutriFont.Caption) },
                             trailingIcon = {
                                 Icon(Icons.Default.Close, null, Modifier.size(14.dp))
                             },
@@ -675,7 +676,7 @@ fun RecipesScreen(
                             InputChip(
                                 selected = true,
                                 onClick = { collectionFilterId = null },
-                                label = { Text("${col.emoji} ${col.name}", fontSize = 11.sp) },
+                                label = { Text("${col.emoji} ${col.name}", fontSize = NutriFont.Caption) },
                                 trailingIcon = {
                                     Icon(Icons.Default.Close, null, Modifier.size(14.dp))
                                 },
@@ -687,7 +688,7 @@ fun RecipesScreen(
                         InputChip(
                             selected = true,
                             onClick = { hideIncomplete = false },
-                            label = { Text("🧹 Unvollständig aus", fontSize = 11.sp) },
+                            label = { Text("🧹 Unvollständig aus", fontSize = NutriFont.Caption) },
                             trailingIcon = {
                                 Icon(Icons.Default.Close, null, Modifier.size(14.dp))
                             },
@@ -704,7 +705,7 @@ fun RecipesScreen(
                         },
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                     ) {
-                        Text("Zurücksetzen", fontSize = 11.sp)
+                        Text("Zurücksetzen", fontSize = NutriFont.Caption)
                     }
                 }
             }
@@ -728,7 +729,7 @@ fun RecipesScreen(
                         )
                         Spacer(Modifier.height(16.dp))
 
-                        Text("Kategorie", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Text("Kategorie", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Body)
                         Spacer(Modifier.height(8.dp))
                         Row(
                             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -742,13 +743,13 @@ fun RecipesScreen(
                                             if (state.categoryFilter == cat) null else cat
                                         )
                                     },
-                                    label = { Text("${cat.emoji} ${cat.label}", fontSize = 12.sp) }
+                                    label = { Text("${cat.emoji} ${cat.label}", fontSize = NutriFont.Small) }
                                 )
                             }
                         }
 
                         Spacer(Modifier.height(16.dp))
-                        Text("Quelle", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Text("Quelle", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Body)
                         Spacer(Modifier.height(8.dp))
                         Row(
                             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -768,13 +769,13 @@ fun RecipesScreen(
                                             if (state.platformFilter == value) null else value
                                         )
                                     },
-                                    label = { Text(label, fontSize = 12.sp) }
+                                    label = { Text(label, fontSize = NutriFont.Small) }
                                 )
                             }
                         }
 
                         Spacer(Modifier.height(16.dp))
-                        Text("Status", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Text("Status", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Body)
                         Spacer(Modifier.height(8.dp))
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -787,7 +788,7 @@ fun RecipesScreen(
                                         else CookedFilter.COOKED
                                     )
                                 },
-                                label = { Text("Schon gekocht", fontSize = 12.sp) }
+                                label = { Text("Schon gekocht", fontSize = NutriFont.Small) }
                             )
                             FilterChip(
                                 selected = state.cookedFilter == CookedFilter.NOT_COOKED,
@@ -797,7 +798,7 @@ fun RecipesScreen(
                                         else CookedFilter.NOT_COOKED
                                     )
                                 },
-                                label = { Text("Noch nicht", fontSize = 12.sp) }
+                                label = { Text("Noch nicht", fontSize = NutriFont.Small) }
                             )
                             FilterChip(
                                 selected = state.cookedFilter == CookedFilter.ARCHIVED,
@@ -807,20 +808,20 @@ fun RecipesScreen(
                                         else CookedFilter.ARCHIVED
                                     )
                                 },
-                                label = { Text("📦 Archiv", fontSize = 12.sp) }
+                                label = { Text("📦 Archiv", fontSize = NutriFont.Small) }
                             )
                             if (incompleteCount > 0) {
                                 FilterChip(
                                     selected = hideIncomplete,
                                     onClick = { hideIncomplete = !hideIncomplete },
-                                    label = { Text("🧹 Unvollständig aus ($incompleteCount)", fontSize = 12.sp) }
+                                    label = { Text("🧹 Unvollständig aus ($incompleteCount)", fontSize = NutriFont.Small) }
                                 )
                             }
                         }
 
                         if (collections.isNotEmpty()) {
                             Spacer(Modifier.height(16.dp))
-                            Text("Sammlungen", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text("Sammlungen", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Body)
                             Spacer(Modifier.height(8.dp))
                             Row(
                                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -839,7 +840,7 @@ fun RecipesScreen(
                                             Text(
                                                 "${col.emoji} ${col.name}" +
                                                     if (colCount > 0) " ($colCount)" else "",
-                                                fontSize = 12.sp
+                                                fontSize = NutriFont.Small
                                             )
                                         }
                                     )
@@ -1356,14 +1357,14 @@ fun RecipesScreen(
                             )
                             Spacer(Modifier.height(4.dp))
                             Text("Protein ${r.scaledProtein.toInt()}g · Carbs ${r.scaledCarbs.toInt()}g · Fett ${r.scaledFat.toInt()}g",
-                                fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.height(10.dp))
-                            Text("Zutaten (angepasst):", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text("Zutaten (angepasst):", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Body)
                             r.ingredients.forEach { line ->
                                 val text = if (line.parsed && line.scaledAmountG != null)
                                     "${line.scaledAmountG.toInt()}g ${line.name ?: line.originalLine}"
                                 else line.originalLine
-                                Text("• $text", fontSize = 13.sp)
+                                Text("• $text", fontSize = NutriFont.Body)
                             }
                         }
                     }

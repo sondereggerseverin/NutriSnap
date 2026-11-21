@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -94,12 +95,12 @@ fun AddToDiarySheet(
                         "Gesamt (nach Kochen): ${yieldTotalG.toInt()} g · ${gramsPerServing?.toInt() ?: "–"} g/Portion"
                     else
                         "Σ Zutaten (roh): ${yieldTotalG.toInt()} g · ${gramsPerServing?.toInt() ?: "–"} g/Portion",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
                     "Tipp: Nudeln/Reis – „Gewicht nach Kochen“ im Rezept setzen für genaues Tracking.",
-                    fontSize = 11.sp,
+                    fontSize = NutriFont.Caption,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -128,7 +129,7 @@ fun AddToDiarySheet(
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "Kein Portionsgewicht hinterlegt — Gramm werden gespeichert, kcal ≈ 1 Portion.",
-                    fontSize = 11.sp,
+                    fontSize = NutriFont.Caption,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -164,7 +165,7 @@ fun AddToDiarySheet(
                     FilterChip(
                         selected = selectedDate == d,
                         onClick = { selectedDate = d },
-                        label = { Text(label, fontSize = 11.sp) }
+                        label = { Text(label, fontSize = NutriFont.Caption) }
                     )
                 }
             }
@@ -280,7 +281,7 @@ fun AddToDiarySheet(
                     Spacer(Modifier.height(4.dp))
                     Text(
                         "Packungen brauchen ein Gewicht (Gramm-Menge oben oder analysierte Portionsgröße). Alternativ Einheit „Gramm“ wählen.",
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -312,15 +313,15 @@ internal fun RecipeQuickRatingDialog(
         title = { Text("Wie war’s?") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(recipe.displayTitle(), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(recipe.displayTitle(), fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (recipe.timesCooked > 0) {
                     Text(
                         "Bereits ${recipe.timesCooked}× getrackt",
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Text("Sterne", fontSize = 12.sp)
+                Text("Sterne", fontSize = NutriFont.Small)
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     for (i in 1..5) {
                         IconButton(onClick = { stars = i }, modifier = Modifier.size(36.dp)) {
@@ -333,12 +334,12 @@ internal fun RecipeQuickRatingDialog(
                         }
                     }
                 }
-                Text("Nächstes Mal", fontSize = 12.sp)
+                Text("Nächstes Mal", fontSize = NutriFont.Small)
                 OutlinedTextField(
                     value = nextTime,
                     onValueChange = { nextTime = it },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("z.B. Himbeeren mit Erythrit süssen", fontSize = 13.sp) },
+                    placeholder = { Text("z.B. Himbeeren mit Erythrit süssen", fontSize = NutriFont.Body) },
                     minLines = 2,
                     maxLines = 4
                 )
@@ -402,13 +403,13 @@ internal fun CookWithWhatIHaveSheet(
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 32.dp)
         ) {
-            Text("Was koche ich?", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            Text("Was koche ich?", fontWeight = FontWeight.Bold, fontSize = NutriFont.Headline)
             Text(
                 if (remaining != null && remaining.hasMeaningfulGap)
                     "Smart-Vorschläge aus ${recipes.size} Rezepten · ${remaining.kcal.toInt()} kcal / P ${remaining.protein.toInt()}g offen"
                 else
                     "Smart-Vorschläge aus ${recipes.size} Rezepten",
-                fontSize = 13.sp,
+                fontSize = NutriFont.Body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
             )
@@ -430,13 +431,13 @@ internal fun CookWithWhatIHaveSheet(
                     FilterChip(
                         selected = mode == m,
                         onClick = { mode = m; seed = System.currentTimeMillis() },
-                        label = { Text(label, fontSize = 12.sp) }
+                        label = { Text(label, fontSize = NutriFont.Small) }
                     )
                 }
             }
 
             // Kategorie optional
-            Text("Kategorie", fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+            Text("Kategorie", fontSize = NutriFont.Small, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
             Row(
                 Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -453,7 +454,7 @@ internal fun CookWithWhatIHaveSheet(
                             category = if (category == cat) null else cat
                             seed = System.currentTimeMillis()
                         },
-                        label = { Text("${cat.emoji} ${cat.label}", fontSize = 12.sp) }
+                        label = { Text("${cat.emoji} ${cat.label}", fontSize = NutriFont.Small) }
                     )
                 }
             }
@@ -463,7 +464,7 @@ internal fun CookWithWhatIHaveSheet(
             if (suggestions.isEmpty()) {
                 Text(
                     "Keine Treffer für diesen Filter. Anderen Modus wählen oder Zutaten suchen.",
-                    fontSize = 13.sp,
+                    fontSize = NutriFont.Body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 16.dp)
                 )
@@ -484,7 +485,7 @@ internal fun CookWithWhatIHaveSheet(
                                 Text(
                                     r.displayTitle(),
                                     fontWeight = FontWeight.SemiBold,
-                                    fontSize = 15.sp,
+                                    fontSize = NutriFont.Subtitle,
                                     modifier = Modifier.weight(1f),
                                     maxLines = 2
                                 )
@@ -509,7 +510,7 @@ internal fun CookWithWhatIHaveSheet(
                             if (macros.isNotEmpty()) {
                                 Text(
                                     macros,
-                                    fontSize = 12.sp,
+                                    fontSize = NutriFont.Small,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(top = 2.dp)
                                 )
@@ -517,7 +518,7 @@ internal fun CookWithWhatIHaveSheet(
                             if (s.reasons.isNotEmpty()) {
                                 Text(
                                     s.reasons.joinToString(" · "),
-                                    fontSize = 11.sp,
+                                    fontSize = NutriFont.Caption,
                                     color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.padding(top = 4.dp)
                                 )
@@ -531,7 +532,7 @@ internal fun CookWithWhatIHaveSheet(
                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                                     modifier = Modifier.height(32.dp)
                                 ) {
-                                    Text("Öffnen", fontSize = 12.sp)
+                                    Text("Öffnen", fontSize = NutriFont.Small)
                                 }
                             }
                         }

@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.deficiency
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -77,7 +78,7 @@ fun DeficiencyTrendScreen(
                     Text(
                         "Basierend auf ${result.trackedDays} getrackten Tagen der letzten 14 Tage. " +
                             "Werte unter 80% der EU-Referenzmenge (NRV) im Schnitt:",
-                        fontSize = 13.sp,
+                        fontSize = NutriFont.Body,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -107,11 +108,11 @@ private fun EmptyState(
             tint = if (iconTint == Color.Unspecified) LocalContentColor.current else iconTint
         )
         Spacer(Modifier.height(NutriSpacing.md))
-        Text(title, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, textAlign = TextAlign.Center)
+        Text(title, fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Title, textAlign = TextAlign.Center)
         Spacer(Modifier.height(NutriSpacing.xs))
         Text(
             message,
-            fontSize = 13.sp,
+            fontSize = NutriFont.Body,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -128,11 +129,11 @@ private fun TrendCard(trend: NutrientDeficiencyTrend) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(trend.label, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                Text(trend.label, fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Subtitle)
                 Text(
                     "${trend.avgPctOfNrv}% NRV",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
+                    fontSize = NutriFont.Subtitle,
                     color = color
                 )
             }
@@ -151,7 +152,7 @@ private fun TrendCard(trend: NutrientDeficiencyTrend) {
                 } else {
                     "Über ${trend.daysTracked} Tage im Schnitt unter 80% der Referenzmenge"
                 },
-                fontSize = 11.sp,
+                fontSize = NutriFont.Caption,
                 color = MaterialTheme.colorScheme.outline
             )
         }

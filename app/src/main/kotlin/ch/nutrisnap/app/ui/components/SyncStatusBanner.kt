@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.components
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -114,7 +115,7 @@ fun SyncStatusBanner() {
                     Text(
                         text = errorLabel!!,
                         color = fg,
-                        fontSize = 10.sp,
+                        fontSize = NutriFont.Tiny,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1
                     )

@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -47,11 +48,11 @@ fun FreezerScreen(vm: FreezerViewModel = viewModel()) {
             Icon(Icons.Default.AcUnit, null, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
-                Text("Gefrierschrank", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                Text("Gefrierschrank", fontWeight = FontWeight.Bold, fontSize = NutriFont.Headline)
                 Text(
                     if (meals.isEmpty()) "Noch nichts eingefroren"
                     else "${meals.sumOf { it.quantity }} Packungen · ${meals.size} Menüs",
-                    fontSize = 13.sp,
+                    fontSize = NutriFont.Body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -75,7 +76,7 @@ fun FreezerScreen(vm: FreezerViewModel = viewModel()) {
                     Spacer(Modifier.height(4.dp))
                     Text(
                         "Beim Rezept „Einfrieren“ wählen\noder aus dem Tracking heraus speichern.",
-                        fontSize = 13.sp,
+                        fontSize = NutriFont.Body,
                         color = MaterialTheme.colorScheme.outline,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
@@ -154,10 +155,10 @@ private fun FrozenMealCard(
                     Spacer(Modifier.width(12.dp))
                 }
                 Column(Modifier.weight(1f)) {
-                    Text(meal.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text(meal.name, fontWeight = FontWeight.Bold, fontSize = NutriFont.Title)
                     Text(
                         "Eingefroren $dateStr · ${meal.quantity}×",
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -168,7 +169,7 @@ private fun FrozenMealCard(
                     Text(
                         "${meal.quantity}×",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
+                        fontSize = NutriFont.BodyLarge,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
@@ -181,14 +182,14 @@ private fun FrozenMealCard(
                     "• ${line.name}: ${line.grams.toInt()} g · ${line.calories.toInt()} kcal · " +
                         "P ${line.protein.toInt()} · K ${line.carbs.toInt()} · F ${line.fat.toInt()}" +
                         if (line.fiber > 0.5f) " · B ${line.fiber.toInt()}" else "",
-                    fontSize = 13.sp
+                    fontSize = NutriFont.Body
                 )
             }
             Spacer(Modifier.height(4.dp))
             Text(
                 "Portion gesamt: ${meal.totalGramsPerPortion().toInt()} g · " +
                     "${meal.totalCaloriesPerPortion().toInt()} kcal",
-                fontSize = 12.sp,
+                fontSize = NutriFont.Small,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -199,12 +200,12 @@ private fun FrozenMealCard(
                     if (meal.totalFiberPerPortion() > 0.5f)
                         " · B ${meal.totalFiberPerPortion().toInt()} g"
                     else "",
-                fontSize = 12.sp,
+                fontSize = NutriFont.Small,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.primary
             )
             if (meal.notes.isNotBlank()) {
-                Text(meal.notes, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(meal.notes, fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             Spacer(Modifier.height(10.dp))
@@ -264,11 +265,11 @@ private fun ThawDialog(
                         if (meal.totalFiberPerPortion() > 0.5f)
                             " · B ${meal.totalFiberPerPortion().toInt()}g"
                         else "",
-                    fontSize = 13.sp,
+                    fontSize = NutriFont.Body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(12.dp))
-                Text("Mahlzeit", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text("Mahlzeit", fontSize = NutriFont.Body, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf(
@@ -280,14 +281,14 @@ private fun ThawDialog(
                         FilterChip(
                             selected = mealType == mt,
                             onClick = { mealType = mt },
-                            label = { Text(label, fontSize = 12.sp) }
+                            label = { Text(label, fontSize = NutriFont.Small) }
                         )
                     }
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = track, onCheckedChange = { track = it })
-                    Text("Ins Tagebuch buchen", fontSize = 14.sp)
+                    Text("Ins Tagebuch buchen", fontSize = NutriFont.BodyLarge)
                 }
             }
         },
@@ -339,7 +340,7 @@ fun FreezeMealSheet(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.AcUnit, null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
-                Text("Einfrieren", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text("Einfrieren", fontWeight = FontWeight.Bold, fontSize = NutriFont.TitleLarge)
             }
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
@@ -359,7 +360,7 @@ fun FreezeMealSheet(
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(Modifier.height(8.dp))
-            Text("Inhalt einer Portion", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Text("Inhalt einer Portion", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Body)
             Spacer(Modifier.height(4.dp))
             lines.forEachIndexed { idx, line ->
                 OutlinedTextField(

@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipegen
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.BorderStroke
@@ -65,14 +66,14 @@ internal fun FreitextInput(
         // Vorschläge nur solange das Feld leer ist - danach nicht mehr im Weg.
         if (input.isBlank()) {
             Spacer(Modifier.height(10.dp))
-            Text("Ideen zum Start", fontSize = 12.sp, fontWeight = FontWeight.Medium,
+            Text("Ideen zum Start", fontSize = NutriFont.Small, fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(6.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 FREITEXT_QUICK_PROMPTS.forEach { (label, prompt) ->
                     SuggestionChip(
                         onClick = { onInputChange(prompt) },
-                        label = { Text(label, fontSize = 12.sp) }
+                        label = { Text(label, fontSize = NutriFont.Small) }
                     )
                 }
             }
@@ -102,7 +103,7 @@ internal fun ZutatenInput(
     onGenerate: () -> Unit
 ) {
     Column {
-        Text("Was hast du zuhause?", fontWeight = FontWeight.Medium, fontSize = 13.sp,
+        Text("Was hast du zuhause?", fontWeight = FontWeight.Medium, fontSize = NutriFont.Body,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -127,7 +128,7 @@ internal fun ZutatenInput(
         }
         if (isScanningFridge) {
             Spacer(Modifier.height(6.dp))
-            Text("Analysiere Foto…", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+            Text("Analysiere Foto…", fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.primary)
         }
         if (chips.isNotEmpty()) {
             Spacer(Modifier.height(10.dp))
@@ -136,7 +137,7 @@ internal fun ZutatenInput(
                     InputChip(
                         selected = false,
                         onClick = { onRemoveChip(chip) },
-                        label = { Text(chip, fontSize = 13.sp) },
+                        label = { Text(chip, fontSize = NutriFont.Body) },
                         trailingIcon = { Icon(Icons.Default.Close, "Entfernen", Modifier.size(14.dp)) }
                     )
                 }
@@ -152,7 +153,7 @@ internal fun ZutatenInput(
         }
         if (chips.isEmpty() && !isScanningFridge) {
             Spacer(Modifier.height(4.dp))
-            Text("Zutaten eintippen oder Kühlschrank fotografieren", fontSize = 12.sp,
+            Text("Zutaten eintippen oder Kühlschrank fotografieren", fontSize = NutriFont.Small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -170,7 +171,7 @@ internal fun FillUpInput(
     Column {
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
             Column(Modifier.padding(14.dp)) {
-                Text("Heute noch übrig", fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                Text("Heute noch übrig", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Body,
                     color = MaterialTheme.colorScheme.onPrimaryContainer)
                 Spacer(Modifier.height(6.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -182,7 +183,7 @@ internal fun FillUpInput(
             }
         }
         Spacer(Modifier.height(12.dp))
-        Text("Für welche Mahlzeit?", fontWeight = FontWeight.Medium, fontSize = 13.sp,
+        Text("Für welche Mahlzeit?", fontWeight = FontWeight.Medium, fontSize = NutriFont.Body,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -190,7 +191,7 @@ internal fun FillUpInput(
                 FilterChip(
                     selected = mealLabel == label,
                     onClick = { onMealLabelChange(label) },
-                    label = { Text(label, fontSize = 12.sp) }
+                    label = { Text(label, fontSize = NutriFont.Small) }
                 )
             }
         }
@@ -204,7 +205,7 @@ internal fun FillUpInput(
         }
         if (budget.calories <= 0f) {
             Spacer(Modifier.height(4.dp))
-            Text("Kein Kalorienbudget mehr übrig für heute", fontSize = 12.sp,
+            Text("Kein Kalorienbudget mehr übrig für heute", fontSize = NutriFont.Small,
                 color = MaterialTheme.colorScheme.error)
         }
     }
@@ -213,9 +214,9 @@ internal fun FillUpInput(
 @Composable
 internal fun BudgetStat(value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontWeight = FontWeight.Bold, fontSize = 16.sp,
+        Text(value, fontWeight = FontWeight.Bold, fontSize = NutriFont.Title,
             color = MaterialTheme.colorScheme.onPrimaryContainer)
-        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+        Text(label, fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onPrimaryContainer)
     }
 }
 
@@ -226,7 +227,7 @@ internal fun ZufallInput(
 ) {
     Column {
         Text("Lass dich überraschen – ein zufälliges, alltagstaugliches Rezept.",
-            fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(10.dp))
         Button(
             onClick = onGenerate,
@@ -246,7 +247,7 @@ internal fun TagesplanInput(
     isLoading: Boolean
 ) {
     Column {
-        Text("Tagesziele", fontWeight = FontWeight.Medium, fontSize = 13.sp,
+        Text("Tagesziele", fontWeight = FontWeight.Medium, fontSize = NutriFont.Body,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -276,12 +277,12 @@ internal fun TagesplanInput(
         Spacer(Modifier.height(14.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Frühstück einplanen", fontSize = 14.sp)
+            Text("Frühstück einplanen", fontSize = NutriFont.BodyLarge)
             Switch(checked = state.dayPlanIncludeBreakfast, onCheckedChange = vm::setDayPlanIncludeBreakfast)
         }
 
         Spacer(Modifier.height(10.dp))
-        Text("Anzahl Mahlzeiten", fontWeight = FontWeight.Medium, fontSize = 13.sp,
+        Text("Anzahl Mahlzeiten", fontWeight = FontWeight.Medium, fontSize = NutriFont.Body,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(6.dp))
         Row(verticalAlignment=Alignment.CenterVertically, horizontalArrangement=Arrangement.spacedBy(16.dp)) {
@@ -289,7 +290,7 @@ internal fun TagesplanInput(
                 onClick = { vm.setDayPlanMealCount(state.dayPlanMealCount - 1) },
                 enabled = state.dayPlanMealCount > 2
             ) { Icon(Icons.Default.Remove, null) }
-            Text("${state.dayPlanMealCount}", fontSize = 18.sp, fontWeight = FontWeight.Bold,
+            Text("${state.dayPlanMealCount}", fontSize = NutriFont.TitleLarge, fontWeight = FontWeight.Bold,
                 modifier = Modifier.width(28.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             FilledTonalIconButton(
                 onClick = { vm.setDayPlanMealCount(state.dayPlanMealCount + 1) },
@@ -300,12 +301,12 @@ internal fun TagesplanInput(
         Spacer(Modifier.height(10.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("High Volume Eating", fontSize = 14.sp)
+            Text("High Volume Eating", fontSize = NutriFont.BodyLarge)
             Switch(checked = state.dayPlanHighVolume, onCheckedChange = vm::setDayPlanHighVolume)
         }
 
         Spacer(Modifier.height(10.dp))
-        Text("Workout-Timing", fontWeight = FontWeight.Medium, fontSize = 13.sp,
+        Text("Workout-Timing", fontWeight = FontWeight.Medium, fontSize = NutriFont.Body,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(6.dp))
         val workoutOptions = listOf(
@@ -319,7 +320,7 @@ internal fun TagesplanInput(
                 FilterChip(
                     selected = state.dayPlanWorkoutTiming == timing,
                     onClick = { vm.setDayPlanWorkoutTiming(timing) },
-                    label = { Text(label, fontSize = 12.sp) }
+                    label = { Text(label, fontSize = NutriFont.Small) }
                 )
             }
         }
@@ -356,7 +357,7 @@ internal fun TagesplanInput(
         }
         if (!canGenerate) {
             Spacer(Modifier.height(4.dp))
-            Text("Kalorien- und Proteinziel angeben", fontSize = 12.sp,
+            Text("Kalorien- und Proteinziel angeben", fontSize = NutriFont.Small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -373,7 +374,7 @@ internal fun DayPlanResultCard(
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
             Column(Modifier.padding(14.dp)) {
-                Text("Tagesplan", fontWeight = FontWeight.Bold, fontSize = 16.sp,
+                Text("Tagesplan", fontWeight = FontWeight.Bold, fontSize = NutriFont.Title,
                     color = MaterialTheme.colorScheme.onPrimaryContainer)
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -385,7 +386,7 @@ internal fun DayPlanResultCard(
                 }
                 if (plan.note.isNotBlank()) {
                     Spacer(Modifier.height(8.dp))
-                    Text(plan.note, fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text(plan.note, fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
             }
         }
@@ -430,16 +431,16 @@ internal fun PlannedMealCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(mealLabel, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                        Text(mealLabel, fontSize = NutriFont.Small, fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (meal.timing.isNotBlank()) {
                             Spacer(Modifier.width(6.dp))
                             Surface(color = MaterialTheme.colorScheme.tertiaryContainer, shape = MaterialTheme.shapes.small) {
-                                Text(meal.timing, Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 10.sp)
+                                Text(meal.timing, Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = NutriFont.Tiny)
                             }
                         }
                     }
-                    Text(meal.title, fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                    Text(meal.title, fontWeight = FontWeight.Bold, fontSize = NutriFont.Subtitle,
                         modifier = Modifier.padding(top = 2.dp))
                 }
                 IconButton(onClick = onAddToDiary, enabled = !isSaved) {
@@ -460,7 +461,7 @@ internal fun PlannedMealCard(
 
             if (expanded && meal.description.isNotBlank()) {
                 Spacer(Modifier.height(8.dp))
-                Text(meal.description, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(meal.description, fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -503,7 +504,7 @@ internal fun CookingMethodSelector(
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(Modifier.padding(14.dp)) {
-            Text("Zubereitung", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+            Text("Zubereitung", fontSize = NutriFont.Small, fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(10.dp))
             // Feste 2×2-Karten statt Chips: verhindert das Zeichen-für-Zeichen-Umbrechen
@@ -532,7 +533,7 @@ internal fun CookingMethodSelector(
                     Text(
                         if (applianceModel.isBlank()) "Gerätemodell hinterlegen für exakte Programme"
                         else "Gerät: $applianceModel",
-                        fontSize = 11.sp, fontWeight = FontWeight.Medium,
+                        fontSize = NutriFont.Caption, fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.weight(1f)
                     )
@@ -551,7 +552,7 @@ internal fun CookingMethodSelector(
             text = {
                 Column {
                     Text("Für exakte Ofen-/Dampfgarer-Programme (z.B. V-ZUG, Miele).",
-                        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(10.dp))
                     OutlinedTextField(
                         value = text, onValueChange = { text = it },
@@ -602,7 +603,7 @@ internal fun MethodCard(
                     // "/" ist der einzige natürliche Umbruchpunkt in den Labels - an dieser
                     // Stelle explizit umbrechen statt der Textengine das Silbentrennen zu überlassen.
                     method.label.replace("/", "/\n"),
-                    fontSize = 11.sp,
+                    fontSize = NutriFont.Caption,
                     lineHeight = 13.sp,
                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                     color = contentColor,
@@ -637,7 +638,7 @@ internal fun RecipeMethodAdaptRow(
     ) {
         Text(
             current.label,
-            fontSize = 11.sp,
+            fontSize = NutriFont.Caption,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1
         )
@@ -651,7 +652,7 @@ internal fun RecipeMethodAdaptRow(
                 if (isAdapting) {
                     CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 2.dp)
                 } else {
-                    Text("→ ${target.label}", fontSize = 11.sp, maxLines = 1)
+                    Text("→ ${target.label}", fontSize = NutriFont.Caption, maxLines = 1)
                 }
             }
         }

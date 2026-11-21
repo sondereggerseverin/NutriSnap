@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipegen
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.BorderStroke
@@ -114,7 +115,7 @@ fun RecipeGeneratorScreen(vm: RecipeGeneratorViewModel = viewModel()) {
                             Tab(
                                 selected = state.mode == mode,
                                 onClick = { vm.setMode(mode) },
-                                text = { Text(label, fontSize = 12.sp) },
+                                text = { Text(label, fontSize = NutriFont.Small) },
                                 icon = { Icon(icon, null, Modifier.size(18.dp)) }
                             )
                         }

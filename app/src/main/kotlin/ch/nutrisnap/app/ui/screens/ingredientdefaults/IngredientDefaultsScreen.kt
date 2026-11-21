@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.ingredientdefaults
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import android.app.Application
 import android.content.Intent
 import android.widget.Toast
@@ -395,7 +396,7 @@ fun IngredientDefaultsScreen(
             item {
                 Text(
                     "Häufige Lebensmittel einmal per Barcode scannen. Beim nächsten Rezept/Foto wird dieser Treffer bevorzugt – vor generischen Defaults.",
-                    fontSize = 13.sp,
+                    fontSize = NutriFont.Body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 18.sp
                 )
@@ -416,7 +417,7 @@ fun IngredientDefaultsScreen(
                     item {
                         Text(
                             "Keine Treffer für «${query.trim()}».",
-                            fontSize = 14.sp,
+                            fontSize = NutriFont.BodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -426,7 +427,7 @@ fun IngredientDefaultsScreen(
                 item {
                     Text(
                         "Noch keine Standards. Tippe + und scanne z. B. deinen körnigen Frischkäse.",
-                        fontSize = 14.sp,
+                        fontSize = NutriFont.BodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -445,7 +446,7 @@ fun IngredientDefaultsScreen(
                         Text(
                             "Vorschläge aus deinem Tagebuch",
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp,
+                            fontSize = NutriFont.Subtitle,
                             modifier = Modifier.weight(1f)
                         )
                         TextButton(onClick = {
@@ -455,7 +456,7 @@ fun IngredientDefaultsScreen(
                     }
                     Text(
                         "Häufig geloggt (letzte 180 Tage), Ø-Werte pro 100 g aus deinen eigenen Einträgen.",
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -466,12 +467,12 @@ fun IngredientDefaultsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(Modifier.weight(1f)) {
-                                Text(sug.alias, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                                Text(sug.alias, fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Subtitle)
                                 Text(
                                     "%d× geloggt · %.0f kcal · P %.1f · K %.1f · F %.1f / 100 g".format(
                                         sug.count, sug.kcal, sug.protein, sug.carbs, sug.fat
                                     ),
-                                    fontSize = 12.sp,
+                                    fontSize = NutriFont.Small,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -562,7 +563,7 @@ fun IngredientDefaultsScreen(
                                         Text(
                                             food.name,
                                             fontWeight = FontWeight.Medium,
-                                            fontSize = 13.sp,
+                                            fontSize = NutriFont.Body,
                                             maxLines = 1
                                         )
                                         val brand = food.brand?.takeIf { it.isNotBlank() }
@@ -580,7 +581,7 @@ fun IngredientDefaultsScreen(
                                                 }
                                                 append(" / 100 g")
                                             },
-                                            fontSize = 11.sp,
+                                            fontSize = NutriFont.Caption,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1
                                         )
@@ -591,7 +592,7 @@ fun IngredientDefaultsScreen(
                     } else if (productQuery.trim().length >= 2 && !searchingLocal) {
                         Text(
                             "Keine Treffer in der lokalen DB",
-                            fontSize = 12.sp,
+                            fontSize = NutriFont.Small,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -605,11 +606,11 @@ fun IngredientDefaultsScreen(
                     }
                     scannedFood?.let { f ->
                         HorizontalDivider()
-                        Text("Ausgewählt:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Ausgewählt:", fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
                             "${f.name}${f.brand?.let { " · $it" } ?: ""}",
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp
+                            fontSize = NutriFont.BodyLarge
                         )
                         Text(
                             buildString {
@@ -619,12 +620,12 @@ fun IngredientDefaultsScreen(
                                 f.fiber?.takeIf { it > 0f }?.let { append(" · B %.1f".format(it)) }
                                 append(" (pro 100 g)")
                             },
-                            fontSize = 13.sp,
+                            fontSize = NutriFont.Body,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     if (loading) {
-                        Text("Suche Produkt…", fontSize = 13.sp)
+                        Text("Suche Produkt…", fontSize = NutriFont.Body)
                     }
                 }
             },
@@ -678,9 +679,9 @@ private fun EditStandardDialog(
         title = { Text("Werte bearbeiten") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(row.originalName, fontWeight = FontWeight.Medium, fontSize = 13.sp)
-                Text(row.offProductName, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
-                Text("pro 100 g", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(row.originalName, fontWeight = FontWeight.Medium, fontSize = NutriFont.Body)
+                Text(row.offProductName, fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                Text("pro 100 g", fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedTextField(kcal, { kcal = it }, label = { Text("kcal") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(protein, { protein = it }, label = { Text("Protein (g)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(carbs, { carbs = it }, label = { Text("Kohlenhydrate (g)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -715,10 +716,10 @@ private fun StandardRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
-                Text(match.originalName, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                Text(match.originalName, fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Subtitle)
                 Text(
                     match.offProductName,
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2
                 )
@@ -726,14 +727,14 @@ private fun StandardRow(
                     "%.0f kcal · P %.1f · K %.1f · F %.1f · B %.1f / 100 g".format(
                         match.kcalPer100g, match.proteinPer100g, match.carbsPer100g, match.fatPer100g, match.fiberPer100g
                     ),
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.primary
                 )
                 match.plausibilityWarning()?.let { w ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text(w, fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+                        Text(w, fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.error)
                     }
                 }
             }

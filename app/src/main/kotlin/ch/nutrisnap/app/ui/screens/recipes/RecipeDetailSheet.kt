@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -140,7 +141,7 @@ fun RecipeDetailSheet(
                     Text(
                         recipe.displayTitle(),
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
+                        fontSize = NutriFont.Headline,
                         lineHeight = 24.sp,
                         modifier = Modifier.weight(1f)
                     )
@@ -197,13 +198,13 @@ fun RecipeDetailSheet(
                         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                             Text(
                                 "Nächstes Mal",
-                                fontSize = 11.sp,
+                                fontSize = NutriFont.Caption,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer
                             )
                             Text(
                                 recipe.nextTimeNote,
-                                fontSize = 13.sp,
+                                fontSize = NutriFont.Body,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer
                             )
                         }
@@ -229,7 +230,7 @@ fun RecipeDetailSheet(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Portionen", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Text("Portionen", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Body)
                         Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surface) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -242,7 +243,7 @@ fun RecipeDetailSheet(
                                 Text(
                                     "$servings",
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp,
+                                    fontSize = NutriFont.Subtitle,
                                     modifier = Modifier.widthIn(min = 24.dp),
                                     style = LocalTextStyle.current.copy(textAlign = TextAlign.Center)
                                 )
@@ -252,7 +253,7 @@ fun RecipeDetailSheet(
                             }
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("metrisch", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("metrisch", fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Switch(
                                 checked = metricMode,
                                 onCheckedChange = { metricMode = it },
@@ -294,7 +295,7 @@ fun RecipeDetailSheet(
                                 label = {
                                     Text(
                                         label,
-                                        fontSize = 12.sp,
+                                        fontSize = NutriFont.Small,
                                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
                                     )
                                 },
@@ -332,7 +333,7 @@ fun RecipeDetailSheet(
                     ) {
                         Icon(Icons.Default.PlaylistAdd, null, Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Tagebuch", fontSize = 13.sp)
+                        Text("Tagebuch", fontSize = NutriFont.Body)
                     }
                     OutlinedButton(
                         onClick = { onAddToShoppingList(recipe.copy(servings = servings)) },
@@ -341,7 +342,7 @@ fun RecipeDetailSheet(
                     ) {
                         Icon(Icons.Default.ShoppingCart, null, Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Einkauf", fontSize = 13.sp)
+                        Text("Einkauf", fontSize = NutriFont.Body)
                     }
                 }
                 Spacer(Modifier.height(6.dp))
@@ -355,7 +356,7 @@ fun RecipeDetailSheet(
                 ) {
                     Icon(Icons.Default.RestaurantMenu, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Kochmodus starten", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Kochmodus starten", fontSize = NutriFont.BodyLarge, fontWeight = FontWeight.SemiBold)
                 }
                 // Frühstück / Dessert / Getränk: kein Komponenten-Split (ein Gericht)
                 val splitAllowed = recipeAllowsComponentSplit(recipe)
@@ -368,7 +369,7 @@ fun RecipeDetailSheet(
                     ) {
                         Icon(Icons.Default.Restaurant, null, Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Komponenten trennen", fontSize = 13.sp)
+                        Text("Komponenten trennen", fontSize = NutriFont.Body)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -385,7 +386,7 @@ fun RecipeDetailSheet(
                     .joinToString("\n").trim()
                 if (desc.isNotBlank()) {
                     item {
-                        Text(desc, fontSize = 13.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(desc, fontSize = NutriFont.Body, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(10.dp))
                     }
                 }
@@ -404,7 +405,7 @@ fun RecipeDetailSheet(
                                 ) {
                                     Icon(Icons.Default.AutoFixHigh, null, Modifier.size(15.dp))
                                     Spacer(Modifier.width(4.dp))
-                                    Text("Abschnitte", fontSize = 12.sp)
+                                    Text("Abschnitte", fontSize = NutriFont.Small)
                                 }
                             }
                             TextButton(
@@ -419,7 +420,7 @@ fun RecipeDetailSheet(
                             ) {
                                 Icon(if (ingredientsEditMode) Icons.Default.Check else Icons.Default.Edit, null, Modifier.size(15.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text(if (ingredientsEditMode) "Fertig" else "Bearbeiten", fontSize = 12.sp)
+                                Text(if (ingredientsEditMode) "Fertig" else "Bearbeiten", fontSize = NutriFont.Small)
                             }
                         }
                     })
@@ -446,8 +447,8 @@ fun RecipeDetailSheet(
                                     },
                                     modifier = Modifier.weight(1f),
                                     singleLine = true,
-                                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
-                                    placeholder = { Text("Abschnittsname", fontSize = 11.sp) },
+                                    textStyle = LocalTextStyle.current.copy(fontSize = NutriFont.Body, fontWeight = FontWeight.Bold),
+                                    placeholder = { Text("Abschnittsname", fontSize = NutriFont.Caption) },
                                     shape = RoundedCornerShape(8.dp),
                                     leadingIcon = {
                                         Icon(Icons.Default.Title, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
@@ -487,9 +488,9 @@ fun RecipeDetailSheet(
                                     },
                                     modifier = Modifier.width(70.dp),
                                     singleLine = true,
-                                    textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                                    textStyle = LocalTextStyle.current.copy(fontSize = NutriFont.BodyLarge, fontWeight = FontWeight.Bold),
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                    placeholder = { Text("Menge", fontSize = 11.sp) },
+                                    placeholder = { Text("Menge", fontSize = NutriFont.Caption) },
                                     shape = RoundedCornerShape(8.dp)
                                 )
 
@@ -501,7 +502,7 @@ fun RecipeDetailSheet(
                                         readOnly = true,
                                         modifier = Modifier.width(92.dp).clickable { unitExpanded = true },
                                         singleLine = true,
-                                        textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                                        textStyle = LocalTextStyle.current.copy(fontSize = NutriFont.Body),
                                         trailingIcon = {
                                             Icon(Icons.Default.ArrowDropDown, null, Modifier.size(16.dp))
                                         },
@@ -513,7 +514,7 @@ fun RecipeDetailSheet(
                                     ) {
                                         INGREDIENT_UNITS.forEach { unit ->
                                             DropdownMenuItem(
-                                                text = { Text(unit, fontSize = 13.sp) },
+                                                text = { Text(unit, fontSize = NutriFont.Body) },
                                                 onClick = {
                                                     selectedUnit = unit
                                                     unitExpanded = false
@@ -537,8 +538,8 @@ fun RecipeDetailSheet(
                                     },
                                     modifier = Modifier.weight(1f),
                                     singleLine = true,
-                                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
-                                    placeholder = { Text("Zutat", fontSize = 11.sp) },
+                                    textStyle = LocalTextStyle.current.copy(fontSize = NutriFont.Body),
+                                    placeholder = { Text("Zutat", fontSize = NutriFont.Caption) },
                                     shape = RoundedCornerShape(8.dp)
                                 )
                             }
@@ -568,7 +569,7 @@ fun RecipeDetailSheet(
                         ) {
                             Icon(Icons.Default.Add, null, Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Zutat hinzufügen", fontSize = 13.sp)
+                            Text("Zutat hinzufügen", fontSize = NutriFont.Body)
                         }
                         Spacer(Modifier.height(6.dp))
                         OutlinedButton(
@@ -580,14 +581,14 @@ fun RecipeDetailSheet(
                         ) {
                             Icon(Icons.Default.Title, null, Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Abschnittsüberschrift", fontSize = 13.sp)
+                            Text("Abschnittsüberschrift", fontSize = NutriFont.Body)
                         }
                         Spacer(Modifier.height(16.dp))
                     }
                 } else if (recipe.ingredients.isBlank()) {
                     item {
                         Text("Noch keine Zutaten – tippe auf „Bearbeiten“, um welche hinzuzufügen.",
-                            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(16.dp))
                     }
                 } else {
@@ -674,7 +675,7 @@ fun RecipeDetailSheet(
                                 Text(
                                     header.uppercase(),
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp,
+                                    fontSize = NutriFont.Caption,
                                     letterSpacing = 0.8.sp,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -686,7 +687,7 @@ fun RecipeDetailSheet(
                                 Text(
                                     header,
                                     fontWeight = FontWeight.SemiBold,
-                                    fontSize = 13.sp,
+                                    fontSize = NutriFont.Body,
                                     color = MaterialTheme.colorScheme.primary
                                 )
                             }
@@ -731,7 +732,7 @@ fun RecipeDetailSheet(
                                     // Ausgerichtete Spalten: Menge | Einheit | Name
                                     Text(
                                         parsed.amount,
-                                        fontSize = 14.sp,
+                                        fontSize = NutriFont.BodyLarge,
                                         lineHeight = 20.sp,
                                         fontWeight = FontWeight.Medium,
                                         textAlign = TextAlign.End,
@@ -740,7 +741,7 @@ fun RecipeDetailSheet(
                                     Spacer(Modifier.width(4.dp))
                                     Text(
                                         parsed.unit,
-                                        fontSize = 13.sp,
+                                        fontSize = NutriFont.Body,
                                         lineHeight = 20.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.width(44.dp)
@@ -748,14 +749,14 @@ fun RecipeDetailSheet(
                                     Spacer(Modifier.width(6.dp))
                                     Text(
                                         parsed.name,
-                                        fontSize = 14.sp,
+                                        fontSize = NutriFont.BodyLarge,
                                         lineHeight = 20.sp,
                                         modifier = Modifier.weight(1f)
                                     )
                                 } else {
                                     Text(
                                         display.trimStart('•', '-', ' '),
-                                        fontSize = 14.sp,
+                                        fontSize = NutriFont.BodyLarge,
                                         lineHeight = 20.sp,
                                         modifier = Modifier.weight(1f)
                                     )
@@ -815,7 +816,7 @@ fun RecipeDetailSheet(
                         }
                         Text(
                             "Längerer Import mit Qualitäts-Retry – überschreibt Zutaten und Schritte.",
-                            fontSize = 11.sp,
+                            fontSize = NutriFont.Caption,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 4.dp)
                         )
@@ -839,7 +840,7 @@ fun RecipeDetailSheet(
                     Spacer(Modifier.width(6.dp))
                     Text(
                         if (showMoreOptions) "Weniger Optionen" else "Mehr Optionen (Gewicht, Deutsch, Budget)",
-                        fontSize = 13.sp
+                        fontSize = NutriFont.Body
                     )
                 }
             }
@@ -858,11 +859,11 @@ fun RecipeDetailSheet(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Gericht-Gewicht", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text("Gericht-Gewicht", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Body)
                             if (rawTotal != null) {
                                 Text(
                                     "Σ roh: ${rawTotal.toInt()} g · ≈ ${(rawTotal / recipe.servings.coerceAtLeast(1)).toInt()} g/Port.",
-                                    fontSize = 12.sp,
+                                    fontSize = NutriFont.Small,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -881,18 +882,18 @@ fun RecipeDetailSheet(
                                         onUpdateCookedWeight(v?.takeIf { it > 0f })
                                     },
                                     modifier = Modifier.weight(1f)
-                                ) { Text("Speichern", fontSize = 13.sp) }
+                                ) { Text("Speichern", fontSize = NutriFont.Body) }
                                 if (recipe.cookedWeightG != null) {
                                     TextButton(onClick = {
                                         cookedText = ""
                                         onUpdateCookedWeight(null)
-                                    }) { Text("Reset", fontSize = 13.sp) }
+                                    }) { Text("Reset", fontSize = NutriFont.Body) }
                                 }
                             }
                             recipe.yieldWeightG()?.let { y ->
                                 Text(
                                     "Tracking-Basis: ${y.toInt()} g (${if (recipe.cookedWeightG != null) "gekocht" else "roh"})",
-                                    fontSize = 12.sp,
+                                    fontSize = NutriFont.Small,
                                     color = MaterialTheme.colorScheme.primary
                                 )
                             }
@@ -902,11 +903,11 @@ fun RecipeDetailSheet(
                             ) {
                                 Icon(Icons.Default.Restaurant, null, Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("Komponenten trennen", fontSize = 13.sp)
+                                Text("Komponenten trennen", fontSize = NutriFont.Body)
                             }
                             Text(
                                 "Getrennt abwiegen oder Meal-Prep gleichmässig aufteilen.",
-                                fontSize = 11.sp,
+                                fontSize = NutriFont.Caption,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             HorizontalDivider()
@@ -918,11 +919,11 @@ fun RecipeDetailSheet(
                                 if (isTranslating) {
                                     CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                                     Spacer(Modifier.width(8.dp))
-                                    Text("Übersetze…", fontSize = 13.sp)
+                                    Text("Übersetze…", fontSize = NutriFont.Body)
                                 } else {
                                     Icon(Icons.Default.AutoAwesome, null, Modifier.size(16.dp))
                                     Spacer(Modifier.width(6.dp))
-                                    Text("Alles auf Deutsch + metrisch", fontSize = 13.sp)
+                                    Text("Alles auf Deutsch + metrisch", fontSize = NutriFont.Body)
                                 }
                             }
                             TextButton(
@@ -932,7 +933,7 @@ fun RecipeDetailSheet(
                             ) {
                                 Icon(Icons.Default.PieChart, null, Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("Auf mein Restbudget anpassen", fontSize = 13.sp)
+                                Text("Auf mein Restbudget anpassen", fontSize = NutriFont.Body)
                             }
                         }
                     }
@@ -1036,30 +1037,30 @@ internal fun NutritionAnalysisCard(
                 Text(
                     "📊 Nährwerte",
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 if (!isAnalyzing) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (hasStoredOverrides && isForThis) {
                             TextButton(onClick = onRecalculateFromOverrides, contentPadding = PaddingValues(2.dp), colors = onContainerButtonColors) {
-                                Text("Auswahl", fontSize = 11.sp)
+                                Text("Auswahl", fontSize = NutriFont.Caption)
                             }
                         }
                         if (hasMacros) {
                             TextButton(onClick = onViewIngredients, contentPadding = PaddingValues(2.dp), colors = onContainerButtonColors) {
                                 Icon(Icons.Default.Visibility, null, Modifier.size(13.dp))
                                 Spacer(Modifier.width(2.dp))
-                                Text("Einsehen", fontSize = 11.sp)
+                                Text("Einsehen", fontSize = NutriFont.Caption)
                             }
                             TextButton(onClick = onVerify, contentPadding = PaddingValues(2.dp), colors = onContainerButtonColors) {
                                 Icon(Icons.Default.QrCodeScanner, null, Modifier.size(13.dp))
                                 Spacer(Modifier.width(2.dp))
-                                Text("Verify", fontSize = 11.sp)
+                                Text("Verify", fontSize = NutriFont.Caption)
                             }
                         }
                         TextButton(onClick = onAnalyze, contentPadding = PaddingValues(2.dp), colors = onContainerButtonColors) {
-                            Text(if (hasMacros) "Neu" else "Berechnen", fontSize = 11.sp)
+                            Text(if (hasMacros) "Neu" else "Berechnen", fontSize = NutriFont.Caption)
                         }
                     }
                 }
@@ -1075,7 +1076,7 @@ internal fun NutritionAnalysisCard(
                     )
                     Text(
                         "Zutaten werden gesucht…",
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
@@ -1107,7 +1108,7 @@ internal fun NutritionAnalysisCard(
                                 fiberPerServ?.let { append("Ballast ${"%.0f".format(it * ratio)}g · ") }
                                 append(if (showDetails) "weniger" else "Details")
                             }.trimEnd(' ', '·'),
-                            fontSize = 11.sp
+                            fontSize = NutriFont.Caption
                         )
                     }
                     if (showDetails) {
@@ -1118,7 +1119,7 @@ internal fun NutritionAnalysisCard(
                             if (result != null && !result.fiberComplete) {
                                 Text(
                                     "Ballaststoffe unvollständig (DB oft ohne Fiber-Wert)",
-                                    fontSize = 10.sp,
+                                    fontSize = NutriFont.Tiny,
                                     color = MaterialTheme.colorScheme.error
                                 )
                             }
@@ -1133,7 +1134,7 @@ internal fun NutritionAnalysisCard(
                                 Text(
                                     "${r.matchedCount}/${r.totalCount} Zutaten gefunden" +
                                         if (r.estimatedCount > 0) " · ${r.estimatedCount} KI-geschätzt" else "",
-                                    fontSize = 10.sp,
+                                    fontSize = NutriFont.Tiny,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                                 )
                             }
@@ -1150,7 +1151,7 @@ internal fun NutritionAnalysisCard(
             } else {
                 Text(
                     "„Berechnen“ für Nährwerte aus der Datenbank.",
-                    fontSize = 11.sp,
+                    fontSize = NutriFont.Caption,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
@@ -1214,13 +1215,13 @@ internal fun formatSmall(value: Float): String =
 private fun SubNutrientRow(label: String, value: String, highlight: Boolean = false) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(
-            label, fontSize = 12.sp,
+            label, fontSize = NutriFont.Small,
             fontWeight = if (highlight) FontWeight.SemiBold else FontWeight.Normal,
             color = if (highlight) MaterialTheme.colorScheme.tertiary
                     else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
         )
         Text(
-            value, fontSize = 12.sp,
+            value, fontSize = NutriFont.Small,
             fontWeight = if (highlight) FontWeight.SemiBold else FontWeight.Normal,
             color = if (highlight) MaterialTheme.colorScheme.tertiary
                     else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)

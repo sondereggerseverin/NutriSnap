@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.diary
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -87,9 +88,9 @@ internal fun EditEntryDialog(
                             fontWeight = FontWeight.SemiBold,
                             color = MacroColors.calories
                         )
-                        Text("P ${(entry.protein * factor).toInt()}g", fontSize = 12.sp, color = MacroColors.protein)
-                        Text("K ${(entry.carbs * factor).toInt()}g", fontSize = 12.sp, color = MacroColors.carbs)
-                        Text("F ${(entry.fat * factor).toInt()}g", fontSize = 12.sp, color = MacroColors.fat)
+                        Text("P ${(entry.protein * factor).toInt()}g", fontSize = NutriFont.Small, color = MacroColors.protein)
+                        Text("K ${(entry.carbs * factor).toInt()}g", fontSize = NutriFont.Small, color = MacroColors.carbs)
+                        Text("F ${(entry.fat * factor).toInt()}g", fontSize = NutriFont.Small, color = MacroColors.fat)
                     }
                 }
             }
@@ -216,7 +217,7 @@ internal fun EntryDetailSheet(
                 Text(
                     entry.foodName,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
+                    fontSize = NutriFont.TitleLarge,
                     modifier = Modifier.weight(1f)
                 )
                 IconButton(onClick = onEdit) {
@@ -227,14 +228,14 @@ internal fun EntryDetailSheet(
             Text(
                 if (showPortionLabel) recipeAmountLabel(entry)
                 else "${entry.amountGrams.toInt()} g",
-                fontSize = 13.sp,
+                fontSize = NutriFont.Body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (entry.isGloballyOverridden) {
                 Spacer(Modifier.height(NutriSpacing.xs))
                 Text(
                     "Gesamtwert manuell gesetzt – Zutaten wurden nicht verändert",
-                    fontSize = 11.sp,
+                    fontSize = NutriFont.Caption,
                     color = MaterialTheme.colorScheme.tertiary
                 )
             }
@@ -251,12 +252,12 @@ internal fun EntryDetailSheet(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "Lange drücken zum direkten Anpassen eines Werts",
-                    fontSize = 10.sp,
+                    fontSize = NutriFont.Tiny,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = NutriSpacing.xs)
                 )
                 TextButton(onClick = { onEditMacro(MacroField.FIBER) }) {
-                    Text("Ballaststoffe", fontSize = 11.sp)
+                    Text("Ballaststoffe", fontSize = NutriFont.Caption)
                 }
             }
             if (micros.isNotEmpty()) {
@@ -266,7 +267,7 @@ internal fun EntryDetailSheet(
                 Spacer(Modifier.height(NutriSpacing.md))
                 Text(
                     "Keine Mikronährstoffe für diesen Eintrag verfügbar.",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -342,7 +343,7 @@ internal fun EntryRecipeIngredientsSection(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
-            Text("Zutaten", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text("Zutaten", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.BodyLarge)
             Text(
                 when {
                     recipe == null -> "Rezept nicht mehr in der Bibliothek"
@@ -351,7 +352,7 @@ internal fun EntryRecipeIngredientsSection(
                     else ->
                         "für ${formatPortionAmount(entry.amountGrams)} (×${"%.2f".format(scaleFactor).trimEnd('0').trimEnd('.')})"
                 },
-                fontSize = 11.sp,
+                fontSize = NutriFont.Caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -367,13 +368,13 @@ internal fun EntryRecipeIngredientsSection(
         if (recipe == null) {
             Text(
                 "Das Original-Rezept wurde gelöscht – Zutaten nicht verfügbar.",
-                fontSize = 12.sp,
+                fontSize = NutriFont.Small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else if (lines.isEmpty()) {
             Text(
                 "Keine Zutaten hinterlegt.",
-                fontSize = 12.sp,
+                fontSize = NutriFont.Small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
@@ -387,13 +388,13 @@ internal fun EntryRecipeIngredientsSection(
                 ) {
                     Text(
                         "•",
-                        fontSize = 13.sp,
+                        fontSize = NutriFont.Body,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(end = 8.dp, top = 1.dp)
                     )
                     Text(
                         display,
-                        fontSize = 13.sp,
+                        fontSize = NutriFont.Body,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -402,7 +403,7 @@ internal fun EntryRecipeIngredientsSection(
             Spacer(Modifier.height(NutriSpacing.sm))
             Text(
                 "${entry.calories.toInt()} kcal · P ${entry.protein.toInt()} · K ${entry.carbs.toInt()} · F ${entry.fat.toInt()} · B ${entry.fiber.toInt()}",
-                fontSize = 11.sp,
+                fontSize = NutriFont.Caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -428,11 +429,11 @@ internal fun EntryMacroItem(
         Text(
             value,
             fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
+            fontSize = NutriFont.TitleLarge,
             color = color
         )
-        Text(unit, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(unit, fontSize = NutriFont.Tiny, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, fontSize = NutriFont.Tiny, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (isOverridden) ManualOverrideBadge()
     }
 }

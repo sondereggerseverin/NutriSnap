@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.home
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import ch.nutrisnap.app.ui.theme.StatusColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -64,7 +65,7 @@ internal fun HealthCard(
                     Text(
                         "Health Connect",
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp
+                        fontSize = NutriFont.BodyLarge
                     )
                 }
                 Icon(
@@ -86,7 +87,7 @@ internal fun HealthCard(
                     Spacer(Modifier.width(NutriSpacing.sm))
                     Text(
                         "Tippe um Health Connect zu verbinden",
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -140,7 +141,7 @@ internal fun HealthCard(
                     Spacer(Modifier.width(4.dp))
                     Text(
                         "Automatisch synchronisiert via Health Connect",
-                        fontSize = 9.sp,
+                        fontSize = NutriFont.Micro,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
                 }
@@ -152,17 +153,17 @@ internal fun HealthCard(
 @Composable
 internal fun HealthStatItem(icon: String, value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(icon, fontSize = 20.sp)
+        Text(icon, fontSize = NutriFont.Headline)
         Spacer(Modifier.height(2.dp))
         Text(
             value,
             fontWeight = FontWeight.Bold,
-            fontSize = 13.sp,
+            fontSize = NutriFont.Body,
             color = MaterialTheme.colorScheme.primary
         )
         Text(
             label,
-            fontSize = 10.sp,
+            fontSize = NutriFont.Tiny,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
@@ -208,14 +209,14 @@ internal fun HomeHeader(
             Column(Modifier.weight(1f)) {
                 Text(
                     state.greeting,
-                    fontSize = 10.sp,
+                    fontSize = NutriFont.Tiny,
                     color = Color.White.copy(alpha = 0.75f),
                     fontWeight = FontWeight.Medium
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         if (state.isViewingToday) "Heute" else "Gestern",
-                        fontSize = 16.sp,
+                        fontSize = NutriFont.Title,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
@@ -229,7 +230,7 @@ internal fun HomeHeader(
                     ) {
                         Text(
                             if (state.isViewingToday) "Gestern" else "Heute",
-                            fontSize = 10.sp,
+                            fontSize = NutriFont.Tiny,
                             fontWeight = FontWeight.SemiBold,
                             color = Color.White,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -239,7 +240,7 @@ internal fun HomeHeader(
                         Spacer(Modifier.width(6.dp))
                         Text(
                             "Adaptiv · ${state.tdeeConfidence}%",
-                            fontSize = 10.sp,
+                            fontSize = NutriFont.Tiny,
                             color = Color.White.copy(alpha = 0.7f)
                         )
                     }
@@ -385,13 +386,13 @@ internal fun HeaderStatCell(
     ) {
         Text(
             label,
-            fontSize = 10.sp,
+            fontSize = NutriFont.Tiny,
             color = Color.White.copy(alpha = 0.65f),
             maxLines = 1
         )
         Text(
             value,
-            fontSize = 13.sp,
+            fontSize = NutriFont.Body,
             fontWeight = FontWeight.Bold,
             color = valueColor,
             maxLines = 1
@@ -431,7 +432,7 @@ internal fun MacroColumn(
             )
             Text(
                 valueText,
-                fontSize = 12.sp,
+                fontSize = NutriFont.Small,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
                 maxLines = 1
@@ -439,14 +440,14 @@ internal fun MacroColumn(
             // Ziel sichtbar machen: "33/120g" statt nur "33g"
             Text(
                 "/${goalText}g",
-                fontSize = 10.sp,
+                fontSize = NutriFont.Tiny,
                 color = Color.White.copy(alpha = 0.75f),
                 maxLines = 1
             )
         }
         Text(
             label,
-            fontSize = 10.sp,
+            fontSize = NutriFont.Tiny,
             color = Color.White.copy(alpha = 0.85f),
             maxLines = 1
         )
@@ -478,11 +479,11 @@ internal fun StreakBadge(streak: Int) {
             .background(Color.White.copy(alpha = 0.16f))
             .padding(horizontal = NutriSpacing.md, vertical = NutriSpacing.xs)
     ) {
-        Text("\uD83D\uDD25", fontSize = 14.sp)
+        Text("\uD83D\uDD25", fontSize = NutriFont.BodyLarge)
         Spacer(Modifier.width(NutriSpacing.xs))
         Text(
             "$streak",
-            fontSize = 13.sp,
+            fontSize = NutriFont.Body,
             fontWeight = FontWeight.Bold,
             color = Color.White
         )
@@ -511,7 +512,7 @@ internal fun MealOverviewGrid(
             Text(
                 if (isViewingToday) "Heute auf dem Plan" else "Gestern auf dem Plan",
                 fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
+                fontSize = NutriFont.Title
             )
             meals.chunked(2).forEach { rowMeals ->
                 Row(
@@ -604,7 +605,7 @@ internal fun MealRowItem(meal: MealOverview, onClick: () -> Unit, onQuickAdd: ()
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             meal.label,
-                            fontSize = 13.sp,
+                            fontSize = NutriFont.Body,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
@@ -618,7 +619,7 @@ internal fun MealRowItem(meal: MealOverview, onClick: () -> Unit, onQuickAdd: ()
                     }
                     Text(
                         "${meal.kcal.toInt()} kcal · ${meal.count} ${if (meal.count == 1) "Eintrag" else "Einträge"}",
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         color = if (meal.count > 0) meal.color else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -662,7 +663,7 @@ private fun MealScoreBadge(score: Int) {
     ) {
         Text(
             "$score",
-            fontSize = 11.sp,
+            fontSize = NutriFont.Caption,
             fontWeight = FontWeight.Bold,
             color = color
         )
@@ -712,7 +713,7 @@ internal fun MealTile(
                 Column(Modifier.weight(1f)) {
                     Text(
                         meal.label,
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
@@ -720,7 +721,7 @@ internal fun MealTile(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             "${meal.kcal.toInt()} kcal",
-                            fontSize = 10.sp,
+                            fontSize = NutriFont.Tiny,
                             color = if (meal.count > 0) meal.color
                             else MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -763,7 +764,7 @@ internal fun HomeScanQuickAccess(
             Text(
                 "Scannen",
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp,
+                fontSize = NutriFont.Body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = NutriSpacing.sm)
             )
@@ -821,7 +822,7 @@ private fun HomeScanChip(
             Spacer(Modifier.height(4.dp))
             Text(
                 label,
-                fontSize = 11.sp,
+                fontSize = NutriFont.Caption,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1
@@ -849,7 +850,7 @@ internal fun HomeNavShortcuts(
             Text(
                 "Verwalten",
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp,
+                fontSize = NutriFont.Body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = NutriSpacing.sm)
             )
@@ -898,19 +899,19 @@ internal fun StreakCard(streak: Int) {
                     .background(macros.fat.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text("\uD83D\uDD25", fontSize = 24.sp)
+                Text("\uD83D\uDD25", fontSize = NutriFont.Display)
             }
             Spacer(Modifier.width(NutriSpacing.lg))
             Column {
                 Text(
                     "$streak-Tage-Streak!",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
+                    fontSize = NutriFont.Title,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     "Du bist auf einem guten Weg. Weiter so!",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -985,23 +986,23 @@ internal fun ManualActivityCard(
                 .padding(NutriSpacing.lg),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("🏃", fontSize = 22.sp)
+            Text("🏃", fontSize = NutriFont.HeadlineLarge)
             Spacer(Modifier.width(NutriSpacing.md))
             Column(Modifier.weight(1f)) {
-                Text("Manuelle Aktivität", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text("Manuelle Aktivität", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.BodyLarge)
                 Text(
                     if (todayKcal != null && todayKcal > 0f)
                         "+${todayKcal.toInt()} kcal ins Ziel · gesamt aktiv ${totalActive.toInt()} kcal"
                     else
                         "Tippen, um Aktivitätskalorien einzutragen (zählen 1:1)",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(
                 if (todayKcal != null && todayKcal > 0f) "${todayKcal.toInt()}" else "+",
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
+                fontSize = NutriFont.TitleLarge,
                 color = MaterialTheme.colorScheme.primary
             )
         }
@@ -1048,7 +1049,7 @@ internal fun ActivityCombinedCard(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(Modifier.width(NutriSpacing.sm))
-                    Text("Health Connect", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text("Health Connect", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.BodyLarge)
                 }
                 Icon(
                     Icons.Default.ChevronRight, null,
@@ -1069,7 +1070,7 @@ internal fun ActivityCombinedCard(
                     Spacer(Modifier.width(NutriSpacing.sm))
                     Text(
                         "Tippe um Health Connect zu verbinden",
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -1119,23 +1120,23 @@ internal fun ActivityCombinedCard(
                 .padding(NutriSpacing.lg),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("🏃", fontSize = 22.sp)
+            Text("🏃", fontSize = NutriFont.HeadlineLarge)
             Spacer(Modifier.width(NutriSpacing.md))
             Column(Modifier.weight(1f)) {
-                Text("Manuelle Aktivität", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text("Manuelle Aktivität", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.BodyLarge)
                 Text(
                     if (manualTodayKcal != null && manualTodayKcal > 0f)
                         "+${manualTodayKcal.toInt()} kcal ins Ziel · gesamt aktiv ${manualTotalActive.toInt()} kcal"
                     else
                         "Tippen, um Aktivitätskalorien einzutragen (zählen 1:1)",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(
                 if (manualTodayKcal != null && manualTodayKcal > 0f) "${manualTodayKcal.toInt()}" else "+",
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
+                fontSize = NutriFont.TitleLarge,
                 color = MaterialTheme.colorScheme.primary
             )
         }
@@ -1166,7 +1167,7 @@ internal fun ManualActivityDialog(
                     "Zusatz zu Health Connect (z. B. fehlende Sport-kcal). " +
                         (healthConnectKcal?.let { "HC: $it kcal. " } ?: "") +
                         "Preset: MET × Gewicht × Dauer.",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(10.dp))
@@ -1187,7 +1188,7 @@ internal fun ManualActivityDialog(
                                     val kcal = preset.estimateKcal(weightKg, dur)
                                     text = kcal.toInt().toString()
                                 },
-                                label = { Text(preset.name, fontSize = 11.sp) },
+                                label = { Text(preset.name, fontSize = NutriFont.Caption) },
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -1264,10 +1265,10 @@ internal fun HomeDetailsHeader(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Tages-Details", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                Text("Tages-Details", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Subtitle)
                 Text(
                     summary,
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -1304,14 +1305,14 @@ internal fun CalorieBreakdownCard(state: HomeUiState) {
                     Text(
                         "So rechnet sich dein Ziel",
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp
+                        fontSize = NutriFont.Subtitle
                     )
                     Text(
                         if (b != null)
                             "${b.targetKcal} kcal · ${if (b.isTrendBased) "aus deinem Verlauf" else "Formel + Aktivität"} · ${b.confidencePercent}%"
                         else
                             "Statisches Ziel ${state.calorieGoal.toInt()} kcal + Sport",
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -1340,14 +1341,14 @@ internal fun CalorieBreakdownCard(state: HomeUiState) {
                 Spacer(Modifier.height(NutriSpacing.sm))
                 Text(
                     "Tipp: Gewicht + Mahlzeiten über ≥5 Tage tracken → adaptives Ziel aus deinem echten Verbrauch.",
-                    fontSize = 11.sp,
+                    fontSize = NutriFont.Caption,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 15.sp
                 )
                 return@Column
             }
 
-            Text("1. Erhaltungsbedarf (TDEE)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Text("1. Erhaltungsbedarf (TDEE)", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Body)
             Spacer(Modifier.height(6.dp))
             b.formulaBmrKcal?.let {
                 BreakdownLine("Grundumsatz BMR (Ruhe)", "$it kcal")
@@ -1363,7 +1364,7 @@ internal fun CalorieBreakdownCard(state: HomeUiState) {
             } else {
                 Text(
                     "Trend noch nicht nutzbar – mind. 5 Tage mit Gewicht (HC oder manuell) und getrackten Mahlzeiten.",
-                    fontSize = 11.sp,
+                    fontSize = NutriFont.Caption,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 15.sp
                 )
@@ -1376,7 +1377,7 @@ internal fun CalorieBreakdownCard(state: HomeUiState) {
 
             if (b.weightChangeKg != null || b.avgIntakeKcal != null) {
                 Spacer(Modifier.height(NutriSpacing.md))
-                Text("Verlauf (${b.trendSpanDays} Tage, ${b.trendOverlapDays} Überlappungen)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                Text("Verlauf (${b.trendSpanDays} Tage, ${b.trendOverlapDays} Überlappungen)", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Body)
                 Spacer(Modifier.height(6.dp))
                 b.weightChangeKg?.let { w ->
                     val label = when {
@@ -1393,7 +1394,7 @@ internal fun CalorieBreakdownCard(state: HomeUiState) {
             }
 
             Spacer(Modifier.height(NutriSpacing.md))
-            Text("2. Tagesziel", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Text("2. Tagesziel", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Body)
             Spacer(Modifier.height(6.dp))
             val deficitNote = b.weeklyTargetLossKg?.let {
                 "−${b.deficitKcal} kcal (Ziel ${"%.1f".format(it)} kg/Woche)"
@@ -1414,7 +1415,7 @@ internal fun CalorieBreakdownCard(state: HomeUiState) {
             BreakdownLine("Ziel heute", "${b.targetKcal} kcal", emphasize = true)
 
             Spacer(Modifier.height(NutriSpacing.md))
-            Text("3. Stand heute", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Text("3. Stand heute", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Body)
             Spacer(Modifier.height(6.dp))
             BreakdownLine("Gegessen", "−${state.totalCalories.toInt()} kcal")
             BreakdownLine("Noch übrig", "${state.remaining.toInt()} kcal", emphasize = true)
@@ -1425,7 +1426,7 @@ internal fun CalorieBreakdownCard(state: HomeUiState) {
                     "Sport: Abweichung vom Ø-Aktiv × ${if (state.aggressiveSportDay) "100" else "75"}%. " +
                     "Bei hartem Tag (viel mehr als Ø) wird das Defizit stark reduziert (Recovery). " +
                     "Konfidenz ${b.confidencePercent}%.",
-                fontSize = 11.sp,
+                fontSize = NutriFont.Caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 15.sp
             )
@@ -1443,13 +1444,13 @@ internal fun BreakdownLine(label: String, value: String, emphasize: Boolean = fa
     ) {
         Text(
             label,
-            fontSize = 12.sp,
+            fontSize = NutriFont.Small,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f)
         )
         Text(
             value,
-            fontSize = 12.sp,
+            fontSize = NutriFont.Small,
             fontWeight = if (emphasize) FontWeight.Bold else FontWeight.Medium,
             color = if (emphasize) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.onSurface
@@ -1473,7 +1474,7 @@ internal fun WhatToCookHomeCard(onClick: () -> Unit) {
             Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("🍳", fontSize = 22.sp, modifier = Modifier.padding(end = 10.dp))
+            Text("🍳", fontSize = NutriFont.HeadlineLarge, modifier = Modifier.padding(end = 10.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     "Was koche ich?",
@@ -1735,7 +1736,7 @@ internal fun DailyHealthScoreCard(
                 Text(
                     "${breakdown.score}",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp,
+                    fontSize = NutriFont.Headline,
                     color = scoreColor
                 )
             }
@@ -1758,7 +1759,7 @@ internal fun DailyHealthScoreCard(
                     Text(
                         "Nähe zum Ziel zählt – starkes Über- oder Unterschreiten senkt den Wert.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 13.sp
+                        fontSize = NutriFont.Body
                     )
                 }
             },
@@ -1795,13 +1796,13 @@ internal fun WaterTrackerCard(
                     Text(
                         "Wasser",
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp
+                        fontSize = NutriFont.BodyLarge
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
                         "${waterMl} / ${goalMl} ml" +
                             if (remaining > 0) " · noch ${remaining} ml" else " · Ziel erreicht",
-                        fontSize = 13.sp,
+                        fontSize = NutriFont.Body,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }

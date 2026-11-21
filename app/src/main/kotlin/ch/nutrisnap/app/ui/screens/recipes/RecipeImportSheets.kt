@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -122,14 +123,14 @@ fun ImportSheet(
                 Text(
                     "Rezept importieren",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp,
+                    fontSize = NutriFont.Headline,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "Instagram, TikTok, Webseite oder KI-JSON",
-                    fontSize = 13.sp,
+                    fontSize = NutriFont.Body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
@@ -161,14 +162,14 @@ fun ImportSheet(
                 if (clipboardJson != null) {
                     Text(
                         "JSON erkannt – 1-Tap Import, Nährwerte aus dem Chat bleiben erhalten.",
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
                     )
                 } else if (jsonImportHint != null) {
                     Text(
                         jsonImportHint!!,
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
                     )
@@ -198,14 +199,14 @@ fun ImportSheet(
                         Text(
                             "Rezepte aus Instagram importieren",
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp,
+                            fontSize = NutriFont.BodyLarge,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
                             "Link kopieren und unten einfügen",
-                            fontSize = 12.sp,
+                            fontSize = NutriFont.Small,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
@@ -229,14 +230,14 @@ fun ImportSheet(
                 }
                 Text(
                     "Ein oder mehrere Screenshots (z.B. TikTok Caption Seite 1+2)",
-                    fontSize = 11.sp,
+                    fontSize = NutriFont.Caption,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp)
                 )
 
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                Text("Oder per Link", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Oder per Link", fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(8.dp))
 
                 OutlinedTextField(value=url, onValueChange={url=it}, label={Text("URL einfügen")},
@@ -257,13 +258,13 @@ fun ImportSheet(
                             Text(
                                 "Caption leer oder unvollständig?",
                                 fontWeight = FontWeight.SemiBold,
-                                fontSize = 13.sp
+                                fontSize = NutriFont.Body
                             )
                             Spacer(Modifier.height(4.dp))
                             Text(
                                 "Link liefert Quelle + Vorschaubild. Ein oder mehrere Screenshots " +
                                     "liefern Zutaten und Zubereitung (z.B. Caption Seite 1 + 2).",
-                                fontSize = 11.sp,
+                                fontSize = NutriFont.Caption,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(Modifier.height(8.dp))
@@ -339,7 +340,7 @@ fun ImportSheet(
                 if (isLoading && !importPhase.isNullOrBlank()) {
                     Text(
                         importPhase!!,
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 8.dp)
                     )
@@ -357,7 +358,7 @@ fun ImportSheet(
                     }
                     Text(
                         "Längerer Versuch mit Qualitäts-Retry – oft bessere Zutaten ohne Screenshot.",
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
                     )
@@ -420,10 +421,10 @@ fun BatchImportSheet(
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 24.dp)
         ) {
-            Text("Rezepte importieren", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            Text("Rezepte importieren", fontWeight = FontWeight.Bold, fontSize = NutriFont.Headline)
             Spacer(Modifier.height(4.dp))
             Text("Mehrere Links auf einmal importieren",
-                fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(16.dp))
 
             // Instagram multi-import card
@@ -445,8 +446,8 @@ fun BatchImportSheet(
                     )
                     Spacer(Modifier.width(12.dp))
                     Column {
-                        Text("Mehrere Rezepte auf einmal", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                        Text("Links aus Zwischenablage einfügen", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Mehrere Rezepte auf einmal", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.BodyLarge)
+                        Text("Links aus Zwischenablage einfügen", fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -482,12 +483,12 @@ fun BatchImportSheet(
                     ) {
                         Text(
                             "${state.doneCount}/${state.items.size} importiert",
-                            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                            fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         if (state.isRunning) {
                             Text(
                                 "Analysiere ${state.items.size} Rezepte…",
-                                fontSize = 12.sp, color = MaterialTheme.colorScheme.primary,
+                                fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
@@ -519,11 +520,11 @@ fun BatchImportSheet(
                             Column(Modifier.weight(1f)) {
                                 Text(
                                     item.resultTitle ?: item.url.take(50),
-                                    fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                    fontSize = NutriFont.Body, maxLines = 1, overflow = TextOverflow.Ellipsis,
                                     fontWeight = if (item.status == BatchStatus.DONE) FontWeight.SemiBold else FontWeight.Normal
                                 )
                                 if (item.error != null) {
-                                    Text(item.error, fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
+                                    Text(item.error, fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.error)
                                 }
                             }
                             if (item.status == BatchStatus.PENDING && !state.isRunning) {

@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import ch.nutrisnap.app.ui.theme.StatusColors
 import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -79,7 +80,7 @@ fun IngredientIdentifySheet(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 CircularProgressIndicator()
                 Spacer(Modifier.height(12.dp))
-                Text("Nährwerte werden gelesen…", fontSize = 14.sp)
+                Text("Nährwerte werden gelesen…", fontSize = NutriFont.BodyLarge)
             }
         }
         return
@@ -208,13 +209,13 @@ private fun IdentifyChooseScreen(
     onAi: () -> Unit
 ) {
     Column(Modifier.padding(16.dp).padding(bottom = 24.dp)) {
-        Text("Zutat identifizieren", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Text("Zutat identifizieren", fontWeight = FontWeight.Bold, fontSize = NutriFont.TitleLarge)
         val subtitle = when {
             ingredientName.isBlank() || ingredientName.equals("Neue Zutat", ignoreCase = true) ->
                 "Neue Zutat hinzufügen"
             else -> ingredientName
         }
-        Text(subtitle, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Text(subtitle, fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 2.dp, bottom = 16.dp))
 
         OptionRow(
@@ -265,12 +266,12 @@ private fun OptionRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Icon(icon, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
             Column(Modifier.weight(1f)) {
-                Text(title, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(title, fontWeight = FontWeight.Medium, fontSize = NutriFont.BodyLarge)
+                Text(subtitle, fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             badge?.let {
                 Surface(shape = RoundedCornerShape(6.dp), color = badgeColor.copy(alpha = 0.12f)) {
-                    Text(it, fontSize = 10.sp, color = badgeColor, fontWeight = FontWeight.SemiBold,
+                    Text(it, fontSize = NutriFont.Tiny, color = badgeColor, fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
                 }
             }
@@ -297,7 +298,7 @@ private fun BarcodeLookupScreen(
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück")
             }
-            Text("Barcode scannen", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text("Barcode scannen", fontWeight = FontWeight.Bold, fontSize = NutriFont.TitleLarge)
         }
         Spacer(Modifier.height(12.dp))
 
@@ -319,9 +320,9 @@ private fun BarcodeLookupScreen(
 
         scanned?.let {
             Spacer(Modifier.height(12.dp))
-            Text("Barcode: $it", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Barcode: $it", fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
             LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp))
-            Text("Suche in Datenbank…", fontSize = 12.sp,
+            Text("Suche in Datenbank…", fontSize = NutriFont.Small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp))
         }
@@ -343,17 +344,17 @@ private fun UnknownBarcodeScreen(
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück")
             }
-            Text("Produkt nicht gefunden", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text("Produkt nicht gefunden", fontWeight = FontWeight.Bold, fontSize = NutriFont.TitleLarge)
         }
         Spacer(Modifier.height(8.dp))
         Text(
             "Barcode $barcode ist nicht in der Datenbank.",
-            fontSize = 13.sp,
+            fontSize = NutriFont.Body,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         if (error != null) {
             Spacer(Modifier.height(6.dp))
-            Text(error, fontSize = 13.sp, color = MaterialTheme.colorScheme.error)
+            Text(error, fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.error)
         }
         Spacer(Modifier.height(16.dp))
         OptionRow(
@@ -435,7 +436,7 @@ private fun FoodSearchScreen(
     Column(Modifier.padding(16.dp).padding(bottom = 24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") }
-            Text("Suchen", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text("Suchen", fontWeight = FontWeight.Bold, fontSize = NutriFont.TitleLarge)
         }
         Spacer(Modifier.height(8.dp))
 
@@ -476,12 +477,12 @@ private fun FoodSearchScreen(
                 }
             }
             errorMsg != null -> Text(
-                "Fehler: $errorMsg", color = MaterialTheme.colorScheme.error, fontSize = 13.sp
+                "Fehler: $errorMsg", color = MaterialTheme.colorScheme.error, fontSize = NutriFont.Body
             )
             results.isEmpty() && !isSearching -> {
                 Text(
                     "Keine Ergebnisse — versuche einen anderen Begriff",
-                    fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                    fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (onCaptureLabel != null) {
                     Spacer(Modifier.height(12.dp))
@@ -514,10 +515,10 @@ private fun FoodSearchScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(Modifier.weight(1f)) {
-                                Text(food.name, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                                Text(food.name, fontWeight = FontWeight.Medium, fontSize = NutriFont.BodyLarge)
                                 Text(
                                     formatFoodMacrosLine(food),
-                                    fontSize = 12.sp,
+                                    fontSize = NutriFont.Small,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -641,8 +642,8 @@ private fun FoodMacroEditDialog(
         title = { Text("Makros bearbeiten") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(food.name, fontWeight = FontWeight.Medium, fontSize = 13.sp)
-                Text("Werte pro 100 g", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(food.name, fontWeight = FontWeight.Medium, fontSize = NutriFont.Body)
+                Text("Werte pro 100 g", fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedTextField(
                     value = cal, onValueChange = { cal = it },
                     label = { Text("kcal") }, singleLine = true,
@@ -753,11 +754,11 @@ private fun AiEstimateScreen(
     Column(Modifier.padding(16.dp).padding(bottom = 24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") }
-            Text("Mit KI schätzen/suchen", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text("Mit KI schätzen/suchen", fontWeight = FontWeight.Bold, fontSize = NutriFont.TitleLarge)
         }
         Text(
             "Zuerst Referenzwerte, sonst KI pro 100g",
-            fontSize = 13.sp,
+            fontSize = NutriFont.Body,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 4.dp, bottom = 12.dp)
         )
@@ -768,12 +769,12 @@ private fun AiEstimateScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator()
                         Spacer(Modifier.height(12.dp))
-                        Text("Suche Nährwerte…", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Suche Nährwerte…", fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
             errorMsg != null -> {
-                Text(errorMsg!!, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+                Text(errorMsg!!, color = MaterialTheme.colorScheme.error, fontSize = NutriFont.Body)
                 Spacer(Modifier.height(12.dp))
                 TextButton(onClick = {
                     scope.launch {
@@ -797,8 +798,8 @@ private fun AiEstimateScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(Modifier.padding(14.dp)) {
-                        Text(food.name, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                        Text(sourceLabel, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary,
+                        Text(food.name, fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Title)
+                        Text(sourceLabel, fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(top = 2.dp, bottom = 10.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             MacroChip("kcal", "${food.calories?.toInt() ?: "–"}")
@@ -808,7 +809,7 @@ private fun AiEstimateScreen(
                         }
                         food.fiber?.takeIf { it > 0f }?.let {
                             Text("Ballaststoffe: %.1f g / 100g".format(it),
-                                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 8.dp))
                         }
                     }

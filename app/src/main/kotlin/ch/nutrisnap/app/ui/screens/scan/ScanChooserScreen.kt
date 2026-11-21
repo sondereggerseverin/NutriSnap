@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.scan
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -103,11 +104,11 @@ private fun ScanOptionCard(
             }
             Spacer(Modifier.width(NutriSpacing.lg))
             Column {
-                Text(title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                Text(title, fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Subtitle)
                 Spacer(Modifier.height(2.dp))
                 Text(
                     subtitle,
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 16.sp
                 )

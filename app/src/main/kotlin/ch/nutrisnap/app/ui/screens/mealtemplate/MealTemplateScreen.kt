@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.mealtemplate
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -137,10 +138,10 @@ private fun TemplateCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("Wochen-Autopilot", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Text("Wochen-Autopilot", fontSize = NutriFont.Body, fontWeight = FontWeight.Medium)
                     Text(
                         "Mo–Fr im Tagebuch vorschlagen",
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }

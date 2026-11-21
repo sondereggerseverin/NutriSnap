@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -149,13 +150,13 @@ fun MultiComponentAddToDiarySheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Ins Tagebuch", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                Text("Ins Tagebuch", fontWeight = FontWeight.Bold, fontSize = NutriFont.TitleLarge, modifier = Modifier.weight(1f))
                 IconButton(onClick = { requestTrackDismiss() }, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.Close, contentDescription = "Schliessen")
                 }
             }
             Spacer(Modifier.height(4.dp))
-            Text(recipe.displayTitle(), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(recipe.displayTitle(), fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(10.dp))
 
             // Mode toggle
@@ -186,7 +187,7 @@ fun MultiComponentAddToDiarySheet(
                     2 -> "Ohne Komponenten – ein Gesamtgewicht oder Portionen, wie ein normales Rezept."
                     else -> "Jede Komponente einzeln abwiegen (z. B. 400 g Reis, 360 g Sauce)."
                 },
-                fontSize = 12.sp,
+                fontSize = NutriFont.Small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(12.dp))
@@ -208,7 +209,7 @@ fun MultiComponentAddToDiarySheet(
                             (c.totalCalories / c.cookedWeightG * 100f).toInt() else 0
                         Text(
                             "• ${c.name}: ${g.toInt()} g  (von ${c.cookedWeightG.toInt()} g · $dens kcal/100g)",
-                            fontSize = 13.sp
+                            fontSize = NutriFont.Body
                         )
                     }
                 }
@@ -217,7 +218,7 @@ fun MultiComponentAddToDiarySheet(
                         Text(
                             "Batch: ${wholeYieldG.toInt()} g · " +
                                 "${wholeGramsPerServing?.toInt() ?: "–"} g/Portion",
-                            fontSize = 12.sp,
+                            fontSize = NutriFont.Small,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(Modifier.height(8.dp))
@@ -283,7 +284,7 @@ fun MultiComponentAddToDiarySheet(
                     Text(
                         "Summe: ${totalCals.toInt()} kcal · ${totalProtein.toInt()} g Protein",
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp,
+                        fontSize = NutriFont.Body,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
@@ -291,7 +292,7 @@ fun MultiComponentAddToDiarySheet(
             }
 
             Spacer(Modifier.height(12.dp))
-            Text("Mahlzeit", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Text("Mahlzeit", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Body)
             Spacer(Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 MealType.entries.forEach { mt ->
@@ -304,13 +305,13 @@ fun MultiComponentAddToDiarySheet(
                     FilterChip(
                         selected = selectedMeal == mt,
                         onClick = { selectedMeal = mt },
-                        label = { Text(label, fontSize = 12.sp) }
+                        label = { Text(label, fontSize = NutriFont.Small) }
                     )
                 }
             }
 
             Spacer(Modifier.height(12.dp))
-            Text("Tag", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Text("Tag", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Body)
             Spacer(Modifier.height(4.dp))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -326,7 +327,7 @@ fun MultiComponentAddToDiarySheet(
                     FilterChip(
                         selected = selectedDate == d,
                         onClick = { selectedDate = d },
-                        label = { Text(label, fontSize = 11.sp) }
+                        label = { Text(label, fontSize = NutriFont.Caption) }
                     )
                 }
             }

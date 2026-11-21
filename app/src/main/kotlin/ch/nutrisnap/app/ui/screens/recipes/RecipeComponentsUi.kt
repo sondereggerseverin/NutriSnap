@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -186,7 +187,7 @@ fun RecipeComponentsEditorSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Komponenten", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                Text("Komponenten", fontWeight = FontWeight.Bold, fontSize = NutriFont.TitleLarge, modifier = Modifier.weight(1f))
                 IconButton(onClick = { requestDismiss() }, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.Close, contentDescription = "Schliessen")
                 }
@@ -194,7 +195,7 @@ fun RecipeComponentsEditorSheet(
             Spacer(Modifier.height(4.dp))
             Text(
                 "Nur Kochgewicht eintragen. Nährwerte kommen automatisch aus den verifizierten Zutaten – keine manuelle Eingabe.",
-                fontSize = 13.sp,
+                fontSize = NutriFont.Body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(12.dp))
@@ -211,7 +212,7 @@ fun RecipeComponentsEditorSheet(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Teil ${index + 1}", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            Text("Teil ${index + 1}", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.BodyLarge)
                             if (drafts.size > 1) {
                                 IconButton(
                                     onClick = { drafts = drafts.toMutableList().also { it.removeAt(index) } },
@@ -263,7 +264,7 @@ fun RecipeComponentsEditorSheet(
                             Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
                                 Text(
                                     "Nährwerte (berechnet aus Zutaten)",
-                                    fontSize = 11.sp,
+                                    fontSize = NutriFont.Caption,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Spacer(Modifier.height(2.dp))
@@ -274,13 +275,13 @@ fun RecipeComponentsEditorSheet(
                                             "KH ${fmtNum(nut.carbsG)} g · " +
                                             "F ${fmtNum(nut.fatG)} g" +
                                             if (nut.fiberG > 0f) " · Ballast ${fmtNum(nut.fiberG)} g" else "",
-                                        fontSize = 13.sp,
+                                        fontSize = NutriFont.Body,
                                         fontWeight = FontWeight.Medium
                                     )
                                 } else {
                                     Text(
                                         "Noch keine Zutaten-Zuordnung. Über «Komponenten trennen» Zutaten diesem Teil zuordnen und Kochgewicht setzen.",
-                                        fontSize = 12.sp,
+                                        fontSize = NutriFont.Small,
                                         color = MaterialTheme.colorScheme.error
                                     )
                                 }

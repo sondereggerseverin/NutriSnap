@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.components
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -58,7 +59,7 @@ fun BarChart(
                     if (v > 0f) {
                         Text(
                             valueFormatter(v),
-                            fontSize = 10.sp,
+                            fontSize = NutriFont.Tiny,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -84,7 +85,7 @@ fun BarChart(
                     Spacer(Modifier.height(NutriSpacing.xs))
                     Text(
                         labels[i],
-                        fontSize = 10.sp,
+                        fontSize = NutriFont.Tiny,
                         fontWeight = if (i == highlightIndex) FontWeight.Bold else FontWeight.Normal,
                         color = if (i == highlightIndex) MaterialTheme.colorScheme.onSurface
                         else MaterialTheme.colorScheme.onSurfaceVariant
@@ -117,7 +118,7 @@ fun LineChart(
         ) {
             Text(
                 "Nicht genug Daten",
-                fontSize = 13.sp,
+                fontSize = NutriFont.Body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -140,9 +141,9 @@ fun LineChart(
                 Modifier.width(yAxisWidth).fillMaxHeight(),
                 horizontalAlignment = Alignment.End
             ) {
-                Text(valueFormatter(max), fontSize = 10.sp, color = axisLabelColor)
+                Text(valueFormatter(max), fontSize = NutriFont.Tiny, color = axisLabelColor)
                 Spacer(Modifier.weight(1f))
-                Text(valueFormatter(min), fontSize = 10.sp, color = axisLabelColor)
+                Text(valueFormatter(min), fontSize = NutriFont.Tiny, color = axisLabelColor)
             }
             Spacer(Modifier.width(NutriSpacing.xs))
             Canvas(Modifier.weight(1f).fillMaxHeight()) {
@@ -234,7 +235,7 @@ fun LineChart(
                 xLabels.forEachIndexed { i, label ->
                     Text(
                         label,
-                        fontSize = 10.sp,
+                        fontSize = NutriFont.Tiny,
                         color = axisLabelColor,
                         modifier = Modifier.weight(1f),
                         textAlign = when (i) {

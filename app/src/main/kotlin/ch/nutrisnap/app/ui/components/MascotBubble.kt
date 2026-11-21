@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.components
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -53,13 +54,13 @@ fun MascotBubble(
             Text(
                 text,
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
+                fontSize = NutriFont.TitleLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
             if (!subtext.isNullOrBlank()) {
                 Text(
                     subtext,
-                    fontSize = 13.sp,
+                    fontSize = NutriFont.Body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp)
                 )

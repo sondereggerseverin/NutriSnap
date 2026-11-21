@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.settings
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -71,7 +72,7 @@ fun HealthConnectCard() {
             HealthConnectStatus.NOT_AVAILABLE -> {
                 Text(
                     "Health Connect ist auf diesem Gerät nicht verfügbar.",
-                    fontSize = 13.sp,
+                    fontSize = NutriFont.Body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -79,7 +80,7 @@ fun HealthConnectCard() {
                 Column(verticalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
                     Text(
                         "Health Connect muss aktualisiert werden.",
-                        fontSize = 13.sp,
+                        fontSize = NutriFont.Body,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedButton(
@@ -105,7 +106,7 @@ fun HealthConnectCard() {
                                 false -> "Nicht verbunden"
                                 null  -> "Wird geprüft\u2026"
                             },
-                            fontSize = 13.sp,
+                            fontSize = NutriFont.Body,
                             fontWeight = FontWeight.Medium,
                             color = when (permissionsGranted) {
                                 true  -> MacroColors.calories
@@ -117,7 +118,7 @@ fun HealthConnectCard() {
                                 "Lesen + Ernährung schreiben (Tagebuch → HC)"
                             else
                                 "Schritte, Kalorien, Schlaf, Herzrate",
-                            fontSize = 11.sp,
+                            fontSize = NutriFont.Caption,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -149,7 +150,7 @@ fun HealthConnectCard() {
                                         setOf(HealthConnectManager.WRITE_NUTRITION_PERMISSION)
                                     )
                                 }) {
-                                    Text("Ernährung teilen", fontSize = 11.sp)
+                                    Text("Ernährung teilen", fontSize = NutriFont.Caption)
                                 }
                             }
                             OutlinedButton(onClick = {
@@ -161,7 +162,7 @@ fun HealthConnectCard() {
                                     }
                                 }
                             }) {
-                                Text("Erneut prüfen", fontSize = 12.sp)
+                                Text("Erneut prüfen", fontSize = NutriFont.Small)
                             }
                         }
                     }
@@ -189,11 +190,11 @@ fun AggressiveSportDayCard() {
                 Text(
                     "Aggressiver Sporttag",
                     fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp
+                    fontSize = NutriFont.BodyLarge
                 )
                 Text(
                     "Tracker-Aktivkcal zählen 100% statt 75% (Abweichung vom Ø). Für sehr lange Einheiten, wenn du bewusst noch mehr essen willst. Harte Tage drosseln das Defizit ohnehin bereits.",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -226,11 +227,11 @@ fun ManualActivitySettingsCard() {
                 Text(
                     "Aktivitätskalorien manuell tracken",
                     fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp
+                    fontSize = NutriFont.BodyLarge
                 )
                 Text(
                     "Zusätzlich zu Health Connect (Garmin). Zählt in Ziel-Rechnung und Durchschnitt.",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -247,7 +248,7 @@ fun ManualActivitySettingsCard() {
             Spacer(Modifier.height(NutriSpacing.sm))
             Text(
                 "Auf der Startseite kannst du für heute Aktivitätskalorien eintragen.",
-                fontSize = 11.sp,
+                fontSize = NutriFont.Caption,
                 color = MaterialTheme.colorScheme.primary
             )
         }
@@ -310,12 +311,12 @@ private fun ThemeCard(
                     .background(theme.primary),
                 contentAlignment = Alignment.Center
             ) {
-                Text(theme.emoji, fontSize = 16.sp)
+                Text(theme.emoji, fontSize = NutriFont.Title)
             }
             Spacer(Modifier.height(NutriSpacing.sm))
             Text(
                 theme.label,
-                fontSize = 12.sp,
+                fontSize = NutriFont.Small,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                 color = if (isSelected) theme.primary else scheme.onSurfaceVariant,
                 maxLines = 1
@@ -345,21 +346,21 @@ internal fun GoalPrognosisPreview(
             Text(
                 if (p.isOnTrack) "Im Plan" else "Vom Plan abgewichen",
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp
+                fontSize = NutriFont.Body
             )
             Text(
                 "Ziel voraussichtlich erreicht am ${p.estimatedGoalDate} (in ${p.daysRemaining} Tagen)",
-                fontSize = 12.sp
+                fontSize = NutriFont.Small
             )
             Text(
                 "Aktuelles Tempo: ${String.format("%.2f", p.actualWeeklyRateKg)} kg/Woche · Ziel: ${String.format("%.2f", p.targetWeeklyRateKg)} kg/Woche",
-                fontSize = 11.sp,
+                fontSize = NutriFont.Caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (!p.isOnTrack && p.suggestedKcalAdjustment != 0) {
                 Text(
                     "Empfehlung: Tagesziel um ${p.suggestedKcalAdjustment} kcal anpassen",
-                    fontSize = 11.sp,
+                    fontSize = NutriFont.Caption,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }

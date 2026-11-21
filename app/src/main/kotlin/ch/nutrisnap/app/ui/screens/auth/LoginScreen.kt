@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.auth
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -125,7 +126,7 @@ fun LoginScreen(onLoggedIn: () -> Unit) {
                     strokeWidth = 2.dp
                 )
             } else {
-                Text(if (isSignUp) "Registrieren" else "Anmelden", fontSize = 16.sp)
+                Text(if (isSignUp) "Registrieren" else "Anmelden", fontSize = NutriFont.Title)
             }
         }
 

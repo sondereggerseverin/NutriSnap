@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -151,7 +152,7 @@ fun RecipeEditSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = onDismiss) { Text("Abbrechen") }
-                Text("Rezept bearbeiten", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("Rezept bearbeiten", fontWeight = FontWeight.Bold, fontSize = NutriFont.Title)
                 TextButton(onClick = { onSave(buildSaved()) }) {
                     Text("Speichern", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
@@ -193,7 +194,7 @@ fun RecipeEditSheet(
 
                 // ── Foto ─────────────────────────────────────────────────────
                 item {
-                    Text("Foto", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text("Foto", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.BodyLarge)
                     Spacer(Modifier.height(6.dp))
 
                     val currentUri = imageUri
@@ -242,7 +243,7 @@ fun RecipeEditSheet(
                                         tint = Color.White, modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(Modifier.width(6.dp))
-                                    Text("Foto ändern", color = Color.White, fontSize = 13.sp)
+                                    Text("Foto ändern", color = Color.White, fontSize = NutriFont.Body)
                                 }
                             }
                         } else {
@@ -255,7 +256,7 @@ fun RecipeEditSheet(
                                 Spacer(Modifier.height(6.dp))
                                 Text(
                                     "Foto aus Galerie wählen",
-                                    fontSize = 13.sp,
+                                    fontSize = NutriFont.Body,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -271,7 +272,7 @@ fun RecipeEditSheet(
                         ) {
                             Icon(Icons.Default.DeleteOutline, null, Modifier.size(14.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("Foto entfernen", fontSize = 12.sp)
+                            Text("Foto entfernen", fontSize = NutriFont.Small)
                         }
                     }
                 }
@@ -319,12 +320,12 @@ fun RecipeEditSheet(
 
                 // ── Zutaten ───────────────────────────────────────────────────
                 item {
-                    Text("Zutaten", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text("Zutaten", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.BodyLarge)
                     Spacer(Modifier.height(4.dp))
                     Text("Eine Zutat pro Zeile. Format: Menge + Einheit + Name",
-                        fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("z.B. \"500g Chicken Breast\" oder \"2 Tsp Salt\"",
-                        fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(4.dp))
                     OutlinedTextField(
                         value = ingredients, onValueChange = { ingredients = it },
@@ -336,7 +337,7 @@ fun RecipeEditSheet(
 
                 // ── Zubereitung ───────────────────────────────────────────────
                 item {
-                    Text("Zubereitung", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text("Zubereitung", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.BodyLarge)
                     Spacer(Modifier.height(4.dp))
                     OutlinedTextField(
                         value = instructions, onValueChange = { instructions = it },
@@ -434,7 +435,7 @@ fun ManualRecipeCreateSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = onDismiss) { Text("Abbrechen") }
-                Text("Freies Rezept", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("Freies Rezept", fontWeight = FontWeight.Bold, fontSize = NutriFont.Title)
                 TextButton(onClick = { doSave() }, enabled = canSave) {
                     Text("Speichern", fontWeight = FontWeight.Bold)
                 }
@@ -451,7 +452,7 @@ fun ManualRecipeCreateSheet(
                 Text(
                     "Ohne Link oder Foto – Name vergeben und Zutaten einzeln eintragen. " +
                         "Nährwerte danach über „Verifizieren“ berechnen.",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
@@ -474,7 +475,7 @@ fun ManualRecipeCreateSheet(
                     leadingIcon = { Icon(Icons.Default.People, null, Modifier.size(18.dp)) }
                 )
 
-                Text("Kategorie", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text("Kategorie", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.BodyLarge)
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -495,10 +496,10 @@ fun ManualRecipeCreateSheet(
                     }
                 }
 
-                Text("Zutaten", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text("Zutaten", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.BodyLarge)
                 Text(
                     "Menge in g und Name – pro Zeile eine Zutat",
-                    fontSize = 11.sp,
+                    fontSize = NutriFont.Caption,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 

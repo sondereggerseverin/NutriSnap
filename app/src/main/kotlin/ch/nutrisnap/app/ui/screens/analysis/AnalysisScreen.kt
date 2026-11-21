@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.analysis
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -92,10 +93,10 @@ fun AnalysisScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
                     }
-                    Text("Analyse", fontWeight = FontWeight.Bold, fontSize = 24.sp)
+                    Text("Analyse", fontWeight = FontWeight.Bold, fontSize = NutriFont.Display)
                 }
             } else {
-                Text("Analyse", fontWeight = FontWeight.Bold, fontSize = 24.sp)
+                Text("Analyse", fontWeight = FontWeight.Bold, fontSize = NutriFont.Display)
             }
         }
 
@@ -108,8 +109,8 @@ fun AnalysisScreen(
                     Column(Modifier.padding(NutriSpacing.md)) {
                         Icon(Icons.Default.Insights, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.height(NutriSpacing.xs))
-                        Text("Insights", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                        Text("Zusammenhänge in deinen Daten", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Insights", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Body)
+                        Text("Zusammenhänge in deinen Daten", fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 Card(
@@ -119,8 +120,8 @@ fun AnalysisScreen(
                     Column(Modifier.padding(NutriSpacing.md)) {
                         Icon(Icons.Default.Chat, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.height(NutriSpacing.xs))
-                        Text("Coach", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                        Text("Chat über deine Daten", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Coach", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Body)
+                        Text("Chat über deine Daten", fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -140,10 +141,10 @@ fun AnalysisScreen(
                     Icon(Icons.Default.WarningAmber, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(NutriSpacing.md))
                     Column(Modifier.weight(1f)) {
-                        Text("Nährstoffmangel-Trend", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text("Nährstoffmangel-Trend", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.BodyLarge)
                         Text(
                             "Vitamine & Mineralstoffe der letzten 14 Tage",
-                            fontSize = 12.sp,
+                            fontSize = NutriFont.Small,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -174,10 +175,10 @@ fun AnalysisScreen(
                     Icon(Icons.Default.DateRange, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(NutriSpacing.md))
                     Column(Modifier.weight(1f)) {
-                        Text("Wochen- & Tagesübersicht", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text("Wochen- & Tagesübersicht", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.BodyLarge)
                         Text(
                             "Gewicht, Kalorien, Aktivität, Zone – Wochen oder Tage",
-                            fontSize = 11.sp,
+                            fontSize = NutriFont.Caption,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -211,7 +212,7 @@ fun AnalysisScreen(
                     Spacer(Modifier.width(NutriSpacing.sm))
                     Text(
                         "Lade Health-Connect-Daten\u2026",
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }

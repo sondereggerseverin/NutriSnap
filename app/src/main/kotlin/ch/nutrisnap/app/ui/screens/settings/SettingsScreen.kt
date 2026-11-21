@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.settings
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -226,11 +227,11 @@ fun SettingsScreen(
             Text(
                 if (renameNav) "Einstellungen" else "Mehr",
                 fontWeight = FontWeight.Bold,
-                fontSize = 24.sp
+                fontSize = NutriFont.Display
             )
             Text(
                 "Einstellungen & Shortcuts",
-                fontSize = 13.sp,
+                fontSize = NutriFont.Body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
@@ -242,10 +243,10 @@ fun SettingsScreen(
                     Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
                 }
                 Column {
-                    Text(section!!.title, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    Text(section!!.title, fontWeight = FontWeight.Bold, fontSize = NutriFont.Headline)
                     Text(
                         section!!.subtitle,
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -276,7 +277,7 @@ fun SettingsScreen(
                 Text(
                     "Schnellzugriff",
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp,
+                    fontSize = NutriFont.Body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = NutriSpacing.sm)
                 )
@@ -284,31 +285,31 @@ fun SettingsScreen(
                     OutlinedButton(onClick = onNavigateToScan, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.PhotoCamera, null, Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Scan", fontSize = 12.sp)
+                        Text("Scan", fontSize = NutriFont.Small)
                     }
                     OutlinedButton(onClick = onNavigateToShoppingList, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.ShoppingCart, null, Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Einkauf", fontSize = 12.sp)
+                        Text("Einkauf", fontSize = NutriFont.Small)
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
                     OutlinedButton(onClick = onNavigateToStats, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.BarChart, null, Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Statistik", fontSize = 12.sp)
+                        Text("Statistik", fontSize = NutriFont.Small)
                     }
                     OutlinedButton(onClick = onNavigateToAnalysis, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.Insights, null, Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Analyse", fontSize = 12.sp)
+                        Text("Analyse", fontSize = NutriFont.Small)
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
                     OutlinedButton(onClick = onNavigateToNotifSettings, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.Notifications, null, Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Reminder", fontSize = 12.sp)
+                        Text("Reminder", fontSize = NutriFont.Small)
                     }
                     Spacer(Modifier.weight(1f))
                 }
@@ -331,7 +332,7 @@ fun SettingsScreen(
                     val classicList = prefs?.get(KEY_CLASSIC_RECIPE_LIST) ?: false
                     Text(
                         "Standard: kompakte 2-Spalten-Kacheln (mehr Rezepte sichtbar). Schalter an = Design vor dem Redesign (Stand CI #758, 1-Spalten-Liste).",
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(NutriSpacing.sm))
@@ -351,7 +352,7 @@ fun SettingsScreen(
                         Spacer(Modifier.height(NutriSpacing.sm))
                         Text(
                             "Standard: 2 Spalten, Foto im 4:3-Format mit Titel und kcal pro Portion darunter. Optional 3 Spalten oder größere Kacheln.",
-                            fontSize = 12.sp,
+                            fontSize = NutriFont.Small,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(Modifier.height(NutriSpacing.sm))
@@ -396,7 +397,7 @@ fun SettingsScreen(
                 SettingsCard(title = "Rezept-Import", icon = Icons.Default.Bolt) {
                     Text(
                         "Standard = schneller Import. Ausschalten stellt den gründlicheren (längeren) Pfad wieder her. Nach dem Import gibt es zusätzlich den Button „Gründlicher“.",
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(NutriSpacing.sm))
@@ -448,7 +449,7 @@ fun SettingsScreen(
                 SettingsCard(title = "Design-Experiment", icon = Icons.Default.AutoAwesome) {
                     Text(
                         "Optionaler Look: große Rezeptbilder, weichere Karten. Standard bleibt, solange die Schalter aus sind.",
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(NutriSpacing.sm))
@@ -508,7 +509,7 @@ fun SettingsScreen(
                 SettingsCard(title = "Ernährung & AI (Experiment)", icon = Icons.Default.AutoFixHigh) {
                     Text(
                         "Neue Funktionen zum Vergleich mit dem bisherigen Verhalten. Ausschalten = wie bisher.",
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(NutriSpacing.sm))
@@ -564,7 +565,7 @@ fun SettingsScreen(
                     Text(
                         "Optional: eigenen Key von console.groq.com hinterlegen. Leer = App-Standard. " +
                             "Gilt für KI-Schätzung, Vision, Rezept-Parsing und Transkripte.",
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(NutriSpacing.sm))
@@ -577,7 +578,7 @@ fun SettingsScreen(
                     if (hasUserKey) {
                         Text(
                             "Aktiv: ${userKeyPref.take(4)}…${userKeyPref.takeLast(4)}",
-                            fontSize = 12.sp,
+                            fontSize = NutriFont.Small,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Medium
                         )
@@ -622,7 +623,7 @@ fun SettingsScreen(
                     }
                     byokStatus?.let {
                         Spacer(Modifier.height(6.dp))
-                        Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                        Text(it, fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.primary)
                     }
                 }
 
@@ -632,7 +633,7 @@ fun SettingsScreen(
                 SettingsCard(title = "Touch-Targets", icon = Icons.Default.TouchApp) {
                     Text(
                         "Größere Tip-Flächen für häufig genutzte Aktionen (Material-Minimum 40–48 dp).",
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     DesignToggleRow(
@@ -862,28 +863,28 @@ fun SettingsScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
                         OutlinedButton(onClick = onNavigateToStats, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.BarChart, null, Modifier.size(16.dp))
-                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Statistik", fontSize = 12.sp)
+                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Statistik", fontSize = NutriFont.Small)
                         }
                         OutlinedButton(onClick = onNavigateToAnalysis, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.Insights, null, Modifier.size(16.dp))
-                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Analyse", fontSize = 12.sp)
+                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Analyse", fontSize = NutriFont.Small)
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
                         OutlinedButton(onClick = onNavigateToNotifSettings, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.Notifications, null, Modifier.size(16.dp))
-                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Reminder", fontSize = 12.sp)
+                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Reminder", fontSize = NutriFont.Small)
                         }
                         Spacer(Modifier.weight(1f))
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
                         OutlinedButton(onClick = onNavigateToMealOrder, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.DragHandle, null, Modifier.size(16.dp))
-                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Reihenfolge", fontSize = 12.sp)
+                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Reihenfolge", fontSize = NutriFont.Small)
                         }
                         OutlinedButton(onClick = onNavigateToShoppingList, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.ShoppingCart, null, Modifier.size(16.dp))
-                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Einkaufsliste", fontSize = 12.sp)
+                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Einkaufsliste", fontSize = NutriFont.Small)
                         }
                     }
                 }
@@ -906,7 +907,7 @@ fun SettingsScreen(
                 SettingsCard(title = "Mein Ziel", icon = Icons.Default.Flag) {
                     Text(
                         "Was möchtest du erreichen?",
-                        fontSize = 13.sp,
+                        fontSize = NutriFont.Body,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(NutriSpacing.sm))
@@ -923,8 +924,8 @@ fun SettingsScreen(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(NutriSpacing.xs)
                                             ) {
-                                                Text(goal.emoji, fontSize = 14.sp)
-                                                Text(goal.label, fontSize = 12.sp)
+                                                Text(goal.emoji, fontSize = NutriFont.BodyLarge)
+                                                Text(goal.label, fontSize = NutriFont.Small)
                                             }
                                         },
                                         modifier = Modifier.weight(1f),
@@ -940,7 +941,7 @@ fun SettingsScreen(
                     }
                     Text(
                         selectedGoal.desc,
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(top = NutriSpacing.xs)
                     )
@@ -949,7 +950,7 @@ fun SettingsScreen(
                 SettingsCard(title = "Körperdaten", icon = Icons.Default.Person) {
                     Text(
                         "Geschlecht",
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(NutriSpacing.xs))
@@ -962,7 +963,7 @@ fun SettingsScreen(
                             FilterChip(
                                 selected = sex == option,
                                 onClick = { sex = option; applyGoal() },
-                                label = { Text(label, fontSize = 12.sp) },
+                                label = { Text(label, fontSize = NutriFont.Small) },
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -982,7 +983,7 @@ fun SettingsScreen(
                 SettingsCard(title = "Ernährungsziele", icon = Icons.Default.TrackChanges) {
                     Text(
                         "Automatisch berechnet – du kannst auch manuell anpassen.",
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(NutriSpacing.xs))
@@ -991,14 +992,14 @@ fun SettingsScreen(
                     Text(
                         "Fud-Formel: Protein nach Aktivität (0,8–2,2 g/kg, +0,2 bei Abnehmen), "
                             + "Fett 0,6 g/kg, KH = Rest. Mifflin-St Jeor + 6 Aktivitätsstufen.",
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     GoalField("Kohlenhydratziel (g)", carbsText,   KeyboardType.Number) { carbsText   = it }
                     GoalField("Fettziel (g)",         fatText,     KeyboardType.Number) { fatText     = it }
                     Text(
                         "Ballaststoffe: fest ${ch.nutrisnap.app.ui.screens.home.FIBER_GOAL_G.toInt()} g/Tag (D-A-CH-Richtwert)",
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
                     )
@@ -1010,10 +1011,10 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text("Wasser-Anzeige", fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                            Text("Wasser-Anzeige", fontWeight = FontWeight.Medium, fontSize = NutriFont.BodyLarge)
                             Text(
                                 "Tracker auf Start & Tagebuch",
-                                fontSize = 12.sp,
+                                fontSize = NutriFont.Small,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -1033,10 +1034,10 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text("Tägliche Gewichtsabfrage", fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                            Text("Tägliche Gewichtsabfrage", fontWeight = FontWeight.Medium, fontSize = NutriFont.BodyLarge)
                             Text(
                                 "Beim Öffnen der App, wenn heute noch kein Gewicht",
-                                fontSize = 12.sp,
+                                fontSize = NutriFont.Small,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -1078,7 +1079,7 @@ fun SettingsScreen(
                     }
                     Text(
                         "Optional: Zielgewicht setzen, um zu sehen, wann du es bei deinem aktuellen Tempo erreichst.",
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(NutriSpacing.xs))
@@ -1111,19 +1112,19 @@ fun SettingsScreen(
                             Column {
                                 Text(
                                     "Dein Grundumsatz (TDEE)",
-                                    fontSize = 12.sp,
+                                    fontSize = NutriFont.Small,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                                 Text(
                                     "Basis für die Zielberechnung",
-                                    fontSize = 10.sp,
+                                    fontSize = NutriFont.Tiny,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                                 )
                             }
                             Text(
                                 "${tdee.toInt()} kcal",
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
+                                fontSize = NutriFont.Title,
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
@@ -1183,11 +1184,11 @@ fun SettingsScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
                         OutlinedButton(onClick = onNavigateToCustomFoods, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.Restaurant, null, Modifier.size(16.dp))
-                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Lebensmittel", fontSize = 12.sp)
+                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Lebensmittel", fontSize = NutriFont.Small)
                         }
                         OutlinedButton(onClick = onNavigateToMealTemplates, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.Bookmark, null, Modifier.size(16.dp))
-                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Vorlagen", fontSize = 12.sp)
+                            Spacer(Modifier.width(NutriSpacing.xs)); Text("Vorlagen", fontSize = NutriFont.Small)
                         }
                     }
                     Spacer(Modifier.height(NutriSpacing.sm))
@@ -1222,7 +1223,7 @@ fun SettingsScreen(
                     if (reanalyze.running && reanalyze.currentTitle.isNotBlank()) {
                         Text(
                             reanalyze.currentTitle,
-                            fontSize = 11.sp,
+                            fontSize = NutriFont.Caption,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1
                         )
@@ -1230,7 +1231,7 @@ fun SettingsScreen(
                     reanalyze.finishedOk?.let { n ->
                         Text(
                             "✓ $n Rezepte aktualisiert (Standards, Fiber, KI)",
-                            fontSize = 12.sp,
+                            fontSize = NutriFont.Small,
                             color = MacroColors.calories,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier
@@ -1241,7 +1242,7 @@ fun SettingsScreen(
                     reanalyze.error?.let { err ->
                         Text(
                             "Fehler: $err",
-                            fontSize = 12.sp,
+                            fontSize = NutriFont.Small,
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier
                                 .clickable { vm.clearReanalyzeMessage() }
@@ -1263,7 +1264,7 @@ fun SettingsScreen(
                 SettingsCard(title = "Backofen / Dampfgarer", icon = Icons.Default.Kitchen) {
                     Text(
                         "Optional: Modell hinterlegen, damit KI-Rezepte für Ofen/Dampfgarer echte Programme, Temperaturen und Zeiten deines Geräts nutzen.",
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(NutriSpacing.xs))
@@ -1336,10 +1337,10 @@ private fun SettingsHubTile(
                     modifier = Modifier.size(22.dp)
                 )
             }
-            Text(section.title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(section.title, fontWeight = FontWeight.SemiBold, fontSize = NutriFont.BodyLarge)
             Text(
                 section.subtitle,
-                fontSize = 11.sp,
+                fontSize = NutriFont.Caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 14.sp
             )
@@ -1360,8 +1361,8 @@ private fun SettingsSwitchRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f).padding(end = 8.dp)) {
-            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(title, fontSize = NutriFont.BodyLarge, fontWeight = FontWeight.Medium)
+            Text(subtitle, fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
@@ -1424,7 +1425,7 @@ fun SettingsCard(
                     Modifier.size(20.dp),
                     tint = MaterialTheme.colorScheme.primary
                 )
-                Text(title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                Text(title, fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Subtitle)
             }
             content()
         }
@@ -1458,7 +1459,7 @@ fun ActivitySlider(value: Float, onValueChange: (Float) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
         Text(
             "$currentLabel · Faktor ${"%.3f".format(snapped).trimEnd('0').trimEnd('.')}",
-            fontSize = 13.sp,
+            fontSize = NutriFont.Body,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Slider(
@@ -1474,8 +1475,8 @@ fun ActivitySlider(value: Float, onValueChange: (Float) -> Unit) {
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("Sitzend", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("Extrem", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Sitzend", fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Extrem", fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -1518,12 +1519,12 @@ private fun PriorityNutrientsSettingsCard(
     SettingsCard(title = "Nährstoffe im Blick", icon = Icons.Default.Visibility) {
         Text(
             "Bis zu $MAX_PRIORITY_NUTRIENTS Nährstoffe auf dem Home-Screen. Ampel zeigt den Tagesfortschritt.",
-            fontSize = 12.sp,
+            fontSize = NutriFont.Small,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
             "${selected.size} / $MAX_PRIORITY_NUTRIENTS ausgewählt",
-            fontSize = 12.sp,
+            fontSize = NutriFont.Small,
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.primary
         )
@@ -1547,7 +1548,7 @@ private fun PriorityNutrientsSettingsCard(
                             persist(selected.toList())
                         }
                     },
-                    label = { Text(label, fontSize = 12.sp) },
+                    label = { Text(label, fontSize = NutriFont.Small) },
                     enabled = isOn || selected.size < MAX_PRIORITY_NUTRIENTS
                 )
             }
@@ -1559,7 +1560,7 @@ private fun PriorityNutrientsSettingsCard(
                 persist(DEFAULT_PRIORITY_NUTRIENT_KEYS)
             }
         ) {
-            Text("Standard wiederherstellen", fontSize = 12.sp)
+            Text("Standard wiederherstellen", fontSize = NutriFont.Small)
         }
     }
 }

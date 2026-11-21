@@ -40,6 +40,25 @@ object NutriRadius {
     val xxl = 24.dp
 }
 
+// ── Font Sizes ────────────────────────────────────────────────────────────────
+// Feste Schriftgrössen-Stufen für Stellen, an denen die Material-Typografie
+// (MaterialTheme.typography) bewusst nicht passt (kompakte Karten, Labels, Zahlen).
+
+object NutriFont {
+    val Micro = 9.sp
+    val Tiny = 10.sp
+    val Caption = 11.sp
+    val Small = 12.sp
+    val Body = 13.sp
+    val BodyLarge = 14.sp
+    val Subtitle = 15.sp
+    val Title = 16.sp
+    val TitleLarge = 18.sp
+    val Headline = 20.sp
+    val HeadlineLarge = 22.sp
+    val Display = 24.sp
+}
+
 // ── Status Colors ─────────────────────────────────────────────────────────────
 // Semantische Statusfarben (gut / Warnung / schlecht / Info). Einheitlich statt
 // pro Screen hartcodiert, damit Theme- und Kontrast-Anpassungen an einer Stelle passieren.

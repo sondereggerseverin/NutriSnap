@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -314,7 +315,7 @@ fun IngredientVerifySheet(
                         Text(
                             if (readOnly) "Zutaten einsehen" else "Zutaten verifizieren",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp,
+                            fontSize = NutriFont.Headline,
                             modifier = Modifier.weight(1f)
                         )
                         IconButton(onClick = { requestDismiss() }, modifier = Modifier.size(36.dp)) {
@@ -323,7 +324,7 @@ fun IngredientVerifySheet(
                     }
                     Text(
                         "$recipeName · $servings Portion${if (servings != 1) "en" else ""}",
-                        fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                        fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     headerExtra?.let {
                         Spacer(Modifier.height(8.dp))
@@ -341,10 +342,10 @@ fun IngredientVerifySheet(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Column {
-                                Text("${safeInt(totalKcal)} kcal", fontWeight = FontWeight.Bold, fontSize = 22.sp,
+                                Text("${safeInt(totalKcal)} kcal", fontWeight = FontWeight.Bold, fontSize = NutriFont.HeadlineLarge,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer)
                                 Text("$verifiedCount/${verifyStates.size} verifiziert",
-                                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.7f))
+                                    fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.7f))
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                                 MacroChip("P", "${safeInt(totalProt)}g")
@@ -358,13 +359,13 @@ fun IngredientVerifySheet(
                         Spacer(Modifier.height(6.dp))
                         Text(
                             "Σ Zutaten: ${totalWeightG.toInt()} g  ·  ≈ ${(totalWeightG / servings.coerceAtLeast(1)).toInt()} g/Portion",
-                            fontSize = 13.sp,
+                            fontSize = NutriFont.Body,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
                             "Nach dem Kochen abweichend? Im Rezept „Gewicht nach Kochen“ setzen.",
-                            fontSize = 11.sp,
+                            fontSize = NutriFont.Caption,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -373,7 +374,7 @@ fun IngredientVerifySheet(
                         Text(
                             "Ballaststoffe: ${"%.1f".format(it)} g" +
                                 if (!fiberComplete) " (teilweise geschätzt)" else "",
-                            fontSize = 12.sp,
+                            fontSize = NutriFont.Small,
                             fontWeight = FontWeight.Normal,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -383,7 +384,7 @@ fun IngredientVerifySheet(
                         Spacer(Modifier.height(4.dp))
                         Text(
                             "Ballaststoffe fehlen bei:",
-                            fontSize = 11.sp,
+                            fontSize = NutriFont.Caption,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         missingFiberStates.take(3).forEach { s ->
@@ -392,7 +393,7 @@ fun IngredientVerifySheet(
                                 .trimStart('•', '-', ' ')
                             Text(
                                 "• $label",
-                                fontSize = 11.sp,
+                                fontSize = NutriFont.Caption,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -403,7 +404,7 @@ fun IngredientVerifySheet(
                         if (missingFiberStates.size > 3) {
                             Text(
                                 "… und ${missingFiberStates.size - 3} weitere",
-                                fontSize = 11.sp,
+                                fontSize = NutriFont.Caption,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -424,21 +425,21 @@ fun IngredientVerifySheet(
                     Spacer(Modifier.size(28.dp))
                     Text(
                         "Menge",
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.width(56.dp)
                     )
                     Text(
                         "Zutat",
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f)
                     )
                     Text(
                         "kcal",
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.width(52.dp)
@@ -658,7 +659,7 @@ fun IngredientVerifySheet(
                 }
                 Text(
                     "Zutaten aufteilen: «Komponenten trennen» im Rezept nutzen (nicht hier).",
-                    fontSize = 11.sp,
+                    fontSize = NutriFont.Caption,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                 )

@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.chat
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import ch.nutrisnap.app.ui.components.VoiceInputButton
 import androidx.compose.ui.platform.LocalContext
 import android.graphics.BitmapFactory
@@ -96,7 +97,7 @@ fun DataChatScreen(
                     Text(
                         "Coach",
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 20.sp
+                        fontSize = NutriFont.Headline
                     )
                 },
                 navigationIcon = {
@@ -137,7 +138,7 @@ fun DataChatScreen(
                             onClick = { send(chip) },
                             enabled = !isLoading,
                             label = {
-                                Text(chip, fontSize = 13.sp, maxLines = 1)
+                                Text(chip, fontSize = NutriFont.Body, maxLines = 1)
                             },
                             icon = {
                                 Icon(
@@ -192,7 +193,7 @@ fun DataChatScreen(
                         onValueChange = { question = it },
                         modifier = Modifier.weight(1f),
                         placeholder = {
-                            Text("Coach fragen…", fontSize = 14.sp)
+                            Text("Coach fragen…", fontSize = NutriFont.BodyLarge)
                         },
                         shape = RoundedCornerShape(24.dp),
                         singleLine = true,
@@ -245,7 +246,7 @@ fun DataChatScreen(
                         Text(
                             COACH_STARTER_CHIPS.first(),
                             fontWeight = FontWeight.Medium,
-                            fontSize = 14.sp
+                            fontSize = NutriFont.BodyLarge
                         )
                     },
                     colors = SuggestionChipDefaults.suggestionChipColors(
@@ -256,7 +257,7 @@ fun DataChatScreen(
                 Spacer(Modifier.weight(1f))
                 Text(
                     "Frag den Coach zu Makros, Gewicht oder Mahlzeiten.",
-                    fontSize = 13.sp,
+                    fontSize = NutriFont.Body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(12.dp))
@@ -288,7 +289,7 @@ fun DataChatScreen(
                             )
                             Text(
                                 "Denkt nach…",
-                                fontSize = 12.sp,
+                                fontSize = NutriFont.Small,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -341,7 +342,7 @@ private fun CoachBubble(msg: ChatMessage) {
             Text(
                 msg.content,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                fontSize = 14.sp,
+                fontSize = NutriFont.BodyLarge,
                 lineHeight = 20.sp,
                 color = if (isUser) {
                     MaterialTheme.colorScheme.onPrimary

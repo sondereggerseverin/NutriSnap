@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.components
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -25,7 +26,7 @@ fun OfflineBanner(isOnline: Boolean) {
         ) {
             Text(
                 text = "Kein Internet - Offline-Modus aktiv",
-                color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium
+                color = Color.White, fontSize = NutriFont.Body, fontWeight = FontWeight.Medium
             )
         }
     }

@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.diary
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import ch.nutrisnap.app.ui.components.FoodThumbFallback
 import android.graphics.Bitmap
 import androidx.compose.foundation.background
@@ -189,7 +190,7 @@ fun AddFoodSheet(
                 Text(
                     "Eintrag hinzufügen",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
+                    fontSize = NutriFont.TitleLarge,
                     modifier = Modifier.weight(1f)
                 )
                 IconButton(onClick = { requestDismiss() }, modifier = Modifier.size(36.dp)) {
@@ -209,7 +210,7 @@ fun AddFoodSheet(
             ) {
                 Text(
                     "Tag",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(end = 2.dp)
                 )
@@ -224,14 +225,14 @@ fun AddFoodSheet(
                     FilterChip(
                         selected = activeDate == d,
                         onClick = { vm.setDate(d) },
-                        label = { Text(label, fontSize = 12.sp) }
+                        label = { Text(label, fontSize = NutriFont.Small) }
                     )
                 }
             }
             if (activeDate != java.time.LocalDate.now()) {
                 Text(
                     "Wird für ${activeDate.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))} gespeichert",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = NutriSpacing.sm)
                 )
@@ -250,27 +251,27 @@ fun AddFoodSheet(
                 ) {
                     Text(
                         "Weitere Wege",
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(end = 4.dp)
                     )
                     AssistChip(
                         onClick = { activeTab = AddFoodTab.AI },
-                        label = { Text("KI schätzen", fontSize = 12.sp) },
+                        label = { Text("KI schätzen", fontSize = NutriFont.Small) },
                         leadingIcon = {
                             Icon(Icons.Default.AutoAwesome, null, Modifier.size(16.dp))
                         }
                     )
                     AssistChip(
                         onClick = { activeTab = AddFoodTab.MANUAL },
-                        label = { Text("Manuell", fontSize = 12.sp) },
+                        label = { Text("Manuell", fontSize = NutriFont.Small) },
                         leadingIcon = {
                             Icon(Icons.Default.Edit, null, Modifier.size(16.dp))
                         }
                     )
                     AssistChip(
                         onClick = { activeTab = AddFoodTab.SAVED },
-                        label = { Text("Vorlagen", fontSize = 12.sp) },
+                        label = { Text("Vorlagen", fontSize = NutriFont.Small) },
                         leadingIcon = {
                             Icon(Icons.Default.Bookmarks, null, Modifier.size(16.dp))
                         }
@@ -290,7 +291,7 @@ fun AddFoodSheet(
                     ) {
                         Icon(Icons.Default.ArrowBack, null, Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Suche", fontSize = 13.sp)
+                        Text("Suche", fontSize = NutriFont.Body)
                     }
                     Text(
                         when (activeTab) {
@@ -300,7 +301,7 @@ fun AddFoodSheet(
                             else -> ""
                         },
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
+                        fontSize = NutriFont.BodyLarge,
                         modifier = Modifier.padding(start = 8.dp)
                     )
                 }
@@ -315,11 +316,11 @@ fun AddFoodSheet(
                         Text(
                             "Barcode $pendingUnknownBarcode nicht in der Datenbank",
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp
+                            fontSize = NutriFont.Body
                         )
                         Text(
                             "Nährwerttabelle fotografieren – Produkt wird gespeichert und ist nächstes Mal per Barcode findbar.",
-                            fontSize = 12.sp,
+                            fontSize = NutriFont.Small,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(Modifier.height(8.dp))
@@ -341,7 +342,7 @@ fun AddFoodSheet(
                 Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.width(8.dp))
-                    Text("Produkt wird gespeichert…", fontSize = 13.sp)
+                    Text("Produkt wird gespeichert…", fontSize = NutriFont.Body)
                 }
             }
 
@@ -415,7 +416,7 @@ private fun SavedMealsTab(
             Text(
                 "Noch keine Vorlagen. Tippe im Tagebuch bei einem Eintrag auf ⋮ → \"Als Vorlage speichern\" " +
                     "(z. B. nach einem Foto-Scan), dann kannst du es hier mit einem Tipp erneut loggen.",
-                fontSize = 13.sp,
+                fontSize = NutriFont.Body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = NutriSpacing.md)
             )
@@ -467,11 +468,11 @@ private fun SavedMealsTab(
                         }
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(m.template.name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, maxLines = 2)
+                            Text(m.template.name, fontWeight = FontWeight.SemiBold, fontSize = NutriFont.BodyLarge, maxLines = 2)
                             Text(
                                 "${m.calories.toInt()} kcal · P ${fmtMacroShort(m.protein)}  K ${fmtMacroShort(m.carbs)}  F ${fmtMacroShort(m.fat)}" +
                                     if (m.items.size > 1) " · ${m.items.size} Einträge" else "",
-                                fontSize = 12.sp,
+                                fontSize = NutriFont.Small,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -586,7 +587,7 @@ private fun SearchTab(
         if (barcodeStatus.isNotBlank()) {
             Text(
                 barcodeStatus,
-                fontSize = 13.sp,
+                fontSize = NutriFont.Body,
                 color = if ("nicht gefunden" in barcodeStatus)
                     MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(top = NutriSpacing.xs)
@@ -597,7 +598,7 @@ private fun SearchTab(
             Text(
                 "Favoriten",
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp,
+                fontSize = NutriFont.Body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = NutriSpacing.md, bottom = NutriSpacing.xs)
             )
@@ -628,7 +629,7 @@ private fun SearchTab(
             ) {
                 Text(
                     "Keine Treffer in der Datenbank",
-                    fontSize = 13.sp,
+                    fontSize = NutriFont.Body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 OutlinedButton(
@@ -678,14 +679,14 @@ private fun SearchTab(
                 Text(
                     food.name,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
+                    fontSize = NutriFont.Title,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
                 food.brand?.let {
                     Text(
                         it,
-                        fontSize = 13.sp,
+                        fontSize = NutriFont.Body,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -714,7 +715,7 @@ private fun SearchTab(
         if (inventorySnack != null) {
             Text(
                 inventorySnack!!,
-                fontSize = 12.sp,
+                fontSize = NutriFont.Small,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(bottom = 4.dp)
             )
@@ -751,7 +752,7 @@ private fun SearchTab(
                         label = {
                             Text(
                                 "Standard ${if (g == g.toInt().toFloat()) g.toInt() else "%.0f".format(g)} g",
-                                fontSize = 12.sp
+                                fontSize = NutriFont.Small
                             )
                         },
                         leadingIcon = {
@@ -764,7 +765,7 @@ private fun SearchTab(
                     FilterChip(
                         selected = amountText.toFloatOrNull() == preset.grams,
                         onClick  = { amountText = preset.grams.toInt().toString() },
-                        label    = { Text(preset.label, fontSize = 12.sp) },
+                        label    = { Text(preset.label, fontSize = NutriFont.Small) },
                         colors = portionChipColors
                     )
                 }
@@ -831,12 +832,12 @@ private fun SearchTab(
                     fontWeight = FontWeight.SemiBold,
                     color = MacroColors.calories
                 )
-                Text("P ${((food.protein ?: 0f) * grams / 100f).toInt()}g", fontSize = 13.sp, color = MacroColors.protein)
-                Text("K ${((food.carbs ?: 0f) * grams / 100f).toInt()}g", fontSize = 13.sp, color = MacroColors.carbs)
-                Text("F ${((food.fat ?: 0f) * grams / 100f).toInt()}g", fontSize = 13.sp, color = MacroColors.fat)
+                Text("P ${((food.protein ?: 0f) * grams / 100f).toInt()}g", fontSize = NutriFont.Body, color = MacroColors.protein)
+                Text("K ${((food.carbs ?: 0f) * grams / 100f).toInt()}g", fontSize = NutriFont.Body, color = MacroColors.carbs)
+                Text("F ${((food.fat ?: 0f) * grams / 100f).toInt()}g", fontSize = NutriFont.Body, color = MacroColors.fat)
                 val fiberG = (food.fiber ?: 0f) * grams / 100f
                 if (fiberG > 0f) {
-                    Text("B ${fiberG.toInt()}g", fontSize = 13.sp, color = MacroColors.fiber)
+                    Text("B ${fiberG.toInt()}g", fontSize = NutriFont.Body, color = MacroColors.fiber)
                 }
             }
         }
@@ -998,7 +999,7 @@ private fun AiEstimateTab(
     ) {
         Text(
             "Sprechen oder tippen: einzelnes Lebensmittel, Gericht oder ganze Mahlzeit (z.B. «2 Eier und Latte»)",
-            fontSize = 12.sp,
+            fontSize = NutriFont.Small,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Row(
@@ -1051,11 +1052,11 @@ private fun AiEstimateTab(
         }
 
         errorMsg?.let {
-            Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+            Text(it, color = MaterialTheme.colorScheme.error, fontSize = NutriFont.Body)
         }
 
         if (multiItems.isNotEmpty()) {
-            Text(sourceLabel, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+            Text(sourceLabel, fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.primary)
             MealPicker(selected = selectedMeal) { selectedMeal = it }
             val totalKcal = multiItems.sumOf { it.calories.toDouble() }
             val totalP = multiItems.sumOf { it.protein.toDouble() }
@@ -1064,7 +1065,7 @@ private fun AiEstimateTab(
             Text(
                 "Summe ≈ ${totalKcal.toInt()} kcal · P ${totalP.toInt()}g · K ${totalC.toInt()}g · F ${totalF.toInt()}g",
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp
+                fontSize = NutriFont.Body
             )
             multiItems.forEachIndexed { idx, item ->
                 Card(
@@ -1077,10 +1078,10 @@ private fun AiEstimateTab(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text(item.name, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                            Text(item.name, fontWeight = FontWeight.Medium, fontSize = NutriFont.BodyLarge)
                             Text(
                                 "${item.grams.toInt()} g · ${item.calories.toInt()} kcal · P ${item.protein.toInt()} · K ${item.carbs.toInt()} · F ${item.fat.toInt()}",
-                                fontSize = 12.sp,
+                                fontSize = NutriFont.Small,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -1120,10 +1121,10 @@ private fun AiEstimateTab(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(food.name, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                    Text(food.name, fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Title)
                     Text(
                         sourceLabel,
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Row(
@@ -1131,15 +1132,15 @@ private fun AiEstimateTab(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("${food.calories?.toInt() ?: "–"} kcal", fontWeight = FontWeight.Bold, color = MacroColors.calories)
-                        Text("P ${food.protein?.let { "%.1f".format(it) } ?: "–"} g", fontSize = 13.sp, color = MacroColors.protein)
-                        Text("K ${food.carbs?.let { "%.1f".format(it) } ?: "–"} g", fontSize = 13.sp, color = MacroColors.carbs)
-                        Text("F ${food.fat?.let { "%.1f".format(it) } ?: "–"} g", fontSize = 13.sp, color = MacroColors.fat)
+                        Text("P ${food.protein?.let { "%.1f".format(it) } ?: "–"} g", fontSize = NutriFont.Body, color = MacroColors.protein)
+                        Text("K ${food.carbs?.let { "%.1f".format(it) } ?: "–"} g", fontSize = NutriFont.Body, color = MacroColors.carbs)
+                        Text("F ${food.fat?.let { "%.1f".format(it) } ?: "–"} g", fontSize = NutriFont.Body, color = MacroColors.fat)
                         val fiberVal = food.fiber
                         if (fiberVal != null && fiberVal > 0f) {
-                            Text("B ${"%.1f".format(fiberVal)} g", fontSize = 13.sp, color = MacroColors.fiber)
+                            Text("B ${"%.1f".format(fiberVal)} g", fontSize = NutriFont.Body, color = MacroColors.fiber)
                         }
                     }
-                    Text("pro 100 g", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("pro 100 g", fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
@@ -1170,7 +1171,7 @@ private fun AiEstimateTab(
                 val b = (food.fiber ?: 0f) * factor
                 Text(
                     "→ ${kcal.toInt()} kcal · P ${p.toInt()}g · K ${k.toInt()}g · F ${f.toInt()}g · B ${b.toInt()}g",
-                    fontSize = 13.sp,
+                    fontSize = NutriFont.Body,
                     fontWeight = FontWeight.Medium
                 )
             }
@@ -1235,7 +1236,7 @@ private fun ManualEntryTab(
 
         Text(
             "Makros (optional)",
-            fontSize = 12.sp,
+            fontSize = NutriFont.Small,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
@@ -1269,9 +1270,9 @@ private fun ManualEntryTab(
         if (isValid) {
             Row(horizontalArrangement = Arrangement.spacedBy(NutriSpacing.lg)) {
                 Text("${kcal.toInt()} kcal", fontWeight = FontWeight.SemiBold, color = MacroColors.calories)
-                if (protein > 0) Text("P ${protein.toInt()}g", fontSize = 12.sp, color = MacroColors.protein)
-                if (carbs > 0)   Text("K ${carbs.toInt()}g", fontSize = 12.sp, color = MacroColors.carbs)
-                if (fat > 0)     Text("F ${fat.toInt()}g", fontSize = 12.sp, color = MacroColors.fat)
+                if (protein > 0) Text("P ${protein.toInt()}g", fontSize = NutriFont.Small, color = MacroColors.protein)
+                if (carbs > 0)   Text("K ${carbs.toInt()}g", fontSize = NutriFont.Small, color = MacroColors.carbs)
+                if (fat > 0)     Text("F ${fat.toInt()}g", fontSize = NutriFont.Small, color = MacroColors.fat)
             }
         }
 
@@ -1337,20 +1338,20 @@ private fun ServingSizeGuideDialog(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(unit.emoji, fontSize = 22.sp)
+                            Text(unit.emoji, fontSize = NutriFont.HeadlineLarge)
                             Spacer(Modifier.width(NutriSpacing.sm))
                             Column {
-                                Text(unit.label, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                Text(unit.label, fontSize = NutriFont.BodyLarge, fontWeight = FontWeight.Medium)
                                 Text(
                                     "${unit.grams.toInt()} g",
-                                    fontSize = 12.sp,
+                                    fontSize = NutriFont.Small,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                         Text(
                             "${kcal.toInt()} kcal",
-                            fontSize = 13.sp,
+                            fontSize = NutriFont.Body,
                             fontWeight = FontWeight.SemiBold,
                             color = MacroColors.calories
                         )
@@ -1402,7 +1403,7 @@ private fun FoodResultRow(
         Column(Modifier.weight(1f)) {
             Text(
                 food.name,
-                fontSize = 14.sp,
+                fontSize = NutriFont.BodyLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1417,7 +1418,7 @@ private fun FoodResultRow(
                         else -> append("–")
                     }
                 },
-                fontSize = 12.sp,
+                fontSize = NutriFont.Small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -1426,7 +1427,7 @@ private fun FoodResultRow(
         Spacer(Modifier.width(NutriSpacing.sm))
         Text(
             "${food.calories?.toInt() ?: "–"} kcal",
-            fontSize = 12.sp,
+            fontSize = NutriFont.Small,
             fontWeight = FontWeight.SemiBold,
             color = MacroColors.calories
         )

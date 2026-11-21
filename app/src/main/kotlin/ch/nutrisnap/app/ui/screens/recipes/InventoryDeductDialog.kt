@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -52,7 +53,7 @@ fun InventoryDeductDialog(
             Column {
                 Text(
                     "Diese Zutaten hast du im Vorrat. Gekochte Mengen abbuchen:",
-                    fontSize = 13.sp,
+                    fontSize = NutriFont.Body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(8.dp))
@@ -68,7 +69,7 @@ fun InventoryDeductDialog(
                         ) {
                             Checkbox(checked = on, onCheckedChange = { selected[d.inventoryId] = it })
                             Column {
-                                Text(d.inventoryName, fontSize = 15.sp)
+                                Text(d.inventoryName, fontSize = NutriFont.Subtitle)
                                 val change = if (d.fullyUsed) {
                                     "${fmtQty(d.currentQty)} ${d.unit} → aufgebraucht (wird entfernt)"
                                 } else {
@@ -76,7 +77,7 @@ fun InventoryDeductDialog(
                                 }
                                 Text(
                                     change + if (!d.measurable) " (Menge unklar)" else "",
-                                    fontSize = 12.sp,
+                                    fontSize = NutriFont.Small,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }

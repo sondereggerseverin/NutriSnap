@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.customfood
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -251,7 +252,7 @@ private fun CustomFoodRow(
                     "${brandPart}${sourceLabel(item.source)} · " +
                         "${item.calories.toInt()} kcal · P ${fmt(item.protein)} · " +
                         "KH ${fmt(item.carbs)} · F ${fmt(item.fat)} / 100 g",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis

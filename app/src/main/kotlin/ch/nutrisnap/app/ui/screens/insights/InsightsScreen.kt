@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.insights
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -52,7 +53,7 @@ fun InsightsScreen(
                 Spacer(Modifier.height(NutriSpacing.md))
                 Text(
                     "Noch keine Zusammenhänge gefunden. Dafür braucht es mind. 1–2 Wochen an Schlaf- und Tagebuchdaten.",
-                    fontSize = 13.sp,
+                    fontSize = NutriFont.Body,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -75,14 +76,14 @@ private fun InsightCard(insight: CorrelationInsight) {
         Column(Modifier.padding(NutriSpacing.lg)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NutriSpacing.sm)) {
                 Icon(Icons.Default.TrendingDown, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Text(insight.title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                Text(insight.title, fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Subtitle)
             }
             Spacer(Modifier.height(NutriSpacing.xs))
-            Text(insight.description, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(insight.description, fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(NutriSpacing.xs))
             Text(
                 "Basiert auf ${insight.sampleSize} Tagen",
-                fontSize = 11.sp,
+                fontSize = NutriFont.Caption,
                 color = MaterialTheme.colorScheme.outline
             )
         }

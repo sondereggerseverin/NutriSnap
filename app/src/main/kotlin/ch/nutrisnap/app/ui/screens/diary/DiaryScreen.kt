@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.diary
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -123,14 +124,14 @@ private fun CompactDayOverview(
                     )
                     Text(
                         " / ${goal.toInt()} kcal",
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 2.dp, start = 2.dp)
                     )
                 }
                 Text(
                     if (remaining >= 0) "${remaining.toInt()} kcal übrig" else "${-remaining.toInt()} kcal über",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     fontWeight = FontWeight.SemiBold,
                     color = if (remaining >= 0) MacroColors.calories else MaterialTheme.colorScheme.error
                 )
@@ -176,14 +177,14 @@ private fun MiniMacroStat(label: String, grams: Float, color: Color) {
         Spacer(Modifier.width(5.dp))
         Text(
             "${grams.toInt()}g",
-            fontSize = 13.sp,
+            fontSize = NutriFont.Body,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(Modifier.width(3.dp))
         Text(
             label,
-            fontSize = 11.sp,
+            fontSize = NutriFont.Caption,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
@@ -334,7 +335,7 @@ fun DiaryScreen(
                     ) {
                         Icon(Icons.Default.ContentCopy, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Gestern übernehmen", fontSize = 13.sp)
+                        Text("Gestern übernehmen", fontSize = NutriFont.Body)
                     }
                 } else {
                     TextButton(
@@ -343,7 +344,7 @@ fun DiaryScreen(
                     ) {
                         Icon(Icons.Default.ContentCopy, null, Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Gestern übernehmen", fontSize = 13.sp)
+                        Text("Gestern übernehmen", fontSize = NutriFont.Body)
                     }
                 }
             }
@@ -429,7 +430,7 @@ fun DiaryScreen(
                                     )
                                     Text(
                                         if (mealTarget > 0) "$mealKcal / $mealTarget kcal" else "$mealKcal kcal",
-                                        fontSize = 13.sp,
+                                        fontSize = NutriFont.Body,
                                         fontWeight = FontWeight.Medium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -670,7 +671,7 @@ private fun RecipeQuickAddBar(recipes: List<Recipe>, onQuickAdd: (Recipe) -> Uni
         Text(
             "\uD83C\uDF73 Rezepte",
             fontWeight = FontWeight.SemiBold,
-            fontSize = 13.sp,
+            fontSize = NutriFont.Body,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
                 .padding(horizontal = NutriSpacing.lg)
@@ -694,7 +695,7 @@ private fun RecipeQuickAddBar(recipes: List<Recipe>, onQuickAdd: (Recipe) -> Uni
                 ) {
                     Text(
                         recipe.title,
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -704,7 +705,7 @@ private fun RecipeQuickAddBar(recipes: List<Recipe>, onQuickAdd: (Recipe) -> Uni
                         val per = (total / recipe.servings.coerceAtLeast(1)).toInt()
                         Text(
                             "$per kcal/Port.",
-                            fontSize = 10.sp,
+                            fontSize = NutriFont.Tiny,
                             color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
                         )
                     }
@@ -720,7 +721,7 @@ private fun QuickAddBar(favorites: List<FoodItem>, onQuickAdd: (FoodItem) -> Uni
         Text(
             "\u26A1 Schnell hinzufügen",
             fontWeight = FontWeight.SemiBold,
-            fontSize = 13.sp,
+            fontSize = NutriFont.Body,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
                 .padding(horizontal = NutriSpacing.lg)
@@ -744,7 +745,7 @@ private fun QuickAddBar(favorites: List<FoodItem>, onQuickAdd: (FoodItem) -> Uni
                 ) {
                     Text(
                         food.name,
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -752,7 +753,7 @@ private fun QuickAddBar(favorites: List<FoodItem>, onQuickAdd: (FoodItem) -> Uni
                     )
                     Text(
                         "${food.calories?.toInt() ?: "–"} kcal/100g",
-                        fontSize = 10.sp,
+                        fontSize = NutriFont.Tiny,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                     )
                 }
@@ -801,7 +802,7 @@ private fun DateNavigator(
                 modifier = Modifier.size(18.dp)
             )
             Spacer(Modifier.width(6.dp))
-            Text(label, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text(label, fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Title)
         }
         // Planung bis 30 Tage in die Zukunft erlauben
         val maxFuture = LocalDate.now().plusDays(30)
@@ -971,7 +972,7 @@ private fun DiaryEntryRow(
                     ) {
                         val emoji = remember(entry.foodName) { FoodEmoji.forName(entry.foodName) }
                         if (emoji != null) {
-                            Text(emoji, fontSize = 24.sp)
+                            Text(emoji, fontSize = NutriFont.Display)
                         } else {
                             Icon(
                                 Icons.Default.Restaurant,
@@ -995,7 +996,7 @@ private fun DiaryEntryRow(
                     Spacer(Modifier.height(2.dp))
                     Text(
                         amountLabel,
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1
                     )
@@ -1008,12 +1009,12 @@ private fun DiaryEntryRow(
                     Text(
                         "${entry.calories.toInt()} kcal",
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
+                        fontSize = NutriFont.BodyLarge,
                         color = MacroColors.calories
                     )
                     Text(
                         "P ${fmtMacroShort(entry.protein)} · K ${fmtMacroShort(entry.carbs)} · F ${fmtMacroShort(entry.fat)} · B ${fmtMacroShort(entry.fiber)}",
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1
                     )

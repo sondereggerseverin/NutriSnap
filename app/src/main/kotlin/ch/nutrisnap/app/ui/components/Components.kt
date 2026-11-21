@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.components
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -119,7 +120,7 @@ fun MacroBar(
                     )
                     Text(
                         "von ${goal.toInt()} kcal",
-                        fontSize = 13.sp,
+                        fontSize = NutriFont.Body,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -127,12 +128,12 @@ fun MacroBar(
                     Text(
                         "${remaining.toInt()}",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 24.sp,
+                        fontSize = NutriFont.Display,
                         color = if (remaining > 0) MacroColors.calories else MaterialTheme.colorScheme.error
                     )
                     Text(
                         if (remaining > 0) "übrig" else "überschritten",
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -211,10 +212,10 @@ private fun NutritionProgressRow(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(label, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+            Text(label, fontSize = NutriFont.Body, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
             Text(
                 "${value.toInt()} / ${goal.toInt()} $unit",
-                fontSize = 12.sp,
+                fontSize = NutriFont.Small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -253,7 +254,7 @@ fun MicronutrientTable(
                     Text(
                         groupLabel,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = contentColor
                     )
                     rows.forEach { (key, value) ->
@@ -262,7 +263,7 @@ fun MicronutrientTable(
                             Modifier.fillMaxWidth().padding(vertical = 2.dp),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(label, fontSize = 12.sp, color = subColor)
+                            Text(label, fontSize = NutriFont.Small, color = subColor)
                             val grams = value * ratio
                             val display = grams * factor
                             val formatted = when {
@@ -273,7 +274,7 @@ fun MicronutrientTable(
                             val nrvPct = NRV_REFERENCE[key]?.let { ref -> ((grams / ref) * 100f).toInt() }
                             Text(
                                 "$formatted $unit" + (nrvPct?.let { "  ·  $it% NRV" } ?: ""),
-                                fontSize = 12.sp, color = subColor
+                                fontSize = NutriFont.Small, color = subColor
                             )
                         }
                     }
@@ -294,12 +295,12 @@ private fun MacroChip(label: String, grams: Float, color: Color) {
         Text(
             "${grams.toInt()}g",
             fontWeight = FontWeight.Bold,
-            fontSize = 16.sp,
+            fontSize = NutriFont.Title,
             color = color
         )
         Text(
             label,
-            fontSize = 11.sp,
+            fontSize = NutriFont.Caption,
             fontWeight = FontWeight.Medium,
             color = color.copy(alpha = 0.8f)
         )
@@ -343,14 +344,14 @@ fun EmptyState(icon: @Composable () -> Unit, message: String, sub: String = "") 
         Text(
             message,
             fontWeight = FontWeight.SemiBold,
-            fontSize = 16.sp,
+            fontSize = NutriFont.Title,
             color = MaterialTheme.colorScheme.onSurface
         )
         if (sub.isNotBlank()) {
             Spacer(Modifier.height(NutriSpacing.xs))
             Text(
                 sub,
-                fontSize = 13.sp,
+                fontSize = NutriFont.Body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )

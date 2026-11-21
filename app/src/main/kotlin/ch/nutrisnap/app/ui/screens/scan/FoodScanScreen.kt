@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.scan
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -107,7 +108,7 @@ private fun AnalysisProgressView(stage: PhotoAnalysisStage, onDevice: Boolean = 
                     "Offline-Erkennung – bitte Ergebnis anschliessend prüfen"
                 else
                     "Dein Foto wird Schritt für Schritt in einzelne Zutaten zerlegt",
-                fontSize = 12.sp,
+                fontSize = NutriFont.Small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(24.dp))
@@ -202,7 +203,7 @@ private fun VerifyAndSaveFlow(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     warnings.forEach { w ->
-                        Text("• $w", fontSize = 14.sp)
+                        Text("• $w", fontSize = NutriFont.BodyLarge)
                     }
                 }
             },
@@ -231,7 +232,7 @@ private fun VerifyAndSaveFlow(
                             onClick = { useMealSummary = false },
                             shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
                         ) {
-                            Text("Zutaten", fontSize = 13.sp)
+                            Text("Zutaten", fontSize = NutriFont.Body)
                         }
                         SegmentedButton(
                             selected = useMealSummary,
@@ -240,7 +241,7 @@ private fun VerifyAndSaveFlow(
                         ) {
                             Text(
                                 "Gesamt ~${mealSummaryAlternative.totalCalories.toInt()} kcal",
-                                fontSize = 13.sp
+                                fontSize = NutriFont.Body
                             )
                         }
                     }

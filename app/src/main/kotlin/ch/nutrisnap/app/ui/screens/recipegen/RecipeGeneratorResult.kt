@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipegen
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.BorderStroke
@@ -92,7 +93,7 @@ internal fun RecipeResultCard(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.height(6.dp))
-                            Text("Bild wird erzeugt…", fontSize = 12.sp,
+                            Text("Bild wird erzeugt…", fontSize = NutriFont.Small,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -109,7 +110,7 @@ internal fun RecipeResultCard(
                                 Spacer(Modifier.height(6.dp))
                                 Text(
                                     "Kein Bild: $imageError",
-                                    fontSize = 11.sp,
+                                    fontSize = NutriFont.Caption,
                                     color = MaterialTheme.colorScheme.error,
                                     textAlign = TextAlign.Center
                                 )
@@ -192,7 +193,7 @@ internal fun RecipeResultCard(
                     // Swissmilk-Meta: Zeit + Portionen in einer Zeile
                     Text(
                         "${recipe.prepTimeMinutes} Min.  ·  ${recipe.servings} Port.",
-                        fontSize = 13.sp,
+                        fontSize = NutriFont.Body,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 6.dp)
@@ -210,7 +211,7 @@ internal fun RecipeResultCard(
                                 "${recipe.fat.toInt()} g Fett, " +
                                 "${recipe.carbs.toInt()} g KH, " +
                                 "${recipe.protein.toInt()} g Eiweiss",
-                            fontSize = 12.sp,
+                            fontSize = NutriFont.Small,
                             lineHeight = 16.sp,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -229,7 +230,7 @@ internal fun RecipeResultCard(
 
                 HorizontalDivider(Modifier.padding(vertical = 10.dp))
 
-                Text("Zutaten", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                Text("Zutaten", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Subtitle)
                 Spacer(Modifier.height(4.dp))
                 val ingredients = recipe.effectiveIngredients()
                 if (isEditing) {
@@ -266,7 +267,7 @@ internal fun RecipeResultCard(
                             Spacer(Modifier.width(4.dp))
                             Text(
                                 if (ing.amount.isNotBlank()) "${ing.amount}  ${ing.name}" else ing.name,
-                                fontSize = 13.sp,
+                                fontSize = NutriFont.Body,
                                 lineHeight = 18.sp,
                                 modifier = Modifier.weight(1f),
                                 color = if (i in checkedIngredients)
@@ -276,7 +277,7 @@ internal fun RecipeResultCard(
                             if (ing.calories > 0) {
                                 Text(
                                     "${ing.calories.roundToInt()}",
-                                    fontSize = 11.sp,
+                                    fontSize = NutriFont.Caption,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -286,7 +287,7 @@ internal fun RecipeResultCard(
 
                 HorizontalDivider(Modifier.padding(vertical = 10.dp))
 
-                Text("Zubereitung", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                Text("Zubereitung", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Subtitle)
                 Spacer(Modifier.height(4.dp))
                 recipe.steps.forEachIndexed { i, step ->
                     Row(
@@ -303,14 +304,14 @@ internal fun RecipeResultCard(
                             Box(contentAlignment = Alignment.Center) {
                                 Text(
                                     "${i + 1}",
-                                    fontSize = 11.sp,
+                                    fontSize = NutriFont.Caption,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                             }
                         }
                         Spacer(Modifier.width(8.dp))
-                        Text(step, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.weight(1f))
+                        Text(step, fontSize = NutriFont.Body, lineHeight = 18.sp, modifier = Modifier.weight(1f))
                     }
                 }
 
@@ -346,7 +347,7 @@ internal fun RecipeResultCard(
 internal fun RowScope.EditMacroField(label: String, value: String, onChange: (String) -> Unit) {
     OutlinedTextField(
         value = value, onValueChange = onChange,
-        label = { Text(label, fontSize = 11.sp) },
+        label = { Text(label, fontSize = NutriFont.Caption) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         modifier = Modifier.weight(1f)
@@ -428,10 +429,10 @@ internal fun AddToDiarySheet(
                 .imePadding()
                 .padding(bottom = 24.dp)
         ) {
-            Text("Zum Tagebuch hinzufügen", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text("Zum Tagebuch hinzufügen", fontWeight = FontWeight.Bold, fontSize = NutriFont.TitleLarge)
             Text(
                 recipe.title,
-                fontSize = 13.sp,
+                fontSize = NutriFont.Body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 2.dp, bottom = 16.dp)
             )
@@ -457,7 +458,7 @@ internal fun AddToDiarySheet(
                     modifier = Modifier.width(88.dp),
                     singleLine = true,
                     textStyle = LocalTextStyle.current.copy(
-                        fontSize = 20.sp,
+                        fontSize = NutriFont.Headline,
                         fontWeight = FontWeight.Bold,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
@@ -470,14 +471,14 @@ internal fun AddToDiarySheet(
                 ) { Icon(Icons.Default.Add, null) }
                 Text(
                     "= ${estKcal.toInt()} kcal",
-                    fontSize = 14.sp,
+                    fontSize = NutriFont.BodyLarge,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold
                 )
             }
             Text(
                 "1 Portion ≈ ${recipe.calories.toInt()} kcal · ±0,5 mit den Buttons",
-                fontSize = 11.sp,
+                fontSize = NutriFont.Caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp)
             )
@@ -491,7 +492,7 @@ internal fun AddToDiarySheet(
                     FilterChip(
                         selected = mealType == type,
                         onClick = { mealType = type },
-                        label = { Text(label, fontSize = 12.sp) },
+                        label = { Text(label, fontSize = NutriFont.Small) },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -501,7 +502,7 @@ internal fun AddToDiarySheet(
                     FilterChip(
                         selected = mealType == type,
                         onClick = { mealType = type },
-                        label = { Text(label, fontSize = 12.sp) },
+                        label = { Text(label, fontSize = NutriFont.Small) },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -521,7 +522,7 @@ internal fun AddToDiarySheet(
                     FilterChip(
                         selected = selectedDate == d,
                         onClick = { selectedDate = d },
-                        label = { Text(label, fontSize = 12.sp) }
+                        label = { Text(label, fontSize = NutriFont.Small) }
                     )
                 }
             }
@@ -550,6 +551,6 @@ internal fun formatServing(v: Float): String =
 internal fun MacroChip(text: String, color: Color) {
     Surface(color = color, shape = MaterialTheme.shapes.small) {
         Text(text, Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            fontSize = NutriFont.Small, fontWeight = FontWeight.Medium)
     }
 }

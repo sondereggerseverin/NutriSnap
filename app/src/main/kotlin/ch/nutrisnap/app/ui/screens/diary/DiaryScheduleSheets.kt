@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.diary
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import ch.nutrisnap.app.ui.theme.NutriRadius
@@ -60,8 +61,8 @@ internal fun EntryScheduleSheet(
                 .imePadding()
                 .padding(bottom = 24.dp)
         ) {
-            Text("Verschieben / kopieren", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Text(entry.foodName, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Verschieben / kopieren", fontWeight = FontWeight.Bold, fontSize = NutriFont.TitleLarge)
+            Text(entry.foodName, fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(12.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -75,38 +76,38 @@ internal fun EntryScheduleSheet(
                     "copy" -> "Einmalig an einen anderen Tag/Mahlzeit kopieren"
                     else -> "Gleiche Portion auf mehrere Tage verteilen (z. B. 5 Portionen vorgekocht)"
                 },
-                fontSize = 11.sp,
+                fontSize = NutriFont.Caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp)
             )
 
             Spacer(Modifier.height(12.dp))
-            Text("Schnell", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Schnell", fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(
                     onClick = { applyQuick(today.minusDays(1), MealType.DINNER) },
                     modifier = Modifier.weight(1f)
-                ) { Text("Gestern Abend", fontSize = 12.sp) }
+                ) { Text("Gestern Abend", fontSize = NutriFont.Small) }
                 OutlinedButton(
                     onClick = { applyQuick(today.minusDays(1), MealType.LUNCH) },
                     modifier = Modifier.weight(1f)
-                ) { Text("Gestern Mittag", fontSize = 12.sp) }
+                ) { Text("Gestern Mittag", fontSize = NutriFont.Small) }
             }
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(
                     onClick = { applyQuick(today.minusDays(2), MealType.DINNER) },
                     modifier = Modifier.weight(1f)
-                ) { Text("Vorgestern Abend", fontSize = 12.sp) }
+                ) { Text("Vorgestern Abend", fontSize = NutriFont.Small) }
                 OutlinedButton(
                     onClick = { applyQuick(today.minusDays(2), MealType.LUNCH) },
                     modifier = Modifier.weight(1f)
-                ) { Text("Vorgestern Mittag", fontSize = 12.sp) }
+                ) { Text("Vorgestern Mittag", fontSize = NutriFont.Small) }
             }
 
             Spacer(Modifier.height(12.dp))
-            Text("Tag", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Tag", fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(
@@ -118,27 +119,27 @@ internal fun EntryScheduleSheet(
                     FilterChip(
                         selected = selectedDate == d,
                         onClick = { selectedDate = d },
-                        label = { Text(label, fontSize = 12.sp) }
+                        label = { Text(label, fontSize = NutriFont.Small) }
                     )
                 }
             }
 
             Spacer(Modifier.height(12.dp))
-            Text("Mahlzeit", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Mahlzeit", fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 MealType.entries.forEach { m ->
                     FilterChip(
                         selected = selectedMeal == m,
                         onClick = { selectedMeal = m },
-                        label = { Text(m.label(), fontSize = 11.sp) }
+                        label = { Text(m.label(), fontSize = NutriFont.Caption) }
                     )
                 }
             }
 
             if (mode == "mealprep") {
                 Spacer(Modifier.height(12.dp))
-                Text("Anzahl Tage (Meal-Prep)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Anzahl Tage (Meal-Prep)", fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(6.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -154,14 +155,14 @@ internal fun EntryScheduleSheet(
                     IconButton(onClick = { dayCount = (dayCount - 1).coerceAtLeast(2) }) {
                         Icon(Icons.Default.Remove, null)
                     }
-                    Text("$dayCount", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("$dayCount", fontWeight = FontWeight.Bold, fontSize = NutriFont.TitleLarge)
                     IconButton(onClick = { dayCount = (dayCount + 1).coerceAtMost(14) }) {
                         Icon(Icons.Default.Add, null)
                     }
                 }
                 Text(
                     "Kopiert ab ${selectedDate.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM."))} auf $dayCount Tage · ${selectedMeal.label()}",
-                    fontSize = 11.sp,
+                    fontSize = NutriFont.Caption,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -211,10 +212,10 @@ internal fun MealCopySheet(
                 .imePadding()
                 .padding(bottom = 24.dp)
         ) {
-            Text("Mahlzeit kopieren", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text("Mahlzeit kopieren", fontWeight = FontWeight.Bold, fontSize = NutriFont.TitleLarge)
             Text(
                 "${meal.label()} · ab ${sourceDate.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM."))} auf Folgetage",
-                fontSize = 13.sp,
+                fontSize = NutriFont.Body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(16.dp))
@@ -228,14 +229,14 @@ internal fun MealCopySheet(
                 IconButton(onClick = { dayCount = (dayCount - 1).coerceAtLeast(2) }) {
                     Icon(Icons.Default.Remove, null)
                 }
-                Text("$dayCount", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text("$dayCount", fontWeight = FontWeight.Bold, fontSize = NutriFont.TitleLarge)
                 IconButton(onClick = { dayCount = (dayCount + 1).coerceAtMost(14) }) {
                     Icon(Icons.Default.Add, null)
                 }
             }
             Text(
                 "Alle Einträge dieser Mahlzeit werden auf die nächsten ${dayCount - 1} Tage kopiert (ohne heute nochmal).",
-                fontSize = 12.sp,
+                fontSize = NutriFont.Small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp)
             )
@@ -262,10 +263,10 @@ internal fun AutopilotBanner(
         )
     ) {
         Column(Modifier.padding(NutriSpacing.md)) {
-            Text("Wochen-Autopilot", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text("Wochen-Autopilot", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.BodyLarge)
             Text(
                 "Mo–Fr · Vorlagen für leere Mahlzeiten",
-                fontSize = 11.sp,
+                fontSize = NutriFont.Caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             templates.forEach { t ->
@@ -276,11 +277,11 @@ internal fun AutopilotBanner(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(t.name, fontWeight = FontWeight.Medium, fontSize = 13.sp)
-                        Text(t.mealType.label(), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(t.name, fontWeight = FontWeight.Medium, fontSize = NutriFont.Body)
+                        Text(t.mealType.label(), fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     FilledTonalButton(onClick = { onApply(t) }) {
-                        Text("Übernehmen", fontSize = 12.sp)
+                        Text("Übernehmen", fontSize = NutriFont.Small)
                     }
                 }
             }
@@ -303,10 +304,10 @@ internal fun MealPatternBanner(
         )
     ) {
         Column(Modifier.padding(NutriSpacing.md)) {
-            Text("Wiederkehrende Mahlzeit", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text("Wiederkehrende Mahlzeit", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.BodyLarge)
             Text(
                 "Aus deinem Verlauf erkannt · 1-Tap-Relog",
-                fontSize = 11.sp,
+                fontSize = NutriFont.Caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             patterns.forEach { p ->
@@ -317,15 +318,15 @@ internal fun MealPatternBanner(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(p.label, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                        Text(p.label, fontWeight = FontWeight.Medium, fontSize = NutriFont.Body)
                         Text(
                             "${p.mealType.label()} · ~${p.avgKcal.toInt()} kcal · ${p.occurrences}×",
-                            fontSize = 11.sp,
+                            fontSize = NutriFont.Caption,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     FilledTonalButton(onClick = { onApply(p) }) {
-                        Text("Übernehmen", fontSize = 12.sp)
+                        Text("Übernehmen", fontSize = NutriFont.Small)
                     }
                 }
             }

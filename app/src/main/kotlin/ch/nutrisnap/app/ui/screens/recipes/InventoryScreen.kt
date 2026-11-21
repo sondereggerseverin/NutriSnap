@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -43,7 +44,7 @@ fun InventoryScreen(vm: InventoryViewModel = viewModel()) {
             Icon(Icons.Default.Kitchen, null, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
-                Text("Inventar", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                Text("Inventar", fontWeight = FontWeight.Bold, fontSize = NutriFont.Headline)
                 val now = remember(items) { System.currentTimeMillis() }
                 val soonCount = remember(items) {
                     items.count {
@@ -55,7 +56,7 @@ fun InventoryScreen(vm: InventoryViewModel = viewModel()) {
                 Text(
                     if (items.isEmpty()) "Noch leer"
                     else "${items.size} Einträge" + if (soonCount > 0) " · $soonCount laufen bald ab" else "",
-                    fontSize = 13.sp,
+                    fontSize = NutriFont.Body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -84,7 +85,7 @@ fun InventoryScreen(vm: InventoryViewModel = viewModel()) {
                     Spacer(Modifier.height(4.dp))
                     Text(
                         "Zutaten und Packungen erfassen,\ndie du zu Hause hast.\nMit Ablaufdatum behältst du den Überblick.",
-                        fontSize = 13.sp,
+                        fontSize = NutriFont.Body,
                         color = MaterialTheme.colorScheme.outline,
                         textAlign = TextAlign.Center
                     )
@@ -114,7 +115,7 @@ fun InventoryScreen(vm: InventoryViewModel = viewModel()) {
                                 Text(
                                     title,
                                     fontWeight = FontWeight.SemiBold,
-                                    fontSize = 13.sp,
+                                    fontSize = NutriFont.Body,
                                     color = if (group == InventoryExpiry.Group.EXPIRED)
                                         MaterialTheme.colorScheme.error
                                     else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -193,7 +194,7 @@ private fun InventoryRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
-                Text(item.name, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                Text(item.name, fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Title)
                 val qtyText = if (item.quantity % 1f == 0f) {
                     item.quantity.toInt().toString()
                 } else {
@@ -202,13 +203,13 @@ private fun InventoryRow(
                 Text(
                     "$qtyText ${item.unit}" +
                         if (item.location.isNotBlank()) " · ${item.location}" else "",
-                    fontSize = 13.sp,
+                    fontSize = NutriFont.Body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 InventoryExpiry.daysLeft(item.expiresAt, now)?.let { days ->
                     Text(
                         InventoryExpiry.label(days) + " · " + InventoryExpiry.format(item.expiresAt!!),
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         fontWeight = if (days <= InventoryExpiry.SOON_DAYS) FontWeight.SemiBold else FontWeight.Normal,
                         color = when {
                             days < 0 -> MaterialTheme.colorScheme.error
@@ -220,7 +221,7 @@ private fun InventoryRow(
                 if (item.notes.isNotBlank()) {
                     Text(
                         item.notes,
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.outline,
                         maxLines = 2
                     )
@@ -304,7 +305,7 @@ private fun InventoryEditDialog(
                         FilterChip(
                             selected = unit == u,
                             onClick = { unit = u },
-                            label = { Text(u, fontSize = 12.sp) }
+                            label = { Text(u, fontSize = NutriFont.Small) }
                         )
                     }
                 }
@@ -317,7 +318,7 @@ private fun InventoryEditDialog(
                         FilterChip(
                             selected = location == loc,
                             onClick = { location = if (location == loc) "" else loc },
-                            label = { Text(loc, fontSize = 11.sp) }
+                            label = { Text(loc, fontSize = NutriFont.Caption) }
                         )
                     }
                 }
@@ -342,7 +343,7 @@ private fun InventoryEditDialog(
                                     InventoryExpiry.inDays(days, System.currentTimeMillis())
                                 )
                             },
-                            label = { Text(label, fontSize = 11.sp) }
+                            label = { Text(label, fontSize = NutriFont.Caption) }
                         )
                     }
                 }

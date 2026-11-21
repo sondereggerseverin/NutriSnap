@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import ch.nutrisnap.app.ui.theme.StatusColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -37,12 +38,12 @@ internal fun ComponentSectionHeader(
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Spacer(Modifier.height(10.dp))
-        Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-        Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(title, fontWeight = FontWeight.Bold, fontSize = NutriFont.Subtitle)
+        Text(subtitle, fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (groupKcal > 0f) {
             Text(
                 "${safeInt(groupKcal)} kcal aus Zutaten",
-                fontSize = 12.sp,
+                fontSize = NutriFont.Small,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -198,7 +199,7 @@ internal fun IngredientVerifyRow(
             // Menge (feste Spalte – etwas breiter für „2 Stück“)
             Text(
                 parts.amountLabel,
-                fontSize = 13.sp,
+                fontSize = NutriFont.Body,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.width(72.dp),
@@ -214,7 +215,7 @@ internal fun IngredientVerifyRow(
             Column(Modifier.weight(1f)) {
                 Text(
                     text = displayName,
-                    fontSize = 13.sp,
+                    fontSize = NutriFont.Body,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 2
@@ -222,7 +223,7 @@ internal fun IngredientVerifyRow(
                 if (lowConfidence) {
                     Text(
                         "Unsicher – bitte prüfen",
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         fontWeight = FontWeight.Medium,
                         color = StatusColors.Warning,
                         maxLines = 1
@@ -230,7 +231,7 @@ internal fun IngredientVerifyRow(
                 } else if (showMatchSub) {
                     Text(
                         text = matchLabel,
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         color = when {
                             isOverride -> StatusColors.Info
                             isMatched  -> StatusColors.Good
@@ -244,7 +245,7 @@ internal fun IngredientVerifyRow(
             // kcal
             Text(
                 if (state.effectiveCalories > 0f) "${safeInt(state.effectiveCalories)}" else "–",
-                fontSize = 13.sp,
+                fontSize = NutriFont.Body,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.width(36.dp),
@@ -252,7 +253,7 @@ internal fun IngredientVerifyRow(
             )
             Text(
                 "kcal",
-                fontSize = 10.sp,
+                fontSize = NutriFont.Tiny,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
@@ -305,24 +306,24 @@ internal fun IngredientVerifyRow(
                                 cnt.toLong().toString() else "%.1f".format(cnt)
                             Text(
                                 "$cntLabel $parsedUnit · ≈ ${"%.0f".format(state.effectiveAmountG)} g",
-                                fontSize = 13.sp, fontWeight = FontWeight.SemiBold
+                                fontSize = NutriFont.Body, fontWeight = FontWeight.SemiBold
                             )
                             Text(
                                 "≈ ${"%.0f".format(gPerUnit ?: 0f)} g pro $parsedUnit – tippen zum Anpassen",
-                                fontSize = 11.sp,
+                                fontSize = NutriFont.Caption,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         } else {
                             Text(
                                 "Menge: ${"%.0f".format(state.effectiveAmountG)} g",
-                                fontSize = 13.sp, fontWeight = FontWeight.SemiBold
+                                fontSize = NutriFont.Body, fontWeight = FontWeight.SemiBold
                             )
                             if (state.amountOverride != null &&
                                 kotlin.math.abs(state.amountOverride - state.originalAmountG) > 0.5f
                             ) {
                                 Text(
                                     "Rezept: ${"%.0f".format(state.originalAmountG)} g",
-                                    fontSize = 11.sp,
+                                    fontSize = NutriFont.Caption,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -393,7 +394,7 @@ internal fun IngredientVerifyRow(
                                 ) {
                                     Text(
                                         "${preset.label} · ${"%.0f".format(preset.grams)} g",
-                                        fontSize = 11.sp,
+                                        fontSize = NutriFont.Caption,
                                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                                         color = if (selected) MaterialTheme.colorScheme.primary
                                         else MaterialTheme.colorScheme.onSurfaceVariant
@@ -413,7 +414,7 @@ internal fun IngredientVerifyRow(
                             label = {
                                 Text(
                                     if (isPiece) "g pro ${parsedUnit ?: "Stück"}" else "Menge (g)",
-                                    fontSize = 11.sp
+                                    fontSize = NutriFont.Caption
                                 )
                             },
                             placeholder = {
@@ -434,7 +435,7 @@ internal fun IngredientVerifyRow(
                             amountInput = "%.0f".format(state.originalAmountG)
                             editingAmount = false
                         }) {
-                            Text("Rezept", fontSize = 11.sp)
+                            Text("Rezept", fontSize = NutriFont.Caption)
                         }
                     }
                     LaunchedEffect(editingAmount) {
@@ -464,20 +465,20 @@ internal fun IngredientVerifyRow(
                 Column(Modifier.padding(bottom = 6.dp)) {
                     Text(
                         "Im Rezept (${"%.0f".format(amountG)} g)",
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         "${safeInt(state.effectiveCalories)} kcal · P ${fmtMacro(state.effectiveProtein)} · K ${fmtMacro(state.effectiveCarbs)} · F ${fmtMacro(state.effectiveFat)}" +
                             (fiberAbs?.let { " · Ballast ${"%.1f".format(it)}" } ?: ""),
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
                         "pro 100 g",
-                        fontSize = 11.sp,
+                        fontSize = NutriFont.Caption,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -489,7 +490,7 @@ internal fun IngredientVerifyRow(
                             fat100?.let { "F ${fmtMacro(it)}" },
                             fiber100?.let { "Ballast ${"%.1f".format(it)}" }
                         ).joinToString(" · ").ifBlank { "—" },
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -501,7 +502,7 @@ internal fun IngredientVerifyRow(
                         OutlinedTextField(
                             value = fiberInput,
                             onValueChange = { fiberInput = it },
-                            label = { Text("Ballaststoffe (g)", fontSize = 11.sp) },
+                            label = { Text("Ballaststoffe (g)", fontSize = NutriFont.Caption) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             singleLine = true,
                             modifier = Modifier.weight(1f).focusRequester(fiberFocusRequester),
@@ -515,26 +516,26 @@ internal fun IngredientVerifyRow(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             "Ballaststoffe: ${"%.1f".format(fiberValue)} g",
-                            fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                            fontSize = NutriFont.Small, fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.tertiary
                         )
                         if (isManualFiber) {
                             Spacer(Modifier.width(6.dp))
                             Icon(Icons.Default.Edit, "manuell überschrieben", Modifier.size(12.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(" manuell", fontSize = 10.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                            Text(" manuell", fontSize = NutriFont.Tiny, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 } else {
                     Text(
                         "Ballaststoffe: – (fehlen)",
-                        fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                        fontSize = NutriFont.Small, fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.error
                     )
                     Text(
                         "✎ Ballaststoffe manuell eintragen",
-                        fontSize = 11.sp, color = MaterialTheme.colorScheme.primary,
+                        fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
                             .clickable { editingFiber = true }
                             .padding(top = 2.dp)
@@ -551,7 +552,7 @@ internal fun IngredientVerifyRow(
                             sugar?.let { "Zucker ${"%.1f".format(it)} g" },
                             salt?.let { "Salz ${"%.1f".format(it)} g" }
                         ).joinToString("   ·   "),
-                        fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                        fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -566,7 +567,7 @@ internal fun IngredientVerifyRow(
                     ) {
                         Icon(Icons.Default.Check, null, Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Belassen", fontSize = 12.sp)
+                        Text("Belassen", fontSize = NutriFont.Small)
                     }
                     // Delete
                     OutlinedButton(
@@ -579,7 +580,7 @@ internal fun IngredientVerifyRow(
                     ) {
                         Icon(Icons.Default.Delete, null, Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Löschen", fontSize = 12.sp)
+                        Text("Löschen", fontSize = NutriFont.Small)
                     }
                 }
                 } // !readOnly
@@ -603,7 +604,7 @@ internal fun SmallScanButton(onClick: () -> Unit) {
         ) {
             Icon(Icons.Default.QrCodeScanner, null, Modifier.size(12.dp),
                 tint = MaterialTheme.colorScheme.onSecondary)
-            Text("Scannen", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSecondary)
+            Text("Scannen", fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onSecondary)
         }
     }
 }
@@ -611,8 +612,8 @@ internal fun SmallScanButton(onClick: () -> Unit) {
 @Composable
 internal fun MacroChip(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.6f))
-        Text(value, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+        Text(label, fontSize = NutriFont.Tiny, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.6f))
+        Text(value, fontSize = NutriFont.Body, fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onPrimaryContainer)
     }
 }

@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.settings
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -75,11 +76,11 @@ fun MealOrderScreen(onBack: () -> Unit) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") }
             Spacer(Modifier.width(4.dp))
-            Text("Mahlzeiten-Reihenfolge", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            Text("Mahlzeiten-Reihenfolge", fontWeight = FontWeight.Bold, fontSize = NutriFont.Headline)
         }
         Text(
             "Ziehe am Handle, um die Reihenfolge auf Start & im Tagebuch anzupassen.",
-            fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp)
         )
         Spacer(Modifier.height(8.dp))
@@ -99,9 +100,9 @@ fun MealOrderScreen(onBack: () -> Unit) {
                         .padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(meal.icon(), fontSize = 18.sp)
+                    Text(meal.icon(), fontSize = NutriFont.TitleLarge)
                     Spacer(Modifier.width(10.dp))
-                    Text(meal.label(), fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                    Text(meal.label(), fontSize = NutriFont.Subtitle, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                     Icon(
                         Icons.Default.DragHandle,
                         contentDescription = "Verschieben",

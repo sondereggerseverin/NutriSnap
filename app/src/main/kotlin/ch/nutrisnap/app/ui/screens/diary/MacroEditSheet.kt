@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.diary
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -79,12 +80,12 @@ fun MacroEditSheet(
             Text(
                 "${field.label} anpassen",
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
+                fontSize = NutriFont.TitleLarge,
                 modifier = Modifier.align(Alignment.Start)
             )
             Text(
                 entry.foodName,
-                fontSize = 13.sp,
+                fontSize = NutriFont.Body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.align(Alignment.Start)
             )
@@ -117,7 +118,7 @@ fun MacroEditSheet(
             Spacer(Modifier.height(NutriSpacing.md))
             Text(
                 "Gesamtwert manuell gesetzt – Zutaten wurden nicht verändert",
-                fontSize = 11.sp,
+                fontSize = NutriFont.Caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
@@ -146,7 +147,7 @@ fun MacroEditSheet(
 fun ManualOverrideBadge(modifier: Modifier = Modifier) {
     Text(
         "manuell",
-        fontSize = 9.sp,
+        fontSize = NutriFont.Micro,
         fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.tertiary,
         modifier = modifier

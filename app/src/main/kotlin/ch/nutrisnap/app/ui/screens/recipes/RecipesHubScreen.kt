@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -172,7 +173,7 @@ private fun RecipeHubSegmentedControl(
                     )
                     Text(
                         text = item.label,
-                        fontSize = 12.sp,
+                        fontSize = NutriFont.Small,
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                         color = content,
                         maxLines = 1

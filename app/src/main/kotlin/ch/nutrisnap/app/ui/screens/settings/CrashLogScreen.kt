@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.settings
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -67,18 +68,18 @@ fun CrashLogScreen(onBack: () -> Unit) {
             if (content.isBlank()) {
                 Text(
                     "Kein Absturz/ANR seit dem letzten Löschen aufgezeichnet.",
-                    fontSize = 13.sp,
+                    fontSize = NutriFont.Body,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
                 Text(
                     "Neuester Eintrag zuerst (CRASH / ANR / ERROR). Zum Melden kopieren und einfügen.",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(8.dp))
                 SelectionContainer(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    Text(content, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                    Text(content, fontSize = NutriFont.Caption, fontFamily = FontFamily.Monospace)
                 }
             }
         }

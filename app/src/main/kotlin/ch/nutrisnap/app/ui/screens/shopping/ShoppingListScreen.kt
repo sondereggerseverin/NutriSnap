@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.shopping
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -119,7 +120,7 @@ fun ShoppingListScreen(onBack: () -> Unit, vm: ShoppingListViewModel = viewModel
                 item { Spacer(Modifier.height(8.dp)) }
                 item {
                     Text("Zusammengefasst, nach Supermarkt-Gang sortiert · Inventar (g/ml) wird abgezogen, wo der Name passt.",
-                        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp))
                 }
                 // Offene Positionen nach Gang gruppiert (Reihenfolge wie im Laden), Erledigtes ans Ende
@@ -132,7 +133,7 @@ fun ShoppingListScreen(onBack: () -> Unit, vm: ShoppingListViewModel = viewModel
                             Text(
                                 aisle.label,
                                 fontWeight = FontWeight.SemiBold,
-                                fontSize = 13.sp,
+                                fontSize = NutriFont.Body,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
                             )
@@ -167,7 +168,7 @@ fun ShoppingListScreen(onBack: () -> Unit, vm: ShoppingListViewModel = viewModel
                 }
                 groups.filterKeys { it != null }.forEach { (recipe, recipeItems) ->
                     item(key = "header_$recipe") {
-                        Text(recipe ?: "", fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                        Text(recipe ?: "", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Body,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
                     }
@@ -214,23 +215,23 @@ private fun AggregatedRow(agg: AggregatedShoppingItem, onToggle: () -> Unit) {
                 agg.totalGrams <= 0f -> { /* keine Mengenangabe */ }
                 fullyCovered -> Text(
                     "Im Inventar vorhanden (${agg.totalGrams.toInt()} g)",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.primary
                 )
                 agg.inventoryGrams > 0f -> Text(
                     "Noch ${agg.stillNeededGrams.toInt()} g · ${agg.inventoryGrams.toInt()} g im Inventar",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 else -> Text(
                     "${agg.totalGrams.toInt()} g",
-                    fontSize = 12.sp,
+                    fontSize = NutriFont.Small,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
         if (agg.itemIds.size > 1) {
-            Text("×${agg.itemIds.size}", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+            Text("×${agg.itemIds.size}", fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -265,12 +266,12 @@ private fun ShoppingRow(
             )
             if (item.amount != null) {
                 val amountText = if (item.amount == item.amount.toInt().toFloat()) item.amount.toInt().toString() else item.amount.toString()
-                Text("$amountText ${item.unit ?: ""}".trim(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("$amountText ${item.unit ?: ""}".trim(), fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (inventoryGrams > 0f && !item.checked) {
                 Text(
                     "≈ ${inventoryGrams.toInt()} g im Inventar",
-                    fontSize = 11.sp,
+                    fontSize = NutriFont.Caption,
                     color = MaterialTheme.colorScheme.primary
                 )
             }

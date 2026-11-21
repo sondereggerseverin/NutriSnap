@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.export
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import android.app.Application
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -364,7 +365,7 @@ fun ExportScreen(
         ) {
             Text(
                 "Exportiere deine Daten als CSV-Datei – z.B. für Excel, Google Sheets oder dein Backup.",
-                fontSize = 13.sp,
+                fontSize = NutriFont.Body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
@@ -459,8 +460,8 @@ fun ExportScreen(
                     ) {
                         Icon(Icons.Default.UploadFile, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
                         Column {
-                            Text("Backup importieren", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                            Text("nutrisnap-backup-v1 JSON · Merge (kein Löschen)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Backup importieren", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Subtitle)
+                            Text("nutrisnap-backup-v1 JSON · Merge (kein Löschen)", fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     Button(
@@ -469,7 +470,7 @@ fun ExportScreen(
                     ) {
                         Icon(Icons.Default.FolderOpen, null, Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Datei wählen", fontSize = 13.sp)
+                        Text("Datei wählen", fontSize = NutriFont.Body)
                     }
                 }
             }
@@ -496,8 +497,8 @@ fun ExportScreen(
                     ) {
                         Icon(Icons.Default.CloudUpload, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
                         Column {
-                            Text("WebDAV-Backup", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                            Text("Nextcloud / ownCloud / beliebiger WebDAV-Server", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("WebDAV-Backup", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Subtitle)
+                            Text("Nextcloud / ownCloud / beliebiger WebDAV-Server", fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     OutlinedTextField(
@@ -544,7 +545,7 @@ fun ExportScreen(
                             }
                         },
                         modifier = Modifier.fillMaxWidth()
-                    ) { Text("Zugangsdaten speichern", fontSize = 13.sp) }
+                    ) { Text("Zugangsdaten speichern", fontSize = NutriFont.Body) }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = {
@@ -573,7 +574,7 @@ fun ExportScreen(
                         ) {
                             Icon(Icons.Default.CloudUpload, null, Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Hochladen", fontSize = 13.sp)
+                            Text("Hochladen", fontSize = NutriFont.Body)
                         }
                         OutlinedButton(
                             onClick = {
@@ -610,11 +611,11 @@ fun ExportScreen(
                         ) {
                             Icon(Icons.Default.CloudDownload, null, Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Herunterladen", fontSize = 13.sp)
+                            Text("Herunterladen", fontSize = NutriFont.Body)
                         }
                     }
                     webdavStatus?.let {
-                        Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                        Text(it, fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
@@ -627,8 +628,8 @@ fun ExportScreen(
                     ) {
                         Icon(Icons.Default.PictureAsPdf, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
                         Column {
-                            Text("PDF-Report", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                            Text("Kalorien, Makros & Gewicht als Bericht zum Teilen", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("PDF-Report", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Subtitle)
+                            Text("Kalorien, Makros & Gewicht als Bericht zum Teilen", fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -640,7 +641,7 @@ fun ExportScreen(
                                 }
                             },
                             modifier = Modifier.weight(1f)
-                        ) { Text("Wochenreport", fontSize = 13.sp) }
+                        ) { Text("Wochenreport", fontSize = NutriFont.Body) }
                         OutlinedButton(
                             onClick = {
                                 scope.launch {
@@ -649,7 +650,7 @@ fun ExportScreen(
                                 }
                             },
                             modifier = Modifier.weight(1f)
-                        ) { Text("Monatsbericht", fontSize = 13.sp) }
+                        ) { Text("Monatsbericht", fontSize = NutriFont.Body) }
                     }
                 }
             }
@@ -676,18 +677,18 @@ private fun ExportCard(
             ) {
                 Icon(icon, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
                 Column {
-                    Text(title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                    Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(title, fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Subtitle)
+                    Text(subtitle, fontSize = NutriFont.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onSave, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.Download, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp)); Text("Speichern", fontSize = 13.sp)
+                    Spacer(Modifier.width(6.dp)); Text("Speichern", fontSize = NutriFont.Body)
                 }
                 OutlinedButton(onClick = onShare, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Default.Share, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp)); Text("Teilen", fontSize = 13.sp)
+                    Spacer(Modifier.width(6.dp)); Text("Teilen", fontSize = NutriFont.Body)
                 }
             }
         }

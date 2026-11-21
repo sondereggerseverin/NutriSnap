@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import ch.nutrisnap.app.ui.theme.StatusColors
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
@@ -58,9 +59,9 @@ fun HealthConnectScreen(
                 Icon(Icons.Default.FavoriteBorder, contentDescription = null,
                     modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
                 Spacer(Modifier.height(16.dp))
-                Text("Health Connect nicht verfügbar", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                Text("Health Connect nicht verfügbar", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Title)
                 Text("Bitte installiere Health Connect aus dem Play Store.",
-                    fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp))
             }
         }
@@ -81,7 +82,7 @@ fun HealthConnectScreen(
                     Text(
                         if (uiState.hasPermission) "✅ Verbunden mit Health Connect (Garmin)"
                         else "Nicht verbunden",
-                        fontSize = 13.sp,
+                        fontSize = NutriFont.Body,
                         color = if (uiState.hasPermission) StatusColors.GoodBright else MaterialTheme.colorScheme.error
                     )
                 }
@@ -97,7 +98,7 @@ fun HealthConnectScreen(
                     Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                         Spacer(Modifier.width(8.dp))
-                        Text(error, fontSize = 13.sp, color = MaterialTheme.colorScheme.onErrorContainer)
+                        Text(error, fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.onErrorContainer)
                     }
                 }
             }
@@ -154,7 +155,7 @@ private fun TodayOverviewCard(
             Row(modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically) {
-                Text("Heute", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                Text("Heute", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Title)
                 if (hasPermission) {
                     IconButton(onClick = onSyncClick, modifier = Modifier.size(32.dp)) {
                         if (isLoading) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -170,7 +171,7 @@ private fun TodayOverviewCard(
                         modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(8.dp))
                     Text("Health Connect verbinden", fontWeight = FontWeight.Medium)
-                    Text("Für automatische Kalorienziel-Anpassung", fontSize = 12.sp,
+                    Text("Für automatische Kalorienziel-Anpassung", fontSize = NutriFont.Small,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(12.dp))
                     Button(onClick = onConnectClick) { Text("Jetzt verbinden") }
@@ -212,13 +213,13 @@ private fun TodayOverviewCard(
                                     "Basis ${target.baseKcal} kcal$bonusText · " +
                                         if (target.isTrendBased) "aus deinem echten Gewichts-/Ess-Trend"
                                         else "aus Grundumsatz × Aktivitätsfaktor (noch wenig Trend-Daten)",
-                                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             } else {
                                 Text("Kalorienziel: $adjustedGoal kcal",
                                     fontWeight = FontWeight.Medium, color = StatusColors.GoodBright)
                                 Text("Basierend auf deinem TDEE (Grundumsatz × Aktivitätsfaktor)",
-                                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -232,20 +233,20 @@ private fun TodayOverviewCard(
 private fun WeeklyAveragesCard(stats: WeeklyStats) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Ø Diese Woche", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text("Ø Diese Woche", fontWeight = FontWeight.SemiBold, fontSize = NutriFont.Title)
             Spacer(Modifier.height(12.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
 
                 // Weight average + trend
                 if (stats.avgWeightKg != null) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("⚖️", fontSize = 22.sp)
+                        Text("⚖️", fontSize = NutriFont.HeadlineLarge)
                         Text(
                             String.format("%.1f kg", stats.avgWeightKg),
-                            fontWeight = FontWeight.Bold, fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold, fontSize = NutriFont.TitleLarge,
                             color = Color(0xFF9C27B0)
                         )
-                        Text("Ø Gewicht", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Ø Gewicht", fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (stats.weightTrend != null) {
                             val trendColor = when {
                                 stats.weightTrend < -0.1 -> StatusColors.GoodBright  // lost weight = green
@@ -259,10 +260,10 @@ private fun WeeklyAveragesCard(stats: WeeklyStats) {
                             }
                             Text(
                                 "$trendIcon ${String.format("%+.1f", stats.weightTrend)} kg",
-                                fontSize = 11.sp, color = trendColor, fontWeight = FontWeight.Medium
+                                fontSize = NutriFont.Caption, color = trendColor, fontWeight = FontWeight.Medium
                             )
                         }
-                        Text("${stats.daysWithWeight} Tage Daten", fontSize = 10.sp,
+                        Text("${stats.daysWithWeight} Tage Daten", fontSize = NutriFont.Tiny,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -274,13 +275,13 @@ private fun WeeklyAveragesCard(stats: WeeklyStats) {
                 // Calorie average + trend
                 if (stats.daysWithKcal > 0) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("🔥", fontSize = 22.sp)
+                        Text("🔥", fontSize = NutriFont.HeadlineLarge)
                         Text(
                             "${stats.avgActiveKcal.toInt()} kcal",
-                            fontWeight = FontWeight.Bold, fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold, fontSize = NutriFont.TitleLarge,
                             color = Color(0xFFFF5722)
                         )
-                        Text("Ø Akt. Kalorien", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Ø Akt. Kalorien", fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (stats.kcalTrend != null) {
                             val trendColor = when {
                                 stats.kcalTrend > 50  -> StatusColors.GoodBright  // more activity = green
@@ -290,10 +291,10 @@ private fun WeeklyAveragesCard(stats: WeeklyStats) {
                             val trendIcon = if (stats.kcalTrend >= 0) "↑" else "↓"
                             Text(
                                 "$trendIcon ${String.format("%+.0f", stats.kcalTrend)} kcal",
-                                fontSize = 11.sp, color = trendColor, fontWeight = FontWeight.Medium
+                                fontSize = NutriFont.Caption, color = trendColor, fontWeight = FontWeight.Medium
                             )
                         }
-                        Text("${stats.daysWithKcal} Tage Daten", fontSize = 10.sp,
+                        Text("${stats.daysWithKcal} Tage Daten", fontSize = NutriFont.Tiny,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -324,9 +325,9 @@ private fun WeightTrendCard(weeklyData: List<HealthConnectCache>) {
 
             // Min / max labels
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(String.format("%.1f kg", minWeight), fontSize = 10.sp,
+                Text(String.format("%.1f kg", minWeight), fontSize = NutriFont.Tiny,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(String.format("%.1f kg", maxWeight), fontSize = 10.sp,
+                Text(String.format("%.1f kg", maxWeight), fontSize = NutriFont.Tiny,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
@@ -359,7 +360,7 @@ private fun WeightTrendCard(weeklyData: List<HealthConnectCache>) {
                 dataPoints.forEach { d ->
                     Text(
                         d.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.GERMAN),
-                        fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                        fontSize = NutriFont.Micro, color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -389,11 +390,11 @@ private fun WeeklyStepsCard(weeklyData: List<HealthConnectCache>) {
                                 shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)) {}
                         }
                         Spacer(Modifier.height(4.dp))
-                        Text(dayLabel, fontSize = 9.sp)
+                        Text(dayLabel, fontSize = NutriFont.Micro)
                     }
                 }
             }
-            Text("🟢 = 10.000+ Schritte erreicht", fontSize = 11.sp,
+            Text("🟢 = 10.000+ Schritte erreicht", fontSize = NutriFont.Caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
         }
     }
@@ -409,7 +410,7 @@ private fun WeeklySleepCard(weeklyData: List<HealthConnectCache>) {
                 val dayLabel = day.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.GERMAN)
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
                     verticalAlignment = Alignment.CenterVertically) {
-                    Text(dayLabel, modifier = Modifier.width(32.dp), fontSize = 12.sp)
+                    Text(dayLabel, modifier = Modifier.width(32.dp), fontSize = NutriFont.Small)
                     LinearProgressIndicator(
                         progress = { (day.sleepMinutes / 480f).coerceIn(0f, 1f) },
                         modifier = Modifier.weight(1f).height(8.dp),
@@ -421,7 +422,7 @@ private fun WeeklySleepCard(weeklyData: List<HealthConnectCache>) {
                         trackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text(day.sleepFormatted, fontSize = 11.sp, modifier = Modifier.width(52.dp))
+                    Text(day.sleepFormatted, fontSize = NutriFont.Caption, modifier = Modifier.width(52.dp))
                 }
             }
         }
@@ -431,9 +432,9 @@ private fun WeeklySleepCard(weeklyData: List<HealthConnectCache>) {
 @Composable
 private fun BigStatItem(value: String, label: String, icon: String, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(icon, fontSize = 22.sp)
-        Text(value, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = color)
-        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(icon, fontSize = NutriFont.HeadlineLarge)
+        Text(value, fontWeight = FontWeight.Bold, fontSize = NutriFont.TitleLarge, color = color)
+        Text(label, fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import ch.nutrisnap.app.ui.theme.NutriFont
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -52,9 +53,9 @@ internal fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Uni
                 Icon(Icons.Default.WarningAmber, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.outline)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(recipe.displayTitle(), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    Text(recipe.displayTitle(), fontSize = NutriFont.Body, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("Unvollständig – Caption fehlt, tippe zum Ergänzen", fontSize = 11.sp,
+                    Text("Unvollständig – Caption fehlt, tippe zum Ergänzen", fontSize = NutriFont.Caption,
                         color = MaterialTheme.colorScheme.outline)
                 }
                 IconButton(onClick = { showConfirm = true }, Modifier.size(32.dp)) {
@@ -66,7 +67,7 @@ internal fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Uni
                 RecipeThumbnail(recipe = recipe, size = 72.dp)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(recipe.displayTitle(), fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                    Text(recipe.displayTitle(), fontWeight = FontWeight.Bold, fontSize = NutriFont.Subtitle,
                         maxLines = 2, overflow = TextOverflow.Ellipsis)
                     if (stars > 0) {
                         Spacer(Modifier.height(2.dp))
@@ -78,7 +79,7 @@ internal fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Uni
                         recipe.totalCalories?.let { MiniChip("🔥 ${(it/recipe.servings.coerceAtLeast(1)).toInt()} kcal/Port.") }
                         recipe.prepTimeMinutes?.let { MiniChip("⏱ $it min") }
                     }
-                    Text("${recipe.servings} Port.", fontSize = 11.sp,
+                    Text("${recipe.servings} Port.", fontSize = NutriFont.Caption,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 2.dp))
                 }
@@ -115,7 +116,7 @@ internal fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Uni
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, Modifier.size(11.dp), tint = MaterialTheme.colorScheme.secondary)
         Spacer(Modifier.width(3.dp))
-        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.secondary)
+        Text(label, fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.secondary)
     }
 }
 
@@ -181,10 +182,10 @@ internal fun RecipeThumbnail(
                             Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp
                         )
                         "fail" -> TextButton(onClick = onRetryImage) {
-                            Text("Kein Bild – erneut", color = Color.White, fontSize = 11.sp)
+                            Text("Kein Bild – erneut", color = Color.White, fontSize = NutriFont.Caption)
                         }
                         else -> TextButton(onClick = onRetryImage) {
-                            Text("Bild nachladen", color = Color.White, fontSize = 11.sp)
+                            Text("Bild nachladen", color = Color.White, fontSize = NutriFont.Caption)
                         }
                     }
                 }
@@ -204,7 +205,7 @@ internal fun platformVisuals(platform: String?): Pair<List<Color>, androidx.comp
     }
 
 @Composable internal fun MiniChip(text: String) =
-    Text(text, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(text, fontSize = NutriFont.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
 
 
