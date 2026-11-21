@@ -414,7 +414,7 @@ fun RecipesScreen(
                     )
                 },
                 trailingIcon = {
-                    IconButton(onClick = { showCollections = true }, modifier = Modifier.size(36.dp)) {
+                    IconButton(onClick = { showCollections = true }, modifier = Modifier.size(48.dp)) {
                         Icon(
                             Icons.Default.Folder,
                             "Sammlungen",

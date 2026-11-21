@@ -145,7 +145,7 @@ fun RecipeDetailSheet(
                         lineHeight = 24.sp,
                         modifier = Modifier.weight(1f)
                     )
-                    IconButton(onClick = onToggleFavorite, modifier = Modifier.size(36.dp)) {
+                    IconButton(onClick = onToggleFavorite, modifier = Modifier.size(48.dp)) {
                         Icon(
                             if (recipe.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = if (recipe.isFavorite) "Favorit entfernen" else "Als Favorit",
@@ -153,7 +153,7 @@ fun RecipeDetailSheet(
                             modifier = Modifier.size(22.dp)
                         )
                     }
-                    IconButton(onClick = onAssignCollection, modifier = Modifier.size(36.dp)) {
+                    IconButton(onClick = onAssignCollection, modifier = Modifier.size(48.dp)) {
                         Icon(
                             Icons.Default.Folder,
                             contentDescription = "Sammlung zuweisen",
@@ -162,10 +162,10 @@ fun RecipeDetailSheet(
                             modifier = Modifier.size(20.dp)
                         )
                     }
-                    IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Default.Edit, "Bearbeiten", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                     }
-                    IconButton(onClick = { requestDismiss() }, modifier = Modifier.size(36.dp)) {
+                    IconButton(onClick = { requestDismiss() }, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Default.Close, contentDescription = "Schliessen", modifier = Modifier.size(20.dp))
                     }
                 }

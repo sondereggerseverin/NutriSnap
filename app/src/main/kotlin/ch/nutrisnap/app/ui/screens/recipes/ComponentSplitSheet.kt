@@ -262,7 +262,7 @@ fun ComponentSplitSheet(
                     fontSize = NutriFont.TitleLarge,
                     modifier = Modifier.weight(1f)
                 )
-                IconButton(onClick = { requestDismiss() }, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = { requestDismiss() }, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Default.Close, contentDescription = "Schliessen")
                 }
             }

@@ -151,7 +151,7 @@ fun MultiComponentAddToDiarySheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Ins Tagebuch", fontWeight = FontWeight.Bold, fontSize = NutriFont.TitleLarge, modifier = Modifier.weight(1f))
-                IconButton(onClick = { requestTrackDismiss() }, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = { requestTrackDismiss() }, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Default.Close, contentDescription = "Schliessen")
                 }
             }

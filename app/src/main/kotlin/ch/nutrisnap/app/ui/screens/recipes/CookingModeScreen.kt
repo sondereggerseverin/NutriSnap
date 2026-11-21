@@ -160,7 +160,7 @@ fun CookingModeScreen(
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 16.dp)
                             )
-                            OutlinedIconButton(onClick = { servings++ }, modifier = Modifier.size(40.dp)) {
+                            OutlinedIconButton(onClick = { servings++ }, modifier = Modifier.size(48.dp)) {
                                 Icon(Icons.Default.Add, "Mehr Portionen", modifier = Modifier.size(20.dp))
                             }
                         }

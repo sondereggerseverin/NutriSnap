@@ -324,7 +324,7 @@ internal fun RecipeQuickRatingDialog(
                 Text("Sterne", fontSize = NutriFont.Small)
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     for (i in 1..5) {
-                        IconButton(onClick = { stars = i }, modifier = Modifier.size(36.dp)) {
+                        IconButton(onClick = { stars = i }, modifier = Modifier.size(48.dp)) {
                             Icon(
                                 Icons.Default.Star,
                                 contentDescription = "$i Sterne",

@@ -84,13 +84,13 @@ internal fun RecipeCard(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Uni
                         modifier = Modifier.padding(top = 2.dp))
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    IconButton(onClick = onAddToDiary, Modifier.size(36.dp)) {
+                    IconButton(onClick = onAddToDiary, Modifier.size(48.dp)) {
                         Icon(Icons.Default.PlaylistAdd, "Ins Tagebuch", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
                     }
-                    IconButton(onClick = onEdit, Modifier.size(36.dp)) {
+                    IconButton(onClick = onEdit, Modifier.size(48.dp)) {
                         Icon(Icons.Default.Edit, "Bearbeiten", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    IconButton(onClick = { showConfirm = true }, Modifier.size(36.dp)) {
+                    IconButton(onClick = { showConfirm = true }, Modifier.size(48.dp)) {
                         Icon(Icons.Default.DeleteOutline, "Löschen", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
                     }
                 }
