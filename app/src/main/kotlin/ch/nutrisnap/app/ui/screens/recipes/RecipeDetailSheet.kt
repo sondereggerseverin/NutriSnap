@@ -31,6 +31,7 @@ import ch.nutrisnap.app.data.model.MatchSource
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeCategory
 import ch.nutrisnap.app.data.model.RecipeComponent
+import ch.nutrisnap.app.domain.IngredientSections
 import ch.nutrisnap.app.domain.RecipeGermanMetricConverter
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import ch.nutrisnap.app.domain.ParsedIngredient
@@ -595,59 +596,22 @@ fun RecipeDetailSheet(
                     // ── Ansicht mit Status-Icons ──
                     // itemsIndexed + Index-Key: identische Zutatenzeilen (z.B. 2× „• 1 shot Espresso“)
                     // würden sonst denselben LazyColumn-Key erzeugen → Crash beim Scrollen.
-                    // Wenn Text flach ist, aber Matches componentGroup haben → gruppiert anzeigen.
-                    // Ausnahme: Frühstück/Dessert/Getränk nie in Beilage/Sauce splitten.
-                    val rawLines = recipe.ingredients.lines().filter { it.isNotBlank() }
-                    val textHasHeaders = rawLines.any { line ->
-                        val d = line.trim()
-                        !d.startsWith("•") && !d.startsWith("-") && d.length > 2 &&
-                            !d.first().isDigit() && !d.startsWith(" ") &&
-                            !Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl)\b""", RegexOption.IGNORE_CASE).containsMatchIn(d)
-                    }
-                    // Split: Kategorie ODER ≥2 Abschnitte im Zutaten-Text (auch Dessert)
+                    // Abschnitte kommen aus EINER Quelle (IngredientSections): Text = Master,
+                    // gruppiert nach Name, jede Zutat in genau einem Abschnitt, Kcal pro Abschnitt.
+                    // Frühstück/Dessert/Getränk: Alt-Zuordnungen (side/sauce) nicht in Abschnitte umwandeln.
                     val allowSplit = recipeAllowsComponentSplit(recipe)
-                    val groupedFromMatches = allowSplit && !textHasHeaders &&
-                        ingredientMatches.any { !it.componentGroup.isNullOrBlank() }
-                    val displayBlocks: List<Pair<String?, String>> = if (groupedFromMatches) {
-                        val order = linkedMapOf<String, MutableList<String>>()
-                        for (m in ingredientMatches.filter { !it.isDeleted }) {
-                            val g = m.componentGroup?.trim().orEmpty().ifBlank { "sauce" }
-                            // side/sauce-Labels nur bei Gerichten, die Split erlauben
-                            val label = when (g) {
-                                "side" -> "Beilage"
-                                "sauce" -> "Sauce / Fleisch"
-                                else -> g
+                    val sectionMatches = if (allowSplit) ingredientMatches
+                    else ingredientMatches.map { it.copy(componentGroup = null) }
+                    val resolvedSections = IngredientSections.resolve(recipe.ingredients, sectionMatches)
+                    val showSectionHeaders = resolvedSections.size >= 2 ||
+                        resolvedSections.firstOrNull()?.name != IngredientSections.DEFAULT_SECTION
+                    val displayBlocks: List<Pair<String?, String>> = buildList {
+                        for (sec in resolvedSections) {
+                            if (showSectionHeaders) {
+                                val kcalSuffix = if (sec.kcal > 0f) " · ${sec.kcal.toInt()} kcal" else ""
+                                add((sec.name + kcalSuffix) to "")
                             }
-                            order.getOrPut(label) { mutableListOf() }.add(
-                                m.ingredientRaw.ifBlank { m.ingredientName }
-                            )
-                        }
-                        // Robuster Abgleich: nicht auf exakte Text-Gleichheit verlassen (Formatierung von
-                        // recipe.ingredients und IngredientMatch.ingredientRaw kann leicht abweichen,
-                        // z.B. "200g" vs "200 g"), sondern normalisiert per Namens-Substring prüfen.
-                        // Sonst landet fälschlich alles doppelt unter "Weitere".
-                        val coveredNames = ingredientMatches
-                            .flatMap { listOf(it.ingredientRaw, it.ingredientName) }
-                            .map { normalizeForCoverageMatch(it) }
-                            .filter { it.isNotBlank() }
-                        val rest = rawLines.filter { line ->
-                            val norm = normalizeForCoverageMatch(line.trimStart('•', '-', ' '))
-                            norm.isNotEmpty() && coveredNames.none { c -> c.length >= 3 && (norm.contains(c) || c.contains(norm)) }
-                        }
-                        if (rest.isNotEmpty()) order.getOrPut("Weitere") { mutableListOf() }.addAll(rest)
-                        buildList {
-                            for ((header, lines) in order) {
-                                add(header to "")
-                                for (line in lines) add(null to line)
-                            }
-                        }
-                    } else {
-                        rawLines.map { line ->
-                            val d = line.trim()
-                            val isHeader = !d.startsWith("•") && !d.startsWith("-") &&
-                                d.length > 2 && !d.first().isDigit() && !d.startsWith(" ") &&
-                                !Regex("""\d+[.,]?\d*\s*(g|kg|ml|l|el|tl)\b""", RegexOption.IGNORE_CASE).containsMatchIn(d)
-                            if (isHeader) d.trimEnd(':') to "" else null to line
+                            for (line in sec.lines) add(null to "• ${line.text}")
                         }
                     }
                     // Lookup echter Match-Status pro Zeile (statt reiner "hat Zahl"-Heuristik):

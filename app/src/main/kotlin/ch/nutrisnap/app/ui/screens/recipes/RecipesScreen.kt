@@ -1285,8 +1285,7 @@ fun RecipesScreen(
                 val names = live.ingredients.lines().mapNotNull { rawLine ->
                     if (rawLine.isBlank()) return@mapNotNull null
                     val scaled = if (ratio != 1f) scaleNumbers(rawLine, ratio) else rawLine
-                    val isHeader = !scaled.startsWith("•") && !scaled.startsWith("-") &&
-                        scaled.length > 2 && !scaled.first().isDigit() && !scaled.startsWith(" ")
+                    val isHeader = ch.nutrisnap.app.domain.IngredientSections.isHeaderLine(scaled)
                     if (isHeader) null else scaled.trimStart('•', '-', ' ').trim().takeIf { it.isNotBlank() }
                 }
                 shoppingVm.addRecipeIngredients(live.displayTitle(), names.map { Triple(it, null, null) })
