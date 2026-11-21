@@ -535,7 +535,9 @@ data class RecipeComponent(
     val carbsG: Float = 0f,
     val fatG: Float = 0f,
     val fiberG: Float = 0f,
-    val sortOrder: Int = 0
+    val sortOrder: Int = 0,
+    /** Letzte Garfaktor-Messungen (gekocht ÷ roh), „;“-getrennt – siehe IngredientSections.encodeFactorHistory. */
+    val factorHistory: String = ""
 ) {
     /** Nährwerte für [grams] dieser Komponente. */
     fun scaledTo(grams: Float): ScaledComponentNutrition {

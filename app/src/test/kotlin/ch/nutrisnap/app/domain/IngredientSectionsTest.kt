@@ -179,4 +179,40 @@ class IngredientSectionsTest {
         assertEquals(h, IngredientSections.parseFactorHistory(IngredientSections.encodeFactorHistory(h)))
         assertEquals(1800f, IngredientSections.netCookedG(2300f, 500f), 0.01f)
     }
+
+    private val splitText = "Sauce / Fleisch\n• 150 g Zwiebel\nBeilage\n• 600 g Jasminreis"
+
+    @Test
+    fun `component per section carries nutrition from its own lines`() {
+        val ms = listOf(m("150 g Zwiebel", "Zwiebel", 42f, 150f), m("600 g Jasminreis", "Jasminreis", 2100f, 600f))
+        val sections = IngredientSections.resolve(splitText, ms)
+        val c = IngredientSections.toComponent(7L, sections[1], ms, 1200f, listOf(2f), sortOrder = 1, id = 5L)
+        assertEquals("Beilage", c.name)
+        assertEquals(2100f, c.totalCalories, 0.01f)
+        assertEquals(1200f, c.cookedWeightG, 0.01f)
+        assertEquals(5L, c.id)
+        assertEquals(listOf(2f), IngredientSections.parseFactorHistory(c.factorHistory))
+    }
+
+    @Test
+    fun `refresh matches components by section name not by keywords`() {
+        // „Reis“ steht bewusst in der Sauce: Name entscheidet, nicht das Schlüsselwort.
+        val t = "Beilage\n• 150 g Zwiebel\nSauce / Fleisch\n• 600 g Jasminreis"
+        val ms = listOf(m("150 g Zwiebel", "Zwiebel", 42f, 150f), m("600 g Jasminreis", "Jasminreis", 2100f, 600f))
+        val old = listOf(
+            ch.nutrisnap.app.data.model.RecipeComponent(1L, 1L, "Sauce / Fleisch", 500f, 1f),
+            ch.nutrisnap.app.data.model.RecipeComponent(2L, 1L, "Beilage", 100f, 1f)
+        )
+        val fresh = IngredientSections.refreshComponents(t, old, ms)
+        assertEquals(2100f, fresh[0].totalCalories, 0.01f)
+        assertEquals(42f, fresh[1].totalCalories, 0.01f)
+        assertEquals(500f, fresh[0].cookedWeightG, 0.01f)
+    }
+
+    @Test
+    fun `find component ignores case and trailing colon`() {
+        val comps = listOf(ch.nutrisnap.app.data.model.RecipeComponent(1L, 1L, "Beilage", 100f, 1f))
+        assertEquals(1L, IngredientSections.findComponent(comps, "beilage:")?.id)
+        assertNull(IngredientSections.findComponent(comps, "Sauce"))
+    }
 }

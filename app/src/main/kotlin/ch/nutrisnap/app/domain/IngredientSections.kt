@@ -1,6 +1,7 @@
 package ch.nutrisnap.app.domain
 
 import ch.nutrisnap.app.data.model.IngredientMatch
+import ch.nutrisnap.app.data.model.RecipeComponent
 
 /**
  * Einzige Quelle der Wahrheit für Rezept-Abschnitte (Sauce / Beilage / Teig …).
@@ -303,5 +304,61 @@ object IngredientSections {
         val f = meanFactor(history) ?: return null
         if (rawG <= 0f) return null
         return Math.round(rawG * f)
+    }
+
+    // ── Abschnitt → Komponente (getrennt abwiegen) ──────────────────────────
+
+    fun matchesOf(section: ResolvedSection, matches: List<IngredientMatch>): List<IngredientMatch> =
+        section.lines.mapNotNull { it.matchIndex?.let(matches::getOrNull) }
+
+    /** Komponente zum Abschnittsnamen (Name = Identität, keine Schlüsselwort-Heuristik). */
+    fun findComponent(components: List<RecipeComponent>, sectionName: String): RecipeComponent? =
+        components.firstOrNull { sameName(it.name, sectionName) }
+
+    /** Nährwerte eines Abschnitts als Komponente; Kochgewicht und Garfaktor-Verlauf kommen von aussen. */
+    fun toComponent(
+        recipeId: Long,
+        section: ResolvedSection,
+        matches: List<IngredientMatch>,
+        cookedG: Float,
+        factorHistory: List<Float>,
+        sortOrder: Int,
+        id: Long = 0
+    ): RecipeComponent {
+        val ms = matchesOf(section, matches)
+        fun sum(f: (IngredientMatch) -> Float?) = ms.sumOf { (f(it) ?: 0f).toDouble() }.toFloat()
+        return RecipeComponent(
+            id = id,
+            recipeId = recipeId,
+            name = section.name,
+            cookedWeightG = cookedG,
+            totalCalories = sum { it.matchedCalories },
+            proteinG = sum { it.matchedProtein },
+            carbsG = sum { it.matchedCarbs },
+            fatG = sum { it.matchedFat },
+            fiberG = sum { it.manualFiberG ?: it.matchedFiber },
+            sortOrder = sortOrder,
+            factorHistory = encodeFactorHistory(factorHistory)
+        )
+    }
+
+    /**
+     * Frische Nährwerte pro Komponente aus den Abschnitten des Rezepts (Zuordnung über den Namen).
+     * Komponenten ohne passenden Abschnitt oder ohne kcal bleiben unverändert.
+     */
+    fun refreshComponents(
+        text: String,
+        components: List<RecipeComponent>,
+        matches: List<IngredientMatch>
+    ): List<RecipeComponent> {
+        val resolved = resolve(text, matches)
+        return components.map { c ->
+            val sec = resolved.firstOrNull { sameName(it.name, c.name) } ?: return@map c
+            val fresh = toComponent(
+                c.recipeId, sec, matches, c.cookedWeightG,
+                parseFactorHistory(c.factorHistory), c.sortOrder, c.id
+            )
+            if (fresh.totalCalories > 0f) fresh else c
+        }
     }
 }

@@ -69,7 +69,6 @@ fun RecipeDetailSheet(
     onScaleToBudget: () -> Unit = {},
     onTranslateGermanMetric: () -> Unit = {},
     isTranslating: Boolean = false,
-    onEditComponents: () -> Unit = {},
     onStartCooking: () -> Unit = {},
     onToggleFavorite: () -> Unit = {},
     onAssignCollection: () -> Unit = {},

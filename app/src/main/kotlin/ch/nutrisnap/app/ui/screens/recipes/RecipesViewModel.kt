@@ -12,10 +12,10 @@ import ch.nutrisnap.app.data.repository.RecipeBudgetScaleResult
 import ch.nutrisnap.app.data.repository.RecipeBudgetScaler
 import ch.nutrisnap.app.data.repository.RecipeRepository
 import ch.nutrisnap.app.domain.RecipeAiParser
+import ch.nutrisnap.app.domain.IngredientSections
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import ch.nutrisnap.app.domain.GroqVisionService
 import ch.nutrisnap.app.domain.RecipeGermanMetricConverter
-import ch.nutrisnap.app.domain.RecipeComponentSuggester
 import ch.nutrisnap.app.domain.RecipeListFilter
 import ch.nutrisnap.app.domain.IngredientMatchSync
 import ch.nutrisnap.app.domain.RecipeVerifiedNutrition
@@ -1088,8 +1088,39 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
      * Nährwerte aus Zutaten-Matches bzw. proportional zum Kochgewicht neu gesetzt.
      */
     fun setComponents(recipeId: Long, components: List<RecipeComponent>, updateRecipeTotals: Boolean = true) {
+        viewModelScope.launch { applyComponents(recipeId, components, updateRecipeTotals) }
+    }
+
+    /**
+     * Speichert die Trennung in einem Rutsch (sequenziell, kein Race):
+     * 1. Zutaten-Text (Text = Master der Abschnitte), 2. Match→Abschnitt, 3. Komponenten.
+     * Leere [components] = ohne Trennung als Ganzes tracken.
+     */
+    fun saveComponentSplit(recipeId: Long, newIngredients: String, components: List<RecipeComponent>) {
         viewModelScope.launch {
             val recipe = repo.getById(recipeId) ?: return@launch
+            if (newIngredients.trim() != recipe.ingredients.trim()) {
+                repo.updateRecipe(recipe.copy(ingredients = newIngredients))
+            }
+            val matches = matchDao.getMatchesForRecipeOnce(recipeId)
+            if (matches.isNotEmpty()) {
+                val groups = if (components.isEmpty()) emptyMap()
+                else IngredientSections.groupsByMatchIndex(IngredientSections.resolve(newIngredients, matches))
+                // Direkt schreiben: der Merge-Pfad würde ein null-Gruppe durch den alten Wert ersetzen.
+                matches.forEachIndexed { i, m ->
+                    if (!m.isDeleted && m.componentGroup != groups[i]) {
+                        matchDao.updateMatch(m.copy(componentGroup = groups[i]))
+                    }
+                }
+                _sessionOverrides.update { it - recipeId }
+            }
+            applyComponents(recipeId, components, updateRecipeTotals = true)
+        }
+    }
+
+    private suspend fun applyComponents(recipeId: Long, components: List<RecipeComponent>, updateRecipeTotals: Boolean) {
+        run {
+            val recipe = repo.getById(recipeId) ?: return
             // Duplikate nach Name zusammenführen (z. B. 2× „Sauce / Fleisch“)
             val deduped = components
                 .groupBy { it.name.trim().lowercase() }
@@ -1115,7 +1146,7 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
             if (updateRecipeTotals && comps.isNotEmpty()) {
                 val totalKcal = comps.sumOf { it.totalCalories.toDouble() }.toFloat()
                 // Nie vorhandene Rezept-Nährwerte mit 0 überschreiben
-                if (totalKcal <= 0f) return@launch
+                if (totalKcal <= 0f) return@run
                 val servings = recipe.servings.coerceAtLeast(1).toFloat()
                 val totalProtein = comps.sumOf { it.proteinG.toDouble() }.toFloat()
                 val totalCarbs = comps.sumOf { it.carbsG.toDouble() }.toFloat()
@@ -1147,16 +1178,6 @@ class RecipesViewModel(app: Application) : AndroidViewModel(app) {
         if (components.isEmpty()) return components
         val matches = matchDao.getMatchesForRecipeOnce(recipe.id)
         return enrichComponentsFromMatches(recipe, components, matches)
-    }
-
-    /**
-     * Schlägt Komponenten aus verifizierten Zutaten vor (beliebig viele Gruppen).
-     * Gruppiert nach [IngredientMatch.componentGroup]; unbekannte Werte werden
-     * heuristisch Beilage vs. Sauce zugeordnet. Kochgewichte bleiben leer.
-     */
-    suspend fun suggestComponentsFromMatches(recipe: Recipe): List<RecipeComponent> {
-        val matches = matchDao.getMatchesForRecipeOnce(recipe.id)
-        return RecipeComponentSuggester.suggestFromMatches(recipe.id, matches)
     }
 
     fun analyzeNutrition(recipe: Recipe, persist: Boolean = false) {

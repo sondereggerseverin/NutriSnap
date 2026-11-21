@@ -24,6 +24,7 @@ import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.model.Recipe
 import ch.nutrisnap.app.data.model.RecipeCategory
 import ch.nutrisnap.app.data.model.RecipeComponent
+import ch.nutrisnap.app.domain.IngredientSections
 import ch.nutrisnap.app.domain.RecipeNutritionAnalyzer
 import ch.nutrisnap.app.ui.theme.MacroColors
 import ch.nutrisnap.app.ui.theme.NutriSpacing
@@ -536,137 +537,8 @@ internal fun parseIngredientSections(ingredients: String): List<Pair<String, Lis
  * - ODER ≥2 Abschnitte im Zutaten-Text (auch Dessert/Frühstück: Teig/Füllung/Frosting)
  */
 internal fun recipeAllowsComponentSplit(recipe: Recipe): Boolean {
-    if (parseIngredientSections(recipe.ingredients).size >= 2) return true
+    if (IngredientSections.parse(recipe.ingredients).size >= 2) return true
     val stored = recipe.withGuessedCategoryIfEmpty().category()
     val guessed = RecipeCategory.guess(recipe.title, recipe.ingredients, recipe.description)
     return stored.allowsComponentSplit && guessed.allowsComponentSplit
-}
-
-/** Ordnet eine Match-Zeile einem Abschnitts-Key zu (Name-Ähnlichkeit). */
-/**
- * Score 0..100 wie gut ein Match zu einer Abschnitts-Zutatenzeile passt.
- */
-internal fun scoreMatchToLine(m: IngredientMatch, line: String): Int {
-    fun coreOf(s: String): String =
-        s.lowercase()
-            .trim()
-            .trimStart('•', '-', '*', ' ')
-            .replace(Regex("""^\d+[.,]?\d*\s*(g|kg|ml|l|el|tl|tbsp|tsp|cup|oz)?\s*"""), "")
-            .trim()
-
-    val rawCore = coreOf(m.ingredientRaw)
-    val nameCore = coreOf(m.ingredientName).ifBlank { rawCore }
-    val matched = coreOf(m.matchedFoodName.orEmpty())
-    val l = coreOf(line)
-    if (l.length < 2) return 0
-
-    var best = 0
-    if (rawCore.length >= 3 && (l == rawCore || l.contains(rawCore) || rawCore.contains(l))) best = maxOf(best, 90)
-    if (nameCore.length >= 3 && (l == nameCore || l.contains(nameCore) || nameCore.contains(l))) best = maxOf(best, 85)
-    if (matched.length >= 3 && (l.contains(matched) || matched.contains(l))) best = maxOf(best, 70)
-
-    val tokensL = l.split(Regex("""[\s,;/&]+""")).filter { it.length >= 4 }
-    val tokensM = ("$rawCore $nameCore $matched").split(Regex("""[\s,;/&]+""")).filter { it.length >= 4 }
-    val overlap = tokensL.count { t -> tokensM.any { it.startsWith(t.take(5)) || t.startsWith(it.take(5)) } }
-    if (overlap > 0) best = maxOf(best, 40 + overlap * 15)
-    return best.coerceAtMost(100)
-}
-
-/**
- * Ordnet jeden Match genau einem Abschnitt zu (beste Score, 1:1 pro Zeile wenn möglich).
- * Verhindert, dass dieselbe Zutat in mehreren Teilen landet.
- */
-internal fun assignMatchesToSections(
-    matches: List<IngredientMatch>,
-    sections: List<Pair<String, List<String>>>
-): Map<Int, String> {
-    if (matches.isEmpty()) return emptyMap()
-    if (sections.isEmpty()) return emptyMap()
-
-    data class Cand(val matchIdx: Int, val section: String, val lineIdx: Int, val score: Int)
-
-    val cands = mutableListOf<Cand>()
-    matches.forEachIndexed { mi, m ->
-        sections.forEach { (sectionName, lines) ->
-            lines.forEachIndexed { li, line ->
-                val s = scoreMatchToLine(m, line)
-                if (s >= 40) cands += Cand(mi, sectionName, li, s)
-            }
-        }
-    }
-    // Beste zuerst
-    cands.sortByDescending { it.score }
-
-    val assignedMatch = mutableSetOf<Int>()
-    // Pro Abschnitt+Zeile nur ein Match (wichtig bei x2-Rezept: zwei identische Zeilen → zwei Slots)
-    val assignedLine = mutableSetOf<String>() // "section|lineIdx" but allow same line text twice via index
-    val result = mutableMapOf<Int, String>()
-
-    for (c in cands) {
-        if (c.matchIdx in assignedMatch) continue
-        val lineKey = "${c.section}\u0000${c.lineIdx}"
-        // Zeile darf mehrfach vergeben werden wenn Score sehr hoch und weitere Matches warten
-        // (x2-Rezept: zwei "600g Hähnchen" → beide auf Hähnchen-Zeile)
-        // Deshalb line-Lock nur bei mittlerem Score
-        if (c.score < 80 && lineKey in assignedLine) continue
-        assignedMatch += c.matchIdx
-        assignedLine += lineKey
-        result[c.matchIdx] = c.section
-    }
-
-    // Rest: Fallback-Heuristik pro Match (nie unzugeordnet lassen)
-    matches.forEachIndexed { mi, m ->
-        if (mi in result) return@forEachIndexed
-        // Persistierte Gruppe hat Vorrang
-        normalizeGroupKey(m.componentGroup)?.let { ng ->
-            sections.firstOrNull { it.first.equals(m.componentGroup, true) }?.let {
-                result[mi] = it.first
-                return@forEachIndexed
-            }
-            sections.firstOrNull { normalizeGroupKey(it.first) == ng }?.let {
-                result[mi] = it.first
-                return@forEachIndexed
-            }
-        }
-        val n = "${m.ingredientRaw} ${m.ingredientName}".lowercase()
-        val sideKeys = listOf(
-            "reis", "kartoffel", "süsskartoffel", "suesskartoffel", "mais", "bohne",
-            "stampf", "mash", "milch", "butter", "milk", "bean", "potato"
-        )
-        val pick = when {
-            sideKeys.any { it in n } ->
-                sections.firstOrNull { (name, _) ->
-                    name.lowercase().let { s ->
-                        listOf("stampf", "mash", "beilage", "kartoffel", "mais", "bohne", "potato").any { it in s }
-                    }
-                }?.first
-            else ->
-                sections.firstOrNull { (name, _) ->
-                    name.lowercase().let { s ->
-                        listOf("fleisch", "hähnchen", "huhn", "chicken", "sauce", "honig", "marinade").any { it in s }
-                    }
-                }?.first
-        }
-        result[mi] = pick ?: sections.lastOrNull()?.first ?: sections.first().first
-    }
-    return result
-}
-
-internal fun matchToSectionKey(
-    m: IngredientMatch,
-    sections: List<Pair<String, List<String>>>
-): String? {
-    if (sections.isEmpty()) return null
-    var bestSection: String? = null
-    var bestScore = 0
-    for ((sectionName, lines) in sections) {
-        for (line in lines) {
-            val s = scoreMatchToLine(m, line)
-            if (s > bestScore) {
-                bestScore = s
-                bestSection = sectionName
-            }
-        }
-    }
-    return if (bestScore >= 40) bestSection else null
 }

@@ -55,6 +55,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ch.nutrisnap.app.data.model.MealType
 import ch.nutrisnap.app.data.model.Recipe
+import ch.nutrisnap.app.data.model.IngredientMatch
+import kotlinx.coroutines.flow.first
 import ch.nutrisnap.app.data.model.RecipeComponent
 import ch.nutrisnap.app.data.model.RecipeCategory
 import ch.nutrisnap.app.data.model.MatchSource
@@ -201,7 +203,6 @@ fun RecipesScreen(
     var rateAfterDiary   by remember { mutableStateOf<Recipe?>(null) }
     var deductAfterCook  by remember { mutableStateOf<Recipe?>(null) }
     var editRecipe        by remember { mutableStateOf<Recipe?>(null) }
-    var editComponentsRecipe by remember { mutableStateOf<Recipe?>(null) }
     var hideIncomplete    by remember { mutableStateOf(false) }
     var favoritesOnly     by remember { mutableStateOf(false) }
     var collectionFilterId by remember { mutableStateOf<Long?>(null) }
@@ -1193,16 +1194,20 @@ fun RecipesScreen(
         }
     }
     if (showSplitSheet && splitRecipe != null) {
-        val splitMatches by vm.getMatches(splitRecipe.id).collectAsStateWithLifecycle(initialValue = emptyList())
-        val splitComps by vm.getComponents(splitRecipe.id).collectAsStateWithLifecycle(initialValue = emptyList())
-        ComponentSplitSheet(
+        // Einmaliger Snapshot (nicht live), damit Eingaben im Sheet nicht von DB-Updates zurückgesetzt werden.
+        val splitMatches by produceState<List<IngredientMatch>?>(null, splitRecipe.id) {
+            value = vm.getMatches(splitRecipe.id).first()
+        }
+        val splitComps by produceState<List<RecipeComponent>?>(null, splitRecipe.id) {
+            value = vm.getComponentsOnce(splitRecipe.id)
+        }
+        val loadedMatches = splitMatches
+        val loadedComps = splitComps
+        if (loadedMatches != null && loadedComps != null) ComponentSplitSheet(
             recipe = splitRecipe,
-            matches = splitMatches,
-            initialComponents = splitComps,
-            onSave = { comps, matches ->
-                vm.replaceMatchesForRecipe(splitRecipe.id, matches)
-                vm.setComponents(splitRecipe.id, comps)
-            },
+            matches = loadedMatches,
+            initialComponents = loadedComps,
+            onSave = { ingredients, comps -> vm.saveComponentSplit(splitRecipe.id, ingredients, comps) },
             onDismiss = {
                 showSplitSheet = false
                 splitRecipeId = null
@@ -1297,10 +1302,6 @@ fun RecipesScreen(
             onScaleToBudget = { vm.scaleToRemainingBudget(live) },
             onTranslateGermanMetric = { vm.translateToGermanMetric(live) },
             isTranslating = state.isTranslating,
-            onEditComponents = {
-                editComponentsRecipe = live
-                selectedRecipe = null
-            },
             onStartCooking = {
                 cookingRecipe = live
                 selectedRecipe = null
@@ -1481,26 +1482,6 @@ fun RecipesScreen(
             recipe    = recipe,
             onSave    = { updated -> vm.updateRecipe(updated); editRecipe = null },
             onDismiss = { editRecipe = null }
-        )
-    }
-
-    editComponentsRecipe?.let { recipe ->
-        val existing by vm.getComponents(recipe.id).collectAsStateWithLifecycle(initialValue = emptyList())
-        var suggested by remember(recipe.id) { mutableStateOf<List<RecipeComponent>>(emptyList()) }
-        var suggestKey by remember { mutableStateOf(0) }
-        LaunchedEffect(recipe.id, suggestKey) {
-            suggested = vm.suggestComponentsFromMatches(recipe)
-        }
-        RecipeComponentsEditorSheet(
-            recipe = recipe,
-            initial = existing,
-            suggested = suggested,
-            onSave = { list ->
-                vm.setComponents(recipe.id, list)
-                editComponentsRecipe = null
-            },
-            onDismiss = { editComponentsRecipe = null },
-            onRequestSuggest = { suggestKey++ }
         )
     }
 }
