@@ -40,6 +40,18 @@ object NutriRadius {
     val xxl = 24.dp
 }
 
+// ── Status Colors ─────────────────────────────────────────────────────────────
+// Semantische Statusfarben (gut / Warnung / schlecht / Info). Einheitlich statt
+// pro Screen hartcodiert, damit Theme- und Kontrast-Anpassungen an einer Stelle passieren.
+
+object StatusColors {
+    val Good = Color(0xFF2E7D32)
+    val GoodBright = Color(0xFF4CAF50)
+    val Warning = Color(0xFFF9A825)
+    val Bad = Color(0xFFC62828)
+    val Info = Color(0xFF1565C0)
+}
+
 // ── Macro Colors ──────────────────────────────────────────────────────────────
 
 object MacroColors {

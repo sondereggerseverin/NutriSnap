@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.analysis
 
+import ch.nutrisnap.app.ui.theme.StatusColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -808,8 +809,8 @@ internal fun DayOverviewDataRow(row: DayOverviewRow) {
 
 @Composable
 internal fun zoneColor(zone: String): Color = when (zone) {
-    "Defizit", "Im Ziel" -> Color(0xFF2E7D32)
-    "Überschuss", "Plus" -> Color(0xFFC62828)
+    "Defizit", "Im Ziel" -> StatusColors.Good
+    "Überschuss", "Plus" -> StatusColors.Bad
     "Zu tief" -> Color(0xFFEF6C00)
     "Erhalt" -> MaterialTheme.colorScheme.primary
     else -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -820,8 +821,8 @@ internal fun zoneColor(zone: String): Color = when (zone) {
 internal fun trendColor(deltaKg: Float?): Color =
     when {
         deltaKg == null -> MaterialTheme.colorScheme.onSurfaceVariant
-        deltaKg > 0.02f -> Color(0xFFC62828)
-        deltaKg < -0.02f -> Color(0xFF2E7D32)
+        deltaKg > 0.02f -> StatusColors.Bad
+        deltaKg < -0.02f -> StatusColors.Good
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
@@ -836,7 +837,7 @@ internal fun formatPct(v: Float?): String =
 internal fun pctColor(v: Float?): Color =
     when {
         v == null -> MaterialTheme.colorScheme.onSurfaceVariant
-        v > 0.5f -> Color(0xFFC62828)
-        v < -0.5f -> Color(0xFF2E7D32)
+        v > 0.5f -> StatusColors.Bad
+        v < -0.5f -> StatusColors.Good
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }

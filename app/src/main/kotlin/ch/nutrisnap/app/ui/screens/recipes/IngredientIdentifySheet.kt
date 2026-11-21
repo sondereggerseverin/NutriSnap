@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import ch.nutrisnap.app.ui.theme.StatusColors
 import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -221,7 +222,7 @@ private fun IdentifyChooseScreen(
             title = "Barcode scannen",
             subtitle = "Kamera öffnet sich — genaueste Methode",
             badge = "Genauest",
-            badgeColor = Color(0xFF2E7D32),
+            badgeColor = StatusColors.Good,
             onClick = onBarcode
         )
         Spacer(Modifier.height(8.dp))
@@ -230,7 +231,7 @@ private fun IdentifyChooseScreen(
             title = "In Datenbank suchen",
             subtitle = "OpenFoodFacts · über 3 Millionen Produkte",
             badge = "Alternativ",
-            badgeColor = Color(0xFF1565C0),
+            badgeColor = StatusColors.Info,
             onClick = onSearch
         )
         Spacer(Modifier.height(8.dp))
@@ -360,7 +361,7 @@ private fun UnknownBarcodeScreen(
             title = "Nährwerttabelle fotografieren",
             subtitle = "Wie beim normalen Tracking – Produkt wird gespeichert und ist nächstes Mal per Barcode findbar",
             badge = "Empfohlen",
-            badgeColor = Color(0xFF2E7D32),
+            badgeColor = StatusColors.Good,
             onClick = onCaptureLabel
         )
         Spacer(Modifier.height(8.dp))

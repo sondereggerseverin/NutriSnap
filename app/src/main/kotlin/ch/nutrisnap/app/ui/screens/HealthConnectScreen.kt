@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens
 
+import ch.nutrisnap.app.ui.theme.StatusColors
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -81,7 +82,7 @@ fun HealthConnectScreen(
                         if (uiState.hasPermission) "✅ Verbunden mit Health Connect (Garmin)"
                         else "Nicht verbunden",
                         fontSize = 13.sp,
-                        color = if (uiState.hasPermission) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error
+                        color = if (uiState.hasPermission) StatusColors.GoodBright else MaterialTheme.colorScheme.error
                     )
                 }
                 if (uiState.isHistoricalSyncing) {
@@ -196,13 +197,13 @@ private fun TodayOverviewCard(
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.TrendingUp, contentDescription = null,
-                            tint = Color(0xFF4CAF50), modifier = Modifier.size(18.dp))
+                            tint = StatusColors.GoodBright, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Column {
                             val target = adaptiveTarget
                             if (target != null) {
                                 Text("Kalorienziel: ${target.targetKcal} kcal",
-                                    fontWeight = FontWeight.Medium, color = Color(0xFF4CAF50))
+                                    fontWeight = FontWeight.Medium, color = StatusColors.GoodBright)
                                 val bonusText = if (target.activityBonusKcal != 0) {
                                     val sign = if (target.activityBonusKcal > 0) "+" else ""
                                     " $sign${target.activityBonusKcal} Sport-Bonus"
@@ -215,7 +216,7 @@ private fun TodayOverviewCard(
                                 )
                             } else {
                                 Text("Kalorienziel: $adjustedGoal kcal",
-                                    fontWeight = FontWeight.Medium, color = Color(0xFF4CAF50))
+                                    fontWeight = FontWeight.Medium, color = StatusColors.GoodBright)
                                 Text("Basierend auf deinem TDEE (Grundumsatz × Aktivitätsfaktor)",
                                     fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
@@ -247,7 +248,7 @@ private fun WeeklyAveragesCard(stats: WeeklyStats) {
                         Text("Ø Gewicht", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (stats.weightTrend != null) {
                             val trendColor = when {
-                                stats.weightTrend < -0.1 -> Color(0xFF4CAF50)  // lost weight = green
+                                stats.weightTrend < -0.1 -> StatusColors.GoodBright  // lost weight = green
                                 stats.weightTrend > 0.1  -> Color(0xFFEF5350)  // gained = red
                                 else                      -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
@@ -282,7 +283,7 @@ private fun WeeklyAveragesCard(stats: WeeklyStats) {
                         Text("Ø Akt. Kalorien", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (stats.kcalTrend != null) {
                             val trendColor = when {
-                                stats.kcalTrend > 50  -> Color(0xFF4CAF50)  // more activity = green
+                                stats.kcalTrend > 50  -> StatusColors.GoodBright  // more activity = green
                                 stats.kcalTrend < -50 -> Color(0xFFEF5350)
                                 else                   -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
@@ -384,7 +385,7 @@ private fun WeeklyStepsCard(weeklyData: List<HealthConnectCache>) {
                         modifier = Modifier.width(36.dp)) {
                         Box(modifier = Modifier.fillMaxWidth(0.7f).fillMaxHeight(fraction)) {
                             Surface(modifier = Modifier.fillMaxSize(),
-                                color = if (day.steps >= 10000) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary,
+                                color = if (day.steps >= 10000) StatusColors.GoodBright else MaterialTheme.colorScheme.primary,
                                 shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)) {}
                         }
                         Spacer(Modifier.height(4.dp))
@@ -413,7 +414,7 @@ private fun WeeklySleepCard(weeklyData: List<HealthConnectCache>) {
                         progress = { (day.sleepMinutes / 480f).coerceIn(0f, 1f) },
                         modifier = Modifier.weight(1f).height(8.dp),
                         color = when (day.sleepQuality) {
-                            SleepQuality.GOOD -> Color(0xFF4CAF50)
+                            SleepQuality.GOOD -> StatusColors.GoodBright
                             SleepQuality.OK -> Color(0xFFFFA726)
                             else -> Color(0xFFEF5350)
                         },

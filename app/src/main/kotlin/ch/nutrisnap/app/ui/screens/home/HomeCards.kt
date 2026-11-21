@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.home
 
+import ch.nutrisnap.app.ui.theme.StatusColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -648,9 +649,9 @@ internal fun MealRowItem(meal: MealOverview, onClick: () -> Unit, onQuickAdd: ()
 @Composable
 private fun MealScoreBadge(score: Int) {
     val color = when {
-        score >= 80 -> Color(0xFF2E7D32)
-        score >= 55 -> Color(0xFFF9A825)
-        else -> Color(0xFFC62828)
+        score >= 80 -> StatusColors.Good
+        score >= 55 -> StatusColors.Warning
+        else -> StatusColors.Bad
     }
     Box(
         modifier = Modifier
@@ -1611,9 +1612,9 @@ private fun PriorityNutrientCard(
     onClick: () -> Unit = {}
 ) {
     val levelColor = when (status.level) {
-        ch.nutrisnap.app.domain.PriorityNutrientLevel.OK -> Color(0xFF2E7D32)
-        ch.nutrisnap.app.domain.PriorityNutrientLevel.LOW -> Color(0xFFF9A825)
-        ch.nutrisnap.app.domain.PriorityNutrientLevel.CRITICAL -> Color(0xFFC62828)
+        ch.nutrisnap.app.domain.PriorityNutrientLevel.OK -> StatusColors.Good
+        ch.nutrisnap.app.domain.PriorityNutrientLevel.LOW -> StatusColors.Warning
+        ch.nutrisnap.app.domain.PriorityNutrientLevel.CRITICAL -> StatusColors.Bad
         ch.nutrisnap.app.domain.PriorityNutrientLevel.UNKNOWN ->
             MaterialTheme.colorScheme.onSurfaceVariant
     }
@@ -1694,9 +1695,9 @@ internal fun DailyHealthScoreCard(
 ) {
     var showInfo by remember { mutableStateOf(false) }
     val scoreColor = when {
-        breakdown.score >= 80 -> Color(0xFF2E7D32)
-        breakdown.score >= 55 -> Color(0xFFF9A825)
-        else -> Color(0xFFC62828)
+        breakdown.score >= 80 -> StatusColors.Good
+        breakdown.score >= 55 -> StatusColors.Warning
+        else -> StatusColors.Bad
     }
 
     NutriCard(

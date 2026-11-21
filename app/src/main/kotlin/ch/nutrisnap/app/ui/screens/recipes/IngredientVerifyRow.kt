@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.recipes
 
+import ch.nutrisnap.app.ui.theme.StatusColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
@@ -171,8 +172,8 @@ internal fun IngredientVerifyRow(
                     .clip(CircleShape)
                     .background(
                         when {
-                            isOverride -> Color(0xFF1565C0).copy(alpha = 0.15f)
-                            isMatched  -> Color(0xFF2E7D32).copy(alpha = 0.12f)
+                            isOverride -> StatusColors.Info.copy(alpha = 0.15f)
+                            isMatched  -> StatusColors.Good.copy(alpha = 0.12f)
                             else       -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.45f)
                         }
                     ),
@@ -187,8 +188,8 @@ internal fun IngredientVerifyRow(
                     contentDescription = null,
                     modifier = Modifier.size(15.dp),
                     tint = when {
-                        isOverride -> Color(0xFF1565C0)
-                        isMatched  -> Color(0xFF2E7D32)
+                        isOverride -> StatusColors.Info
+                        isMatched  -> StatusColors.Good
                         else       -> MaterialTheme.colorScheme.error
                     }
                 )
@@ -223,7 +224,7 @@ internal fun IngredientVerifyRow(
                         "Unsicher – bitte prüfen",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
-                        color = Color(0xFFF9A825),
+                        color = StatusColors.Warning,
                         maxLines = 1
                     )
                 } else if (showMatchSub) {
@@ -231,8 +232,8 @@ internal fun IngredientVerifyRow(
                         text = matchLabel,
                         fontSize = 11.sp,
                         color = when {
-                            isOverride -> Color(0xFF1565C0)
-                            isMatched  -> Color(0xFF2E7D32)
+                            isOverride -> StatusColors.Info
+                            isMatched  -> StatusColors.Good
                             else       -> MaterialTheme.colorScheme.error
                         },
                         maxLines = 1

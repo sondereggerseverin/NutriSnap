@@ -1,5 +1,6 @@
 package ch.nutrisnap.app.ui.screens.nutrient
 
+import ch.nutrisnap.app.ui.theme.StatusColors
 import android.app.Application
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -170,9 +171,9 @@ fun NutrientDetailScreen(
     LaunchedEffect(nutrientKey) { vm.load(nutrientKey) }
 
     val levelColor = when (state.level) {
-        PriorityNutrientLevel.OK -> Color(0xFF2E7D32)
-        PriorityNutrientLevel.LOW -> Color(0xFFF9A825)
-        PriorityNutrientLevel.CRITICAL -> Color(0xFFC62828)
+        PriorityNutrientLevel.OK -> StatusColors.Good
+        PriorityNutrientLevel.LOW -> StatusColors.Warning
+        PriorityNutrientLevel.CRITICAL -> StatusColors.Bad
         PriorityNutrientLevel.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
