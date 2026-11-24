@@ -114,10 +114,10 @@ object AdaptiveTdeeCalculator {
         return manualByDate + healthConnectByDate
     }
 
-    // Hard safety floor: never suggest a target below this, regardless of computed
-    // deficit/activity adjustment. Guards against a tracker glitch (e.g. a bad low
-    // active-calories reading) producing an unsafely low recommendation.
-    const val SAFETY_FLOOR_KCAL = 1500.0
+    // Hard floor: never suggest a target below this, regardless of computed
+    // deficit/activity adjustment. 2000 kcal ≈ Grundbedarf des Nutzers (Single-User-App);
+    // guards against Tracker-Glitches und zu aggressive Defizite.
+    const val SAFETY_FLOOR_KCAL = 2000.0
 
 
     /** Exponentiell gewichteter gleitender Durchschnitt für eine Zeitreihe. */
