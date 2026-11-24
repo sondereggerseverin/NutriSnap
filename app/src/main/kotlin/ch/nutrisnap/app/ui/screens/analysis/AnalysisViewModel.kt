@@ -339,7 +339,8 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
                         )
                         val t = dayTarget?.targetKcal ?: profile.dailyCalorieGoal
                         targetSum += t
-                        maintenanceSum += t + (dayTarget?.deficitKcal ?: 0)
+                        // rawTarget: das Mindestziel würde die Erhaltung sonst verfälschen
+                        maintenanceSum += (dayTarget?.rawTargetKcal ?: t) + (dayTarget?.deficitKcal ?: 0)
                     }
                     if (act > 0f) {
                         actSum += act

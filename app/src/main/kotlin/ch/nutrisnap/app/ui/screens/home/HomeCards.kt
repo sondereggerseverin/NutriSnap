@@ -1412,6 +1412,10 @@ internal fun CalorieBreakdownCard(state: HomeUiState) {
             b.manualActivityKcal?.let {
                 BreakdownLine("davon manuell", "$it kcal")
             }
+            if (b.rawTargetKcal < b.targetKcal) {
+                BreakdownLine("Berechnet", "${b.rawTargetKcal} kcal")
+                BreakdownLine("Mindestziel", "${ch.nutrisnap.app.domain.AdaptiveTdeeCalculator.SAFETY_FLOOR_KCAL.toInt()} kcal")
+            }
             BreakdownLine("Ziel heute", "${b.targetKcal} kcal", emphasize = true)
 
             Spacer(Modifier.height(NutriSpacing.md))

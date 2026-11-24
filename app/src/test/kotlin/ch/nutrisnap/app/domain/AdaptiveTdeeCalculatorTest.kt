@@ -97,4 +97,25 @@ class AdaptiveTdeeCalculatorTest {
         assertEquals(4175, hard.targetKcal)
         assertTrue(hard.targetKcal > normal.targetKcal + 1500)
     }
+
+    @Test
+    fun `floor raises target and exposes raw target`() {
+        val t = AdaptiveTdeeCalculator.computeDailyTarget(
+            formulaBmr = 1500.0, formulaTdee = 2000.0, trend = null,
+            todayActiveKcal = 0.0, avgActiveKcal = 0.0
+        )!!
+        assertEquals(2000, t.targetKcal)
+        assertTrue(t.rawTargetKcal < t.targetKcal)
+    }
+
+    @Test
+    fun `trend below BMR x1_2 is ignored in favour of formula`() {
+        val low = TrendTdeeResult(tdee = 2100.0, overlapDays = 10, spanDays = 10)
+        val t = AdaptiveTdeeCalculator.computeDailyTarget(
+            formulaBmr = 1915.0, formulaTdee = 2968.0, trend = low,
+            todayActiveKcal = null, avgActiveKcal = null
+        )!!
+        assertTrue(!t.isTrendBased)
+        assertEquals(2968, t.maintenanceKcal)
+    }
 }

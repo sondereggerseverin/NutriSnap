@@ -55,6 +55,8 @@ data class CalorieBreakdown(
     val deficitKcal: Int = 0,
     val activityBonusKcal: Int = 0,
     val targetKcal: Int = 0,
+    /** Ziel vor Mindestziel; < targetKcal ⇒ Mindestziel wurde angehoben. */
+    val rawTargetKcal: Int = 0,
     val isTrendBased: Boolean = false,
     val confidencePercent: Int = 0,
     val weightChangeKg: Float? = null,
@@ -277,6 +279,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 deficitKcal = t.deficitKcal,
                 activityBonusKcal = t.activityBonusKcal,
                 targetKcal = finalTarget,
+                rawTargetKcal = t.rawTargetKcal,
                 isTrendBased = t.isTrendBased,
                 confidencePercent = t.confidencePercent,
                 weightChangeKg = t.weightChangeKg,

@@ -10,6 +10,8 @@ import java.time.temporal.ChronoUnit
  */
 data class AdaptiveCalorieTarget(
     val targetKcal: Int,
+    /** Ziel vor Anwendung des Mindestziels; < targetKcal ⇒ Mindestziel greift. */
+    val rawTargetKcal: Int,
     val baseKcal: Int,
     val activityBonusKcal: Int,
     val isTrendBased: Boolean,   // true = real weight+intake trend, false = BMR*activityFactor formula
@@ -178,6 +180,10 @@ object AdaptiveTdeeCalculator {
     // plausible maintenance number for an adult at all, formula-available or not.
     const val TREND_MIN_PLAUSIBLE_KCAL = 1000.0
 
+    // Mit bekanntem BMR gilt Trend < BMR × 1.2 (sitzender Alltag) als unplausibel:
+    // meist unterschätzte Zufuhr im Tagebuch, nicht echter Stoffwechsel.
+    const val TREND_MIN_BMR_MULTIPLIER = 1.2
+
     /**
      * Tagesziel:
      *
@@ -203,13 +209,14 @@ object AdaptiveTdeeCalculator {
         /** 0.5 = Standard (Wearable-Vorsicht); 1.0 = aggressiver Sporttag. */
         activityFactor: Double = ACTIVITY_ADJUSTMENT_FACTOR
     ): AdaptiveCalorieTarget? {
+        val bmr = formulaBmr?.takeIf { it > 0 }
+        val minPlausibleTrend = maxOf(TREND_MIN_PLAUSIBLE_KCAL, (bmr ?: 0.0) * TREND_MIN_BMR_MULTIPLIER)
+
         val trustedTrend = trend?.takeIf {
-            it.tdee >= TREND_MIN_PLAUSIBLE_KCAL &&
+            it.tdee >= minPlausibleTrend &&
                 (formulaTdee == null ||
                     kotlin.math.abs(it.tdee - formulaTdee) <= formulaTdee * TREND_PLAUSIBILITY_RATIO)
         }
-
-        val bmr = formulaBmr?.takeIf { it > 0 }
 
         // Erhaltung: echte Daten vor Formel vor BMR-Alltag
         val maintenance = when {
@@ -251,12 +258,14 @@ object AdaptiveTdeeCalculator {
         }
         val base = maintenance - safeDeficit
 
-        val target = (base + bonus).coerceAtLeast(SAFETY_FLOOR_KCAL)
+        val rawTarget = base + bonus
+        val target = rawTarget.coerceAtLeast(SAFETY_FLOOR_KCAL)
 
         val confidence = computeConfidence(trustedTrend, formulaTdee)
 
         return AdaptiveCalorieTarget(
             targetKcal = target.toInt(),
+            rawTargetKcal = rawTarget.toInt(),
             baseKcal = base.toInt(),
             activityBonusKcal = bonus.toInt(),
             isTrendBased = trustedTrend != null,
