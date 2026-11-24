@@ -141,6 +141,7 @@ fun HomeScreen(
                             data = hcState.todayData,
                             hasPermission = hcState.hasPermission,
                             onOpenHealth = onNavigateToHealth,
+                            weightKg = state.lastWeightKg,
                             onEditWeight = { showWeightDialog = true },
                             manualTodayKcal = state.manualActivityKcal,
                             manualTotalActive = state.burnedKcal,
@@ -148,7 +149,7 @@ fun HomeScreen(
                         )
                     }
                 } else {
-                    item { HealthCard(hcState.todayData, hcState.hasPermission, onNavigateToHealth) { showWeightDialog = true } }
+                    item { HealthCard(hcState.todayData, hcState.hasPermission, onNavigateToHealth, state.lastWeightKg) { showWeightDialog = true } }
                     if (state.manualActivityEnabled) {
                         item {
                             ManualActivityCard(

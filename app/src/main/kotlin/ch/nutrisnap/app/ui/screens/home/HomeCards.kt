@@ -41,6 +41,8 @@ internal fun HealthCard(
     data: ch.nutrisnap.app.data.model.HealthConnectCache?,
     hasPermission: Boolean,
     onOpenHealth: () -> Unit,
+    /** Zusammengeführtes Gewicht (HC + manuell), damit auch manuelle Einträge erscheinen. */
+    weightKg: Float? = null,
     onEditWeight: () -> Unit = {}
 ) {
     NutriCard(
@@ -107,11 +109,11 @@ internal fun HealthCard(
                         val m = data.sleepMinutes % 60
                         HealthStatItem(icon = "\uD83D\uDE34", value = "${h}h ${m}m", label = "Schlaf")
                     }
-                    if (data.weightKg != null) {
+                    if (weightKg != null) {
                         Box {
                             HealthStatItem(
                                 icon = "\u2696\uFE0F",
-                                value = "%.1f kg".format(data.weightKg),
+                                value = "%.1f kg".format(weightKg),
                                 label = "Gewicht"
                             )
                             // Edit icon for manual weight correction
@@ -1021,6 +1023,7 @@ internal fun ActivityCombinedCard(
     data: ch.nutrisnap.app.data.model.HealthConnectCache?,
     hasPermission: Boolean,
     onOpenHealth: () -> Unit,
+    weightKg: Float? = null,
     onEditWeight: () -> Unit = {},
     manualTodayKcal: Float?,
     manualTotalActive: Float,
@@ -1090,11 +1093,11 @@ internal fun ActivityCombinedCard(
                         val m = data.sleepMinutes % 60
                         HealthStatItem(icon = "\uD83D\uDE34", value = "${h}h ${m}m", label = "Schlaf")
                     }
-                    if (data.weightKg != null) {
+                    if (weightKg != null) {
                         Box {
                             HealthStatItem(
                                 icon = "\u2696\uFE0F",
-                                value = "%.1f kg".format(data.weightKg),
+                                value = "%.1f kg".format(weightKg),
                                 label = "Gewicht"
                             )
                             Icon(
