@@ -118,4 +118,15 @@ class AdaptiveTdeeCalculatorTest {
         assertTrue(!t.isTrendBased)
         assertEquals(2968, t.maintenanceKcal)
     }
+
+    @Test
+    fun `days below minimum intake are treated as not logged`() {
+        val start = LocalDate.of(2026, 1, 1)
+        val weights = (0..9).associate { start.plusDays(it.toLong()) to 80f }
+        // jeder zweite Tag vergessen (300 kcal), echte Zufuhr 2800
+        val intake = (0..9).associate { start.plusDays(it.toLong()) to if (it % 2 == 0) 2800f else 300f }
+        val trend = AdaptiveTdeeCalculator.computeTrendTdee(weights, intake)
+        assertNotNull(trend)
+        assertTrue(trend!!.tdee in 2700.0..2900.0)
+    }
 }

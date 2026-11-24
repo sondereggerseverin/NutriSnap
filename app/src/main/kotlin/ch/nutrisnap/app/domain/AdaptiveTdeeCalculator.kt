@@ -136,26 +136,41 @@ object AdaptiveTdeeCalculator {
     }
 
     /**
-     * Derives real average TDEE from overlapping weight + intake history.
+     * Tage mit weniger geloggter Zufuhr gelten als vergessen/unvollständig und werden
+     * weder für den Trend noch für Ø-Zufuhr-Anzeigen herangezogen (echte Zufuhr: 2500–3500).
+     */
+    const val MIN_COMPLETE_DAY_KCAL = 2000f
+
+    /**
+     * Derives real average TDEE from weight + intake history.
+     * Nur vollständig geloggte Tage ([MIN_COMPLETE_DAY_KCAL]) zählen als Zufuhr; das Gewicht
+     * wird unabhängig davon über alle Wägungen im Fenster geglättet.
      * Returns null if there isn't enough overlapping data to trust the trend.
      */
     fun computeTrendTdee(
         weightByDate: Map<LocalDate, Float>,
         intakeByDate: Map<LocalDate, Float>
     ): TrendTdeeResult? {
-        val days = weightByDate.keys.intersect(intakeByDate.keys).sorted()
+        val validIntake = intakeByDate.filterValues { it >= MIN_COMPLETE_DAY_KCAL }
+        val days = weightByDate.keys.intersect(validIntake.keys).sorted()
         if (days.size < MIN_TREND_DAYS) return null
 
-        val spanDays = ChronoUnit.DAYS.between(days.first(), days.last())
+        val first = days.first()
+        val last = days.last()
+        val spanDays = ChronoUnit.DAYS.between(first, last)
         if (spanDays < MIN_TREND_DAYS - 1) return null // guard against clustered/duplicate dates
 
         // EWMA-geglättetes Gewicht (Hacker's Diet / Trendweight-Prinzip):
         // Tagesgewicht ist durch Wasser/Verdauung verrauscht (±1–2 kg).
-        val rawWeights = days.map { weightByDate.getValue(it).toDouble() }
+        val weightDays = weightByDate.keys.filter { !it.isBefore(first) && !it.isAfter(last) }.sorted()
+        val rawWeights = weightDays.map { weightByDate.getValue(it).toDouble() }
         val smoothed = ewmaSeries(rawWeights, WEIGHT_EWMA_ALPHA)
         val weightChangeKg = smoothed.last() - smoothed.first()
 
-        val avgIntake = days.map { intakeByDate.getValue(it) }.average()
+        // Zufuhr über alle vollständigen Tage im Fenster, auch ohne Wägung am selben Tag.
+        val avgIntake = validIntake
+            .filterKeys { !it.isBefore(first) && !it.isAfter(last) }
+            .values.average()
 
         // Energiebilanz rückwärts: ΔGewicht × 7700 ≈ Zufuhr − Verbrauch
         // => TDEE ≈ Ø-Zufuhr − (ΔGewicht × 7700) / Tage

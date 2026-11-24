@@ -326,7 +326,7 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
                     val hc = hcByDate[d]
                     val act = hc?.activeCaloriesKcal?.toFloat() ?: 0f
                     // Der heutige Tag ist meist unvollständig geloggt und würde den Ø nach unten ziehen.
-                    if (s != null && s.calories > 0f && d != today) {
+                    if (s != null && s.calories >= AdaptiveTdeeCalculator.MIN_COMPLETE_DAY_KCAL && d != today) {
                         calSum += s.calories
                         calDays++
                         val dayTarget = AdaptiveTdeeCalculator.computeDailyTarget(
@@ -493,6 +493,7 @@ class AnalysisViewModel(app: Application) : AndroidViewModel(app) {
                 val zone = when {
                     cal <= 0 -> "—"
                     d == today && cal < target -> "Offen"
+                    cal < AdaptiveTdeeCalculator.MIN_COMPLETE_DAY_KCAL -> "Unvollst."
                     cal < target * 0.85f -> "Zu tief"
                     cal <= target * 1.05f -> "Im Ziel"
                     cal <= maintenanceDay * 1.05f -> "Erhalt"
