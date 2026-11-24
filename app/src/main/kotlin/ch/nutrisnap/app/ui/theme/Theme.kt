@@ -446,10 +446,8 @@ val KEY_TOGGLE_TOUCH_RECIPE_MENU = androidx.datastore.preferences.core.booleanPr
 val KEY_TOGGLE_MACRO_COLOR_SEPARATION = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_macro_color_separation")
 val KEY_TOGGLE_CARD_ELEVATION = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_card_elevation")
 val KEY_TOGGLE_DARK_MODE_CONTRAST = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_dark_mode_contrast")
-val KEY_TOGGLE_CROPPER_THEME_COLOR = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_cropper_theme_color")
 val KEY_TOGGLE_CALORIES_REMAINING_HIGHLIGHT = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_calories_remaining_highlight")
 // Layout
-val KEY_TOGGLE_SPACING_TOKENS = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_spacing_tokens")
 val KEY_TOGGLE_HOME_ACTIVITY_MERGE = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_home_activity_merge")
 val KEY_TOGGLE_HOME_REORDER = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_home_reorder")
 val KEY_TOGGLE_DIARY_LAYOUT_COMPACT = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_diary_layout_compact")
@@ -466,10 +464,6 @@ val KEY_TOGGLE_NAV_LABEL_RENAME = androidx.datastore.preferences.core.booleanPre
 val KEY_TOGGLE_NAV_SHORTCUTS = androidx.datastore.preferences.core.booleanPreferencesKey("toggle_nav_shortcuts")
 
 // ── Experimentell: Ernährung / AI (Yazio-Vergleich) ───────────────────────────
-/** Wenn Match keinen Fiber hat: lokale Referenz-DB nachziehen (default an). */
-val KEY_FIBER_FALLBACK = androidx.datastore.preferences.core.booleanPreferencesKey("fiber_fallback")
-/** Smarte Dosen-/Konserven-Mengen (Bohnen etc. statt pauschal 120–200 g, default an). */
-val KEY_SMART_CAN_PORTIONS = androidx.datastore.preferences.core.booleanPreferencesKey("smart_can_portions")
 /** Foto → Gesamtschätzung Gericht (Name + Makros), Yazio-ähnlich (default an). */
 val KEY_MEAL_PHOTO_SUMMARY = androidx.datastore.preferences.core.booleanPreferencesKey("meal_photo_summary")
 /** Bei Gerichtsnamen in „KI schätzen“ Meal-Summary statt Einzelzutaten-Fail (default an). */

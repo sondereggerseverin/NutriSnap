@@ -67,9 +67,7 @@ import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TOUCH_RECIPE_MENU
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_MACRO_COLOR_SEPARATION
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_CARD_ELEVATION
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_DARK_MODE_CONTRAST
-import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_CROPPER_THEME_COLOR
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_CALORIES_REMAINING_HIGHLIGHT
-import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_SPACING_TOKENS
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_HOME_ACTIVITY_MERGE
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_HOME_REORDER
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_DIARY_LAYOUT_COMPACT
@@ -81,8 +79,6 @@ import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_PROGRESS_BAR_COLOR_SHIFT
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_TYPOGRAPHY_NUMBERS
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_NAV_LABEL_RENAME
 import ch.nutrisnap.app.ui.theme.KEY_TOGGLE_NAV_SHORTCUTS
-import ch.nutrisnap.app.ui.theme.KEY_FIBER_FALLBACK
-import ch.nutrisnap.app.ui.theme.KEY_SMART_CAN_PORTIONS
 import ch.nutrisnap.app.ui.theme.KEY_MEAL_PHOTO_SUMMARY
 import ch.nutrisnap.app.ui.theme.KEY_DISH_NAME_AI_ESTIMATE
 import ch.nutrisnap.app.ui.theme.KEY_MICRO_NUTRIENT_FILL
@@ -514,24 +510,6 @@ fun SettingsScreen(
                     )
                     Spacer(Modifier.height(NutriSpacing.sm))
                     DesignToggleRow(
-                        title = "Fiber-Fallback (lokale DB)",
-                        subtitle = "Fehlende Ballaststoffe aus Referenz-DB ergänzen",
-                        key = KEY_FIBER_FALLBACK,
-                        defaultOn = true,
-                        prefs = prefs,
-                        scope = scope,
-                        context = context
-                    )
-                    DesignToggleRow(
-                        title = "Smarte Dosen-Mengen",
-                        subtitle = "Bohnen/Konserven realistischer (nicht 120 g)",
-                        key = KEY_SMART_CAN_PORTIONS,
-                        defaultOn = true,
-                        prefs = prefs,
-                        scope = scope,
-                        context = context
-                    )
-                    DesignToggleRow(
                         title = "Foto → Gericht-Summary",
                         subtitle = "Yazio-ähnlich: Name + Makros aus Tellerfoto",
                         key = KEY_MEAL_PHOTO_SUMMARY,
@@ -720,15 +698,6 @@ fun SettingsScreen(
                         context = context
                     )
                     DesignToggleRow(
-                        title = "Cropper Theme-Farbe",
-                        subtitle = "Theme-Primary statt hartkodiertem Grün",
-                        key = KEY_TOGGLE_CROPPER_THEME_COLOR,
-                        defaultOn = true,
-                        prefs = prefs,
-                        scope = scope,
-                        context = context
-                    )
-                    DesignToggleRow(
                         title = "„Noch X kcal übrig“ hervorheben",
                         subtitle = "Stärker mit Macro-/Primary-Farbe",
                         key = KEY_TOGGLE_CALORIES_REMAINING_HIGHLIGHT,
@@ -739,15 +708,6 @@ fun SettingsScreen(
                     )
                 }
                 SettingsCard(title = "Layout", icon = Icons.Default.ViewQuilt) {
-                    DesignToggleRow(
-                        title = "Spacing-Tokens",
-                        subtitle = "Hardcodes → NutriSpacing (Refactor)",
-                        key = KEY_TOGGLE_SPACING_TOKENS,
-                        defaultOn = true,
-                        prefs = prefs,
-                        scope = scope,
-                        context = context
-                    )
                     DesignToggleRow(
                         title = "Activity-Karten zusammenlegen",
                         subtitle = "Health Connect + manuelle Aktivität",
